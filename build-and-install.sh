@@ -21,7 +21,7 @@ if [ ! -d "./build" ]; then
 fi
 
 # Update the Claude configuration to use this server
-CONFIG_FILE="/home/sparrow/.config/Claude/claude_desktop_config.json"
+CONFIG_FILE="$HOME/.config/Claude/claude_desktop_config.json"
 
 if [ -f "$CONFIG_FILE" ]; then
   echo "Updating Claude configuration for prompt-manager..."
