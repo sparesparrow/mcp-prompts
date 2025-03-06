@@ -33,6 +33,17 @@ interface PgAIClient {
   initVectorStorage(tableName: string, schema?: string): Promise<void>;
 }
 
+// Add storage configuration interfaces
+interface FileStorageConfig {
+  baseDir?: string;
+}
+
+interface PgAIStorageConfig {
+  connectionString: string;
+  tableName?: string;
+  schema?: string;
+}
+
 /**
  * File-based storage provider
  */
@@ -366,7 +377,7 @@ export class PgAIStorageProvider implements PromptStorage {
       
       const result = await client.query(query, params);
       
-      return result.rows.map(row => this.rowToPrompt(row));
+      return result.rows.map((row: any) => this.rowToPrompt(row));
     } finally {
       client.release();
     }
@@ -491,7 +502,7 @@ export class PgAIStorageProvider implements PromptStorage {
         LIMIT $2
       `, [queryEmbedding, limit]);
       
-      return result.rows.map(row => this.rowToPrompt(row));
+      return result.rows.map((row: any) => this.rowToPrompt(row));
     } finally {
       client.release();
     }
@@ -509,19 +520,19 @@ export class PgAIStorageProvider implements PromptStorage {
    * @param row The database row
    * @returns The prompt object
    */
-  private rowToPrompt(row: any): Prompt {
+  private rowToPrompt(row: Record<string, any>): Prompt {
     return {
       id: row.id,
       name: row.name,
+      description: row.description || '',
       content: row.content,
-      description: row.description,
-      tags: row.tags,
-      isTemplate: row.is_template,
-      variables: row.variables,
-      createdAt: new Date(row.created_at),
-      updatedAt: new Date(row.updated_at),
-      version: row.version,
-      metadata: row.metadata
+      tags: row.tags || [],
+      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
+      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
+      isTemplate: row.is_template || false,
+      variables: row.variables || [],
+      version: row.version || 1,
+      metadata: row.metadata || {}
     };
   }
 }
@@ -532,22 +543,27 @@ export class PgAIStorageProvider implements PromptStorage {
  * @returns A storage provider instance
  */
 export function createStorageProvider(config: Config): PromptStorage {
+  if (!config.storage) {
+    // Default to file storage if not specified
+    return new FileStorageProvider(path.join(process.cwd(), 'prompts'));
+  }
+
   if (config.storage.type === 'file') {
-    const options = config.storage.options as { baseDir: string };
-    return new FileStorageProvider(options.baseDir);
+    const options = config.storage.options as FileStorageConfig;
+    const baseDir = options?.baseDir || path.join(process.cwd(), 'prompts');
+    return new FileStorageProvider(baseDir);
   } else if (config.storage.type === 'pgai') {
-    const options = config.storage.options as { 
-      connectionString: string;
-      schema?: string;
-      tableName?: string;
-    };
-    return new PgAIStorageProvider(
-      options.connectionString,
-      options.tableName,
-      options.schema
-    );
+    const options = config.storage.options as PgAIStorageConfig;
+    const connectionString = options?.connectionString;
+    const tableName = options?.tableName || 'mcp_prompts';
+    const schema = options?.schema || 'public';
+    
+    if (!connectionString) {
+      throw new Error('PostgreSQL connection string is required for pgai storage');
+    }
+    
+    return new PgAIStorageProvider(connectionString, tableName, schema);
   } else {
     throw new Error(`Unsupported storage type: ${(config.storage as any).type}`);
   }
-} 
 } 

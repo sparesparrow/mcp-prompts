@@ -6,7 +6,6 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { Command } from 'commander';
-import { v4 as uuidv4 } from 'uuid';
 import { createConfig, Prompt, extractVariables } from './core';
 import { createStorageProvider } from './storage';
 

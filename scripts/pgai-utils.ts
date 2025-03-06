@@ -5,8 +5,6 @@
  * This script provides utilities for working with PGAI storage
  */
 
-import fs from 'fs/promises';
-import path from 'path';
 import { createConfig, Prompt } from '../src/core';
 import { createStorageProvider } from '../src/storage';
 
@@ -402,7 +400,7 @@ async function testListAndFilter(storage: any): Promise<void> {
   const templatePrompts = await storage.listPrompts({ tags: ['template'] });
   
   // Verify at least our template prompt is returned
-  const hasTemplatePrompt = templatePrompts.some(p => p.id === testPrompts[1].id);
+  const hasTemplatePrompt = templatePrompts.some((p: { id: string }) => p.id === testPrompts[1].id);
   
   if (!hasTemplatePrompt) {
     throw new Error('Template prompt not found when filtering by "template" tag');
@@ -415,7 +413,7 @@ async function testListAndFilter(storage: any): Promise<void> {
   const templatesOnly = await storage.listPrompts({ templatesOnly: true });
   
   // Verify at least our template prompt is returned
-  const hasTemplateInTemplatesOnly = templatesOnly.some(p => p.id === testPrompts[1].id);
+  const hasTemplateInTemplatesOnly = templatesOnly.some((p: { id: string }) => p.id === testPrompts[1].id);
   
   if (!hasTemplateInTemplatesOnly) {
     throw new Error('Template prompt not found when filtering by template status');
@@ -428,7 +426,7 @@ async function testListAndFilter(storage: any): Promise<void> {
   const categoryAPrompts = await storage.listPrompts({ tags: ['category-a'] });
   
   // Verify our category-a prompt is returned
-  const hasCategoryA = categoryAPrompts.some(p => p.id === testPrompts[2].id);
+  const hasCategoryA = categoryAPrompts.some((p: { id: string }) => p.id === testPrompts[2].id);
   
   if (!hasCategoryA) {
     throw new Error('Category A prompt not found when filtering by "category-a" tag');
@@ -501,7 +499,7 @@ async function testSemanticSearch(storage: any): Promise<void> {
     const codeResults = await storage.searchPromptsByContent('JavaScript programming bugs');
     
     // Verify code review prompt is in the results
-    const hasCodePrompt = codeResults.some(p => p.id === testPrompts[0].id);
+    const hasCodePrompt = codeResults.some((p: { id: string }) => p.id === testPrompts[0].id);
     console.log(`Search results for "JavaScript programming bugs": ${codeResults.length} results`);
     
     if (!hasCodePrompt) {
@@ -515,7 +513,7 @@ async function testSemanticSearch(storage: any): Promise<void> {
     const dataResults = await storage.searchPromptsByContent('numerical data visualization');
     
     // Verify data analysis prompt is in the results
-    const hasDataPrompt = dataResults.some(p => p.id === testPrompts[1].id);
+    const hasDataPrompt = dataResults.some((p: { id: string }) => p.id === testPrompts[1].id);
     console.log(`Search results for "numerical data visualization": ${dataResults.length} results`);
     
     if (!hasDataPrompt) {
@@ -529,7 +527,7 @@ async function testSemanticSearch(storage: any): Promise<void> {
     const writingResults = await storage.searchPromptsByContent('fiction writing stories');
     
     // Verify creative writing prompt is in the results
-    const hasWritingPrompt = writingResults.some(p => p.id === testPrompts[2].id);
+    const hasWritingPrompt = writingResults.some((p: { id: string }) => p.id === testPrompts[2].id);
     console.log(`Search results for "fiction writing stories": ${writingResults.length} results`);
     
     if (!hasWritingPrompt) {

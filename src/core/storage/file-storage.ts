@@ -40,7 +40,9 @@ export class FileStorageProvider implements PromptStorage {
           
           // Filter by tags if provided
           if (options?.tags && options.tags.length > 0) {
-            if (!prompt.tags || !options.tags.some(tag => prompt.tags.includes(tag))) {
+            const promptTags = prompt.tags || [];
+            const filterTags = options.tags;
+            if (!promptTags.some(tag => filterTags.includes(tag))) {
               continue;
             }
           }

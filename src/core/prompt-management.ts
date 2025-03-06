@@ -17,9 +17,6 @@ import { exec as execCallback } from 'child_process';
 import * as readline from 'readline';
 import { Prompt } from './index';
 
-// Promisify exec
-const exec = promisify(execCallback);
-
 // Configuration
 const PROMPTS_DIR = path.join(process.cwd(), 'prompts');
 const PROCESSED_DIR = path.join(process.cwd(), 'processed_prompts');
@@ -62,6 +59,7 @@ export interface TagOptions {
   tag?: string;
   newTag?: string;
   promptIds?: string[];
+  searchPattern?: string;
 }
 
 // Pipeline options interface
@@ -69,6 +67,7 @@ export interface PipelineOptions {
   dryRun?: boolean;
   verbose?: boolean;
   shouldCleanup?: boolean;
+  shouldBackup?: boolean;
 }
 
 // Helper function for logging
@@ -446,18 +445,31 @@ function generateDescription(content: string): string {
 // =====================================
 
 export async function manageTags(options: TagOptions): Promise<void> {
-  const { action, tag, newTag, promptIds } = options;
+  const { action, tag, newTag, promptIds, searchPattern } = options;
   
   switch (action) {
     case 'list':
       await listTags();
       break;
     case 'add':
-      if (!tag || !promptIds || promptIds.length === 0) {
-        log('Error: tag and promptIds are required for add action', true);
-        return;
+      if (!tag) {
+        throw new Error('Tag is required for add operation');
       }
-      await addTagToPrompts(tag, promptIds);
+      if (!promptIds && !searchPattern) {
+        throw new Error('Either promptIds or searchPattern is required for add operation');
+      }
+      
+      if (searchPattern) {
+        // Find prompts matching the search pattern
+        const matchingPromptIds = await findPromptsWithPattern(searchPattern);
+        if (matchingPromptIds.length === 0) {
+          console.log(`No prompts found matching pattern: ${searchPattern}`);
+          return;
+        }
+        await addTagToPrompts(tag, matchingPromptIds);
+      } else if (promptIds) {
+        await addTagToPrompts(tag, promptIds);
+      }
       break;
     case 'remove':
       if (!tag || !promptIds || promptIds.length === 0) {
@@ -622,6 +634,49 @@ async function renameTag(oldTag: string, newTag: string): Promise<void> {
   log(`Renamed tag '${oldTag}' to '${newTag}' in ${updated} prompts`);
 }
 
+/**
+ * Find prompts containing a specific pattern
+ * 
+ * @param pattern Search pattern (regex)
+ * @returns Array of prompt IDs matching the pattern
+ */
+async function findPromptsWithPattern(pattern: string): Promise<string[]> {
+  const matchingPrompts: string[] = [];
+  const regex = new RegExp(pattern, 'i');
+  
+  function processDirectory(dir: string): void {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        // Process subdirectories recursively
+        processDirectory(fullPath);
+      } else if (entry.name.endsWith('.json')) {
+        // Process JSON files
+        try {
+          const promptContent = fs.readFileSync(fullPath, 'utf8');
+          const prompt = JSON.parse(promptContent);
+          
+          // Check if the prompt content matches the pattern
+          if (regex.test(prompt.content)) {
+            matchingPrompts.push(prompt.id);
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`Error processing ${fullPath}: ${errorMessage}`);
+        }
+      }
+    }
+  }
+  
+  // Start processing from the root prompts directory
+  processDirectory(PROMPTS_DIR);
+  
+  return matchingPrompts;
+}
+
 // =====================================
 // Export the main functions for command-line use
 // =====================================
@@ -722,6 +777,254 @@ export async function runExport(options: ExportOptions = {}): Promise<void> {
       break;
     default:
       log(`Error: Unsupported export format: ${format}`, true);
+  }
+}
+
+/**
+ * Organizes prompts into a structured directory tree based on their categories and tags.
+ * 
+ * @param options Organization options
+ */
+export async function organizePrompts(options: OrganizeOptions = {}): Promise<void> {
+  const { dryRun = false, force = false, verbose = false } = options;
+  
+  const CATEGORIES: Record<string, string[]> = {
+    'development': ['programming', 'code', 'development', 'debugging', 'refactoring', 'architecture', 'coding'],
+    'analysis': ['analysis', 'data', 'statistics', 'research', 'insights', 'visualization'],
+    'content': ['content', 'translation', 'language', 'writing', 'summary'],
+    'planning': ['planning', 'decision-making', 'future', 'scenarios', 'prediction'],
+    'productivity': ['productivity', 'workflow', 'organization', 'problem-solving'],
+    'ai': ['ai', 'llm', 'language-model', 'claude', 'gpt', 'ai-assistant'],
+    'templates': []
+  };
+
+  verbose && console.log(`${dryRun ? '[DRY RUN] ' : ''}Organizing prompts...`);
+
+  // Ensure all category directories exist
+  Object.keys(CATEGORIES).forEach(category => {
+    const categoryDir = path.join(PROMPTS_DIR, category);
+    if (!fs.existsSync(categoryDir)) {
+      if (!dryRun) {
+        fs.mkdirSync(categoryDir, { recursive: true });
+        verbose && console.log(`Created directory: ${categoryDir}`);
+      } else {
+        verbose && console.log(`Would create directory: ${categoryDir}`);
+      }
+    }
+  });
+
+  // Process directory function
+  function processDirectory(dir: string): void {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+    
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+      
+      if (entry.isDirectory()) {
+        // Skip category directories we just created
+        if (Object.keys(CATEGORIES).includes(entry.name)) {
+          continue;
+        }
+        // Process subdirectories recursively
+        processDirectory(fullPath);
+      } else if (entry.name.endsWith('.json')) {
+        // Process JSON files
+        try {
+          const promptContent = fs.readFileSync(fullPath, 'utf8');
+          const prompt = JSON.parse(promptContent);
+          
+          // Skip special directories like 'examples' and 'curated'
+          const parentDir = path.basename(dir);
+          if (['examples', 'curated'].includes(parentDir)) {
+            continue;
+          }
+          
+          // Determine the appropriate category based on tags
+          let targetCategory = null;
+          
+          // Templates go to the templates category
+          if (prompt.isTemplate) {
+            targetCategory = 'templates';
+          } else {
+            // Find the first matching category
+            for (const [category, tags] of Object.entries(CATEGORIES)) {
+              if (prompt.tags && prompt.tags.some((tag: string) => tags.includes(tag.toLowerCase()))) {
+                targetCategory = category;
+                break;
+              }
+            }
+          }
+          
+          // If no category was found, use the generic 'ai' category
+          if (!targetCategory) {
+            targetCategory = 'ai';
+          }
+          
+          const targetDir = path.join(PROMPTS_DIR, targetCategory);
+          const targetJsonPath = path.join(targetDir, entry.name);
+          const targetMdPath = path.join(targetDir, entry.name.replace('.json', '.md'));
+          
+          // Check if the MD version exists
+          const mdPath = fullPath.replace('.json', '.md');
+          const mdExists = fs.existsSync(mdPath);
+          
+          // Skip if target already exists and force is not specified
+          if (!force && (fs.existsSync(targetJsonPath) || (mdExists && fs.existsSync(targetMdPath)))) {
+            verbose && console.log(`Skipping ${entry.name} - target already exists. Use --force to overwrite.`);
+            continue;
+          }
+          
+          // Move the files
+          if (!dryRun) {
+            // Copy JSON file
+            fs.copyFileSync(fullPath, targetJsonPath);
+            verbose && console.log(`Moved ${fullPath} to ${targetJsonPath}`);
+            
+            // Copy MD file if it exists
+            if (mdExists) {
+              fs.copyFileSync(mdPath, targetMdPath);
+              verbose && console.log(`Moved ${mdPath} to ${targetMdPath}`);
+            }
+            
+            // Delete original files after successful move
+            fs.unlinkSync(fullPath);
+            if (mdExists) {
+              fs.unlinkSync(mdPath);
+            }
+          } else {
+            verbose && console.log(`Would move ${fullPath} to ${targetJsonPath}`);
+            if (mdExists) {
+              verbose && console.log(`Would move ${mdPath} to ${targetMdPath}`);
+            }
+          }
+        } catch (error: unknown) {
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          console.error(`Error processing ${fullPath}: ${errorMessage}`);
+        }
+      }
+    }
+  }
+
+  // Start processing from the root prompts directory
+  processDirectory(PROMPTS_DIR);
+
+  // Update README.md with new structure
+  const readmePath = path.join(PROMPTS_DIR, 'README.md');
+  if (fs.existsSync(readmePath)) {
+    let readme = fs.readFileSync(readmePath, 'utf8');
+    
+    // Add a section about the new organization if it doesn't exist
+    if (!readme.includes('## Directory Structure')) {
+      const structureSection = `
+## Directory Structure
+
+The prompts are organized into the following categories:
+
+- **development/** - Programming, coding, debugging, and architecture prompts
+- **analysis/** - Data analysis, research, and insights prompts
+- **content/** - Content creation, translation, and language prompts
+- **planning/** - Future planning, decision-making, and scenario prompts
+- **productivity/** - Workflow and organization prompts
+- **ai/** - General AI and language model prompts
+- **templates/** - Reusable prompt templates with variables
+
+Special directories:
+- **examples/** - Example prompts for demonstration purposes
+- **curated/** - Carefully crafted and enhanced prompts
+`;
+      
+      readme += structureSection;
+      
+      if (!dryRun) {
+        fs.writeFileSync(readmePath, readme);
+        verbose && console.log(`Updated ${readmePath} with directory structure information`);
+      } else {
+        verbose && console.log(`Would update ${readmePath} with directory structure information`);
+      }
+    }
+  }
+
+  console.log(`${dryRun ? '[DRY RUN] ' : ''}Prompt organization completed.`);
+}
+
+/**
+ * Run the complete prompt processing pipeline:
+ * 1. Process raw prompts
+ * 2. Organize prompts into categories
+ * 3. Run tag management operations
+ * 
+ * @param options Pipeline options
+ */
+export async function runPipeline(options: PipelineOptions = {}): Promise<void> {
+  const { dryRun = false, verbose = false, shouldCleanup = true, shouldBackup = true } = options;
+  const RAW_PROMPTS_FILE = path.join(process.cwd(), 'rawprompts.txt');
+
+  console.log('Starting MCP Prompts processing pipeline...');
+
+  // Check if rawprompts.txt exists
+  if (!fs.existsSync(RAW_PROMPTS_FILE)) {
+    console.error(`Error: Raw prompts file not found at ${RAW_PROMPTS_FILE}`);
+    console.log('Please create a rawprompts.txt file with your prompt data first.');
+    process.exit(1);
+  }
+
+  try {
+    // Step 1: Process raw prompts
+    const processOptions: ProcessOptions = {
+      shouldCleanup: shouldCleanup,
+      shouldBackup: shouldBackup,
+      rawPromptsFile: RAW_PROMPTS_FILE
+    };
+    
+    console.log('\n[Pipeline] Processing raw prompts');
+    await processRawPrompts(processOptions);
+    
+    // Step 2: Run tag management operations
+    // First list all tags to see what we're working with
+    console.log('\n[Pipeline] Listing current tags');
+    await manageTags({ action: 'list' });
+    
+    // Add or update tags based on content
+    const tagOperations = [
+      // Add AI Assistant tag to relevant prompts
+      { action: 'add' as const, tag: 'ai-assistant', pattern: 'You are a' },
+      
+      // Add language-model tag to prompts about LLMs
+      { action: 'add' as const, tag: 'language-model', pattern: 'language model|LLM|Claude|GPT' },
+      
+      // Add coding tag to programming-related prompts
+      { action: 'add' as const, tag: 'coding', pattern: 'code|programming|developer|Python|JavaScript' },
+      
+      // Add problem-solving tag
+      { action: 'add' as const, tag: 'problem-solving', pattern: 'solve|solution|troubleshoot|fix|debug' }
+    ];
+    
+    for (const operation of tagOperations) {
+      console.log(`\n[Pipeline] Adding tag "${operation.tag}" to prompts matching "${operation.pattern}"`);
+      await manageTags({ 
+        action: operation.action, 
+        tag: operation.tag, 
+        searchPattern: operation.pattern
+      });
+    }
+    
+    // Step 3: Organize prompts into categories
+    console.log('\n[Pipeline] Organizing prompts into categories');
+    await organizePrompts({ dryRun, verbose });
+    
+    // Final step: Show updated tag statistics
+    console.log('\n[Pipeline] Final tag statistics');
+    await manageTags({ action: 'list' });
+    
+    console.log('\n🎉 Prompt processing pipeline completed successfully!');
+    console.log('\nNext steps:');
+    console.log('- Review the organized prompts in the prompts/ directory');
+    console.log('- Start the MCP server with: npm start');
+    console.log('- Or integrate with Claude Desktop');
+    
+  } catch (error) {
+    console.error('\n❌ Pipeline failed:', error);
+    process.exit(1);
   }
 }
 

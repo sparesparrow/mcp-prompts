@@ -5,8 +5,6 @@
  * This script creates improved versions of selected prompts and migrates them to PGAI
  */
 
-import fs from 'fs/promises';
-import path from 'path';
 import { createConfig, Prompt } from '../src/core';
 import { createStorageProvider } from '../src/storage';
 

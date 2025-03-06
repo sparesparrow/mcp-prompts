@@ -29,6 +29,8 @@ Commands:
   export       Export prompts to a file
   process      Process raw prompts
   tags         Manage prompt tags
+  organize     Organize prompts into categories
+  pipeline     Run the complete prompt processing pipeline
 
 Options:
   Run a command with --help to see command-specific options
@@ -173,6 +175,69 @@ Options:
   });
 }
 
+// Handle organize command
+async function handleOrganize() {
+  const dryRun = args.includes('--dry-run');
+  const force = args.includes('--force') || args.includes('-f');
+  const verbose = args.includes('--verbose') || args.includes('-v');
+  const showHelp = args.includes('--help') || args.includes('-h');
+  
+  if (showHelp) {
+    console.log(`
+Organize prompts into categories
+
+Usage:
+  npx prompt-cli organize [options]
+
+Options:
+  --dry-run         Show what would be organized without making changes
+  --force, -f       Force organization (overwrite existing files)
+  --verbose, -v     Show detailed output
+  --help, -h        Show this help
+    `);
+    return;
+  }
+  
+  await promptManagement.organizePrompts({
+    dryRun,
+    force,
+    verbose
+  });
+}
+
+// Handle pipeline command
+async function handlePipeline() {
+  const dryRun = args.includes('--dry-run');
+  const verbose = args.includes('--verbose') || args.includes('-v');
+  const shouldCleanup = !args.includes('--no-cleanup');
+  const shouldBackup = !args.includes('--no-backup');
+  const showHelp = args.includes('--help') || args.includes('-h');
+  
+  if (showHelp) {
+    console.log(`
+Run the complete prompt processing pipeline
+
+Usage:
+  npx prompt-cli pipeline [options]
+
+Options:
+  --dry-run         Show what would happen without making changes
+  --verbose, -v     Show detailed output
+  --no-cleanup      Do not delete the raw prompts file after processing
+  --no-backup       Do not create a backup of the raw prompts file
+  --help, -h        Show this help
+    `);
+    return;
+  }
+  
+  await promptManagement.runPipeline({
+    dryRun,
+    verbose,
+    shouldCleanup,
+    shouldBackup
+  });
+}
+
 // Run the appropriate command
 (async () => {
   try {
@@ -189,6 +254,12 @@ Options:
       case 'tags':
         await handleTags();
         break;
+      case 'organize':
+        await handleOrganize();
+        break;
+      case 'pipeline':
+        await handlePipeline();
+        break;
       case '--help':
       case '-h':
         showHelp();
@@ -198,8 +269,9 @@ Options:
         showHelp();
         process.exit(1);
     }
-  } catch (error) {
-    console.error(`Error: ${error.message}`);
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`Error: ${errorMessage}`);
     process.exit(1);
   }
 })(); 

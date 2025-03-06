@@ -161,7 +161,7 @@ export class PgAIStorageProvider implements PromptStorage {
         'DELETE FROM prompts WHERE id = $1 RETURNING id',
         [id]
       );
-      return result.rowCount > 0;
+      return (result.rowCount ?? 0) > 0;
     } catch (error) {
       console.error(`Error deleting prompt ${id}:`, error);
       throw error;

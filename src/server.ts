@@ -9,6 +9,7 @@ import morgan from 'morgan';
 import { v4 as uuidv4 } from 'uuid';
 import { Config, Prompt, PromptStorage, applyTemplate, extractVariables } from './core';
 import { createStorageProvider } from './storage';
+import { Server } from 'http';
 
 /**
  * Create and configure an MCP server
@@ -29,14 +30,22 @@ export function createServer(config: Config): express.Application {
   }
   
   // Health check endpoint
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok', version: '1.1.0' });
+  app.get('/health', (_req, res) => {
+    res.json({ status: 'ok' });
   });
   
   // Add prompt
-  app.post('/mcp/tools/add_prompt', async (req, res) => {
-    try {
-      const { name, content, description, tags, isTemplate, id } = req.body;
+  app.post('/mcp/tools/add_prompt', (req, res) => {
+    handlePromiseRoute(async () => {
+      // Validate request
+      if (!req.body || !req.body.arguments || !req.body.arguments.prompt) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Missing required parameters'
+        });
+      }
+
+      const { name, content, description, tags, isTemplate, id } = req.body.arguments.prompt;
       
       // Validate required fields
       if (!name || !content) {
@@ -71,22 +80,16 @@ export function createServer(config: Config): express.Application {
       // Add the prompt to storage
       const result = await storage.addPrompt(prompt);
       
-      res.json({
-        success: true,
-        prompt: result
+      return res.json({
+        status: 'success',
+        data: result
       });
-    } catch (error) {
-      console.error('Error adding prompt:', error);
-      res.status(500).json({
-        error: 'Failed to add prompt',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Edit prompt
-  app.post('/mcp/tools/edit_prompt', async (req, res) => {
-    try {
+  app.post('/mcp/tools/edit_prompt', (req, res) => {
+    handlePromiseRoute(async () => {
       const { id, name, content, description, tags, isTemplate } = req.body;
       
       // Validate required fields
@@ -127,22 +130,16 @@ export function createServer(config: Config): express.Application {
       // Update the prompt in storage
       const result = await storage.addPrompt(updatedPrompt);
       
-      res.json({
-        success: true,
-        prompt: result
+      return res.json({
+        status: 'success',
+        data: result
       });
-    } catch (error) {
-      console.error('Error editing prompt:', error);
-      res.status(500).json({
-        error: 'Failed to edit prompt',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Get prompt
-  app.post('/mcp/tools/get_prompt', async (req, res) => {
-    try {
+  app.post('/mcp/tools/get_prompt', (req, res) => {
+    handlePromiseRoute(async () => {
       const { id } = req.body;
       
       // Validate required fields
@@ -163,22 +160,16 @@ export function createServer(config: Config): express.Application {
         });
       }
       
-      res.json({
-        success: true,
-        prompt
+      return res.json({
+        status: 'success',
+        data: prompt
       });
-    } catch (error) {
-      console.error('Error getting prompt:', error);
-      res.status(500).json({
-        error: 'Failed to get prompt',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // List prompts
-  app.post('/mcp/tools/list_prompts', async (req, res) => {
-    try {
+  app.post('/mcp/tools/list_prompts', (req, res) => {
+    handlePromiseRoute(async () => {
       const { tags, templatesOnly } = req.body;
       
       // List prompts with optional filters
@@ -187,23 +178,19 @@ export function createServer(config: Config): express.Application {
         templatesOnly
       });
       
-      res.json({
-        success: true,
-        prompts,
-        count: prompts.length
+      return res.json({
+        status: 'success',
+        data: {
+          prompts,
+          count: prompts.length
+        }
       });
-    } catch (error) {
-      console.error('Error listing prompts:', error);
-      res.status(500).json({
-        error: 'Failed to list prompts',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Apply template
-  app.post('/mcp/tools/apply_template', async (req, res) => {
-    try {
+  app.post('/mcp/tools/apply_template', (req, res) => {
+    handlePromiseRoute(async () => {
       const { id, variables } = req.body;
       
       // Validate required fields
@@ -234,24 +221,20 @@ export function createServer(config: Config): express.Application {
       // Apply the template with variables
       const content = applyTemplate(template, variables);
       
-      res.json({
-        success: true,
-        content,
-        templateId: id,
-        variablesApplied: Object.keys(variables)
+      return res.json({
+        status: 'success',
+        data: {
+          content,
+          templateId: id,
+          variablesApplied: Object.keys(variables)
+        }
       });
-    } catch (error) {
-      console.error('Error applying template:', error);
-      res.status(500).json({
-        error: 'Failed to apply template',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Delete prompt
-  app.post('/mcp/tools/delete_prompt', async (req, res) => {
-    try {
+  app.post('/mcp/tools/delete_prompt', (req, res) => {
+    handlePromiseRoute(async () => {
       const { id } = req.body;
       
       // Validate required fields
@@ -272,22 +255,16 @@ export function createServer(config: Config): express.Application {
         });
       }
       
-      res.json({
-        success: true,
+      return res.json({
+        status: 'success',
         message: `Prompt ${id} deleted successfully`
       });
-    } catch (error) {
-      console.error('Error deleting prompt:', error);
-      res.status(500).json({
-        error: 'Failed to delete prompt',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Search prompts
-  app.post('/mcp/tools/search_prompts', async (req, res) => {
-    try {
+  app.post('/mcp/tools/search_prompts', (req, res) => {
+    handlePromiseRoute(async () => {
       const { content, limit } = req.body;
       
       // Validate required fields
@@ -309,18 +286,14 @@ export function createServer(config: Config): express.Application {
       // Search for prompts by content
       const prompts = await storage.searchPromptsByContent(content, limit || 10);
       
-      res.json({
-        success: true,
-        prompts,
-        count: prompts.length
+      return res.json({
+        status: 'success',
+        data: {
+          prompts,
+          count: prompts.length
+        }
       });
-    } catch (error) {
-      console.error('Error searching prompts:', error);
-      res.status(500).json({
-        error: 'Failed to search prompts',
-        details: (error as Error).message
-      });
-    }
+    }, res);
   });
   
   // Add close handler
@@ -336,13 +309,30 @@ export function createServer(config: Config): express.Application {
  * @param config The server configuration
  * @returns A promise that resolves with the HTTP server
  */
-export async function startServer(config: Config): Promise<any> {
+export function startServer(config: Config): Server {
   const app = createServer(config);
   
-  return new Promise((resolve) => {
-    const server = app.listen(config.server.port, config.server.host, () => {
-      console.log(`MCP Prompts Server running at http://${config.server.host}:${config.server.port}`);
-      resolve(server);
+  // Ensure we have valid port and host
+  const port = config.server?.port || 3000;
+  const host = config.server?.host || 'localhost';
+  
+  const server = app.listen(port, host, () => {
+    console.log(`MCP Prompts Server running at http://${host}:${port}`);
+  });
+
+  return server;
+}
+
+// Add a helper function to handle promise-based routes
+function handlePromiseRoute(
+  routeHandler: () => Promise<any>,
+  res: express.Response
+): void {
+  routeHandler().catch(error => {
+    console.error('Route error:', error);
+    res.status(500).json({
+      status: 'error',
+      message: error instanceof Error ? error.message : 'Unknown error'
     });
   });
 } 
