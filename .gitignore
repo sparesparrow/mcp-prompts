@@ -1,21 +1,48 @@
-# Dependencies
+# Node.js
 node_modules/
+npm-debug.log*
+yarn-error.log*
+yarn-debug.log*
+.npm/
+.yarn/
 
 # Build output
 build/
 dist/
 
-# Environment variables
-.env
+# Generated content
+processed_prompts/
+exports/*
+!exports/.gitkeep
+logs/*
+!logs/.gitkeep
+backups/
+temp*/
 
-# Logs
-logs/
-*.log
-npm-debug.log*
+# Examples and data
+!prompts/examples/
+!prompts/curated/
+prompts/*
+!prompts/README.md
+
+# Environment variables
+.env*
+!.env.example
 
 # Editor directories and files
 .idea/
-.vscode/
-*.swp
-*.swo
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/launch.json
+*.sublime-project
+*.sublime-workspace
 .DS_Store
+Thumbs.db
+
+# Testing
+coverage/
+.nyc_output/
+
+# Raw prompts source file
+rawprompts.txt

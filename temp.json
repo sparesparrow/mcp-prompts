@@ -8,23 +8,19 @@
     "prompt-cli": "./build/bin/prompt-cli.js"
   },
   "scripts": {
-    "build": "node build-tools.js",
-    "build:install": "node build-tools.js --install",
-    "build:clean": "node build-tools.js --clean",
-    "build:force": "node build-tools.js --install --force",
-    "build:all": "node build-tools.js --clean --install --force",
-    "build:docker": "node build-tools.js --docker",
+    "build": "tsc",
+    "build:install": "node bin/build.js --install",
+    "build:clean": "node bin/build.js --clean",
+    "build:force": "node bin/build.js --install --force",
+    "build:all": "node bin/build.js --clean --install --force",
     "start": "node build/index.js",
     "dev": "nodemon --watch 'src/**/*.ts' --exec 'ts-node' src/index.ts",
     "test": "ts-node src/tests/promptServer.test.ts",
     "test:ci": "npm run build && node build/tests/promptServer.test.js",
     "lint": "eslint src/**/*.ts",
     "format": "prettier --write \"src/**/*.ts\"",
-    "clean": "node build-tools.js --clean",
+    "clean": "rimraf build/ processed_prompts/ temp-*/ test-output/",
     "prepare": "npm run build",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down",
-    "docker:build": "docker-compose build",
     "prompt:process": "ts-node bin/prompt-cli.ts process",
     "prompt:process:backup": "ts-node bin/prompt-cli.ts process --backup",
     "prompt:process:keep": "ts-node bin/prompt-cli.ts process --no-cleanup",
@@ -46,12 +42,6 @@
     "prompt:pipeline:dry": "node scripts/prompt-pipeline.js --dry-run",
     "prompt:pipeline:verbose": "node scripts/prompt-pipeline.js --verbose",
     "prompt:pipeline:keep": "node scripts/prompt-pipeline.js --no-cleanup",
-    "pgai:migrate": "ts-node scripts/pgai-utils.ts migrate",
-    "pgai:migrate:dry": "ts-node scripts/pgai-utils.ts migrate --dry-run",
-    "pgai:test": "ts-node scripts/pgai-utils.ts test",
-    "pgai:migrate:improved": "ts-node scripts/migrate-prompts.ts",
-    "pgai:migrate:improved:dry": "ts-node scripts/migrate-prompts.ts --dry-run",
-    "pgai:verify": "ts-node scripts/verify-improved-prompts.ts",
     "install:deps": "npm install pg pgai @types/pg"
   },
   "keywords": [
@@ -110,3 +100,4 @@
     "prompts/README.md"
   ]
 }
+    "pgai:migrate": "ts-node scripts/pgai-utils.ts migrate",\n    "pgai:migrate:dry": "ts-node scripts/pgai-utils.ts migrate --dry-run",\n    "pgai:test": "ts-node scripts/pgai-utils.ts test",
