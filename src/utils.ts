@@ -287,4 +287,79 @@ export async function listPrompts(options: ListPromptsOptions = {}): Promise<Pro
   }
   
   return prompts;
+}
+
+/**
+ * Simple HTML sanitization to prevent XSS
+ * @param html The HTML to sanitize
+ * @returns Sanitized HTML
+ */
+export function sanitizeHtml(html: string): string {
+  if (!html) return '';
+  
+  // Simple sanitization - replace HTML tags with escaped versions
+  return html
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+
+/**
+ * Generate a slug from a string
+ * @param str The string to slugify
+ * @returns A URL-friendly slug
+ */
+export function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/[\s_-]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Format a date string in a human-readable format
+ * @param date The date to format
+ * @returns Formatted date string
+ */
+export function formatDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  return d.toISOString().split('T')[0];
+}
+
+/**
+ * Truncate a string to a maximum length with ellipsis
+ * @param str The string to truncate
+ * @param maxLength Maximum length before truncation
+ * @returns Truncated string
+ */
+export function truncate(str: string, maxLength: number = 100): string {
+  if (str.length <= maxLength) return str;
+  return str.slice(0, maxLength) + '...';
+}
+
+/**
+ * Safely parse JSON with error handling
+ * @param json The JSON string to parse
+ * @param fallback Default value if parsing fails
+ * @returns Parsed object or fallback
+ */
+export function safeJsonParse<T>(json: string, fallback: T): T {
+  try {
+    return JSON.parse(json);
+  } catch (error) {
+    console.error('Error parsing JSON:', error);
+    return fallback;
+  }
+}
+
+/**
+ * Delay execution for a specified time
+ * @param ms Milliseconds to delay
+ * @returns Promise that resolves after the delay
+ */
+export function delay(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
 } 

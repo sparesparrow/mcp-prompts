@@ -1,0 +1,1422 @@
+---
+description: Guidelines for optimizing the performance of the MCP-Prompts server
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+---
+
+# Performance Optimization for MCP-Prompts
+
+This rule provides guidelines for optimizing the performance of the MCP-Prompts server, focusing on resource utilization, response times, and scalability.
+
+## Performance Principles
+
+1. **Measure First**: Always measure performance before and after optimizations.
+2. **Focus on Hot Paths**: Optimize the most frequently executed code paths first.
+3. **Resource Efficiency**: Minimize CPU, memory, and I/O usage.
+4. **Responsive Interactions**: Keep MCP tool responses fast and responsive.
+5. **Scale Gracefully**: Design for horizontal and vertical scaling.
+
+## Common Performance Bottlenecks
+
+### 1. File System Operations
+
+File I/O is often the slowest part of prompt management:
+
+```typescript
+// Inefficient: Synchronous file I/O
+import fs from 'fs';
+
+function getPrompt(id: string): Prompt {
+  const filePath = `${promptsDir}/${id}.json`;
+  const content = fs.readFileSync(filePath, 'utf8'); // Blocking operation
+  return JSON.parse(content);
+}
+
+// Optimized: Asynchronous file I/O
+import fs from 'fs/promises';
+
+async function getPrompt(id: string): Promise<Prompt> {
+  const filePath = `${promptsDir}/${id}.json`;
+  const content = await fs.readFile(filePath, 'utf8'); // Non-blocking
+  return JSON.parse(content);
+}
+```
+
+### 2. Database Operations
+
+When using database storage, optimize queries:
+
+```typescript
+// Inefficient: Multiple database queries
+async function getPromptsWithTags(category: string): Promise<Prompt[]> {
+  // First query to get prompts
+  const prompts = await db.query('SELECT * FROM prompts WHERE category = $1', [category]);
+  
+  // Then query tags for each prompt (N+1 problem)
+  for (const prompt of prompts) {
+    prompt.tags = await db.query('SELECT tag FROM prompt_tags WHERE prompt_id = $1', [prompt.id]);
+  }
+  
+  return prompts;
+}
+
+// Optimized: Single query with join
+async function getPromptsWithTags(category: string): Promise<Prompt[]> {
+  // Get prompts and tags in a single query
+  const rows = await db.query(`
+    SELECT p.*, array_agg(t.tag) as tags
+    FROM prompts p
+    LEFT JOIN prompt_tags t ON p.id = t.prompt_id
+    WHERE p.category = $1
+    GROUP BY p.id
+  `, [category]);
+  
+  return rows.map(row => ({
+    ...row,
+    tags: row.tags.filter(Boolean) // Filter out null values
+  }));
+}
+```
+
+### 3. Prompt List Filtering
+
+Optimize filtering of prompt lists:
+
+```typescript
+// Inefficient: Load all prompts into memory, then filter
+async function listPrompts(options: ListPromptsOptions): Promise<Prompt[]> {
+  // Load all prompts
+  const files = await fs.readdir(promptsDir);
+  const prompts = await Promise.all(
+    files.map(async file => {
+      const content = await fs.readFile(`${promptsDir}/${file}`, 'utf8');
+      return JSON.parse(content);
+    })
+  );
+  
+  // Filter in memory
+  let filtered = prompts;
+  
+  if (options.tags) {
+    filtered = filtered.filter(prompt => 
+      prompt.tags && options.tags.some(tag => prompt.tags.includes(tag))
+    );
+  }
+  
+  if (options.category) {
+    filtered = filtered.filter(prompt => prompt.category === options.category);
+  }
+  
+  // More filtering...
+  
+  return filtered;
+}
+
+// Optimized: Use index files for faster filtering
+async function listPrompts(options: ListPromptsOptions): Promise<Prompt[]> {
+  let promptIds: string[] = [];
+  
+  // Use index files for filtering
+  if (options.tags) {
+    // Load tag index
+    const tagIndex = await loadIndex('tags');
+    
+    // Get IDs of prompts with the given tags
+    const tagPromptIds = options.tags.flatMap(tag => tagIndex[tag] || []);
+    
+    // If this is the first filter, use these IDs
+    if (promptIds.length === 0) {
+      promptIds = tagPromptIds;
+    } else {
+      // Otherwise, find intersection
+      promptIds = promptIds.filter(id => tagPromptIds.includes(id));
+    }
+    
+    // If no prompts match the tags, return empty array
+    if (promptIds.length === 0) {
+      return [];
+    }
+  }
+  
+  // Similar approach for other filters...
+  
+  // Load only the filtered prompts
+  return Promise.all(
+    promptIds.map(async id => {
+      const content = await fs.readFile(`${promptsDir}/${id}.json`, 'utf8');
+      return JSON.parse(content);
+    })
+  );
+}
+
+// Helper to load index files
+async function loadIndex(indexName: string): Promise<Record<string, string[]>> {
+  try {
+    const content = await fs.readFile(`${promptsDir}/indexes/${indexName}.json`, 'utf8');
+    return JSON.parse(content);
+  } catch (error) {
+    // If index doesn't exist, return empty object
+    return {};
+  }
+}
+```
+
+### 4. Template Variable Substitution
+
+Optimize template processing:
+
+```typescript
+// Inefficient: Multiple regex replacements
+function applyTemplate(template: string, variables: Record<string, string>): string {
+  let result = template;
+  
+  // For each variable, perform a regex replace
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+    result = result.replace(regex, value);
+  }
+  
+  return result;
+}
+
+// Optimized: Single pass with function-based replacement
+function applyTemplate(template: string, variables: Record<string, string>): string {
+  // Compile a single regex that matches all variables
+  const variableNames = Object.keys(variables);
+  if (variableNames.length === 0) return template;
+  
+  const variablePattern = variableNames.map(name => name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|');
+  const regex = new RegExp(`\\{\\{\\s*(${variablePattern})\\s*\\}\\}`, 'g');
+  
+  // Replace all variables in a single pass
+  return template.replace(regex, (match, name) => {
+    return variables[name] || match; // Replace with variable value or keep original if not found
+  });
+}
+```
+
+## Caching Strategies
+
+### 1. In-Memory Cache
+
+Implement an in-memory cache for frequently accessed prompts:
+
+```typescript
+// src/cache/prompt-cache.ts
+import LRUCache from 'lru-cache';
+import { Prompt } from '../core/types';
+
+export class PromptCache {
+  private cache: LRUCache<string, Prompt>;
+  
+  constructor(options: { maxItems?: number, ttl?: number } = {}) {
+    this.cache = new LRUCache({
+      max: options.maxItems || 1000,
+      ttl: options.ttl || 1000 * 60 * 60, // 1 hour by default
+      updateAgeOnGet: true
+    });
+  }
+  
+  get(id: string): Prompt | undefined {
+    return this.cache.get(id);
+  }
+  
+  set(id: string, prompt: Prompt): void {
+    this.cache.set(id, prompt);
+  }
+  
+  delete(id: string): void {
+    this.cache.delete(id);
+  }
+  
+  invalidate(): void {
+    this.cache.clear();
+  }
+}
+```
+
+### 2. Index Caching
+
+Maintain cached indexes for filtering operations:
+
+```typescript
+// src/cache/index-cache.ts
+import { Prompt } from '../core/types';
+
+export class IndexCache {
+  private tagIndex: Map<string, Set<string>> = new Map();
+  private categoryIndex: Map<string, Set<string>> = new Map();
+  private templateIndex: Set<string> = new Set();
+  
+  // Update indexes when a prompt is added or updated
+  updateIndexes(prompt: Prompt): void {
+    // Update tag index
+    if (prompt.tags) {
+      for (const tag of prompt.tags) {
+        if (!this.tagIndex.has(tag)) {
+          this.tagIndex.set(tag, new Set());
+        }
+        this.tagIndex.get(tag)!.add(prompt.id);
+      }
+    }
+    
+    // Update category index
+    if (prompt.category) {
+      if (!this.categoryIndex.has(prompt.category)) {
+        this.categoryIndex.set(prompt.category, new Set());
+      }
+      this.categoryIndex.get(prompt.category)!.add(prompt.id);
+    }
+    
+    // Update template index
+    if (prompt.isTemplate) {
+      this.templateIndex.add(prompt.id);
+    } else {
+      this.templateIndex.delete(prompt.id);
+    }
+  }
+  
+  // Remove prompt from indexes
+  removeFromIndexes(id: string, prompt?: Prompt): void {
+    // If prompt is provided, remove only from relevant indexes
+    if (prompt) {
+      // Remove from tag index
+      if (prompt.tags) {
+        for (const tag of prompt.tags) {
+          this.tagIndex.get(tag)?.delete(id);
+        }
+      }
+      
+      // Remove from category index
+      if (prompt.category) {
+        this.categoryIndex.get(prompt.category)?.delete(id);
+      }
+      
+      // Remove from template index
+      if (prompt.isTemplate) {
+        this.templateIndex.delete(id);
+      }
+    } else {
+      // Otherwise, scan all indexes to remove the ID
+      
+      // Remove from tag index
+      for (const tagSet of this.tagIndex.values()) {
+        tagSet.delete(id);
+      }
+      
+      // Remove from category index
+      for (const categorySet of this.categoryIndex.values()) {
+        categorySet.delete(id);
+      }
+      
+      // Remove from template index
+      this.templateIndex.delete(id);
+    }
+  }
+  
+  // Get prompt IDs by tag
+  getPromptIdsByTag(tag: string): string[] {
+    return Array.from(this.tagIndex.get(tag) || []);
+  }
+  
+  // Get prompt IDs by category
+  getPromptIdsByCategory(category: string): string[] {
+    return Array.from(this.categoryIndex.get(category) || []);
+  }
+  
+  // Get template prompt IDs
+  getTemplatePromptIds(): string[] {
+    return Array.from(this.templateIndex);
+  }
+  
+  // Clear all indexes
+  clear(): void {
+    this.tagIndex.clear();
+    this.categoryIndex.clear();
+    this.templateIndex.clear();
+  }
+}
+```
+
+### 3. Integration with Storage Adapter
+
+Integrate caching with storage adapter:
+
+```typescript
+// src/adapters/cached-file-adapter.ts
+import { FileAdapter } from './file-adapter';
+import { Prompt, ListPromptsOptions, StorageAdapter } from '../core/types';
+import { PromptCache } from '../cache/prompt-cache';
+import { IndexCache } from '../cache/index-cache';
+
+export class CachedFileAdapter implements StorageAdapter {
+  private fileAdapter: FileAdapter;
+  private promptCache: PromptCache;
+  private indexCache: IndexCache;
+  private initialized: boolean = false;
+  
+  constructor(promptsDir: string) {
+    this.fileAdapter = new FileAdapter(promptsDir);
+    this.promptCache = new PromptCache();
+    this.indexCache = new IndexCache();
+  }
+  
+  async connect(): Promise<void> {
+    // Connect to the underlying adapter
+    await this.fileAdapter.connect();
+    
+    // Initialize cache if not already done
+    if (!this.initialized) {
+      await this.initializeCache();
+      this.initialized = true;
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    await this.fileAdapter.disconnect();
+  }
+  
+  private async initializeCache(): Promise<void> {
+    // Load all prompts to initialize the cache
+    const prompts = await this.fileAdapter.listPrompts();
+    
+    for (const prompt of prompts) {
+      // Add to prompt cache
+      this.promptCache.set(prompt.id, prompt);
+      
+      // Update indexes
+      this.indexCache.updateIndexes(prompt);
+    }
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    // Try to get from cache first
+    const cachedPrompt = this.promptCache.get(id);
+    if (cachedPrompt) {
+      return cachedPrompt;
+    }
+    
+    // If not in cache, get from storage
+    const prompt = await this.fileAdapter.getPrompt(id);
+    
+    // Add to cache
+    this.promptCache.set(id, prompt);
+    
+    return prompt;
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    // Save to storage
+    await this.fileAdapter.savePrompt(prompt);
+    
+    // Update cache
+    this.promptCache.set(prompt.id, prompt);
+    
+    // Update indexes
+    this.indexCache.updateIndexes(prompt);
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    // Get prompt from cache if available
+    const prompt = this.promptCache.get(id);
+    
+    // Delete from storage
+    await this.fileAdapter.deletePrompt(id);
+    
+    // Remove from cache
+    this.promptCache.delete(id);
+    
+    // Remove from indexes
+    this.indexCache.removeFromIndexes(id, prompt);
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    // If no options, return all prompts from storage
+    if (!options) {
+      return this.fileAdapter.listPrompts();
+    }
+    
+    // If initialized, use indexes for filtering
+    if (this.initialized) {
+      let promptIds: Set<string> | null = null;
+      
+      // Filter by tags
+      if (options.tags && options.tags.length > 0) {
+        const tagPromptIds = new Set<string>();
+        
+        // Get IDs for each tag
+        for (const tag of options.tags) {
+          const ids = this.indexCache.getPromptIdsByTag(tag);
+          ids.forEach(id => tagPromptIds.add(id));
+        }
+        
+        // Initialize or intersect with existing filter
+        if (promptIds === null) {
+          promptIds = tagPromptIds;
+        } else {
+          promptIds = new Set([...promptIds].filter(id => tagPromptIds.has(id)));
+        }
+        
+        // If no prompts match, return empty array
+        if (promptIds.size === 0) {
+          return [];
+        }
+      }
+      
+      // Filter by category
+      if (options.category) {
+        const categoryPromptIds = new Set(this.indexCache.getPromptIdsByCategory(options.category));
+        
+        // Initialize or intersect with existing filter
+        if (promptIds === null) {
+          promptIds = categoryPromptIds;
+        } else {
+          promptIds = new Set([...promptIds].filter(id => categoryPromptIds.has(id)));
+        }
+        
+        // If no prompts match, return empty array
+        if (promptIds.size === 0) {
+          return [];
+        }
+      }
+      
+      // Filter by template status
+      if (options.isTemplate !== undefined) {
+        const templatePromptIds = new Set(this.indexCache.getTemplatePromptIds());
+        const filteredIds = options.isTemplate
+          ? templatePromptIds
+          : new Set([...this.promptCache.keys()].filter(id => !templatePromptIds.has(id)));
+        
+        // Initialize or intersect with existing filter
+        if (promptIds === null) {
+          promptIds = filteredIds;
+        } else {
+          promptIds = new Set([...promptIds].filter(id => filteredIds.has(id)));
+        }
+        
+        // If no prompts match, return empty array
+        if (promptIds.size === 0) {
+          return [];
+        }
+      }
+      
+      // If we have filtered IDs, load prompts from cache or storage
+      if (promptIds !== null) {
+        const prompts = await Promise.all(
+          [...promptIds].map(id => this.getPrompt(id))
+        );
+        
+        // Apply remaining filters (search, sort, limit, offset)
+        return this.applyRemainingFilters(prompts, options);
+      }
+    }
+    
+    // Fall back to storage-based filtering
+    return this.fileAdapter.listPrompts(options);
+  }
+  
+  private applyRemainingFilters(prompts: Prompt[], options: ListPromptsOptions): Prompt[] {
+    let filtered = prompts;
+    
+    // Apply search filter
+    if (options.search) {
+      const search = options.search.toLowerCase();
+      filtered = filtered.filter(prompt => 
+        prompt.name.toLowerCase().includes(search) ||
+        (prompt.description && prompt.description.toLowerCase().includes(search)) ||
+        prompt.content.toLowerCase().includes(search)
+      );
+    }
+    
+    // Apply sort
+    if (options.sort) {
+      const sortField = options.sort as keyof Prompt;
+      const sortOrder = options.order === 'desc' ? -1 : 1;
+      
+      filtered.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortOrder * aValue.localeCompare(bValue);
+        }
+        
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+        return 0;
+      });
+    }
+    
+    // Apply pagination
+    if (options.offset || options.limit) {
+      const offset = options.offset || 0;
+      const limit = options.limit || filtered.length;
+      filtered = filtered.slice(offset, offset + limit);
+    }
+    
+    return filtered;
+  }
+}
+```
+
+## Memory Optimization
+
+### 1. Streaming Large Results
+
+When handling large prompt lists, use streaming to avoid memory spikes:
+
+```typescript
+// src/tools/prompt-tools.ts (optimized for large results)
+server.tool(
+  "list_prompts",
+  {
+    // Schema definition...
+  },
+  async ({ tags, isTemplate, category, search, sort, order, limit, offset }) => {
+    try {
+      // Get total count for pagination info
+      const totalCount = await promptService.getPromptCount({ tags, isTemplate, category, search });
+      
+      // If there are too many prompts, return a paginated response
+      if (totalCount > 1000) {
+        // Ensure pagination is applied
+        const pageLimit = limit || 100;
+        const pageOffset = offset || 0;
+        
+        // Get prompts for current page
+        const prompts = await promptService.listPrompts({
+          tags, isTemplate, category, search, sort, order,
+          limit: pageLimit,
+          offset: pageOffset
+        });
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify({
+              total: totalCount,
+              page: Math.floor(pageOffset / pageLimit) + 1,
+              pageSize: pageLimit,
+              totalPages: Math.ceil(totalCount / pageLimit),
+              prompts: prompts
+            }, null, 2) 
+          }]
+        };
+      }
+      
+      // For smaller result sets, return all prompts
+      const prompts = await promptService.listPrompts({
+        tags, isTemplate, category, search, sort, order, limit, offset
+      });
+      
+      return {
+        content: [{ 
+          type: "text", 
+          text: JSON.stringify({ prompts }, null, 2) 
+        }]
+      };
+    } catch (error) {
+      // Error handling...
+    }
+  }
+);
+```
+
+### 2. Buffer Management
+
+When working with files, use proper buffer management:
+
+```typescript
+// src/adapters/optimized-file-adapter.ts (excerpt)
+import fs from 'fs/promises';
+import { createReadStream } from 'fs';
+import { pipeline } from 'stream/promises';
+import { createGunzip, createGzip } from 'zlib';
+
+// For very large files, use streaming to read and parse JSON
+async function readLargePromptFile(filePath: string): Promise<Prompt> {
+  // Check if file is compressed
+  const isCompressed = filePath.endsWith('.gz');
+  
+  return new Promise((resolve, reject) => {
+    const chunks: Buffer[] = [];
+    
+    const readStream = createReadStream(filePath);
+    
+    // Set up pipeline
+    let stream = readStream;
+    
+    // Add decompression if needed
+    if (isCompressed) {
+      stream = stream.pipe(createGunzip());
+    }
+    
+    // Handle data
+    stream.on('data', (chunk) => {
+      chunks.push(Buffer.from(chunk));
+    });
+    
+    // Handle end
+    stream.on('end', () => {
+      try {
+        const content = Buffer.concat(chunks).toString('utf8');
+        const prompt = JSON.parse(content);
+        resolve(prompt);
+      } catch (error) {
+        reject(error);
+      }
+    });
+    
+    // Handle errors
+    stream.on('error', (error) => {
+      reject(error);
+    });
+  });
+}
+
+// For very large content, use compression
+async function writePromptWithCompression(filePath: string, prompt: Prompt): Promise<void> {
+  const content = JSON.stringify(prompt);
+  
+  // Only compress large content
+  if (content.length > 100000) { // 100KB
+    const outputPath = `${filePath}.gz`;
+    
+    // Create streams
+    const readStream = fs.createReadStream(content);
+    const gzipStream = createGzip();
+    const writeStream = fs.createWriteStream(outputPath);
+    
+    // Use pipeline for proper error handling
+    await pipeline(readStream, gzipStream, writeStream);
+  } else {
+    // For smaller content, write directly
+    await fs.writeFile(filePath, content, 'utf8');
+  }
+}
+```
+
+## CPU Optimization
+
+### 1. Worker Threads for CPU-Intensive Tasks
+
+Use worker threads for CPU-intensive operations:
+
+```typescript
+// src/workers/template-processor.ts
+import { parentPort, workerData } from 'worker_threads';
+
+// Process the template
+const { template, variables } = workerData;
+
+// Apply the variables to the template
+function applyTemplate(template, variables) {
+  let result = template;
+  
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+    result = result.replace(regex, String(value));
+  }
+  
+  return result;
+}
+
+// Process the template
+const result = applyTemplate(template, variables);
+
+// Send the result back to the main thread
+parentPort.postMessage(result);
+```
+
+```typescript
+// src/services/worker-template-service.ts
+import { Worker } from 'worker_threads';
+import path from 'path';
+
+export class WorkerTemplateService {
+  async applyTemplate(template: string, variables: Record<string, any>): Promise<string> {
+    return new Promise((resolve, reject) => {
+      // Create a worker
+      const worker = new Worker(path.join(__dirname, '../workers/template-processor.js'), {
+        workerData: { template, variables }
+      });
+      
+      // Handle worker messages
+      worker.on('message', (result) => {
+        resolve(result);
+      });
+      
+      // Handle worker errors
+      worker.on('error', (err) => {
+        reject(err);
+      });
+      
+      // Handle worker exit
+      worker.on('exit', (code) => {
+        if (code !== 0) {
+          reject(new Error(`Worker stopped with exit code ${code}`));
+        }
+      });
+    });
+  }
+}
+```
+
+### 2. Batch Processing
+
+Implement batch processing for operations on multiple prompts:
+
+```typescript
+// src/services/batch-processor.ts
+export class BatchProcessor {
+  private readonly batchSize: number;
+  
+  constructor(batchSize: number = 100) {
+    this.batchSize = batchSize;
+  }
+  
+  async processBatch<T, R>(
+    items: T[],
+    processor: (batch: T[]) => Promise<R[]>
+  ): Promise<R[]> {
+    const results: R[] = [];
+    
+    // Process items in batches
+    for (let i = 0; i < items.length; i += this.batchSize) {
+      const batch = items.slice(i, i + this.batchSize);
+      const batchResults = await processor(batch);
+      results.push(...batchResults);
+    }
+    
+    return results;
+  }
+}
+
+// Example usage
+const batchProcessor = new BatchProcessor(50);
+
+// Process a large number of prompts
+const processedPrompts = await batchProcessor.processBatch(
+  promptIds,
+  async (batch) => {
+    // Get prompts by ID
+    return Promise.all(batch.map(id => promptService.getPrompt(id)));
+  }
+);
+```
+
+## Network Optimization
+
+### 1. Connection Pooling
+
+When using databases, implement connection pooling:
+
+```typescript
+// src/adapters/postgres-adapter.ts (excerpt)
+import { Pool } from 'pg';
+
+export class PostgresAdapter implements StorageAdapter {
+  private pool: Pool;
+  
+  constructor(connectionString: string) {
+    this.pool = new Pool({
+      connectionString,
+      max: 20, // Maximum number of connections
+      idleTimeoutMillis: 30000, // How long a connection can be idle before being closed
+      connectionTimeoutMillis: 5000 // How long to wait for a connection
+    });
+  }
+  
+  async connect(): Promise<void> {
+    // Test the connection
+    const client = await this.pool.connect();
+    try {
+      await client.query('SELECT 1');
+    } finally {
+      client.release();
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    await this.pool.end();
+  }
+  
+  // Other methods using this.pool.query()...
+}
+```
+
+### 2. Compression
+
+Implement compression for large prompts:
+
+```typescript
+// src/utils/compression.ts
+import { promisify } from 'util';
+import { gzip, gunzip } from 'zlib';
+
+const gzipPromise = promisify(gzip);
+const gunzipPromise = promisify(gunzip);
+
+export async function compressData(data: string): Promise<Buffer> {
+  return gzipPromise(Buffer.from(data, 'utf8'));
+}
+
+export async function decompressData(data: Buffer): Promise<string> {
+  const decompressed = await gunzipPromise(data);
+  return decompressed.toString('utf8');
+}
+```
+
+## Measurement and Monitoring
+
+### 1. Performance Metrics Collection
+
+```typescript
+// src/utils/performance.ts
+type PerformanceMetric = {
+  operation: string;
+  durationMs: number;
+  timestamp: number;
+  metadata?: Record<string, any>;
+};
+
+export class PerformanceMonitor {
+  private metrics: PerformanceMetric[] = [];
+  private readonly maxMetrics: number;
+  
+  constructor(maxMetrics: number = 1000) {
+    this.maxMetrics = maxMetrics;
+  }
+  
+  // Track the performance of a function
+  async track<T>(
+    operation: string,
+    fn: () => Promise<T> | T,
+    metadata?: Record<string, any>
+  ): Promise<T> {
+    const startTime = performance.now();
+    
+    try {
+      const result = await fn();
+      return result;
+    } finally {
+      const endTime = performance.now();
+      const durationMs = endTime - startTime;
+      
+      this.addMetric({
+        operation,
+        durationMs,
+        timestamp: Date.now(),
+        metadata
+      });
+    }
+  }
+  
+  private addMetric(metric: PerformanceMetric): void {
+    this.metrics.push(metric);
+    
+    // Keep metrics within the configured limit
+    if (this.metrics.length > this.maxMetrics) {
+      this.metrics = this.metrics.slice(-this.maxMetrics);
+    }
+  }
+  
+  // Get metrics for a specific operation
+  getMetricsForOperation(operation: string): PerformanceMetric[] {
+    return this.metrics.filter(metric => metric.operation === operation);
+  }
+  
+  // Get average duration for an operation
+  getAverageDuration(operation: string): number {
+    const operationMetrics = this.getMetricsForOperation(operation);
+    
+    if (operationMetrics.length === 0) {
+      return 0;
+    }
+    
+    const totalDuration = operationMetrics.reduce(
+      (sum, metric) => sum + metric.durationMs,
+      0
+    );
+    
+    return totalDuration / operationMetrics.length;
+  }
+  
+  // Get all metrics
+  getAllMetrics(): PerformanceMetric[] {
+    return [...this.metrics];
+  }
+  
+  // Clear all metrics
+  clearMetrics(): void {
+    this.metrics = [];
+  }
+}
+```
+
+### 2. Integration with Prompt Service
+
+```typescript
+// src/services/monitored-prompt-service.ts
+import { PromptService } from './prompt-service';
+import { PerformanceMonitor } from '../utils/performance';
+import { Prompt, ListPromptsOptions, TemplateVariables, ApplyTemplateResult } from '../core/types';
+
+export class MonitoredPromptService extends PromptService {
+  private monitor: PerformanceMonitor;
+  
+  constructor(
+    storageAdapter: StorageAdapter,
+    monitor: PerformanceMonitor = new PerformanceMonitor()
+  ) {
+    super(storageAdapter);
+    this.monitor = monitor;
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    return this.monitor.track(
+      'getPrompt',
+      () => super.getPrompt(id),
+      { id }
+    );
+  }
+  
+  async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    return this.monitor.track(
+      'addPrompt',
+      () => super.addPrompt(data)
+    );
+  }
+  
+  async updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt> {
+    return this.monitor.track(
+      'updatePrompt',
+      () => super.updatePrompt(id, data),
+      { id }
+    );
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    return this.monitor.track(
+      'listPrompts',
+      () => super.listPrompts(options),
+      { options }
+    );
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    return this.monitor.track(
+      'deletePrompt',
+      () => super.deletePrompt(id),
+      { id }
+    );
+  }
+  
+  async applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult> {
+    return this.monitor.track(
+      'applyTemplate',
+      () => super.applyTemplate(id, variables),
+      { id, variableCount: Object.keys(variables).length }
+    );
+  }
+  
+  // Get performance metrics
+  getPerformanceMetrics(): any {
+    return {
+      averages: {
+        getPrompt: this.monitor.getAverageDuration('getPrompt'),
+        addPrompt: this.monitor.getAverageDuration('addPrompt'),
+        updatePrompt: this.monitor.getAverageDuration('updatePrompt'),
+        listPrompts: this.monitor.getAverageDuration('listPrompts'),
+        deletePrompt: this.monitor.getAverageDuration('deletePrompt'),
+        applyTemplate: this.monitor.getAverageDuration('applyTemplate')
+      },
+      detailed: {
+        getPrompt: this.monitor.getMetricsForOperation('getPrompt'),
+        addPrompt: this.monitor.getMetricsForOperation('addPrompt'),
+        updatePrompt: this.monitor.getMetricsForOperation('updatePrompt'),
+        listPrompts: this.monitor.getMetricsForOperation('listPrompts'),
+        deletePrompt: this.monitor.getMetricsForOperation('deletePrompt'),
+        applyTemplate: this.monitor.getMetricsForOperation('applyTemplate')
+      }
+    };
+  }
+  
+  // Clear performance metrics
+  clearPerformanceMetrics(): void {
+    this.monitor.clearMetrics();
+  }
+}
+```
+
+### 3. MCP Tool for Performance Monitoring
+
+```typescript
+// src/tools/performance-tools.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { MonitoredPromptService } from "../services/monitored-prompt-service";
+
+export function setupPerformanceTools(server: Server, promptService: MonitoredPromptService) {
+  // Get performance metrics
+  server.tool(
+    "get_performance_metrics",
+    {},
+    async () => {
+      try {
+        const metrics = promptService.getPerformanceMetrics();
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(metrics, null, 2) 
+          }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error retrieving performance metrics: ${error instanceof Error ? error.message : String(error)}` 
+          }]
+        };
+      }
+    }
+  );
+  
+  // Clear performance metrics
+  server.tool(
+    "clear_performance_metrics",
+    {},
+    async () => {
+      try {
+        promptService.clearPerformanceMetrics();
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: "Performance metrics cleared successfully" 
+          }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error clearing performance metrics: ${error instanceof Error ? error.message : String(error)}` 
+          }]
+        };
+      }
+    }
+  );
+}
+```
+
+## Advanced Performance Techniques
+
+### 1. Lazy Loading
+
+Implement lazy loading for prompt content:
+
+```typescript
+// src/adapters/lazy-loading-adapter.ts
+import { StorageAdapter, Prompt, ListPromptsOptions } from '../core/types';
+
+// Create a proxy for lazy loading prompt content
+function createLazyPrompt(
+  id: string,
+  metadata: Omit<Prompt, 'content'>,
+  loadContent: () => Promise<string>
+): Prompt {
+  let contentPromise: Promise<string> | null = null;
+  let loadedContent: string | null = null;
+  
+  // Create a proxy object that loads content on first access
+  return new Proxy(
+    {
+      ...metadata,
+      id,
+      content: '' // Placeholder that will be replaced
+    } as Prompt,
+    {
+      get(target, prop) {
+        if (prop === 'content') {
+          // If content is not loaded yet, initiate loading
+          if (loadedContent === null && contentPromise === null) {
+            contentPromise = loadContent().then(content => {
+              loadedContent = content;
+              return content;
+            });
+          }
+          
+          // If content is already loaded, return it
+          if (loadedContent !== null) {
+            return loadedContent;
+          }
+          
+          // Otherwise, return the loading promise
+          return contentPromise;
+        }
+        
+        // For all other properties, return the value from target
+        return target[prop as keyof Prompt];
+      }
+    }
+  );
+}
+
+export class LazyLoadingAdapter implements StorageAdapter {
+  private underlyingAdapter: StorageAdapter;
+  
+  constructor(adapter: StorageAdapter) {
+    this.underlyingAdapter = adapter;
+  }
+  
+  async connect(): Promise<void> {
+    await this.underlyingAdapter.connect();
+  }
+  
+  async disconnect(): Promise<void> {
+    await this.underlyingAdapter.disconnect();
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    // For getPrompt, we load the full prompt immediately
+    return this.underlyingAdapter.getPrompt(id);
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    await this.underlyingAdapter.savePrompt(prompt);
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    await this.underlyingAdapter.deletePrompt(id);
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    // If searching in content, we need to load full prompts
+    if (options?.search) {
+      return this.underlyingAdapter.listPrompts(options);
+    }
+    
+    // Get prompt metadata first
+    const promptMetadata = await this.getPromptMetadata(options);
+    
+    // Create lazy loading prompts
+    return promptMetadata.map(metadata => 
+      createLazyPrompt(
+        metadata.id,
+        metadata,
+        () => this.loadPromptContent(metadata.id)
+      )
+    );
+  }
+  
+  // Helper method to get prompt metadata
+  private async getPromptMetadata(options?: ListPromptsOptions): Promise<Omit<Prompt, 'content'>[]> {
+    // Implementation to get prompt metadata without content
+    // This will depend on the underlying adapter's implementation
+  }
+  
+  // Helper method to load prompt content
+  private async loadPromptContent(id: string): Promise<string> {
+    const prompt = await this.underlyingAdapter.getPrompt(id);
+    return prompt.content;
+  }
+}
+```
+
+### 2. Partial Updates
+
+Implement partial updates to avoid overwriting entire prompt contents:
+
+```typescript
+// src/adapters/partial-update-adapter.ts (excerpt)
+import { StorageAdapter, Prompt } from '../core/types';
+import { NotFoundError } from '../core/errors';
+
+export class PartialUpdateAdapter implements StorageAdapter {
+  private underlyingAdapter: StorageAdapter;
+  
+  constructor(adapter: StorageAdapter) {
+    this.underlyingAdapter = adapter;
+  }
+  
+  // Other methods...
+  
+  async updatePrompt(id: string, updates: Partial<Prompt>): Promise<Prompt> {
+    try {
+      // Get the current prompt
+      const current = await this.underlyingAdapter.getPrompt(id);
+      
+      // Create updated prompt
+      const updated: Prompt = {
+        ...current,
+        ...updates,
+        id, // Ensure ID doesn't change
+        updatedAt: new Date().toISOString(),
+        version: current.version + 1
+      };
+      
+      // Save the updated prompt
+      await this.underlyingAdapter.savePrompt(updated);
+      
+      return updated;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      throw new Error(`Failed to update prompt: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+```
+
+## Best Practices for Performance
+
+1. **Measure Before Optimizing**: Always establish performance baselines before making changes.
+2. **Profile the Code**: Use profiling tools to identify bottlenecks.
+3. **Optimize Hot Paths**: Focus on frequently executed code paths first.
+4. **Use Asynchronous I/O**: Avoid blocking operations.
+5. **Implement Caching**: Cache frequently accessed data.
+6. **Batch Operations**: Group similar operations together.
+7. **Minimize Memory Usage**: Avoid unnecessary copies of large data.
+8. **Use Streams**: Process large data in chunks.
+9. **Consider Compression**: Compress large data when appropriate.
+10. **Monitor in Production**: Continuously monitor performance metrics.
+
+## Performance Testing
+
+Implement performance testing to ensure optimizations are effective:
+
+```typescript
+// tests/performance/prompt-service.perf.ts
+import { PromptService } from '../../src/services/prompt-service';
+import { FileAdapter } from '../../src/adapters/file-adapter';
+import { CachedFileAdapter } from '../../src/adapters/cached-file-adapter';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+
+async function setupTestDir(): Promise<string> {
+  const testDir = path.join(os.tmpdir(), `mcp-prompts-perf-${Date.now()}`);
+  await fs.mkdir(testDir, { recursive: true });
+  return testDir;
+}
+
+async function cleanupTestDir(testDir: string): Promise<void> {
+  await fs.rm(testDir, { recursive: true, force: true });
+}
+
+async function generateTestPrompts(dir: string, count: number): Promise<void> {
+  for (let i = 0; i < count; i++) {
+    const prompt = {
+      id: `prompt-${i}`,
+      name: `Test Prompt ${i}`,
+      description: `Description for test prompt ${i}`,
+      content: `This is the content for test prompt ${i}. It can be a bit longer to simulate real content.`,
+      isTemplate: i % 5 === 0, // Make every 5th prompt a template
+      tags: [`tag-${i % 10}`, `tag-${i % 5}`], // Add some tags
+      category: `category-${i % 3}`, // Add some categories
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1
+    };
+    
+    await fs.writeFile(
+      path.join(dir, `${prompt.id}.json`),
+      JSON.stringify(prompt),
+      'utf8'
+    );
+  }
+}
+
+async function runPerformanceTest() {
+  console.log('Starting performance test...');
+  
+  const testDir = await setupTestDir();
+  console.log(`Test directory: ${testDir}`);
+  
+  try {
+    // Generate test prompts
+    console.log('Generating test prompts...');
+    const promptCount = 1000;
+    await generateTestPrompts(testDir, promptCount);
+    
+    // Test uncached adapter
+    console.log('\nTesting uncached adapter...');
+    const uncachedAdapter = new FileAdapter(testDir);
+    await uncachedAdapter.connect();
+    
+    const uncachedService = new PromptService(uncachedAdapter);
+    
+    // Test getPrompt
+    console.time('Uncached getPrompt');
+    await uncachedService.getPrompt('prompt-500');
+    console.timeEnd('Uncached getPrompt');
+    
+    // Test listPrompts
+    console.time('Uncached listPrompts (all)');
+    const uncachedAllPrompts = await uncachedService.listPrompts();
+    console.timeEnd('Uncached listPrompts (all)');
+    console.log(`Retrieved ${uncachedAllPrompts.length} prompts`);
+    
+    // Test filtered listPrompts
+    console.time('Uncached listPrompts (filtered)');
+    const uncachedFilteredPrompts = await uncachedService.listPrompts({
+      tags: ['tag-3'],
+      category: 'category-1',
+      isTemplate: true
+    });
+    console.timeEnd('Uncached listPrompts (filtered)');
+    console.log(`Retrieved ${uncachedFilteredPrompts.length} filtered prompts`);
+    
+    await uncachedAdapter.disconnect();
+    
+    // Test cached adapter
+    console.log('\nTesting cached adapter...');
+    const cachedAdapter = new CachedFileAdapter(testDir);
+    await cachedAdapter.connect();
+    
+    const cachedService = new PromptService(cachedAdapter);
+    
+    // Test getPrompt
+    console.time('Cached getPrompt (first)');
+    await cachedService.getPrompt('prompt-500');
+    console.timeEnd('Cached getPrompt (first)');
+    
+    console.time('Cached getPrompt (second)');
+    await cachedService.getPrompt('prompt-500');
+    console.timeEnd('Cached getPrompt (second)');
+    
+    // Test listPrompts
+    console.time('Cached listPrompts (all)');
+    const cachedAllPrompts = await cachedService.listPrompts();
+    console.timeEnd('Cached listPrompts (all)');
+    console.log(`Retrieved ${cachedAllPrompts.length} prompts`);
+    
+    // Test filtered listPrompts
+    console.time('Cached listPrompts (filtered)');
+    const cachedFilteredPrompts = await cachedService.listPrompts({
+      tags: ['tag-3'],
+      category: 'category-1',
+      isTemplate: true
+    });
+    console.timeEnd('Cached listPrompts (filtered)');
+    console.log(`Retrieved ${cachedFilteredPrompts.length} filtered prompts`);
+    
+    await cachedAdapter.disconnect();
+    
+  } finally {
+    await cleanupTestDir(testDir);
+    console.log('Performance test completed');
+  }
+}
+
+runPerformanceTest().catch(console.error);
+```
+
+## Conclusion
+
+By applying these performance optimization techniques, the MCP-Prompts server can achieve better resource utilization, faster response times, and improved scalability. Remember to always measure performance before and after optimizations to ensure they have the desired effect. The techniques described in this rule should be applied thoughtfully based on the specific requirements and usage patterns of your implementation.

@@ -1,30 +1,27 @@
-FROM node:20-slim
+FROM node:18-alpine
 
 WORKDIR /app
 
-# Install PostgreSQL client for health checks
-RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
-
-# Copy package files first to leverage Docker cache
-COPY package.json package-lock.json ./
+# Copy package files
+COPY package*.json ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy the rest of the application
+# Copy source code
 COPY . .
 
 # Build the application
 RUN npm run build
 
-# Create necessary directories
-RUN mkdir -p logs exports backups
+# Create prompts directory
+RUN mkdir -p /app/prompts
 
-# Make scripts executable
-RUN chmod +x scripts/*.ts bin/*.ts bin/*.js docker/startup.sh
+# Set environment variables
+ENV NODE_ENV=production
+ENV STORAGE_TYPE=file
+ENV PROMPTS_DIR=/app/prompts
+ENV LOG_LEVEL=info
 
-# Expose port for the server
-EXPOSE 3000
-
-# Set the command to run the server
-CMD ["docker/startup.sh"] 
+# Expose stdin and make terminal interactive
+ENTRYPOINT ["node", "build/index.js"] 

@@ -1,0 +1,1106 @@
+---
+description: Guidelines for implementing security measures in the MCP-Prompts server
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+  - "Dockerfile"
+  - "docker-compose.yml"
+---
+
+# Security Considerations for MCP-Prompts
+
+This rule provides comprehensive guidelines for implementing security measures in the MCP-Prompts server to protect against common vulnerabilities and ensure secure operation.
+
+## Security Principles
+
+1. **Defense in Depth**: Implement multiple layers of security controls.
+2. **Least Privilege**: Grant only the minimum necessary permissions.
+3. **Secure by Default**: Choose secure defaults for all settings.
+4. **Input Validation**: Validate all external inputs.
+5. **Output Encoding**: Encode outputs to prevent injection attacks.
+6. **Secure Storage**: Protect sensitive data at rest and in transit.
+7. **Audit and Logging**: Maintain comprehensive security logs.
+
+## Input Validation
+
+### 1. Validate All External Inputs
+
+Use Zod for robust schema validation:
+
+```typescript
+// src/utils/validators.ts
+import { z } from 'zod';
+import { ValidationError } from '../core/errors';
+
+// Define schemas for all external inputs
+export const promptIdSchema = z.string()
+  .min(1, 'Prompt ID is required')
+  .regex(/^[a-z0-9-]+$/, 'Prompt ID must contain only lowercase letters, numbers, and hyphens');
+
+export const promptSchema = z.object({
+  id: promptIdSchema.optional(),
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  content: z.string().min(1, 'Content is required'),
+  isTemplate: z.boolean().default(false),
+  variables: z.array(z.string()).optional(),
+  tags: z.array(z.string().regex(/^[a-z0-9-]+$/, 'Tags must contain only lowercase letters, numbers, and hyphens')).default([]),
+  category: z.string().regex(/^[a-z0-9-]+$/, 'Category must contain only lowercase letters, numbers, and hyphens').optional(),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
+  version: z.number().int().positive().optional()
+}).refine(data => {
+  // If it's a template, it should contain variables in the content
+  if (data.isTemplate) {
+    const variableRegex = /\{\{([^}]+)\}\}/g;
+    const hasVariables = variableRegex.test(data.content);
+    return hasVariables;
+  }
+  return true;
+}, {
+  message: 'Template prompts must contain variables in the content',
+  path: ['content']
+});
+
+export const listPromptsOptionsSchema = z.object({
+  tags: z.array(z.string()).optional(),
+  isTemplate: z.boolean().optional(),
+  category: z.string().optional(),
+  search: z.string().optional(),
+  sort: z.string().optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+export const templateVariablesSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()])
+);
+
+// Validator function
+export function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issues = error.errors.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+      throw new ValidationError(`Validation failed: ${issues}`);
+    }
+    throw error;
+  }
+}
+```
+
+### 2. Apply Input Validation in Services
+
+```typescript
+// src/services/prompt-service.ts (excerpt)
+import { Prompt, PromptService as PromptServiceInterface, StorageAdapter } from '../core/types';
+import { promptSchema, promptIdSchema, templateVariablesSchema } from '../utils/validators';
+import { ValidationError, NotFoundError } from '../core/errors';
+import { validate } from '../utils/validators';
+
+export class PromptService implements PromptServiceInterface {
+  // Constructor...
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    // Validate ID
+    const validId = validate(promptIdSchema, id);
+    
+    return this.storage.getPrompt(validId);
+  }
+  
+  async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    // Prepare prompt with defaults
+    const now = new Date().toISOString();
+    const id = data.id || slugify(data.name || '') || uuidv4();
+    
+    const promptData = {
+      ...data,
+      id,
+      createdAt: now,
+      updatedAt: now,
+      version: 1
+    };
+    
+    // Validate the prompt
+    const validPrompt = validate(promptSchema, promptData);
+    
+    // Check if prompt already exists
+    try {
+      await this.storage.getPrompt(validPrompt.id);
+      throw new ValidationError(`Prompt with ID "${validPrompt.id}" already exists`);
+    } catch (error) {
+      // NotFoundError is expected - continue with saving
+      if (!(error instanceof NotFoundError)) {
+        throw error;
+      }
+    }
+    
+    // Save the prompt
+    await this.storage.savePrompt(validPrompt);
+    return validPrompt;
+  }
+  
+  // Other methods with validation...
+}
+```
+
+### 3. Apply Input Validation in MCP Tools
+
+```typescript
+// src/tools/prompt-tools.ts (excerpt)
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { z } from "zod";
+import { PromptService } from "../services/prompt-service";
+import { ValidationError } from "../core/errors";
+import { logger } from "../utils/logger";
+
+export function setupPromptTools(server: Server, promptService: PromptService) {
+  // Add prompt tool with schema validation
+  server.tool(
+    "add_prompt",
+    {
+      prompt: z.object({
+        id: z.string().optional(),
+        name: z.string().min(1, 'Name is required'),
+        description: z.string().optional(),
+        content: z.string().min(1, 'Content is required'),
+        isTemplate: z.boolean().default(false),
+        tags: z.array(z.string()).optional(),
+        category: z.string().optional(),
+        variables: z.array(z.string()).optional()
+      })
+    },
+    async ({ prompt }) => {
+      try {
+        // Additional security check for template prompts
+        if (prompt.isTemplate) {
+          const variableRegex = /\{\{([^}]+)\}\}/g;
+          const hasVariables = variableRegex.test(prompt.content);
+          if (!hasVariables) {
+            return {
+              isError: true,
+              content: [{ 
+                type: "text", 
+                text: "Template prompts must contain variables in the content" 
+              }]
+            };
+          }
+        }
+        
+        const result = await promptService.addPrompt(prompt);
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Prompt added with ID: ${result.id}` 
+          }]
+        };
+      } catch (error) {
+        logger.error('Error adding prompt', { error, prompt });
+        
+        // Format error response
+        const errorMessage = error instanceof ValidationError
+          ? `Validation error: ${error.message}`
+          : `Error adding prompt: ${error instanceof Error ? error.message : String(error)}`;
+        
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: errorMessage
+          }]
+        };
+      }
+    }
+  );
+  
+  // Other tools with validation...
+}
+```
+
+## Path Security
+
+### 1. Path Validation
+
+Implement strict path validation:
+
+```typescript
+// src/utils/path-security.ts
+import path from 'path';
+import { ValidationError } from '../core/errors';
+
+export function validatePath(basePath: string, inputPath: string): string {
+  // Resolve the full path
+  const fullPath = path.resolve(path.join(basePath, inputPath));
+  
+  // Check if the path is outside the base path
+  if (!fullPath.startsWith(path.resolve(basePath))) {
+    throw new ValidationError('Path traversal attempt detected');
+  }
+  
+  return fullPath;
+}
+
+export function sanitizeFilename(filename: string): string {
+  // Replace any characters that aren't alphanumeric, dots, hyphens, or underscores
+  return filename.replace(/[^a-zA-Z0-9\._\-]/g, '_');
+}
+```
+
+### 2. Use Path Validation in Storage Adapters
+
+```typescript
+// src/adapters/file-adapter.ts (excerpt)
+import fs from 'fs/promises';
+import path from 'path';
+import { Prompt, StorageAdapter } from '../core/types';
+import { validatePath, sanitizeFilename } from '../utils/path-security';
+import { NotFoundError, StorageError } from '../core/errors';
+
+export class FileAdapter implements StorageAdapter {
+  private promptsDir: string;
+  
+  constructor(promptsDir: string) {
+    this.promptsDir = path.resolve(promptsDir);
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      // Sanitize the ID
+      const safeId = sanitizeFilename(id);
+      
+      // Validate the path
+      const filePath = validatePath(this.promptsDir, `${safeId}.json`);
+      
+      const content = await fs.readFile(filePath, 'utf8');
+      return JSON.parse(content) as Prompt;
+    } catch (error) {
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new NotFoundError('Prompt', id);
+      }
+      
+      throw new StorageError(
+        `Failed to read prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  // Other methods with path validation...
+}
+```
+
+## Content Security
+
+### 1. Content Sanitization
+
+Implement content sanitization to prevent XSS attacks:
+
+```typescript
+// src/utils/content-security.ts
+import createDOMPurify from 'dompurify';
+import { JSDOM } from 'jsdom';
+
+// Create a DOMPurify instance
+const window = new JSDOM('').window;
+const DOMPurify = createDOMPurify(window);
+
+/**
+ * Sanitize HTML content to prevent XSS attacks
+ * 
+ * @param html HTML content to sanitize
+ * @returns Sanitized HTML
+ */
+export function sanitizeHtml(html: string): string {
+  return DOMPurify.sanitize(html, {
+    ALLOWED_TAGS: ['p', 'b', 'i', 'em', 'strong', 'a', 'ul', 'ol', 'li', 'code', 'pre', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6'],
+    ALLOWED_ATTR: ['href', 'target', 'rel'],
+    FORBID_TAGS: ['script', 'style', 'iframe', 'form', 'input', 'button'],
+    FORBID_ATTR: ['onerror', 'onload', 'onclick', 'onmouseover'],
+    ALLOW_DATA_ATTR: false
+  });
+}
+
+/**
+ * Sanitize a prompt's HTML content
+ * 
+ * @param prompt Prompt object to sanitize
+ * @returns Sanitized prompt object
+ */
+export function sanitizePrompt<T extends { content: string }>(prompt: T): T {
+  // Clone the prompt
+  const sanitized = { ...prompt };
+  
+  // Sanitize HTML content
+  sanitized.content = sanitizeHtml(prompt.content);
+  
+  return sanitized;
+}
+
+/**
+ * Escape special characters in a string to prevent injection attacks
+ * 
+ * @param str String to escape
+ * @returns Escaped string
+ */
+export function escapeString(str: string): string {
+  return str
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#039;');
+}
+```
+
+### 2. Apply Content Sanitization in Services
+
+```typescript
+// src/services/prompt-service.ts (excerpt)
+import { sanitizePrompt } from '../utils/content-security';
+
+export class PromptService implements PromptServiceInterface {
+  // Methods...
+  
+  async applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult> {
+    // Validate inputs...
+    
+    const prompt = await this.storage.getPrompt(id);
+    
+    if (!prompt.isTemplate) {
+      throw new TemplateError('Prompt is not a template');
+    }
+    
+    // Sanitize variables to prevent injection
+    const sanitizedVariables: TemplateVariables = {};
+    for (const [key, value] of Object.entries(variables)) {
+      sanitizedVariables[key] = typeof value === 'string' ? escapeString(value) : value;
+    }
+    
+    // Apply the template
+    const templateVariables = prompt.variables || extractVariables(prompt.content);
+    const missingVariables = templateVariables.filter(v => !sanitizedVariables[v]);
+    
+    let content = prompt.content;
+    for (const [key, value] of Object.entries(sanitizedVariables)) {
+      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      content = content.replace(regex, String(value));
+    }
+    
+    // Return the result
+    return {
+      content,
+      originalPrompt: prompt,
+      appliedVariables: sanitizedVariables,
+      missingVariables: missingVariables.length > 0 ? missingVariables : undefined
+    };
+  }
+}
+```
+
+## Authentication and Authorization
+
+### 1. API Key Authentication
+
+Implement API key authentication for HTTP transport:
+
+```typescript
+// src/auth/api-key-auth.ts
+import { Request, Response, NextFunction } from 'express';
+import { ValidationError } from '../core/errors';
+
+export function apiKeyMiddleware(req: Request, res: Response, next: NextFunction): void {
+  // Get API key from environment
+  const validApiKey = process.env.API_KEY;
+  
+  // Skip authentication if no API key is configured
+  if (!validApiKey) {
+    return next();
+  }
+  
+  // Get API key from request
+  const apiKey = req.headers['x-api-key'];
+  
+  // Validate API key
+  if (!apiKey || apiKey !== validApiKey) {
+    res.status(401).json({
+      error: 'Unauthorized',
+      message: 'Invalid or missing API key'
+    });
+    return;
+  }
+  
+  next();
+}
+```
+
+### 2. Environment Variable Security
+
+Implement secure environment variable handling:
+
+```typescript
+// src/config/env.ts
+import * as dotenv from 'dotenv';
+import path from 'path';
+import { z } from 'zod';
+
+// Load environment variables from .env file
+dotenv.config();
+
+// Define schema for environment variables
+const envSchema = z.object({
+  // Server configuration
+  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+  PORT: z.string().transform(val => parseInt(val, 10)).default('3000'),
+  
+  // Storage configuration
+  STORAGE_TYPE: z.enum(['file', 'postgres']).default('file'),
+  PROMPTS_DIR: z.string().default('./prompts'),
+  
+  // Database configuration (optional)
+  DATABASE_URL: z.string().optional(),
+  
+  // Authentication
+  API_KEY: z.string().optional(),
+  
+  // Logging
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  
+  // Integration configuration
+  FILESYSTEM_SERVER_ENABLED: z.enum(['true', 'false']).transform(val => val === 'true').default('false'),
+  MEMORY_SERVER_ENABLED: z.enum(['true', 'false']).transform(val => val === 'true').default('false'),
+  GITHUB_SERVER_ENABLED: z.enum(['true', 'false']).transform(val => val === 'true').default('false'),
+  GITHUB_TOKEN: z.string().optional()
+});
+
+// Parse and validate environment variables
+export const env = envSchema.parse(process.env);
+
+// Export typed environment variables
+export default env;
+```
+
+## Secure Dependency Management
+
+### 1. Package.json Security Configuration
+
+```json
+{
+  "name": "mcp-prompts",
+  "version": "1.0.0",
+  "description": "MCP server for managing prompts and templates",
+  "scripts": {
+    "audit": "npm audit",
+    "audit:fix": "npm audit fix",
+    "preinstall": "npx npm-force-resolutions",
+    "prepare": "husky install"
+  },
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "resolutions": {
+    // Force resolution of dependencies with security issues
+  },
+  "dependencies": {
+    // Dependencies...
+  },
+  "devDependencies": {
+    "husky": "^8.0.0",
+    // Other dev dependencies...
+  }
+}
+```
+
+### 2. Dependency Vulnerability Checking
+
+```yaml
+# .github/workflows/security.yml
+name: Security Check
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+  schedule:
+    - cron: '0 0 * * 0'  # Run once a week on Sunday
+
+jobs:
+  security:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Security audit
+      run: npm audit --audit-level=high
+    
+    - name: Run Snyk to check for vulnerabilities
+      uses: snyk/actions/node@master
+      env:
+        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+```
+
+## Docker Security
+
+### 1. Secure Dockerfile
+
+```dockerfile
+# Dockerfile
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Install dependencies with specific npm flags for security
+COPY package*.json ./
+RUN npm ci --no-optional --ignore-scripts --no-audit
+
+# Copy source files
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Multi-stage build for smaller attack surface
+FROM node:18-alpine
+
+# Create non-root user
+RUN addgroup -g 1001 nodejs && \
+    adduser -S -u 1001 -G nodejs nodejs
+
+# Set working directory and ownership
+WORKDIR /app
+RUN chown nodejs:nodejs /app
+
+# Copy only necessary files from build stage
+COPY --from=build --chown=nodejs:nodejs /app/package*.json ./
+COPY --from=build --chown=nodejs:nodejs /app/build ./build
+
+# Install production dependencies only
+RUN npm ci --only=production --no-optional --ignore-scripts --no-audit
+
+# Create directory for prompts with proper permissions
+RUN mkdir -p /app/prompts && chown -R nodejs:nodejs /app/prompts
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Switch to non-root user
+USER nodejs
+
+# Start the server
+CMD ["node", "build/index.js"]
+```
+
+### 2. Docker Compose Security Configuration
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  mcp-prompts:
+    build: .
+    volumes:
+      - ./prompts:/app/prompts:ro  # Read-only mount
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+      - API_KEY=${API_KEY}
+    ports:
+      - "127.0.0.1:3000:3000"  # Bind to localhost only
+    stdin_open: true
+    tty: true
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    # Drop all capabilities
+    cap_drop:
+      - ALL
+```
+
+## Secrets Management
+
+### 1. Secrets in Configuration
+
+```typescript
+// src/config/secrets.ts
+import fs from 'fs';
+import path from 'path';
+
+export interface Secrets {
+  apiKey?: string;
+  githubToken?: string;
+  postgresPassword?: string;
+}
+
+export function loadSecrets(): Secrets {
+  const secrets: Secrets = {};
+  
+  // Try to load secrets from environment variables
+  if (process.env.API_KEY) {
+    secrets.apiKey = process.env.API_KEY;
+  }
+  
+  if (process.env.GITHUB_TOKEN) {
+    secrets.githubToken = process.env.GITHUB_TOKEN;
+  }
+  
+  if (process.env.POSTGRES_PASSWORD) {
+    secrets.postgresPassword = process.env.POSTGRES_PASSWORD;
+  }
+  
+  // Try to load secrets from files (Docker secrets)
+  const secretsDir = process.env.SECRETS_DIR || '/run/secrets';
+  
+  if (fs.existsSync(secretsDir)) {
+    const secretFiles = ['api-key', 'github-token', 'postgres-password'];
+    
+    for (const file of secretFiles) {
+      const filePath = path.join(secretsDir, file);
+      
+      if (fs.existsSync(filePath)) {
+        try {
+          const content = fs.readFileSync(filePath, 'utf8').trim();
+          
+          switch (file) {
+            case 'api-key':
+              secrets.apiKey = content;
+              break;
+            case 'github-token':
+              secrets.githubToken = content;
+              break;
+            case 'postgres-password':
+              secrets.postgresPassword = content;
+              break;
+          }
+        } catch (error) {
+          console.error(`Error reading secret file ${file}:`, error);
+        }
+      }
+    }
+  }
+  
+  return secrets;
+}
+```
+
+### 2. Using Secrets in Services
+
+```typescript
+// src/services/github-sync-service.ts (excerpt)
+import { GitHubClient } from '../adapters/github-client';
+import { StorageAdapter } from '../core/types';
+import { loadSecrets } from '../config/secrets';
+
+export class GitHubSyncService {
+  private client: GitHubClient;
+  
+  constructor(
+    private storage: StorageAdapter,
+    private options: GitHubSyncOptions
+  ) {
+    // Load secrets
+    const secrets = loadSecrets();
+    
+    // Use token from secrets or options
+    const token = secrets.githubToken || options.token;
+    
+    if (!token) {
+      throw new Error('GitHub token is required for synchronization');
+    }
+    
+    this.client = new GitHubClient(token);
+  }
+  
+  // Service methods...
+}
+```
+
+## Security Logging and Auditing
+
+### 1. Security Logger Implementation
+
+```typescript
+// src/utils/security-logger.ts
+import fs from 'fs';
+import path from 'path';
+import { createLogger, format, transports } from 'winston';
+
+// Create logger instance
+const securityLogger = createLogger({
+  level: 'info',
+  format: format.combine(
+    format.timestamp(),
+    format.json()
+  ),
+  defaultMeta: { service: 'mcp-prompts-security' },
+  transports: [
+    // Log security events to a separate file
+    new transports.File({ 
+      filename: process.env.SECURITY_LOG_PATH || 'logs/security.log',
+      maxsize: 10 * 1024 * 1024, // 10MB
+      maxFiles: 5,
+      tailable: true
+    })
+  ]
+});
+
+// Add console transport in non-production environments
+if (process.env.NODE_ENV !== 'production') {
+  securityLogger.add(new transports.Console({
+    format: format.combine(
+      format.colorize(),
+      format.simple()
+    )
+  }));
+}
+
+// Security log levels
+export enum SecurityLogLevel {
+  INFO = 'info',
+  WARN = 'warn',
+  ALERT = 'alert'
+}
+
+// Security event types
+export enum SecurityEventType {
+  AUTHENTICATION = 'authentication',
+  AUTHORIZATION = 'authorization',
+  VALIDATION = 'validation',
+  RESOURCE_ACCESS = 'resource_access',
+  CONFIGURATION = 'configuration',
+  INTEGRATION = 'integration'
+}
+
+// Log a security event
+export function logSecurityEvent(
+  level: SecurityLogLevel,
+  eventType: SecurityEventType,
+  message: string,
+  metadata?: Record<string, any>
+): void {
+  securityLogger.log(level, message, {
+    eventType,
+    ...metadata
+  });
+}
+
+// Log authentication event
+export function logAuthentication(
+  success: boolean,
+  method: string,
+  metadata?: Record<string, any>
+): void {
+  const level = success ? SecurityLogLevel.INFO : SecurityLogLevel.ALERT;
+  const message = success
+    ? `Successful authentication using ${method}`
+    : `Failed authentication attempt using ${method}`;
+  
+  logSecurityEvent(level, SecurityEventType.AUTHENTICATION, message, metadata);
+}
+
+// Log authorization event
+export function logAuthorization(
+  success: boolean,
+  resource: string,
+  action: string,
+  metadata?: Record<string, any>
+): void {
+  const level = success ? SecurityLogLevel.INFO : SecurityLogLevel.ALERT;
+  const message = success
+    ? `Authorized access to ${resource} for action ${action}`
+    : `Unauthorized access attempt to ${resource} for action ${action}`;
+  
+  logSecurityEvent(level, SecurityEventType.AUTHORIZATION, message, metadata);
+}
+
+// Log validation event
+export function logValidation(
+  success: boolean,
+  target: string,
+  metadata?: Record<string, any>
+): void {
+  const level = success ? SecurityLogLevel.INFO : SecurityLogLevel.WARN;
+  const message = success
+    ? `Validation succeeded for ${target}`
+    : `Validation failed for ${target}`;
+  
+  logSecurityEvent(level, SecurityEventType.VALIDATION, message, metadata);
+}
+
+// Log resource access event
+export function logResourceAccess(
+  success: boolean,
+  resource: string,
+  action: string,
+  metadata?: Record<string, any>
+): void {
+  const level = success ? SecurityLogLevel.INFO : SecurityLogLevel.WARN;
+  const message = success
+    ? `Successfully ${action} resource ${resource}`
+    : `Failed to ${action} resource ${resource}`;
+  
+  logSecurityEvent(level, SecurityEventType.RESOURCE_ACCESS, message, metadata);
+}
+```
+
+### 2. Using Security Logging in the Application
+
+```typescript
+// src/adapters/file-adapter.ts (excerpt)
+import { Prompt, StorageAdapter } from '../core/types';
+import { validatePath, sanitizeFilename } from '../utils/path-security';
+import { NotFoundError, StorageError } from '../core/errors';
+import { logResourceAccess } from '../utils/security-logger';
+
+export class FileAdapter implements StorageAdapter {
+  private promptsDir: string;
+  
+  constructor(promptsDir: string) {
+    this.promptsDir = path.resolve(promptsDir);
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      // Sanitize the ID
+      const safeId = sanitizeFilename(id);
+      
+      // Validate the path
+      const filePath = validatePath(this.promptsDir, `${safeId}.json`);
+      
+      const content = await fs.readFile(filePath, 'utf8');
+      const prompt = JSON.parse(content) as Prompt;
+      
+      // Log successful access
+      logResourceAccess(true, 'prompt', 'read', { id, path: filePath });
+      
+      return prompt;
+    } catch (error) {
+      // Log failed access
+      logResourceAccess(false, 'prompt', 'read', { 
+        id, 
+        error: error instanceof Error ? error.message : String(error)
+      });
+      
+      if (error instanceof ValidationError) {
+        throw error;
+      }
+      
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new NotFoundError('Prompt', id);
+      }
+      
+      throw new StorageError(
+        `Failed to read prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  // Other methods with security logging...
+}
+```
+
+### 3. Security Audit Tool
+
+```typescript
+// src/tools/security-tools.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import fs from 'fs/promises';
+import path from 'path';
+import { z } from "zod";
+import { validatePath } from '../utils/path-security';
+import { logAuthorization } from '../utils/security-logger';
+
+export function setupSecurityTools(server: Server, logDir: string) {
+  // Get security logs
+  server.tool(
+    "get_security_logs",
+    {
+      days: z.number().int().min(1).max(30).default(7)
+    },
+    async ({ days }) => {
+      try {
+        // Check if API key is provided
+        const apiKey = process.env.API_KEY;
+        const requestApiKey = server.getContext().get('apiKey');
+        
+        if (apiKey && requestApiKey !== apiKey) {
+          logAuthorization(false, 'security_logs', 'read', { days });
+          
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: "Unauthorized: API key required" 
+            }]
+          };
+        }
+        
+        // Log authorized access
+        logAuthorization(true, 'security_logs', 'read', { days });
+        
+        // Calculate date range
+        const endDate = new Date();
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() - days);
+        
+        // Read log files
+        const logFilePath = validatePath(logDir, 'security.log');
+        const logContent = await fs.readFile(logFilePath, 'utf8');
+        
+        // Filter logs by date
+        const logLines = logContent.split('\n').filter(line => {
+          if (!line) return false;
+          
+          try {
+            const logEntry = JSON.parse(line);
+            const logDate = new Date(logEntry.timestamp);
+            return logDate >= startDate && logDate <= endDate;
+          } catch (error) {
+            return false;
+          }
+        });
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: logLines.join('\n')
+          }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error retrieving security logs: ${error instanceof Error ? error.message : String(error)}` 
+          }]
+        };
+      }
+    }
+  );
+}
+```
+
+## Regular Security Updates
+
+### 1. Dependency Update Script
+
+```bash
+#!/bin/bash
+# scripts/update-dependencies.sh
+
+# Exit on error
+set -e
+
+# Update NPM
+npm install -g npm@latest
+
+# Update dependencies
+npm update
+
+# Check for security vulnerabilities
+npm audit
+
+# Suggest fixes
+echo "To fix vulnerabilities:"
+echo "npm audit fix"
+echo "or for major version updates:"
+echo "npm audit fix --force"
+```
+
+### 2. GitHub Action for Dependency Updates
+
+```yaml
+# .github/workflows/update-dependencies.yml
+name: Update Dependencies
+
+on:
+  schedule:
+    - cron: '0 0 * * 1'  # Run every Monday at midnight
+  workflow_dispatch:      # Allow manual trigger
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18'
+        cache: 'npm'
+    
+    - name: Update dependencies
+      run: |
+        npm update
+        npm audit fix || true
+        
+    - name: Check for changes
+      id: git-check
+      run: |
+        git diff --exit-code || echo "::set-output name=changes::true"
+    
+    - name: Create Pull Request
+      if: steps.git-check.outputs.changes == 'true'
+      uses: peter-evans/create-pull-request@v5
+      with:
+        title: 'chore(deps): update dependencies'
+        commit-message: 'chore(deps): update dependencies'
+        branch: update-dependencies
+        base: main
+        body: |
+          Automated dependency updates.
+          
+          This PR was created automatically by the Update Dependencies workflow.
+```
+
+## Security Best Practices
+
+1. **Keep Dependencies Updated**: Regularly update dependencies to include security patches.
+2. **Implement Rate Limiting**: Protect against brute force and DoS attacks.
+3. **Use HTTPS Only**: Enforce HTTPS for all communications.
+4. **Implement Resource Limits**: Set limits on resource usage to prevent DoS attacks.
+5. **Follow Least Privilege Principle**: Run with minimal necessary permissions.
+6. **Validate All Inputs**: Always validate and sanitize user inputs.
+7. **Encrypt Sensitive Data**: Encrypt sensitive data at rest and in transit.
+8. **Log Security Events**: Maintain comprehensive security logs.
+9. **Perform Regular Audits**: Regularly audit code and dependencies for security issues.
+10. **Practice Defense in Depth**: Implement multiple layers of security controls.
+
+## Conclusion
+
+By implementing these security measures, the MCP-Prompts server can protect against common vulnerabilities and ensure secure operation. Remember that security is an ongoing process, requiring continuous monitoring, updating, and improvement.

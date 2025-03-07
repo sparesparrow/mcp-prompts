@@ -1,0 +1,430 @@
+ ---
+description: Guidelines for designing and implementing the FlatBuffers schema for the MCP-Prompts project
+globs:
+  - "*.fbs"
+  - "schema/*.ts"
+  - "schema/*.js"
+  - "schema/*.py"
+---
+
+# FlatBuffers Schema Design for MCP-Prompts
+
+This rule provides guidance for creating and using the FlatBuffers schema in the MCP-Prompts project.
+
+## Schema Overview
+
+The FlatBuffers schema serves as the universal representation for prompts in various formats. It must:
+
+1. Support different prompt types (file-based, content-based, composite)
+2. Define request/response structures for MCP operations
+3. Be compatible with MCP protocol specifications
+4. Support serialization/deserialization in multiple languages
+
+## Core Schema Structure
+
+```flatbuffers
+// prompt_schema.fbs
+namespace PromptSchema;
+
+// Fundamental types
+
+enum PromptFormat: byte {
+  Markdown = 0,
+  MDX = 1,
+  JSON = 2,
+  YAML = 3,
+  PlainText = 4,
+  CursorRules = 5,
+  Python = 6,
+  JavaScript = 7,
+  TypeScript = 8,
+  Custom = 9
+}
+
+table PromptMetadata {
+  id: string;
+  name: string;
+  description: string;
+  tags: [string];
+  created_at: string;
+  updated_at: string;
+  version: uint;
+  is_template: bool = false;
+}
+
+// Prompt type variants
+
+table FilePrompt {
+  metadata: PromptMetadata;
+  filename: string;
+  extension: string;
+  parent_dir: string;
+  format: PromptFormat;
+  template_variables: [string];
+}
+
+table ContentPrompt {
+  metadata: PromptMetadata;
+  content: string;
+  format: PromptFormat;
+  template_variables: [string];
+}
+
+table CompositePrompt {
+  metadata: PromptMetadata;
+  components: [string]; // IDs of other prompts
+  composition_type: string; // "sequence", "conditional", etc.
+  template_variables: [string];
+}
+
+union PromptType {
+  FilePrompt,
+  ContentPrompt,
+  CompositePrompt
+}
+
+table Prompt {
+  prompt_type: PromptType;
+}
+
+// Operation request/response structures
+
+table TemplateVariable {
+  name: string;
+  description: string;
+  required: bool = true;
+  default_value: string;
+}
+
+table AddPromptRequest {
+  prompt: Prompt;
+}
+
+table AddPromptResponse {
+  success: bool;
+  message: string;
+  prompt_id: string;
+}
+
+table GetPromptRequest {
+  id: string;
+}
+
+table GetPromptResponse {
+  success: bool;
+  message: string;
+  prompt: Prompt;
+}
+
+table ListPromptsRequest {
+  tags: [string];
+  format: PromptFormat = Markdown; // Filter by format
+  page: uint = 1;
+  limit: uint = 50;
+}
+
+table ListPromptsResponse {
+  success: bool;
+  message: string;
+  prompts: [Prompt];
+  total: uint;
+}
+
+table ApplyTemplateRequest {
+  prompt_id: string;
+  variables: [KeyValuePair];
+}
+
+table KeyValuePair {
+  key: string;
+  value: string;
+}
+
+table ApplyTemplateResponse {
+  success: bool;
+  message: string;
+  result: string;
+}
+
+// MCP-specific structures for protocol compatibility
+
+table MCPPrompt {
+  name: string;
+  description: string;
+  arguments: [TemplateVariable];
+}
+
+table MCPPromptMessage {
+  role: string;
+  content: MCPPromptContent;
+}
+
+table MCPPromptContent {
+  type: string;
+  text: string;
+}
+
+table MCPGetPromptResult {
+  messages: [MCPPromptMessage];
+}
+
+table MCPListPromptsResult {
+  prompts: [MCPPrompt];
+}
+
+// Root types
+root_type Prompt;
+root_type AddPromptRequest;
+root_type GetPromptRequest;
+root_type ListPromptsRequest;
+root_type ApplyTemplateRequest;
+root_type MCPGetPromptResult;
+root_type MCPListPromptsResult;
+```
+
+## Schema Generation and Usage
+
+### Generating Code from Schema
+
+Use the FlatBuffers compiler (`flatc`) to generate language-specific code:
+
+```bash
+# Generate TypeScript code
+flatc --ts -o generated/ schema/prompt_schema.fbs
+
+# Generate Python code
+flatc --python -o generated/ schema/prompt_schema.fbs
+
+# Generate Rust code
+flatc --rust -o generated/ schema/prompt_schema.fbs
+```
+
+### Using Generated Code in TypeScript
+
+```typescript
+import { PromptSchema } from './generated/prompt_schema';
+import flatbuffers from 'flatbuffers';
+
+// Creating a prompt
+function createPrompt(id: string, content: string): Uint8Array {
+  const builder = new flatbuffers.Builder(1024);
+  
+  // Create metadata
+  const idOffset = builder.createString(id);
+  const descOffset = builder.createString('Description here');
+  
+  PromptSchema.PromptMetadata.startPromptMetadata(builder);
+  PromptSchema.PromptMetadata.addId(builder, idOffset);
+  PromptSchema.PromptMetadata.addDescription(builder, descOffset);
+  const metadataOffset = PromptSchema.PromptMetadata.endPromptMetadata(builder);
+  
+  // Create content
+  const contentOffset = builder.createString(content);
+  
+  PromptSchema.ContentPrompt.startContentPrompt(builder);
+  PromptSchema.ContentPrompt.addMetadata(builder, metadataOffset);
+  PromptSchema.ContentPrompt.addContent(builder, contentOffset);
+  const contentPromptOffset = PromptSchema.ContentPrompt.endContentPrompt(builder);
+  
+  // Create union
+  PromptSchema.Prompt.startPrompt(builder);
+  PromptSchema.Prompt.addPromptType(builder, PromptSchema.PromptType.ContentPrompt);
+  PromptSchema.Prompt.addPromptTypeValue(builder, contentPromptOffset);
+  const promptOffset = PromptSchema.Prompt.endPrompt(builder);
+  
+  builder.finish(promptOffset);
+  return builder.asUint8Array();
+}
+
+// Reading a prompt
+function readPrompt(buffer: Uint8Array): any {
+  const buf = new flatbuffers.ByteBuffer(buffer);
+  const prompt = PromptSchema.Prompt.getRootAsPrompt(buf);
+  
+  const promptType = prompt.promptType();
+  
+  if (promptType === PromptSchema.PromptType.ContentPrompt) {
+    const contentPrompt = prompt.promptTypeValue(new PromptSchema.ContentPrompt());
+    const metadata = contentPrompt.metadata();
+    
+    return {
+      id: metadata.id(),
+      description: metadata.description(),
+      content: contentPrompt.content()
+    };
+  }
+  
+  // Handle other prompt types...
+  
+  return null;
+}
+```
+
+### Using Generated Code in Python
+
+```python
+import flatbuffers
+from generated.PromptSchema import Prompt, PromptMetadata, ContentPrompt, PromptType
+
+# Creating a prompt
+def create_prompt(id_str, content):
+    builder = flatbuffers.Builder(1024)
+    
+    # Create strings
+    id_offset = builder.CreateString(id_str)
+    desc_offset = builder.CreateString("Description here")
+    content_offset = builder.CreateString(content)
+    
+    # Create metadata
+    PromptMetadata.PromptMetadataStart(builder)
+    PromptMetadata.PromptMetadataAddId(builder, id_offset)
+    PromptMetadata.PromptMetadataAddDescription(builder, desc_offset)
+    metadata_offset = PromptMetadata.PromptMetadataEnd(builder)
+    
+    # Create content prompt
+    ContentPrompt.ContentPromptStart(builder)
+    ContentPrompt.ContentPromptAddMetadata(builder, metadata_offset)
+    ContentPrompt.ContentPromptAddContent(builder, content_offset)
+    content_prompt_offset = ContentPrompt.ContentPromptEnd(builder)
+    
+    # Create prompt with union
+    Prompt.PromptStart(builder)
+    Prompt.PromptAddPromptType(builder, PromptType.ContentPrompt)
+    Prompt.PromptAddPromptTypeValue(builder, content_prompt_offset)
+    prompt_offset = Prompt.PromptEnd(builder)
+    
+    builder.Finish(prompt_offset)
+    return builder.Output()
+
+# Reading a prompt
+def read_prompt(buffer):
+    buf = bytearray(buffer)
+    prompt = Prompt.Prompt.GetRootAsPrompt(buf, 0)
+    
+    prompt_type = prompt.PromptType()
+    
+    if prompt_type == PromptType.ContentPrompt:
+        content_prompt = ContentPrompt.ContentPrompt()
+        content_prompt.Init(prompt.PromptTypeValue().Bytes, prompt.PromptTypeValue().Pos)
+        
+        metadata = content_prompt.Metadata()
+        
+        return {
+            'id': metadata.Id().decode('utf-8'),
+            'description': metadata.Description().decode('utf-8'),
+            'content': content_prompt.Content().decode('utf-8')
+        }
+    
+    # Handle other prompt types...
+    
+    return None
+```
+
+## Converting Between MCP Format and Schema
+
+When interfacing with MCP clients, you'll need to convert between MCP format and your schema:
+
+```typescript
+// Convert from MCP to schema
+function mcpToSchema(mcpPrompt: any): Uint8Array {
+  const builder = new flatbuffers.Builder(1024);
+  
+  // Extract data from MCP format
+  const id = mcpPrompt.name;
+  const description = mcpPrompt.description || '';
+  const template_variables = mcpPrompt.arguments?.map(arg => arg.name) || [];
+  
+  // Create metadata
+  const idOffset = builder.createString(id);
+  const descOffset = builder.createString(description);
+  
+  PromptSchema.PromptMetadata.startPromptMetadata(builder);
+  PromptSchema.PromptMetadata.addId(builder, idOffset);
+  PromptSchema.PromptMetadata.addDescription(builder, descOffset);
+  const metadataOffset = PromptSchema.PromptMetadata.endPromptMetadata(builder);
+  
+  // Create content
+  const contentOffset = builder.createString('');
+  
+  PromptSchema.ContentPrompt.startContentPrompt(builder);
+  PromptSchema.ContentPrompt.addMetadata(builder, metadataOffset);
+  PromptSchema.ContentPrompt.addContent(builder, contentOffset);
+  
+  // Add template variables
+  const varOffsets = template_variables.map(v => builder.createString(v));
+  PromptSchema.ContentPrompt.startTemplateVariablesVector(builder, varOffsets.length);
+  for (let i = varOffsets.length - 1; i >= 0; i--) {
+    builder.addOffset(varOffsets[i]);
+  }
+  const varsOffset = builder.endVector();
+  PromptSchema.ContentPrompt.addTemplateVariables(builder, varsOffset);
+  
+  const contentPromptOffset = PromptSchema.ContentPrompt.endContentPrompt(builder);
+  
+  // Create union
+  PromptSchema.Prompt.startPrompt(builder);
+  PromptSchema.Prompt.addPromptType(builder, PromptSchema.PromptType.ContentPrompt);
+  PromptSchema.Prompt.addPromptTypeValue(builder, contentPromptOffset);
+  const promptOffset = PromptSchema.Prompt.endPrompt(builder);
+  
+  builder.finish(promptOffset);
+  return builder.asUint8Array();
+}
+
+// Convert from schema to MCP
+function schemaToMCP(buffer: Uint8Array): any {
+  const buf = new flatbuffers.ByteBuffer(buffer);
+  const prompt = PromptSchema.Prompt.getRootAsPrompt(buf);
+  
+  // Common structure for any prompt type
+  let mcpPrompt = {
+    name: '',
+    description: '',
+    arguments: []
+  };
+  
+  // Handle based on prompt type
+  const promptType = prompt.promptType();
+  
+  if (promptType === PromptSchema.PromptType.ContentPrompt) {
+    const contentPrompt = prompt.promptTypeValue(new PromptSchema.ContentPrompt());
+    const metadata = contentPrompt.metadata();
+    
+    mcpPrompt.name = metadata.id();
+    mcpPrompt.description = metadata.description();
+    
+    // Convert template variables to MCP arguments
+    const varCount = contentPrompt.templateVariablesLength();
+    for (let i = 0; i < varCount; i++) {
+      mcpPrompt.arguments.push({
+        name: contentPrompt.templateVariables(i),
+        description: `Variable ${contentPrompt.templateVariables(i)}`,
+        required: true
+      });
+    }
+  }
+  
+  // Handle other prompt types...
+  
+  return mcpPrompt;
+}
+```
+
+## Best Practices
+
+1. **Schema Versioning**: Include version field in schema for future compatibility
+2. **Extensibility**: Design schema to allow adding new fields and types without breaking compatibility
+3. **Validation**: Implement validation for all schema-related operations
+4. **Performance**: Be mindful of memory usage with large buffers
+5. **Testing**: Write comprehensive tests for serialization/deserialization
+6. **Documentation**: Document schema design decisions and usage patterns
+
+## Integration with MCP Protocol
+
+The schema must be compatible with MCP protocol specifications:
+
+1. The `MCPPrompt` table should match the MCP Prompt structure
+2. `MCPGetPromptResult` should match the expected response format for GetPrompt requests
+3. `MCPListPromptsResult` should match the expected response format for ListPrompts requests
+
+This ensures that your schema can be used with any MCP client while maintaining your internal representation.

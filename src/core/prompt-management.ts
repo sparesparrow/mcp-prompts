@@ -17,6 +17,43 @@ import { exec as execCallback } from 'child_process';
 import * as readline from 'readline';
 import { Prompt } from './index';
 
+/**
+ * Apply variables to a template
+ * @param content The template content
+ * @param variables The variables to apply
+ * @returns The processed content with variables replaced
+ */
+export function applyTemplate(content: string, variables: Record<string, string>): string {
+  let processedContent = content;
+  
+  for (const [key, value] of Object.entries(variables)) {
+    const regex = new RegExp(`{{\\s*${key}\\s*}}`, 'g');
+    processedContent = processedContent.replace(regex, value);
+  }
+  
+  return processedContent;
+}
+
+/**
+ * Extract variable names from a template content
+ * @param content The template content to extract variables from
+ * @returns Array of variable names
+ */
+export function extractVariables(content: string): string[] {
+  const regex = /{{([^{}]+)}}/g;
+  const variables: string[] = [];
+  let match;
+  
+  while ((match = regex.exec(content)) !== null) {
+    const variable = match[1].trim();
+    if (!variables.includes(variable)) {
+      variables.push(variable);
+    }
+  }
+  
+  return variables;
+}
+
 // Configuration
 const PROMPTS_DIR = path.join(process.cwd(), 'prompts');
 const PROCESSED_DIR = path.join(process.cwd(), 'processed_prompts');

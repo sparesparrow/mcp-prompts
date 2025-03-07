@@ -1,0 +1,654 @@
+---
+description: Guidelines for implementing a comprehensive testing strategy for the MCP-Prompts server
+globs:
+  - "src/**/*.test.ts"
+  - "src/**/*.spec.ts"
+  - "tests/**/*.ts"
+  - "jest.config.*"
+---
+
+# Testing Strategy for MCP-Prompts
+
+This rule provides guidelines for implementing an effective testing strategy for the MCP-Prompts server, ensuring reliability and maintainability.
+
+## Testing Principles
+
+1. **Test Business Logic, Not Implementation**: Focus on testing the behavior of components rather than their implementation details.
+2. **Arrange-Act-Assert**: Structure tests using the AAA pattern for clarity.
+3. **Isolation**: Test components in isolation using mocks and stubs for dependencies.
+4. **Coverage**: Aim for high test coverage of core functionality.
+5. **Maintainability**: Write tests that are easy to maintain and understand.
+
+## Test Types
+
+### Unit Tests
+
+Focus on testing individual components in isolation:
+
+```typescript
+// src/services/prompt-service.test.ts
+import { PromptService } from '../services/prompt-service';
+import { StorageAdapter } from '../core/types';
+
+// Mock the storage adapter
+const mockStorageAdapter: jest.Mocked<StorageAdapter> = {
+  getPrompt: jest.fn(),
+  savePrompt: jest.fn(),
+  listPrompts: jest.fn(),
+  deletePrompt: jest.fn(),
+  connect: jest.fn(),
+  disconnect: jest.fn()
+};
+
+describe('PromptService', () => {
+  let service: PromptService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new PromptService(mockStorageAdapter);
+  });
+
+  describe('getPrompt', () => {
+    it('should return a prompt by id', async () => {
+      // Arrange
+      const mockPrompt = { 
+        id: 'test-prompt',
+        name: 'Test Prompt',
+        content: 'Test content',
+        isTemplate: false,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        version: 1
+      };
+      mockStorageAdapter.getPrompt.mockResolvedValue(mockPrompt);
+
+      // Act
+      const result = await service.getPrompt('test-prompt');
+
+      // Assert
+      expect(mockStorageAdapter.getPrompt).toHaveBeenCalledWith('test-prompt');
+      expect(result).toEqual(mockPrompt);
+    });
+
+    it('should throw an error when prompt not found', async () => {
+      // Arrange
+      mockStorageAdapter.getPrompt.mockRejectedValue(new Error('Prompt not found'));
+
+      // Act & Assert
+      await expect(service.getPrompt('non-existent')).rejects.toThrow('Prompt not found');
+    });
+  });
+
+  describe('addPrompt', () => {
+    it('should add a new prompt', async () => {
+      // Arrange
+      const promptData = {
+        name: 'New Prompt',
+        content: 'New content',
+        isTemplate: false
+      };
+      mockStorageAdapter.savePrompt.mockResolvedValue(undefined);
+
+      // Act
+      const result = await service.addPrompt(promptData);
+
+      // Assert
+      expect(mockStorageAdapter.savePrompt).toHaveBeenCalled();
+      expect(result).toMatchObject({
+        name: 'New Prompt',
+        content: 'New content',
+        isTemplate: false
+      });
+      expect(result.id).toBeDefined();
+      expect(result.createdAt).toBeDefined();
+      expect(result.updatedAt).toBeDefined();
+      expect(result.version).toBe(1);
+    });
+
+    it('should throw an error when content is missing', async () => {
+      // Arrange
+      const promptData = {
+        name: 'Invalid Prompt'
+        // content is missing
+      };
+
+      // Act & Assert
+      await expect(service.addPrompt(promptData)).rejects.toThrow('Content is required');
+    });
+  });
+
+  // Additional test cases for other methods...
+});
+```
+
+### Integration Tests
+
+Test the interaction between components:
+
+```typescript
+// tests/integration/prompt-server.test.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { PromptService } from '../../src/services/prompt-service';
+import { FileAdapter } from '../../src/adapters/file-adapter';
+import { setupPromptTools } from '../../src/tools/prompt-tools';
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+
+describe('Prompt Server Integration', () => {
+  let server: Server;
+  let promptService: PromptService;
+  let tempDir: string;
+  let storageAdapter: FileAdapter;
+
+  beforeAll(async () => {
+    // Create a temporary directory for test prompts
+    tempDir = path.join(os.tmpdir(), 'mcp-prompts-test-' + Math.random().toString(36).substring(2));
+    await fs.mkdir(tempDir, { recursive: true });
+
+    // Initialize the storage adapter with the temp directory
+    storageAdapter = new FileAdapter(tempDir);
+    await storageAdapter.connect();
+
+    // Initialize the prompt service
+    promptService = new PromptService(storageAdapter);
+
+    // Initialize the server
+    server = new Server({
+      name: "test-server",
+      version: "1.0.0"
+    });
+
+    // Set up the tools
+    setupPromptTools(server, promptService);
+  });
+
+  afterAll(async () => {
+    // Clean up the temporary directory
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  beforeEach(async () => {
+    // Clear all prompts before each test
+    const files = await fs.readdir(tempDir);
+    for (const file of files) {
+      await fs.unlink(path.join(tempDir, file));
+    }
+  });
+
+  it('should add a prompt through the tool', async () => {
+    // Arrange
+    const addPromptTool = server.getTool('add_prompt');
+    const getPromptTool = server.getTool('get_prompt');
+
+    // Act
+    const addResult = await addPromptTool({
+      prompt: {
+        name: 'Test Prompt',
+        content: 'Test content',
+        isTemplate: false
+      }
+    });
+
+    // Extract the prompt ID from the result
+    const addResultText = addResult.content[0].text;
+    const idMatch = addResultText.match(/ID: ([a-z0-9-]+)/i);
+    const promptId = idMatch ? idMatch[1] : null;
+
+    // Get the prompt
+    const getResult = await getPromptTool({
+      id: promptId
+    });
+
+    // Parse the result
+    const prompt = JSON.parse(getResult.content[0].text);
+
+    // Assert
+    expect(prompt.name).toBe('Test Prompt');
+    expect(prompt.content).toBe('Test content');
+    expect(prompt.isTemplate).toBe(false);
+  });
+
+  // Additional integration test cases...
+});
+```
+
+### E2E Tests
+
+Test the complete flow from a client perspective:
+
+```typescript
+// tests/e2e/client-server.test.ts
+import { spawn, ChildProcess } from 'child_process';
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import fs from 'fs/promises';
+import path from 'path';
+import os from 'os';
+
+describe('Client-Server E2E', () => {
+  let serverProcess: ChildProcess;
+  let client: Client;
+  let tempDir: string;
+  
+  beforeAll(async () => {
+    // Create a temporary directory for test prompts
+    tempDir = path.join(os.tmpdir(), 'mcp-prompts-e2e-' + Math.random().toString(36).substring(2));
+    await fs.mkdir(tempDir, { recursive: true });
+    
+    // Start the server process
+    serverProcess = spawn('node', ['build/index.js'], {
+      env: {
+        ...process.env,
+        PROMPTS_DIR: tempDir,
+        NODE_ENV: 'test'
+      },
+      stdio: ['pipe', 'pipe', 'pipe']
+    });
+    
+    // Initialize the client
+    const transport = new StdioClientTransport({
+      input: serverProcess.stdout,
+      output: serverProcess.stdin
+    });
+    
+    client = new Client({ name: "test-client", version: "1.0.0" }, {});
+    await client.connect(transport);
+  });
+  
+  afterAll(async () => {
+    // Disconnect the client
+    await client.disconnect();
+    
+    // Kill the server process
+    serverProcess.kill();
+    
+    // Clean up the temporary directory
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+  
+  it('should add and retrieve a prompt', async () => {
+    // Add a prompt
+    const addResult = await client.callTool('add_prompt', {
+      prompt: {
+        name: 'E2E Test Prompt',
+        content: 'This is a test prompt for E2E testing',
+        isTemplate: false,
+        tags: ['test', 'e2e']
+      }
+    });
+    
+    // Extract the prompt ID
+    const addResultText = addResult.content[0].text;
+    const idMatch = addResultText.match(/ID: ([a-z0-9-]+)/i);
+    const promptId = idMatch ? idMatch[1] : null;
+    
+    // Get the prompt
+    const getResult = await client.callTool('get_prompt', {
+      id: promptId
+    });
+    
+    // Parse the result
+    const prompt = JSON.parse(getResult.content[0].text);
+    
+    // Assert
+    expect(prompt.name).toBe('E2E Test Prompt');
+    expect(prompt.content).toBe('This is a test prompt for E2E testing');
+    expect(prompt.isTemplate).toBe(false);
+    expect(prompt.tags).toEqual(['test', 'e2e']);
+  });
+  
+  // Additional E2E test cases...
+});
+```
+
+## Jest Configuration
+
+Set up Jest for TypeScript testing:
+
+```javascript
+// jest.config.js
+module.exports = {
+  preset: 'ts-jest',
+  testEnvironment: 'node',
+  roots: ['<rootDir>/src', '<rootDir>/tests'],
+  testMatch: ['**/*.test.ts', '**/*.spec.ts'],
+  collectCoverageFrom: [
+    'src/**/*.ts',
+    '!src/**/*.d.ts',
+    '!src/**/index.ts',
+    '!src/types.ts'
+  ],
+  coverageThreshold: {
+    global: {
+      branches: 80,
+      functions: 80,
+      lines: 80,
+      statements: 80
+    }
+  },
+  moduleNameMapper: {
+    '^@/(.*)$': '<rootDir>/src/$1'
+  },
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts']
+};
+```
+
+## Test Setup
+
+Create helper files for test setup:
+
+```typescript
+// tests/setup.ts
+// Global test setup
+
+// Extend Jest with custom matchers if needed
+expect.extend({
+  // Custom matchers here
+});
+
+// Global test timeout
+jest.setTimeout(10000);
+
+// Mock environment variables
+process.env.NODE_ENV = 'test';
+```
+
+```typescript
+// tests/mocks/storage-adapter.mock.ts
+import { StorageAdapter, Prompt, ListPromptsOptions } from '../../src/core/types';
+
+export class MockStorageAdapter implements StorageAdapter {
+  private prompts: Map<string, Prompt> = new Map();
+  
+  async connect(): Promise<void> {
+    // No-op
+  }
+  
+  async disconnect(): Promise<void> {
+    // No-op
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    const prompt = this.prompts.get(id);
+    if (!prompt) {
+      throw new Error(`Prompt not found: ${id}`);
+    }
+    return prompt;
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    this.prompts.set(prompt.id, prompt);
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    let prompts = Array.from(this.prompts.values());
+    
+    // Apply filtering based on options
+    if (options) {
+      if (options.tags && options.tags.length > 0) {
+        prompts = prompts.filter(prompt => 
+          prompt.tags && options.tags?.some(tag => prompt.tags?.includes(tag))
+        );
+      }
+      
+      if (options.isTemplate !== undefined) {
+        prompts = prompts.filter(prompt => prompt.isTemplate === options.isTemplate);
+      }
+      
+      // Additional filtering logic...
+    }
+    
+    return prompts;
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    if (!this.prompts.has(id)) {
+      throw new Error(`Prompt not found: ${id}`);
+    }
+    this.prompts.delete(id);
+  }
+  
+  // Helper method for test setup
+  reset(): void {
+    this.prompts.clear();
+  }
+  
+  // Helper method for test setup
+  addMockPrompt(prompt: Prompt): void {
+    this.prompts.set(prompt.id, prompt);
+  }
+}
+```
+
+## Test Scripts
+
+Add test scripts to package.json:
+
+```json
+{
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "test:coverage": "jest --coverage",
+    "test:unit": "jest src/",
+    "test:integration": "jest tests/integration",
+    "test:e2e": "jest tests/e2e"
+  }
+}
+```
+
+## Test-Driven Development Workflow
+
+1. **Write Tests First**: Start by writing tests for the functionality you want to implement.
+2. **Run Tests**: Run the tests and watch them fail.
+3. **Implement Code**: Write the minimal code needed to make the tests pass.
+4. **Refactor**: Refactor the code while ensuring tests continue to pass.
+5. **Repeat**: Continue the cycle for new features.
+
+## Continuous Integration
+
+Set up GitHub Actions for continuous testing:
+
+```yaml
+# .github/workflows/test.yml
+name: Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Build
+      run: npm run build
+      
+    - name: Run tests
+      run: npm test
+      
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
+```
+
+## Best Practices
+
+1. **Don't Test Implementation Details**: Focus on testing behavior, not implementation.
+2. **Use Descriptive Test Names**: Write test names that describe the expected behavior.
+3. **Keep Tests Small and Focused**: Each test should test one thing.
+4. **Use Test Fixtures**: Create reusable test fixtures for common test scenarios.
+5. **Test Error Cases**: Don't just test the happy path, test error scenarios too.
+6. **Avoid Test Interdependence**: Tests should not depend on each other.
+7. **Clean Up After Tests**: Ensure tests clean up after themselves.
+8. **Run Tests in CI**: Always run tests in a continuous integration environment.
+9. **Use Code Coverage**: Monitor code coverage to identify untested code.
+10. **Refactor Tests**: Refactor tests when they become difficult to maintain.
+
+## Testing MCP-Specific Functionality
+
+When testing MCP server functionality, consider these guidelines:
+
+1. **Mock Transport**: Use mock transports for testing to avoid actual I/O.
+2. **Test Tool Definitions**: Verify that tools are registered correctly.
+3. **Test Tool Handlers**: Test the behavior of tool handlers with different inputs.
+4. **Test Resource Handlers**: Verify resource handlers return expected content.
+5. **Test Protocol Compliance**: Ensure responses conform to the MCP protocol spec.
+
+Example of testing tool registration:
+
+```typescript
+// src/tools/prompt-tools.test.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { PromptService } from '../services/prompt-service';
+import { setupPromptTools } from './prompt-tools';
+import { MockPromptService } from '../tests/mocks/prompt-service.mock';
+
+describe('Prompt Tools', () => {
+  let server: Server;
+  let promptService: PromptService;
+  
+  beforeEach(() => {
+    server = new Server({
+      name: "test-server",
+      version: "1.0.0"
+    });
+    
+    promptService = new MockPromptService();
+    
+    // Spy on server.tool method
+    jest.spyOn(server, 'tool');
+    
+    // Set up the tools
+    setupPromptTools(server, promptService);
+  });
+  
+  it('should register all required tools', () => {
+    // Verify that all expected tools are registered
+    expect(server.tool).toHaveBeenCalledWith(
+      'add_prompt',
+      expect.any(Object),
+      expect.any(Function)
+    );
+    
+    expect(server.tool).toHaveBeenCalledWith(
+      'get_prompt',
+      expect.any(Object),
+      expect.any(Function)
+    );
+    
+    expect(server.tool).toHaveBeenCalledWith(
+      'list_prompts',
+      expect.any(Object),
+      expect.any(Function)
+    );
+    
+    expect(server.tool).toHaveBeenCalledWith(
+      'apply_template',
+      expect.any(Object),
+      expect.any(Function)
+    );
+    
+    expect(server.tool).toHaveBeenCalledWith(
+      'delete_prompt',
+      expect.any(Object),
+      expect.any(Function)
+    );
+  });
+  
+  // Additional tests for tool behavior...
+});
+```
+
+## Property-Based Testing
+
+For complex functionality like template variable substitution, consider using property-based testing:
+
+```typescript
+// src/utils/template-utils.test.ts
+import { extractVariables, applyTemplate } from '../utils/template-utils';
+import fc from 'fast-check';
+
+describe('Template Utils', () => {
+  describe('extractVariables', () => {
+    it('should extract all variables from a template', () => {
+      const template = 'Hello {{name}}, welcome to {{location}}!';
+      const variables = extractVariables(template);
+      expect(variables).toEqual(['name', 'location']);
+    });
+    
+    it('should extract variables with whitespace', () => {
+      const template = 'Hello {{ name }}, welcome to {{ location }}!';
+      const variables = extractVariables(template);
+      expect(variables).toEqual(['name', 'location']);
+    });
+    
+    it('should return empty array for templates without variables', () => {
+      const template = 'Hello, welcome!';
+      const variables = extractVariables(template);
+      expect(variables).toEqual([]);
+    });
+    
+    it('should handle templates with repeated variables', () => {
+      const template = 'Hello {{name}}, your name is {{name}}!';
+      const variables = extractVariables(template);
+      expect(variables).toEqual(['name']);
+    });
+    
+    // Property-based test
+    it('should always extract the correct variables', () => {
+      fc.assert(
+        fc.property(
+          fc.array(
+            fc.string({ minLength: 1, maxLength: 10 }).filter(s => !s.includes('{{') && !s.includes('}}')),
+            { minLength: 0, maxLength: 5 }
+          ),
+          (variableNames) => {
+            // Create a template with these variables
+            const template = variableNames.reduce(
+              (acc, name, index) => `${acc} {{${name}}}${index < variableNames.length - 1 ? ',' : ''}`,
+              'Template:'
+            );
+            
+            // Extract variables
+            const extractedVars = extractVariables(template);
+            
+            // Get unique variable names for comparison
+            const uniqueVars = [...new Set(variableNames)];
+            
+            // Check that all variables were extracted
+            return uniqueVars.every(name => extractedVars.includes(name)) && 
+                   extractedVars.every(name => uniqueVars.includes(name));
+          }
+        )
+      );
+    });
+  });
+  
+  // Additional property-based tests for applyTemplate...
+});
+```
+
+## Conclusion
+
+By implementing a comprehensive testing strategy for the MCP-Prompts server, you can ensure the reliability, maintainability, and correctness of your codebase. This guide provides the foundation for testing all aspects of the server, from individual components to the complete system. By following test-driven development practices and continuously running tests in a CI environment, you can have confidence in your code and make changes without fear of breaking existing functionality.

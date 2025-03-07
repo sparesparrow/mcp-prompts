@@ -7,9 +7,12 @@ import express from 'express';
 import cors from 'cors';
 import morgan from 'morgan';
 import { v4 as uuidv4 } from 'uuid';
-import { Config, Prompt, PromptStorage, applyTemplate, extractVariables } from './core';
-import { createStorageProvider } from './storage';
+import { createStorageProvider } from './core/storage';
 import { Server } from 'http';
+import { Prompt, ListPromptOptions } from './core/types';
+import { Config } from './core/config';
+import { applyTemplate, extractVariables } from './core/prompt-management';
+import { sanitizeHtml } from './utils';
 
 /**
  * Create and configure an MCP server
@@ -18,15 +21,27 @@ import { Server } from 'http';
  */
 export function createServer(config: Config): express.Application {
   const app = express();
-  const storage = createStorageProvider(config);
+  
+  // Create storage provider from config
+  const storageType = config.storage.type;
+  const dbConnectionString = (config.storage.options as any)?.connectionString;
+  const fileStorageBaseDir = (config.storage.options as any)?.baseDir;
+  
+  const storage = createStorageProvider({
+    storageType,
+    promptsDir: storageType === 'file' ? fileStorageBaseDir : undefined,
+    databaseUrl: ['pgai', 'postgres', 'postgresql'].includes(storageType) ? dbConnectionString : undefined
+  });
   
   // Configure middleware
   app.use(cors());
   app.use(express.json());
   
   // Add logging if not disabled
-  if (config.server.logLevel !== 'none') {
-    app.use(morgan(config.server.logLevel || 'dev'));
+  const logLevel = config.server.logLevel || 'dev';
+  // We use a string comparison here because the type system doesn't know all possible values
+  if (logLevel && typeof logLevel === 'string' && logLevel.toLowerCase() !== 'none') {
+    app.use(morgan(logLevel));
   }
   
   // Health check endpoint
@@ -45,44 +60,62 @@ export function createServer(config: Config): express.Application {
         });
       }
 
-      const { name, content, description, tags, isTemplate, id } = req.body.arguments.prompt;
+      const { name, content, description, tags, isTemplate, id, category } = req.body.arguments.prompt;
       
       // Validate required fields
-      if (!name || !content) {
+      if (!name) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Name and content are required'
+          status: 'error',
+          message: 'Prompt name is required'
         });
       }
       
-      // Generate a unique ID if not provided
-      const promptId = id || `prompt-${uuidv4()}`;
+      if (!content) {
+        return res.status(400).json({
+          status: 'error',
+          message: 'Prompt content is required'
+        });
+      }
       
-      // Create the prompt object
+      // Create or update prompt
+      const promptId = id || uuidv4();
+      
+      // Extract variables if this is a template
+      let variables: string[] = [];
+      if (isTemplate) {
+        variables = extractVariables(content);
+      }
+
+      // Create prompt object
       const prompt: Prompt = {
         id: promptId,
         name,
         content,
-        description,
+        description: description || '',
         tags: tags || [],
         isTemplate: isTemplate || false,
+        variables,
         createdAt: new Date(),
         updatedAt: new Date(),
         version: 1,
-        metadata: {}
+        category: category || 'development'
       };
       
-      // Auto-detect variables if it's a template
-      if (prompt.isTemplate) {
-        prompt.variables = extractVariables(content);
-      }
-      
-      // Add the prompt to storage
-      const result = await storage.addPrompt(prompt);
+      // Save prompt
+      await storage.addPrompt(prompt);
       
       return res.json({
         status: 'success',
-        data: result
+        data: {
+          id: promptId,
+          name,
+          content: [
+            {
+              type: 'text',
+              text: `Prompt "${name}" has been saved with ID "${promptId}"`
+            }
+          ]
+        }
       });
     }, res);
   });
@@ -90,49 +123,56 @@ export function createServer(config: Config): express.Application {
   // Edit prompt
   app.post('/mcp/tools/edit_prompt', (req, res) => {
     handlePromiseRoute(async () => {
-      const { id, name, content, description, tags, isTemplate } = req.body;
-      
-      // Validate required fields
-      if (!id) {
+      if (!req.body || !req.body.arguments || !req.body.arguments.id) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Prompt ID is required'
+          status: 'error',
+          message: 'Missing required parameters'
         });
       }
+      
+      const { id, name, content, description, tags, isTemplate, category } = req.body.arguments;
       
       // Get the existing prompt
       const existingPrompt = await storage.getPrompt(id);
       
       if (!existingPrompt) {
         return res.status(404).json({
-          error: 'Prompt not found',
-          details: `No prompt found with ID: ${id}`
+          status: 'error',
+          message: `No prompt found with ID "${id}". Try listing available prompts with list_prompts.`
         });
       }
       
-      // Update the prompt
+      // Create updated prompt
       const updatedPrompt: Prompt = {
         ...existingPrompt,
         name: name || existingPrompt.name,
         content: content || existingPrompt.content,
         description: description !== undefined ? description : existingPrompt.description,
         tags: tags || existingPrompt.tags,
+        category: category || existingPrompt.category || 'development',
         isTemplate: isTemplate !== undefined ? isTemplate : existingPrompt.isTemplate,
         updatedAt: new Date(),
         version: existingPrompt.version + 1
       };
       
-      // Auto-detect variables if it's a template and content was updated
-      if (updatedPrompt.isTemplate && content) {
-        updatedPrompt.variables = extractVariables(content);
+      // If it's a template, extract variables
+      if (updatedPrompt.isTemplate) {
+        updatedPrompt.variables = extractVariables(updatedPrompt.content);
+      } else {
+        updatedPrompt.variables = [];
       }
       
-      // Update the prompt in storage
-      const result = await storage.addPrompt(updatedPrompt);
+      // Update the prompt
+      await storage.addPrompt(updatedPrompt);
       
-      return res.json({
+      res.json({
         status: 'success',
-        data: result
+        content: [
+          {
+            type: 'text',
+            text: JSON.stringify(updatedPrompt, null, 2)
+          }
+        ]
       });
     }, res);
   });
@@ -140,29 +180,46 @@ export function createServer(config: Config): express.Application {
   // Get prompt
   app.post('/mcp/tools/get_prompt', (req, res) => {
     handlePromiseRoute(async () => {
-      const { id } = req.body;
-      
-      // Validate required fields
-      if (!id) {
+      // Validate request
+      if (!req.body || !req.body.arguments || !req.body.arguments.id) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Prompt ID is required'
+          status: 'error',
+          message: 'Missing required parameters'
         });
       }
       
-      // Get the prompt
+      const { id } = req.body.arguments;
+      
+      // Get prompt
       const prompt = await storage.getPrompt(id);
       
       if (!prompt) {
         return res.status(404).json({
-          error: 'Prompt not found',
-          details: `No prompt found with ID: ${id}`
+          status: 'error',
+          message: `Prompt with ID "${id}" not found. Try listing available prompts with list_prompts.`
         });
+      }
+      
+      // Increment usage count if the storage provider supports it
+      try {
+        if ('incrementUsage' in storage) {
+          await (storage as any).incrementUsage(id);
+        }
+      } catch (error) {
+        console.error(`Error incrementing usage for prompt ${id}:`, error);
+        // Continue since this is not a critical error
       }
       
       return res.json({
         status: 'success',
-        data: prompt
+        data: {
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(prompt, null, 2)
+            }
+          ]
+        }
       });
     }, res);
   });
@@ -170,19 +227,49 @@ export function createServer(config: Config): express.Application {
   // List prompts
   app.post('/mcp/tools/list_prompts', (req, res) => {
     handlePromiseRoute(async () => {
-      const { tags, templatesOnly } = req.body;
+      const options: ListPromptOptions = {};
       
-      // List prompts with optional filters
-      const prompts = await storage.listPrompts({
-        tags,
-        templatesOnly
-      });
+      // Extract filter options from request
+      if (req.body && req.body.arguments) {
+        const { tags, templatesOnly, category } = req.body.arguments;
+        
+        if (tags && Array.isArray(tags)) {
+          options.tags = tags;
+        }
+        
+        if (templatesOnly !== undefined) {
+          options.templatesOnly = templatesOnly === true;
+        }
+        
+        if (category) {
+          options.category = category;
+        }
+      }
+      
+      // Retrieve prompts
+      const prompts = await storage.listPrompts(options);
+      
+      // Format for display
+      const promptsList = prompts.map(p => ({
+        id: p.id,
+        name: p.name,
+        description: p.description,
+        isTemplate: p.isTemplate,
+        tags: p.tags,
+        category: p.category || 'development',
+        usageCount: p.usageCount || 0,
+        lastUsed: p.lastUsed
+      }));
       
       return res.json({
         status: 'success',
         data: {
-          prompts,
-          count: prompts.length
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(promptsList, null, 2)
+            }
+          ]
         }
       });
     }, res);
@@ -191,42 +278,55 @@ export function createServer(config: Config): express.Application {
   // Apply template
   app.post('/mcp/tools/apply_template', (req, res) => {
     handlePromiseRoute(async () => {
-      const { id, variables } = req.body;
-      
-      // Validate required fields
-      if (!id || !variables) {
+      // Validate request
+      if (!req.body || !req.body.arguments || !req.body.arguments.id) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Template ID and variables are required'
+          status: 'error',
+          message: 'Missing required parameters'
         });
       }
       
-      // Get the template prompt
+      const { id, variables } = req.body.arguments;
+      
+      // Get template
       const template = await storage.getPrompt(id);
       
       if (!template) {
         return res.status(404).json({
-          error: 'Template not found',
-          details: `No template found with ID: ${id}`
+          status: 'error',
+          message: `Template with ID "${id}" not found. Try listing available templates with list_prompts.`
         });
       }
       
       if (!template.isTemplate) {
         return res.status(400).json({
-          error: 'Not a template',
-          details: `The prompt with ID ${id} is not a template`
+          status: 'error',
+          message: `Prompt with ID "${id}" is not a template.`
         });
       }
       
-      // Apply the template with variables
-      const content = applyTemplate(template, variables);
+      // Increment usage count if the storage provider supports it
+      try {
+        if ('incrementUsage' in storage) {
+          await (storage as any).incrementUsage(id);
+        }
+      } catch (error) {
+        console.error(`Error incrementing usage for template ${id}:`, error);
+        // Continue since this is not a critical error
+      }
+      
+      // Apply variables to template
+      const appliedContent = applyTemplate(template.content, variables || {});
       
       return res.json({
         status: 'success',
         data: {
-          content,
-          templateId: id,
-          variablesApplied: Object.keys(variables)
+          content: [
+            {
+              type: 'text',
+              text: appliedContent
+            }
+          ]
         }
       });
     }, res);
@@ -235,13 +335,13 @@ export function createServer(config: Config): express.Application {
   // Delete prompt
   app.post('/mcp/tools/delete_prompt', (req, res) => {
     handlePromiseRoute(async () => {
-      const { id } = req.body;
+      const { id } = req.body?.arguments || {};
       
       // Validate required fields
       if (!id) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Prompt ID is required'
+          status: 'error',
+          message: 'Prompt ID is required'
         });
       }
       
@@ -250,14 +350,19 @@ export function createServer(config: Config): express.Application {
       
       if (!success) {
         return res.status(404).json({
-          error: 'Prompt not found',
-          details: `No prompt found with ID: ${id}`
+          status: 'error',
+          message: `No prompt found with ID "${id}"`
         });
       }
       
-      return res.json({
+      res.json({
         status: 'success',
-        message: `Prompt ${id} deleted successfully`
+        content: [
+          {
+            type: 'text',
+            text: `Prompt "${id}" successfully deleted.`
+          }
+        ]
       });
     }, res);
   });
@@ -265,34 +370,91 @@ export function createServer(config: Config): express.Application {
   // Search prompts
   app.post('/mcp/tools/search_prompts', (req, res) => {
     handlePromiseRoute(async () => {
-      const { content, limit } = req.body;
+      const { content, limit } = req.body?.arguments || {};
       
       // Validate required fields
       if (!content) {
         return res.status(400).json({
-          error: 'Missing required fields',
-          details: 'Search content is required'
+          status: 'error',
+          message: 'Search content is required'
         });
       }
       
-      // Check if semantic search is supported
-      if (!storage.searchPromptsByContent) {
+      // Check if semantic search is available
+      if (!(storage as any).searchPromptsByContent) {
         return res.status(501).json({
-          error: 'Semantic search not supported',
-          details: 'The current storage provider does not support semantic search'
+          status: 'error',
+          message: 'Semantic search is not available with the current storage provider. Try using PGAI storage.'
         });
       }
       
-      // Search for prompts by content
-      const prompts = await storage.searchPromptsByContent(content, limit || 10);
-      
-      return res.json({
-        status: 'success',
-        data: {
-          prompts,
-          count: prompts.length
+      // Search prompts by content
+      try {
+        const prompts = await (storage as any).searchPromptsByContent(content, limit || 10);
+        
+        // Format the response to only include necessary fields
+        const formattedPrompts = prompts.map((prompt: any) => ({
+          id: prompt.id,
+          name: prompt.name,
+          description: prompt.description,
+          isTemplate: prompt.isTemplate,
+          tags: prompt.tags,
+          category: prompt.category,
+          usage_count: prompt.usage_count,
+          last_used: prompt.last_used
+        }));
+        
+        res.json({
+          status: 'success',
+          content: [
+            {
+              type: 'text',
+              text: JSON.stringify(formattedPrompts, null, 2)
+            }
+          ]
+        });
+      } catch (error) {
+        console.error('Error searching prompts:', error);
+        return res.status(500).json({
+          status: 'error',
+          message: 'An error occurred during search. ' + (error instanceof Error ? error.message : 'Unknown error')
+        });
+      }
+    }, res);
+  });
+  
+  // Add prompt_analytics tool
+  app.post('/mcp/tools/prompt_analytics', (req, res) => {
+    handlePromiseRoute(async () => {
+      // Get analytics data
+      try {
+        if (!('getPromptAnalytics' in storage)) {
+          return res.status(501).json({
+            status: 'error',
+            message: 'Analytics functionality is not supported by the current storage provider.'
+          });
         }
-      });
+        
+        const analytics = await (storage as any).getPromptAnalytics();
+        
+        return res.json({
+          status: 'success',
+          data: {
+            content: [
+              {
+                type: 'text',
+                text: JSON.stringify(analytics, null, 2)
+              }
+            ]
+          }
+        });
+      } catch (error) {
+        console.error('Error getting prompt analytics:', error);
+        return res.status(500).json({
+          status: 'error',
+          message: 'Failed to retrieve prompt analytics. Please try again later.'
+        });
+      }
     }, res);
   });
   

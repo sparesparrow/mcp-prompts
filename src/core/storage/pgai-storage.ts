@@ -22,7 +22,10 @@ export class PgAIStorageProvider implements PromptStorage {
   private pool: Pool;
 
   constructor(connectionString: string) {
-    this.pool = new Pool({ connectionString });
+    this.pool = new Pool({ 
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
     this.client = createPgAIClient(this.pool);
     this.initializeSchema();
   }
@@ -43,18 +46,23 @@ export class PgAIStorageProvider implements PromptStorage {
           created_at TIMESTAMP DEFAULT NOW(),
           updated_at TIMESTAMP DEFAULT NOW(),
           version INTEGER DEFAULT 1,
+          category TEXT NOT NULL DEFAULT 'development',
+          usage_count INTEGER DEFAULT 0,
+          last_used TIMESTAMP,
           embedding vector(1536)
         );
         
         CREATE INDEX IF NOT EXISTS prompts_tags_idx ON prompts USING GIN (tags);
         CREATE INDEX IF NOT EXISTS prompts_is_template_idx ON prompts (is_template);
+        CREATE INDEX IF NOT EXISTS prompts_category_idx ON prompts (category);
+        CREATE INDEX IF NOT EXISTS prompts_usage_count_idx ON prompts (usage_count DESC);
       `);
       
       // Set up vector storage if PGAI supports it
       await this.client.initVectorStorage('prompts', 'content', 'embedding');
-      console.log('Database schema initialized successfully');
+      console.log('PGAI: Database schema initialized successfully');
     } catch (error) {
-      console.error('Error initializing database schema:', error);
+      console.error('PGAI: Error initializing database schema:', error);
       throw error;
     }
   }
@@ -73,7 +81,7 @@ export class PgAIStorageProvider implements PromptStorage {
       const row = result.rows[0];
       return this.rowToPrompt(row);
     } catch (error) {
-      console.error(`Error getting prompt ${id}:`, error);
+      console.error(`PGAI: Error getting prompt ${id}:`, error);
       throw error;
     }
   }
@@ -86,7 +94,7 @@ export class PgAIStorageProvider implements PromptStorage {
 
       // Filter by tags if provided
       if (options?.tags && options.tags.length > 0) {
-        conditions.push('tags && $1');
+        conditions.push('tags && $' + (queryParams.length + 1));
         queryParams.push(options.tags);
       }
 
@@ -94,6 +102,12 @@ export class PgAIStorageProvider implements PromptStorage {
       if (options?.templatesOnly !== undefined) {
         conditions.push('is_template = $' + (queryParams.length + 1));
         queryParams.push(options.templatesOnly);
+      }
+      
+      // Filter by category if provided
+      if (options?.category) {
+        conditions.push('category = $' + (queryParams.length + 1));
+        queryParams.push(options.category);
       }
 
       // Add WHERE clause if there are conditions
@@ -107,7 +121,7 @@ export class PgAIStorageProvider implements PromptStorage {
       const result = await this.pool.query(queryText, queryParams);
       return result.rows.map((row: any) => this.rowToPrompt(row));
     } catch (error) {
-      console.error('Error listing prompts:', error);
+      console.error('PGAI: Error listing prompts:', error);
       throw error;
     }
   }
@@ -117,12 +131,20 @@ export class PgAIStorageProvider implements PromptStorage {
       // Generate embedding for the prompt content
       const embeddingResult = await this.client.createEmbedding(prompt.content);
       const embedding = embeddingResult.embedding;
+      
+      // Default category to 'development' if not provided
+      const category = prompt.category || 'development';
+      
+      // Default usage analytics if not provided
+      const usageCount = prompt.usageCount || 0;
+      const lastUsed = prompt.lastUsed || null;
 
       await this.pool.query(
         `INSERT INTO prompts (
           id, name, content, description, tags, is_template, variables, 
-          created_at, updated_at, version, embedding, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+          created_at, updated_at, version, embedding, metadata, category,
+          usage_count, last_used
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         ON CONFLICT (id) DO UPDATE SET
           name = $2,
           content = $3,
@@ -133,7 +155,10 @@ export class PgAIStorageProvider implements PromptStorage {
           updated_at = $9,
           version = $10,
           embedding = $11,
-          metadata = $12`,
+          metadata = $12,
+          category = $13,
+          usage_count = $14,
+          last_used = $15`,
         [
           prompt.id,
           prompt.name,
@@ -146,11 +171,14 @@ export class PgAIStorageProvider implements PromptStorage {
           prompt.updatedAt,
           prompt.version,
           embedding,
-          prompt.metadata || {}
+          prompt.metadata || {},
+          category,
+          usageCount,
+          lastUsed
         ]
       );
     } catch (error) {
-      console.error(`Error adding prompt ${prompt.id}:`, error);
+      console.error(`PGAI: Error adding prompt ${prompt.id}:`, error);
       throw error;
     }
   }
@@ -163,7 +191,7 @@ export class PgAIStorageProvider implements PromptStorage {
       );
       return (result.rowCount ?? 0) > 0;
     } catch (error) {
-      console.error(`Error deleting prompt ${id}:`, error);
+      console.error(`PGAI: Error deleting prompt ${id}:`, error);
       throw error;
     }
   }
@@ -185,7 +213,45 @@ export class PgAIStorageProvider implements PromptStorage {
       
       return searchResult.rows.map((row: any) => this.rowToPrompt(row));
     } catch (error) {
-      console.error('Error searching prompts by content:', error);
+      console.error('PGAI: Error searching prompts by content:', error);
+      throw error;
+    }
+  }
+  
+  /**
+   * Increment usage count and update last used timestamp
+   * @param id Prompt ID
+   */
+  async incrementUsage(id: string): Promise<void> {
+    try {
+      await this.pool.query(
+        'UPDATE prompts SET usage_count = usage_count + 1, last_used = NOW() WHERE id = $1',
+        [id]
+      );
+    } catch (error) {
+      console.error(`PGAI: Error incrementing usage for prompt ${id}:`, error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get prompt usage analytics
+   * @returns Array of prompt analytics data
+   */
+  async getPromptAnalytics(): Promise<{ id: string, name: string, usageCount: number, lastUsed: string | Date }[]> {
+    try {
+      const result = await this.pool.query(
+        'SELECT id, name, usage_count, last_used FROM prompts ORDER BY usage_count DESC'
+      );
+      
+      return result.rows.map(row => ({
+        id: row.id,
+        name: row.name,
+        usageCount: row.usage_count,
+        lastUsed: row.last_used
+      }));
+    } catch (error) {
+      console.error('PGAI: Error getting prompt analytics:', error);
       throw error;
     }
   }
@@ -202,6 +268,9 @@ export class PgAIStorageProvider implements PromptStorage {
       createdAt: row.created_at,
       updatedAt: row.updated_at,
       version: row.version,
+      category: row.category || 'development',
+      usageCount: row.usage_count || 0,
+      lastUsed: row.last_used,
       metadata: row.metadata
     };
   }

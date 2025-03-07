@@ -32,6 +32,15 @@ export interface Prompt {
   /** Tags for categorization and filtering */
   tags?: string[];
   
+  /** Category for organization (e.g., 'development', 'project-orchestration') */
+  category?: string;
+  
+  /** Number of times this prompt has been used */
+  usage_count?: number;
+  
+  /** Last time this prompt was used */
+  last_used?: string;
+  
   /** ISO timestamp of creation date */
   createdAt: string;
   
@@ -64,6 +73,9 @@ export interface ListPromptsOptions {
   
   /** Filter prompts by template status */
   isTemplate?: boolean;
+  
+  /** Filter prompts by category */
+  category?: string;
   
   /** Search term to match against name, description, or content */
   search?: string;

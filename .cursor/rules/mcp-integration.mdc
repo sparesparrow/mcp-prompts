@@ -1,0 +1,1356 @@
+---
+description: Guidelines for integrating the MCP-Prompts server with other MCP tools and services
+globs:
+  - "src/adapters/*.ts"
+  - "src/config/*.ts"
+  - "src/integration/*.ts"
+  - "docker-compose*.yml"
+---
+
+# MCP Server Integration Guide
+
+This rule provides guidelines for seamlessly integrating the MCP-Prompts server with other MCP tools and services, creating a cohesive ecosystem of functionality.
+
+## Core Integration Principles
+
+1. **Complementary Functionality**: Design your server to complement existing MCP servers rather than duplicating functionality.
+2. **Loose Coupling**: Maintain loose coupling between servers to allow for independent evolution.
+3. **Common Protocols**: Use standard MCP patterns for communication between servers.
+4. **Federated Capabilities**: Clearly define which server is responsible for which functionality.
+5. **Graceful Degradation**: Handle scenarios where integrated servers are unavailable.
+
+## Integration Architecture
+
+The MCP-Prompts server can integrate with other MCP servers in several ways:
+
+### 1. Client-Side Integration
+
+Multiple MCP servers can be configured in Claude Desktop or other MCP clients:
+
+```json
+// claude_desktop_config.json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "npx",
+      "args": ["-y", "mcp-prompts"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+      }
+    }
+  }
+}
+```
+
+### 2. Server-to-Server Integration
+
+MCP-Prompts can directly communicate with other MCP servers:
+
+```typescript
+// src/adapters/filesystem-client.ts
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { spawn } from "child_process";
+import { logger } from "../utils/logger.js";
+
+export class FilesystemClient {
+  private client: Client;
+  private process: any;
+  private connected: boolean = false;
+  
+  constructor(private basePath: string) {}
+  
+  async connect(): Promise<void> {
+    if (this.connected) return;
+    
+    try {
+      // Start the filesystem server process
+      this.process = spawn("npx", ["-y", "@modelcontextprotocol/server-filesystem", this.basePath], {
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+      
+      // Log process output for debugging
+      this.process.stderr.on("data", (data: Buffer) => {
+        logger.debug(`Filesystem server: ${data.toString().trim()}`);
+      });
+      
+      // Initialize client with stdio transport
+      const transport = new StdioClientTransport({
+        input: this.process.stdout,
+        output: this.process.stdin
+      });
+      
+      this.client = new Client(
+        { name: "mcp-prompts", version: "1.0.0" },
+        {}
+      );
+      
+      // Connect to the server
+      await this.client.connect(transport);
+      this.connected = true;
+      
+      logger.info("Connected to filesystem server", { basePath: this.basePath });
+    } catch (error) {
+      logger.error("Failed to connect to filesystem server", { error });
+      throw new Error(`Failed to connect to filesystem server: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (!this.connected) return;
+    
+    try {
+      // Disconnect client
+      await this.client.disconnect();
+      
+      // Kill the process
+      this.process.kill();
+      this.connected = false;
+      
+      logger.info("Disconnected from filesystem server");
+    } catch (error) {
+      logger.error("Error disconnecting from filesystem server", { error });
+    }
+  }
+  
+  async readFile(path: string): Promise<string> {
+    if (!this.connected) {
+      throw new Error("Not connected to filesystem server");
+    }
+    
+    try {
+      const result = await this.client.callTool("read_file", { path });
+      return result.content;
+    } catch (error) {
+      logger.error("Error reading file", { path, error });
+      throw new Error(`Failed to read file '${path}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async writeFile(path: string, content: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("Not connected to filesystem server");
+    }
+    
+    try {
+      await this.client.callTool("write_file", { path, content });
+    } catch (error) {
+      logger.error("Error writing file", { path, error });
+      throw new Error(`Failed to write file '${path}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async listFiles(directory: string, pattern?: string): Promise<string[]> {
+    if (!this.connected) {
+      throw new Error("Not connected to filesystem server");
+    }
+    
+    try {
+      const result = await this.client.callTool("list_directory", { path: directory });
+      let files = result.entries.filter(entry => entry.type === "file").map(entry => entry.path);
+      
+      // Apply pattern filtering if provided
+      if (pattern) {
+        const regex = new RegExp(pattern.replace(/\*/g, ".*"));
+        files = files.filter(file => regex.test(file));
+      }
+      
+      return files;
+    } catch (error) {
+      logger.error("Error listing files", { directory, pattern, error });
+      throw new Error(`Failed to list files in '${directory}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  // Additional methods as needed...
+}
+```
+
+### 3. Docker Compose Integration
+
+Create a comprehensive Docker Compose configuration that integrates multiple MCP servers:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Main prompt manager service
+  mcp-prompts:
+    build: .
+    volumes:
+      - ./prompts:/app/prompts
+    environment:
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+      - FILESYSTEM_SERVER_ENABLED=true
+      - FILESYSTEM_SERVER_PATH=/data
+      - MEMORY_SERVER_ENABLED=true
+      - GITHUB_SERVER_ENABLED=false
+    depends_on:
+      - filesystem-server
+      - memory-server
+    stdin_open: true
+    tty: true
+
+  # Filesystem MCP server
+  filesystem-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-filesystem /data
+    volumes:
+      - ./data:/data
+    stdin_open: true
+    tty: true
+
+  # Memory MCP server
+  memory-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-memory
+    volumes:
+      - ./memory-data:/data
+    stdin_open: true
+    tty: true
+
+  # GitHub MCP server (optional)
+  github-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-github
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN:-}
+    stdin_open: true
+    tty: true
+    profiles:
+      - github
+```
+
+## Integration Strategies
+
+### 1. Filesystem MCP Server Integration
+
+Store prompts as files using the Filesystem MCP server:
+
+```typescript
+// src/adapters/filesystem-storage-adapter.ts
+import { StorageAdapter, Prompt, ListPromptsOptions } from "../core/types";
+import { FilesystemClient } from "./filesystem-client";
+import { NotFoundError, StorageError } from "../core/errors";
+import { logger } from "../utils/logger";
+import path from "path";
+
+export class FilesystemStorageAdapter implements StorageAdapter {
+  private client: FilesystemClient;
+  private promptsDir: string;
+  
+  constructor(basePath: string, promptsDir: string = "prompts") {
+    this.client = new FilesystemClient(basePath);
+    this.promptsDir = promptsDir;
+  }
+  
+  async connect(): Promise<void> {
+    await this.client.connect();
+    
+    // Ensure prompts directory exists
+    try {
+      await this.client.callTool("create_directory", { path: this.promptsDir });
+      logger.info("Prompts directory created/verified", { path: this.promptsDir });
+    } catch (error) {
+      logger.error("Failed to create prompts directory", { path: this.promptsDir, error });
+      throw new StorageError(
+        `Failed to create prompts directory: ${this.promptsDir}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    await this.client.disconnect();
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      const filePath = path.join(this.promptsDir, `${id}.json`);
+      const content = await this.client.readFile(filePath);
+      return JSON.parse(content) as Prompt;
+    } catch (error) {
+      // Check if it's a not found error
+      if (error instanceof Error && error.message.includes("ENOENT")) {
+        throw new NotFoundError("Prompt", id);
+      }
+      
+      logger.error("Error reading prompt from filesystem", { id, error });
+      throw new StorageError(
+        `Failed to read prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    try {
+      const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
+      await this.client.writeFile(filePath, JSON.stringify(prompt, null, 2));
+    } catch (error) {
+      logger.error("Error saving prompt to filesystem", { id: prompt.id, error });
+      throw new StorageError(
+        `Failed to save prompt: ${prompt.id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    try {
+      // Get all JSON files in the prompts directory
+      const files = await this.client.listFiles(this.promptsDir, "*.json");
+      
+      // Read each file and parse it
+      const prompts = await Promise.all(
+        files.map(async file => {
+          try {
+            const content = await this.client.readFile(file);
+            return JSON.parse(content) as Prompt;
+          } catch (error) {
+            logger.warn("Error reading prompt file", { file, error });
+            return null;
+          }
+        })
+      );
+      
+      // Filter out nulls (failed reads)
+      const validPrompts = prompts.filter(Boolean) as Prompt[];
+      
+      // Apply filters
+      return this.filterPrompts(validPrompts, options);
+    } catch (error) {
+      logger.error("Error listing prompts from filesystem", { error });
+      throw new StorageError(
+        "Failed to list prompts",
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    try {
+      const filePath = path.join(this.promptsDir, `${id}.json`);
+      await this.client.callTool("delete_file", { path: filePath });
+    } catch (error) {
+      // Check if it's a not found error
+      if (error instanceof Error && error.message.includes("ENOENT")) {
+        throw new NotFoundError("Prompt", id);
+      }
+      
+      logger.error("Error deleting prompt from filesystem", { id, error });
+      throw new StorageError(
+        `Failed to delete prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  private filterPrompts(prompts: Prompt[], options?: ListPromptsOptions): Prompt[] {
+    if (!options) return prompts;
+    
+    let filtered = prompts;
+    
+    // Apply filters
+    if (options.tags && options.tags.length > 0) {
+      filtered = filtered.filter(prompt => 
+        prompt.tags && options.tags?.some(tag => prompt.tags?.includes(tag))
+      );
+    }
+    
+    if (options.isTemplate !== undefined) {
+      filtered = filtered.filter(prompt => prompt.isTemplate === options.isTemplate);
+    }
+    
+    if (options.category) {
+      filtered = filtered.filter(prompt => prompt.category === options.category);
+    }
+    
+    if (options.search) {
+      const search = options.search.toLowerCase();
+      filtered = filtered.filter(prompt => 
+        prompt.name.toLowerCase().includes(search) ||
+        (prompt.description && prompt.description.toLowerCase().includes(search)) ||
+        prompt.content.toLowerCase().includes(search)
+      );
+    }
+    
+    // Apply sorting
+    if (options.sort) {
+      const sortField = options.sort as keyof Prompt;
+      const sortOrder = options.order === 'desc' ? -1 : 1;
+      
+      filtered.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortOrder * aValue.localeCompare(bValue);
+        }
+        
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+        return 0;
+      });
+    }
+    
+    // Apply pagination
+    if (options.limit || options.offset) {
+      const offset = options.offset || 0;
+      const limit = options.limit || filtered.length;
+      filtered = filtered.slice(offset, offset + limit);
+    }
+    
+    return filtered;
+  }
+}
+```
+
+### 2. Memory MCP Server Integration
+
+Use the Memory MCP server for storing metadata and caching:
+
+```typescript
+// src/adapters/memory-client.ts
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { spawn } from "child_process";
+import { logger } from "../utils/logger.js";
+
+export class MemoryClient {
+  private client: Client;
+  private process: any;
+  private connected: boolean = false;
+  
+  constructor() {}
+  
+  async connect(): Promise<void> {
+    if (this.connected) return;
+    
+    try {
+      // Start the memory server process
+      this.process = spawn("npx", ["-y", "@modelcontextprotocol/server-memory"], {
+        stdio: ["pipe", "pipe", "pipe"]
+      });
+      
+      // Log process output for debugging
+      this.process.stderr.on("data", (data: Buffer) => {
+        logger.debug(`Memory server: ${data.toString().trim()}`);
+      });
+      
+      // Initialize client with stdio transport
+      const transport = new StdioClientTransport({
+        input: this.process.stdout,
+        output: this.process.stdin
+      });
+      
+      this.client = new Client(
+        { name: "mcp-prompts", version: "1.0.0" },
+        {}
+      );
+      
+      // Connect to the server
+      await this.client.connect(transport);
+      this.connected = true;
+      
+      logger.info("Connected to memory server");
+    } catch (error) {
+      logger.error("Failed to connect to memory server", { error });
+      throw new Error(`Failed to connect to memory server: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (!this.connected) return;
+    
+    try {
+      // Disconnect client
+      await this.client.disconnect();
+      
+      // Kill the process
+      this.process.kill();
+      this.connected = false;
+      
+      logger.info("Disconnected from memory server");
+    } catch (error) {
+      logger.error("Error disconnecting from memory server", { error });
+    }
+  }
+  
+  async get(key: string): Promise<any> {
+    if (!this.connected) {
+      throw new Error("Not connected to memory server");
+    }
+    
+    try {
+      const result = await this.client.callTool("get", { key });
+      return result.value;
+    } catch (error) {
+      logger.error("Error getting value from memory", { key, error });
+      return null;
+    }
+  }
+  
+  async set(key: string, value: any): Promise<void> {
+    if (!this.connected) {
+      throw new Error("Not connected to memory server");
+    }
+    
+    try {
+      await this.client.callTool("set", { key, value });
+    } catch (error) {
+      logger.error("Error setting value in memory", { key, error });
+      throw new Error(`Failed to set value for key '${key}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async delete(key: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("Not connected to memory server");
+    }
+    
+    try {
+      await this.client.callTool("delete", { key });
+    } catch (error) {
+      logger.error("Error deleting value from memory", { key, error });
+      throw new Error(`Failed to delete key '${key}': ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async keys(pattern: string): Promise<string[]> {
+    if (!this.connected) {
+      throw new Error("Not connected to memory server");
+    }
+    
+    try {
+      const result = await this.client.callTool("keys", { pattern });
+      return result.keys;
+    } catch (error) {
+      logger.error("Error getting keys from memory", { pattern, error });
+      return [];
+    }
+  }
+  
+  // Additional methods as needed...
+}
+```
+
+```typescript
+// src/services/metadata-service.ts
+import { MemoryClient } from "../adapters/memory-client";
+import { logger } from "../utils/logger";
+
+export interface PromptMetadata {
+  id: string;
+  name: string;
+  description?: string;
+  tags?: string[];
+  category?: string;
+  isTemplate: boolean;
+  usageCount: number;
+  lastUsed?: string;
+}
+
+export class MetadataService {
+  private client: MemoryClient;
+  private connected: boolean = false;
+  
+  constructor() {
+    this.client = new MemoryClient();
+  }
+  
+  async connect(): Promise<void> {
+    try {
+      await this.client.connect();
+      this.connected = true;
+    } catch (error) {
+      logger.error("Failed to connect to metadata service", { error });
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (this.connected) {
+      await this.client.disconnect();
+      this.connected = false;
+    }
+  }
+  
+  async getMetadata(id: string): Promise<PromptMetadata | null> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected");
+      return null;
+    }
+    
+    try {
+      return await this.client.get(`metadata:${id}`);
+    } catch (error) {
+      logger.error("Error getting metadata", { id, error });
+      return null;
+    }
+  }
+  
+  async saveMetadata(metadata: PromptMetadata): Promise<void> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected, skipping metadata save");
+      return;
+    }
+    
+    try {
+      await this.client.set(`metadata:${metadata.id}`, metadata);
+      
+      // Update tags index
+      if (metadata.tags && metadata.tags.length > 0) {
+        for (const tag of metadata.tags) {
+          const tagIds = await this.client.get(`tag:${tag}`) || [];
+          if (!tagIds.includes(metadata.id)) {
+            tagIds.push(metadata.id);
+            await this.client.set(`tag:${tag}`, tagIds);
+          }
+        }
+      }
+      
+      // Update category index
+      if (metadata.category) {
+        const categoryIds = await this.client.get(`category:${metadata.category}`) || [];
+        if (!categoryIds.includes(metadata.id)) {
+          categoryIds.push(metadata.id);
+          await this.client.set(`category:${metadata.category}`, categoryIds);
+        }
+      }
+      
+      // Update templates index
+      if (metadata.isTemplate) {
+        const templateIds = await this.client.get("templates") || [];
+        if (!templateIds.includes(metadata.id)) {
+          templateIds.push(metadata.id);
+          await this.client.set("templates", templateIds);
+        }
+      }
+    } catch (error) {
+      logger.error("Error saving metadata", { id: metadata.id, error });
+    }
+  }
+  
+  async deleteMetadata(id: string): Promise<void> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected, skipping metadata delete");
+      return;
+    }
+    
+    try {
+      // Get the current metadata to update indexes
+      const metadata = await this.getMetadata(id);
+      if (metadata) {
+        // Remove from tags index
+        if (metadata.tags && metadata.tags.length > 0) {
+          for (const tag of metadata.tags) {
+            const tagIds = await this.client.get(`tag:${tag}`) || [];
+            const updatedTagIds = tagIds.filter(promptId => promptId !== id);
+            await this.client.set(`tag:${tag}`, updatedTagIds);
+          }
+        }
+        
+        // Remove from category index
+        if (metadata.category) {
+          const categoryIds = await this.client.get(`category:${metadata.category}`) || [];
+          const updatedCategoryIds = categoryIds.filter(promptId => promptId !== id);
+          await this.client.set(`category:${metadata.category}`, updatedCategoryIds);
+        }
+        
+        // Remove from templates index
+        if (metadata.isTemplate) {
+          const templateIds = await this.client.get("templates") || [];
+          const updatedTemplateIds = templateIds.filter(promptId => promptId !== id);
+          await this.client.set("templates", updatedTemplateIds);
+        }
+      }
+      
+      // Delete the metadata
+      await this.client.delete(`metadata:${id}`);
+    } catch (error) {
+      logger.error("Error deleting metadata", { id, error });
+    }
+  }
+  
+  async incrementUsage(id: string): Promise<void> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected, skipping usage increment");
+      return;
+    }
+    
+    try {
+      const metadata = await this.getMetadata(id);
+      if (metadata) {
+        metadata.usageCount = (metadata.usageCount || 0) + 1;
+        metadata.lastUsed = new Date().toISOString();
+        await this.saveMetadata(metadata);
+      }
+    } catch (error) {
+      logger.error("Error incrementing usage", { id, error });
+    }
+  }
+  
+  async getPromptsByTag(tag: string): Promise<string[]> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected");
+      return [];
+    }
+    
+    try {
+      return await this.client.get(`tag:${tag}`) || [];
+    } catch (error) {
+      logger.error("Error getting prompts by tag", { tag, error });
+      return [];
+    }
+  }
+  
+  async getPromptsByCategory(category: string): Promise<string[]> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected");
+      return [];
+    }
+    
+    try {
+      return await this.client.get(`category:${category}`) || [];
+    } catch (error) {
+      logger.error("Error getting prompts by category", { category, error });
+      return [];
+    }
+  }
+  
+  async getTemplateIds(): Promise<string[]> {
+    if (!this.connected) {
+      logger.warn("Metadata service not connected");
+      return [];
+    }
+    
+    try {
+      return await this.client.get("templates") || [];
+    } catch (error) {
+      logger.error("Error getting template IDs", { error });
+      return [];
+    }
+  }
+  
+  // Additional methods...
+}
+```
+
+### 3. GitHub MCP Server Integration
+
+Use the GitHub MCP server for synchronization:
+
+```typescript
+// src/adapters/github-client.ts
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { spawn } from "child_process";
+import { logger } from "../utils/logger.js";
+
+export class GitHubClient {
+  private client: Client;
+  private process: any;
+  private connected: boolean = false;
+  
+  constructor(private token: string) {}
+  
+  async connect(): Promise<void> {
+    if (this.connected) return;
+    
+    try {
+      // Start the GitHub server process
+      this.process = spawn("npx", ["-y", "@modelcontextprotocol/server-github"], {
+        stdio: ["pipe", "pipe", "pipe"],
+        env: {
+          ...process.env,
+          GITHUB_PERSONAL_ACCESS_TOKEN: this.token
+        }
+      });
+      
+      // Log process output for debugging
+      this.process.stderr.on("data", (data: Buffer) => {
+        logger.debug(`GitHub server: ${data.toString().trim()}`);
+      });
+      
+      // Initialize client with stdio transport
+      const transport = new StdioClientTransport({
+        input: this.process.stdout,
+        output: this.process.stdin
+      });
+      
+      this.client = new Client(
+        { name: "mcp-prompts", version: "1.0.0" },
+        {}
+      );
+      
+      // Connect to the server
+      await this.client.connect(transport);
+      this.connected = true;
+      
+      logger.info("Connected to GitHub server");
+    } catch (error) {
+      logger.error("Failed to connect to GitHub server", { error });
+      throw new Error(`Failed to connect to GitHub server: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (!this.connected) return;
+    
+    try {
+      // Disconnect client
+      await this.client.disconnect();
+      
+      // Kill the process
+      this.process.kill();
+      this.connected = false;
+      
+      logger.info("Disconnected from GitHub server");
+    } catch (error) {
+      logger.error("Error disconnecting from GitHub server", { error });
+    }
+  }
+  
+  async getFile(owner: string, repo: string, path: string, branch: string = "main"): Promise<string> {
+    if (!this.connected) {
+      throw new Error("Not connected to GitHub server");
+    }
+    
+    try {
+      const result = await this.client.callTool("get_file_contents", {
+        owner,
+        repo,
+        path,
+        branch
+      });
+      
+      if (result.type === "file") {
+        return Buffer.from(result.content, "base64").toString("utf8");
+      }
+      
+      throw new Error(`Path is not a file: ${path}`);
+    } catch (error) {
+      logger.error("Error getting file from GitHub", { owner, repo, path, branch, error });
+      throw new Error(`Failed to get file from GitHub: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async createOrUpdateFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch: string = "main"
+  ): Promise<void> {
+    if (!this.connected) {
+      throw new Error("Not connected to GitHub server");
+    }
+    
+    try {
+      // Check if the file exists to get its SHA
+      let sha: string | undefined;
+      
+      try {
+        const fileInfo = await this.client.callTool("get_file_contents", {
+          owner,
+          repo,
+          path,
+          branch
+        });
+        
+        if (fileInfo.type === "file") {
+          sha = fileInfo.sha;
+        }
+      } catch (error) {
+        // File doesn't exist, that's fine
+        logger.debug("File doesn't exist, will create it", { path });
+      }
+      
+      // Create or update the file
+      await this.client.callTool("create_or_update_file", {
+        owner,
+        repo,
+        path,
+        content,
+        message,
+        branch,
+        sha
+      });
+    } catch (error) {
+      logger.error("Error creating/updating file on GitHub", { owner, repo, path, branch, error });
+      throw new Error(`Failed to create/update file on GitHub: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async listFiles(owner: string, repo: string, path: string, branch: string = "main"): Promise<string[]> {
+    if (!this.connected) {
+      throw new Error("Not connected to GitHub server");
+    }
+    
+    try {
+      const result = await this.client.callTool("get_file_contents", {
+        owner,
+        repo,
+        path,
+        branch
+      });
+      
+      if (result.type === "dir") {
+        return result.entries.filter(entry => entry.type === "file").map(entry => entry.path);
+      }
+      
+      throw new Error(`Path is not a directory: ${path}`);
+    } catch (error) {
+      logger.error("Error listing files from GitHub", { owner, repo, path, branch, error });
+      throw new Error(`Failed to list files from GitHub: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  // Additional methods...
+}
+```
+
+```typescript
+// src/services/sync-service.ts
+import { GitHubClient } from "../adapters/github-client";
+import { StorageAdapter, Prompt } from "../core/types";
+import { logger } from "../utils/logger";
+
+export interface SyncOptions {
+  owner: string;
+  repo: string;
+  branch: string;
+  path: string;
+  direction: "push" | "pull" | "both";
+}
+
+export interface SyncResult {
+  pushed: number;
+  pulled: number;
+  errors: { id: string; error: string }[];
+}
+
+export class SyncService {
+  private client: GitHubClient;
+  private connected: boolean = false;
+  
+  constructor(
+    private storage: StorageAdapter,
+    private token: string
+  ) {
+    this.client = new GitHubClient(token);
+  }
+  
+  async connect(): Promise<void> {
+    try {
+      await this.client.connect();
+      this.connected = true;
+    } catch (error) {
+      logger.error("Failed to connect to sync service", { error });
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (this.connected) {
+      await this.client.disconnect();
+      this.connected = false;
+    }
+  }
+  
+  async syncPrompts(options: SyncOptions): Promise<SyncResult> {
+    if (!this.connected) {
+      throw new Error("Sync service not connected");
+    }
+    
+    const result: SyncResult = {
+      pushed: 0,
+      pulled: 0,
+      errors: []
+    };
+    
+    try {
+      // Get all local prompts
+      const localPrompts = await this.storage.listPrompts();
+      
+      // Create a map of local prompts by ID
+      const localPromptsMap = new Map<string, Prompt>();
+      for (const prompt of localPrompts) {
+        localPromptsMap.set(prompt.id, prompt);
+      }
+      
+      // If pulling, get remote prompts
+      if (options.direction === "pull" || options.direction === "both") {
+        try {
+          // List files in the remote directory
+          const files = await this.client.listFiles(
+            options.owner,
+            options.repo,
+            options.path,
+            options.branch
+          );
+          
+          // Filter JSON files
+          const jsonFiles = files.filter(file => file.endsWith(".json"));
+          
+          // Pull each file
+          for (const file of jsonFiles) {
+            try {
+              // Extract prompt ID from file path
+              const fileName = file.split("/").pop();
+              const promptId = fileName?.replace(".json", "");
+              
+              if (promptId) {
+                // Get the remote prompt content
+                const content = await this.client.getFile(
+                  options.owner,
+                  options.repo,
+                  file,
+                  options.branch
+                );
+                
+                // Parse the prompt
+                const remotePrompt = JSON.parse(content) as Prompt;
+                
+                // Check if we need to update local prompt
+                const localPrompt = localPromptsMap.get(promptId);
+                
+                if (!localPrompt || new Date(remotePrompt.updatedAt) > new Date(localPrompt.updatedAt)) {
+                  // Save the remote prompt locally
+                  await this.storage.savePrompt(remotePrompt);
+                  result.pulled++;
+                  logger.info("Pulled prompt from remote", { id: promptId });
+                }
+              }
+            } catch (error) {
+              const errorMessage = error instanceof Error ? error.message : String(error);
+              logger.error("Error pulling prompt", { file, error });
+              result.errors.push({ id: file, error: errorMessage });
+            }
+          }
+        } catch (error) {
+          logger.error("Error listing remote files", { error });
+          throw error;
+        }
+      }
+      
+      // If pushing, push local prompts to remote
+      if (options.direction === "push" || options.direction === "both") {
+        for (const [id, prompt] of localPromptsMap.entries()) {
+          try {
+            // Create the file path
+            const filePath = `${options.path}/${id}.json`;
+            
+            // Convert prompt to JSON
+            const content = JSON.stringify(prompt, null, 2);
+            
+            // Push to GitHub
+            await this.client.createOrUpdateFile(
+              options.owner,
+              options.repo,
+              filePath,
+              content,
+              `Update prompt: ${prompt.name}`,
+              options.branch
+            );
+            
+            result.pushed++;
+            logger.info("Pushed prompt to remote", { id });
+          } catch (error) {
+            const errorMessage = error instanceof Error ? error.message : String(error);
+            logger.error("Error pushing prompt", { id, error });
+            result.errors.push({ id, error: errorMessage });
+          }
+        }
+      }
+      
+      return result;
+    } catch (error) {
+      logger.error("Error syncing prompts", { error });
+      throw new Error(`Failed to sync prompts: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+}
+```
+
+## Integration Configuration
+
+Implement a flexible configuration system for integrations:
+
+```typescript
+// src/config/integration-config.ts
+export interface FilesystemServerConfig {
+  enabled: boolean;
+  basePath: string;
+  promptsDir: string;
+}
+
+export interface MemoryServerConfig {
+  enabled: boolean;
+}
+
+export interface GitHubServerConfig {
+  enabled: boolean;
+  token: string;
+  owner: string;
+  repo: string;
+  branch: string;
+  path: string;
+}
+
+export interface IntegrationConfig {
+  filesystem: FilesystemServerConfig;
+  memory: MemoryServerConfig;
+  github?: GitHubServerConfig;
+}
+
+export function getIntegrationConfig(): IntegrationConfig {
+  return {
+    filesystem: {
+      enabled: process.env.FILESYSTEM_SERVER_ENABLED === "true",
+      basePath: process.env.FILESYSTEM_SERVER_PATH || "/data",
+      promptsDir: process.env.PROMPTS_DIR || "prompts"
+    },
+    memory: {
+      enabled: process.env.MEMORY_SERVER_ENABLED === "true"
+    },
+    github: process.env.GITHUB_SERVER_ENABLED === "true" ? {
+      enabled: true,
+      token: process.env.GITHUB_TOKEN || "",
+      owner: process.env.GITHUB_OWNER || "",
+      repo: process.env.GITHUB_REPO || "",
+      branch: process.env.GITHUB_BRANCH || "main",
+      path: process.env.GITHUB_PATH || "prompts"
+    } : undefined
+  };
+}
+```
+
+## Integration Factory
+
+Create a factory for creating integrated components:
+
+```typescript
+// src/integration/integration-factory.ts
+import { StorageAdapter } from "../core/types";
+import { FileAdapter } from "../adapters/file-adapter";
+import { FilesystemStorageAdapter } from "../adapters/filesystem-storage-adapter";
+import { MetadataService } from "../services/metadata-service";
+import { SyncService } from "../services/sync-service";
+import { getIntegrationConfig, IntegrationConfig } from "../config/integration-config";
+import { logger } from "../utils/logger";
+
+export class IntegrationFactory {
+  private config: IntegrationConfig;
+  
+  constructor() {
+    this.config = getIntegrationConfig();
+  }
+  
+  async createStorageAdapter(): Promise<StorageAdapter> {
+    // If filesystem server is enabled, use the filesystem adapter
+    if (this.config.filesystem.enabled) {
+      logger.info("Creating filesystem storage adapter", {
+        basePath: this.config.filesystem.basePath,
+        promptsDir: this.config.filesystem.promptsDir
+      });
+      
+      const adapter = new FilesystemStorageAdapter(
+        this.config.filesystem.basePath,
+        this.config.filesystem.promptsDir
+      );
+      
+      await adapter.connect();
+      return adapter;
+    }
+    
+    // Otherwise, use the file adapter
+    logger.info("Creating file storage adapter", {
+      promptsDir: this.config.filesystem.promptsDir
+    });
+    
+    const adapter = new FileAdapter(this.config.filesystem.promptsDir);
+    await adapter.connect();
+    return adapter;
+  }
+  
+  async createMetadataService(): Promise<MetadataService | null> {
+    if (this.config.memory.enabled) {
+      logger.info("Creating metadata service");
+      
+      const service = new MetadataService();
+      await service.connect();
+      return service;
+    }
+    
+    logger.info("Metadata service disabled");
+    return null;
+  }
+  
+  async createSyncService(storage: StorageAdapter): Promise<SyncService | null> {
+    if (this.config.github?.enabled && this.config.github.token) {
+      logger.info("Creating sync service", {
+        owner: this.config.github.owner,
+        repo: this.config.github.repo
+      });
+      
+      const service = new SyncService(storage, this.config.github.token);
+      await service.connect();
+      return service;
+    }
+    
+    logger.info("Sync service disabled");
+    return null;
+  }
+  
+  async cleanup(
+    storage: StorageAdapter,
+    metadata?: MetadataService | null,
+    sync?: SyncService | null
+  ): Promise<void> {
+    // Disconnect all services
+    const promises: Promise<void>[] = [storage.disconnect()];
+    
+    if (metadata) {
+      promises.push(metadata.disconnect());
+    }
+    
+    if (sync) {
+      promises.push(sync.disconnect());
+    }
+    
+    await Promise.all(promises);
+    logger.info("Integration services disconnected");
+  }
+}
+```
+
+## Main Server with Integration
+
+```typescript
+// src/index.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { PromptService } from "./services/prompt-service.js";
+import { setupPromptTools } from "./tools/prompt-tools.js";
+import { IntegrationFactory } from "./integration/integration-factory.js";
+import { logger } from "./utils/logger.js";
+
+async function main() {
+  let storageAdapter;
+  let metadataService;
+  let syncService;
+  
+  try {
+    logger.info("Starting MCP Prompts server");
+    
+    // Initialize the integration factory
+    const factory = new IntegrationFactory();
+    
+    // Create the storage adapter
+    storageAdapter = await factory.createStorageAdapter();
+    
+    // Create the metadata service
+    metadataService = await factory.createMetadataService();
+    
+    // Create the sync service
+    syncService = await factory.createSyncService(storageAdapter);
+    
+    // Initialize the prompt service
+    const promptService = new PromptService(storageAdapter, metadataService);
+    
+    // Initialize the server
+    const server = new Server({
+      name: "mcp-prompts",
+      version: "1.0.0"
+    });
+    
+    // Set up tools
+    setupPromptTools(server, promptService, syncService);
+    
+    // Start the server
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    
+    logger.info("MCP Prompts server started");
+    
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      logger.info("Shutting down MCP Prompts server");
+      
+      try {
+        await factory.cleanup(storageAdapter, metadataService, syncService);
+      } catch (error) {
+        logger.error("Error during cleanup", { error });
+      }
+      
+      process.exit(0);
+    };
+    
+    process.on("SIGINT", shutdown);
+    process.on("SIGTERM", shutdown);
+  } catch (error) {
+    logger.error("Failed to start server", { error });
+    
+    // Attempt cleanup
+    if (storageAdapter) {
+      try {
+        await storageAdapter.disconnect();
+      } catch (cleanupError) {
+        logger.error("Error disconnecting storage", { error: cleanupError });
+      }
+    }
+    
+    if (metadataService) {
+      try {
+        await metadataService.disconnect();
+      } catch (cleanupError) {
+        logger.error("Error disconnecting metadata service", { error: cleanupError });
+      }
+    }
+    
+    if (syncService) {
+      try {
+        await syncService.disconnect();
+      } catch (cleanupError) {
+        logger.error("Error disconnecting sync service", { error: cleanupError });
+      }
+    }
+    
+    process.exit(1);
+  }
+}
+
+main();
+```
+
+## Integration Best Practices
+
+1. **Graceful Degradation**: Design integrations to gracefully degrade when services are unavailable.
+2. **Configuration Options**: Make integrations configurable through environment variables.
+3. **Loose Coupling**: Keep integrations loosely coupled to allow for independent evolution.
+4. **Connection Management**: Properly manage connections to external services.
+5. **Error Handling**: Implement robust error handling for integration failures.
+6. **Logging**: Log all integration-related events for debugging.
+7. **Security**: Handle credentials securely for external services.
+8. **Resource Management**: Clean up resources when shutting down.
+9. **Testing**: Test integrations with mock services.
+10. **Documentation**: Document integration points and configuration options.
+
+## Conclusion
+
+By following these integration guidelines, you can create a powerful MCP-Prompts server that seamlessly integrates with other MCP tools and services, creating a cohesive ecosystem of functionality.

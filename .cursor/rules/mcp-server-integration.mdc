@@ -1,0 +1,632 @@
+ ---
+description: Guidelines for integrating the MCP-Prompts project with existing MCP servers for storage, metadata, and synchronization
+globs:
+  - "src/adapters/*.ts"
+  - "src/adapters/*.js"
+  - "src/config/*.ts"
+  - "src/config/*.js"
+  - "docker-compose.yml"
+---
+
+# MCP Server Integration Guidelines
+
+This rule provides guidance for integrating the MCP-Prompts project with existing MCP servers to leverage their capabilities instead of reimplementing functionality.
+
+## Overview of Integrated MCP Servers
+
+The MCP-Prompts project integrates with several existing MCP servers:
+
+1. **Storage**: `@modelcontextprotocol/server-filesystem` and `@modelcontextprotocol/server-postgres`
+2. **Metadata**: `@modelcontextprotocol/server-memory`
+3. **Synchronization**: `@modelcontextprotocol/server-github`
+4. **Extended Capabilities**: `@modelcontextprotocol/server-sequential-thinking` and `mamertofabian/elevenlabs-mcp-server`
+
+## Integration Architecture
+
+The integration follows an adapter pattern to provide a unified interface for different MCP servers:
+
+```typescript
+// src/adapters/base-adapter.ts
+export interface MCPServerAdapter {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  isConnected(): boolean;
+}
+
+// src/adapters/storage-adapter.ts
+export interface StorageAdapter extends MCPServerAdapter {
+  getPrompt(id: string): Promise<Prompt>;
+  savePrompt(prompt: Prompt): Promise<void>;
+  listPrompts(filter?: PromptFilter): Promise<Prompt[]>;
+  deletePrompt(id: string): Promise<void>;
+}
+
+// Implementation for Filesystem MCP server
+export class FilesystemAdapter implements StorageAdapter {
+  private client: FilesystemClient;
+  private connected: boolean = false;
+  
+  constructor(private config: FilesystemConfig) {
+    this.client = new FilesystemClient(config);
+  }
+  
+  async connect(): Promise<void> {
+    if (!this.connected) {
+      await this.client.connect();
+      this.connected = true;
+    }
+  }
+  
+  async disconnect(): Promise<void> {
+    if (this.connected) {
+      await this.client.disconnect();
+      this.connected = false;
+    }
+  }
+  
+  isConnected(): boolean {
+    return this.connected;
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    // Convert ID to filesystem path
+    const path = this.idToPath(id);
+    
+    // Read the file using Filesystem MCP server
+    const content = await this.client.readFile(path);
+    
+    // Convert to Prompt object
+    return this.convertToPrompt(content, path);
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    // Convert Prompt to file content
+    const content = this.convertFromPrompt(prompt);
+    
+    // Get path from prompt
+    const path = this.promptToPath(prompt);
+    
+    // Save using Filesystem MCP server
+    await this.client.writeFile(path, content);
+  }
+  
+  async listPrompts(filter?: PromptFilter): Promise<Prompt[]> {
+    // Get directory listing from Filesystem MCP server
+    const files = await this.client.listFiles(this.config.promptsDir, filter?.pattern || '*.md*');
+    
+    // Convert each file to a Prompt
+    const prompts = await Promise.all(
+      files.map(async file => {
+        const content = await this.client.readFile(file);
+        return this.convertToPrompt(content, file);
+      })
+    );
+    
+    // Apply any additional filtering
+    return this.filterPrompts(prompts, filter);
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    // Convert ID to filesystem path
+    const path = this.idToPath(id);
+    
+    // Delete the file using Filesystem MCP server
+    await this.client.deleteFile(path);
+  }
+  
+  // Helper methods
+  private idToPath(id: string): string {
+    return `${this.config.promptsDir}/${id}.md`;
+  }
+  
+  private promptToPath(prompt: Prompt): string {
+    // Logic to determine file path based on prompt properties
+    const filename = prompt.id || prompt.name.toLowerCase().replace(/\s+/g, '-');
+    return `${this.config.promptsDir}/${filename}.md`;
+  }
+  
+  private convertToPrompt(content: string, path: string): Prompt {
+    // Parse content and extract prompt information
+    // This depends on the file format (md, mdx, json, etc.)
+    // For .mdc files, parse YAML frontmatter and Markdown content
+    
+    // Return a Prompt object
+    return {
+      id: path.split('/').pop().replace(/\.\w+$/, ''),
+      name: 'Extracted from file',
+      description: 'Extracted description',
+      content: content,
+      // other properties...
+    };
+  }
+  
+  private convertFromPrompt(prompt: Prompt): string {
+    // Convert a Prompt object to file content
+    // For .mdc files, format as YAML frontmatter + Markdown content
+    
+    return `---
+description: ${prompt.description}
+globs: ${JSON.stringify(prompt.globs || [])}
+---
+
+${prompt.content}`;
+  }
+  
+  private filterPrompts(prompts: Prompt[], filter?: PromptFilter): Prompt[] {
+    if (!filter) return prompts;
+    
+    return prompts.filter(prompt => {
+      if (filter.tags && filter.tags.length > 0) {
+        // Check if prompt has all required tags
+        const promptTags = prompt.tags || [];
+        return filter.tags.every(tag => promptTags.includes(tag));
+      }
+      
+      return true;
+    });
+  }
+}
+```
+
+## PostgreSQL Adapter Integration
+
+For situations requiring relational database storage:
+
+```typescript
+// src/adapters/postgres-adapter.ts
+export class PostgresAdapter implements StorageAdapter {
+  private client: PostgresClient;
+  private connected: boolean = false;
+  
+  constructor(private config: PostgresConfig) {
+    this.client = new PostgresClient(config);
+  }
+  
+  // Implementation of StorageAdapter interface
+  // Similar to FilesystemAdapter but using SQL queries
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    // Query prompt from PostgreSQL using MCP server
+    const result = await this.client.executeQuery(`
+      SELECT * FROM prompts WHERE id = $1
+    `, [id]);
+    
+    // Convert row to Prompt object
+    return this.rowToPrompt(result.rows[0]);
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    // Convert Prompt to row data
+    const data = this.promptToRow(prompt);
+    
+    // Save using upsert query
+    await this.client.executeQuery(`
+      INSERT INTO prompts (id, name, description, content, tags, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      ON CONFLICT (id) DO UPDATE
+      SET name = $2, description = $3, content = $4, tags = $5, updated_at = $7
+    `, [
+      data.id,
+      data.name,
+      data.description,
+      data.content,
+      data.tags,
+      data.created_at,
+      data.updated_at
+    ]);
+  }
+  
+  // Other methods...
+}
+```
+
+## Memory MCP Server for Metadata
+
+Use the Memory MCP server to store and retrieve prompt metadata:
+
+```typescript
+// src/adapters/memory-adapter.ts
+export class MemoryAdapter implements MetadataAdapter {
+  private client: MemoryClient;
+  private connected: boolean = false;
+  
+  constructor(private config: MemoryConfig) {
+    this.client = new MemoryClient(config);
+  }
+  
+  async connect(): Promise<void> {
+    if (!this.connected) {
+      await this.client.connect();
+      this.connected = true;
+    }
+  }
+  
+  async getMetadata(id: string): Promise<PromptMetadata> {
+    // Get metadata from Memory MCP server
+    const result = await this.client.get(`prompt:${id}`);
+    
+    if (!result) {
+      throw new Error(`Metadata not found for prompt: ${id}`);
+    }
+    
+    return result as PromptMetadata;
+  }
+  
+  async saveMetadata(id: string, metadata: PromptMetadata): Promise<void> {
+    // Save metadata using Memory MCP server
+    await this.client.set(`prompt:${id}`, metadata);
+  }
+  
+  async listMetadata(filter?: MetadataFilter): Promise<PromptMetadata[]> {
+    // List metadata matching the filter
+    const keys = await this.client.keys('prompt:*');
+    
+    const allMetadata = await Promise.all(
+      keys.map(async key => {
+        const metadata = await this.client.get(key);
+        return metadata as PromptMetadata;
+      })
+    );
+    
+    return this.filterMetadata(allMetadata, filter);
+  }
+  
+  // Helper methods
+  private filterMetadata(metadata: PromptMetadata[], filter?: MetadataFilter): PromptMetadata[] {
+    if (!filter) return metadata;
+    
+    return metadata.filter(meta => {
+      if (filter.tags && filter.tags.length > 0) {
+        // Check if metadata has all required tags
+        const metaTags = meta.tags || [];
+        return filter.tags.every(tag => metaTags.includes(tag));
+      }
+      
+      return true;
+    });
+  }
+}
+```
+
+## GitHub MCP Server for Synchronization
+
+Use the GitHub MCP server to sync prompts with a remote repository:
+
+```typescript
+// src/adapters/github-adapter.ts
+export class GitHubAdapter implements SyncAdapter {
+  private client: GitHubClient;
+  private connected: boolean = false;
+  
+  constructor(private config: GitHubConfig) {
+    this.client = new GitHubClient(config);
+  }
+  
+  async connect(): Promise<void> {
+    if (!this.connected) {
+      await this.client.connect();
+      this.connected = true;
+    }
+  }
+  
+  async syncPrompts(localPath: string, remotePath: string): Promise<SyncResult> {
+    // Get files from remote repository
+    const remoteFiles = await this.client.listFiles(
+      this.config.owner,
+      this.config.repo,
+      remotePath,
+      this.config.branch
+    );
+    
+    // Get local files
+    const localFiles = await this.listLocalFiles(localPath);
+    
+    // Determine files to push and pull
+    const { toPush, toPull } = this.calculateSyncChanges(localFiles, remoteFiles);
+    
+    // Pull from remote
+    for (const file of toPull) {
+      await this.pullFile(file, remotePath, localPath);
+    }
+    
+    // Push to remote
+    for (const file of toPush) {
+      await this.pushFile(file, localPath, remotePath);
+    }
+    
+    return {
+      pulled: toPull.length,
+      pushed: toPush.length,
+      total: toPull.length + toPush.length
+    };
+  }
+  
+  // Helper methods
+  private async listLocalFiles(path: string): Promise<FileInfo[]> {
+    // Implementation to list local files
+  }
+  
+  private calculateSyncChanges(localFiles: FileInfo[], remoteFiles: FileInfo[]): SyncChanges {
+    // Logic to determine which files to push and pull
+  }
+  
+  private async pullFile(file: string, remotePath: string, localPath: string): Promise<void> {
+    // Get file content from GitHub
+    const content = await this.client.getFileContent(
+      this.config.owner,
+      this.config.repo,
+      `${remotePath}/${file}`,
+      this.config.branch
+    );
+    
+    // Save locally
+    // Implementation to save file locally
+  }
+  
+  private async pushFile(file: string, localPath: string, remotePath: string): Promise<void> {
+    // Get local file content
+    // Implementation to read local file
+    
+    // Push to GitHub
+    await this.client.createOrUpdateFile(
+      this.config.owner,
+      this.config.repo,
+      `${remotePath}/${file}`,
+      content,
+      `Update ${file} from MCP-Prompts`,
+      this.config.branch
+    );
+  }
+}
+```
+
+## Additional Capabilities Integration
+
+Integration with Sequential Thinking and ElevenLabs MCP servers:
+
+```typescript
+// src/adapters/sequential-thinking-adapter.ts
+export class SequentialThinkingAdapter {
+  private client: SequentialThinkingClient;
+  
+  constructor(private config: SequentialThinkingConfig) {
+    this.client = new SequentialThinkingClient(config);
+  }
+  
+  async think(prompt: string, context: any): Promise<ThinkingResult> {
+    // Use Sequential Thinking MCP server for enhanced reasoning
+    return await this.client.think(prompt, context);
+  }
+}
+
+// src/adapters/elevenlabs-adapter.ts
+export class ElevenLabsAdapter {
+  private client: ElevenLabsClient;
+  
+  constructor(private config: ElevenLabsConfig) {
+    this.client = new ElevenLabsClient(config);
+  }
+  
+  async speakPrompt(prompt: Prompt): Promise<SpeechResult> {
+    // Generate description for speaking
+    const description = `This prompt is titled ${prompt.name}. ${prompt.description}`;
+    
+    // Use ElevenLabs MCP server to convert text to speech
+    return await this.client.textToSpeech(description, {
+      voice: this.config.voice,
+      speed: this.config.speed,
+      pitch: this.config.pitch
+    });
+  }
+}
+```
+
+## Configuration Management
+
+Create a unified configuration system for all MCP server integrations:
+
+```typescript
+// src/config/config.ts
+export interface MCPServerConfig {
+  type: string;
+  enabled: boolean;
+}
+
+export interface FilesystemConfig extends MCPServerConfig {
+  type: 'filesystem';
+  promptsDir: string;
+  allowedPatterns: string[];
+}
+
+export interface PostgresConfig extends MCPServerConfig {
+  type: 'postgres';
+  connectionString: string;
+  schema: string;
+}
+
+export interface MemoryConfig extends MCPServerConfig {
+  type: 'memory';
+  persistence: boolean;
+  dataDir?: string;
+}
+
+export interface GitHubConfig extends MCPServerConfig {
+  type: 'github';
+  owner: string;
+  repo: string;
+  branch: string;
+  token: string;
+}
+
+export interface SequentialThinkingConfig extends MCPServerConfig {
+  type: 'sequential-thinking';
+  maxThoughts: number;
+}
+
+export interface ElevenLabsConfig extends MCPServerConfig {
+  type: 'elevenlabs';
+  apiKey: string;
+  voice: string;
+  speed: number;
+  pitch: number;
+}
+
+export interface AppConfig {
+  storage: FilesystemConfig | PostgresConfig;
+  metadata: MemoryConfig;
+  sync?: GitHubConfig;
+  sequentialThinking?: SequentialThinkingConfig;
+  elevenlabs?: ElevenLabsConfig;
+}
+
+// Load config from environment or config file
+export function loadConfig(): AppConfig {
+  return {
+    storage: {
+      type: 'filesystem',
+      enabled: true,
+      promptsDir: process.env.PROMPTS_DIR || './prompts',
+      allowedPatterns: ['*.md', '*.mdx', '*.json']
+    },
+    metadata: {
+      type: 'memory',
+      enabled: true,
+      persistence: true,
+      dataDir: process.env.METADATA_DIR || './data'
+    },
+    sync: process.env.GITHUB_TOKEN ? {
+      type: 'github',
+      enabled: true,
+      owner: process.env.GITHUB_OWNER || 'sparesparrow',
+      repo: process.env.GITHUB_REPO || 'mcp-prompts',
+      branch: process.env.GITHUB_BRANCH || 'main',
+      token: process.env.GITHUB_TOKEN
+    } : undefined,
+    // Optional integrations
+    sequentialThinking: process.env.ENABLE_SEQUENTIAL_THINKING === 'true' ? {
+      type: 'sequential-thinking',
+      enabled: true,
+      maxThoughts: parseInt(process.env.MAX_THOUGHTS || '10')
+    } : undefined,
+    elevenlabs: process.env.ELEVENLABS_API_KEY ? {
+      type: 'elevenlabs',
+      enabled: true,
+      apiKey: process.env.ELEVENLABS_API_KEY,
+      voice: process.env.ELEVENLABS_VOICE || 'Adam',
+      speed: parseFloat(process.env.ELEVENLABS_SPEED || '1.0'),
+      pitch: parseFloat(process.env.ELEVENLABS_PITCH || '1.0')
+    } : undefined
+  };
+}
+```
+
+## Docker Compose Integration
+
+A Docker Compose setup to orchestrate all the MCP servers:
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Main prompt manager service
+  prompt-manager:
+    build: .
+    volumes:
+      - ./prompts:/app/prompts
+      - ./data:/app/data
+    environment:
+      - PROMPTS_DIR=/app/prompts
+      - METADATA_DIR=/app/data
+      - STORAGE_TYPE=filesystem
+      - GITHUB_TOKEN=${GITHUB_TOKEN}
+      - GITHUB_OWNER=${GITHUB_OWNER:-sparesparrow}
+      - GITHUB_REPO=${GITHUB_REPO:-mcp-prompts}
+      - GITHUB_BRANCH=${GITHUB_BRANCH:-main}
+      - ENABLE_SEQUENTIAL_THINKING=${ENABLE_SEQUENTIAL_THINKING:-false}
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+    ports:
+      - "3000:3000"
+    depends_on:
+      - memory-server
+      - filesystem-server
+      - github-server
+      - sequential-thinking-server
+      - elevenlabs-server
+
+  # Memory MCP server for metadata
+  memory-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-memory
+    volumes:
+      - ./data:/data
+    ports:
+      - "3001:3000"
+
+  # Filesystem MCP server for accessing prompt files
+  filesystem-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-filesystem /prompts
+    volumes:
+      - ./prompts:/prompts
+    ports:
+      - "3002:3000"
+
+  # GitHub MCP server for synchronization
+  github-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-github
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN}
+    ports:
+      - "3003:3000"
+
+  # Sequential Thinking MCP server
+  sequential-thinking-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-sequential-thinking
+    ports:
+      - "3004:3000"
+
+  # ElevenLabs MCP server
+  elevenlabs-server:
+    image: node:18-alpine
+    command: npm start
+    working_dir: /app
+    volumes:
+      - ./elevenlabs-mcp:/app
+    environment:
+      - ELEVENLABS_API_KEY=${ELEVENLABS_API_KEY}
+    ports:
+      - "3005:3000"
+
+  # PostgreSQL database (optional alternative storage)
+  postgres:
+    image: postgres:14-alpine
+    environment:
+      - POSTGRES_USER=mcp
+      - POSTGRES_PASSWORD=mcp_pass
+      - POSTGRES_DB=prompts
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+
+volumes:
+  postgres-data:
+```
+
+## Best Practices for MCP Server Integration
+
+1. **Lazy Connection**: Connect to MCP servers only when needed to reduce resource usage
+2. **Connection Pooling**: Reuse connections when possible
+3. **Error Handling**: Implement proper error handling for all server interactions
+4. **Fallback Mechanisms**: Provide fallbacks when servers are unavailable
+5. **Configuration Validation**: Validate server configurations before connecting
+6. **Logging**: Log all server interactions for debugging
+7. **Rate Limiting**: Respect rate limits and implement backoff strategies
+8. **Security**: Handle credentials securely and validate server responses
+9. **Health Checks**: Implement health checks for all integrated servers
+10. **Graceful Shutdown**: Properly close connections when shutting down
+
+By following these guidelines, you can effectively leverage existing MCP servers to provide a robust and flexible prompt management system without reimplementing core functionality.

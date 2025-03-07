@@ -1,0 +1,807 @@
+---
+description: Guidelines for consistent code style and formatting in the MCP-Prompts project
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+  - "tests/**/*.ts"
+  - "tests/**/*.js"
+---
+
+# Code Style and Formatting Guidelines
+
+This rule defines the coding standards and style guidelines for the MCP-Prompts project to ensure consistency, readability, and maintainability across the codebase.
+
+## General Principles
+
+1. **Consistency**: Follow consistent patterns throughout the codebase.
+2. **Readability**: Write code that is easy to read and understand.
+3. **Simplicity**: Keep code simple and avoid unnecessary complexity.
+4. **Documentation**: Document code thoroughly but concisely.
+5. **Testability**: Write code that is easy to test.
+
+## TypeScript Standards
+
+### Naming Conventions
+
+1. **Files**: Use kebab-case for filenames (e.g., `prompt-service.ts`, `file-adapter.ts`).
+2. **Directories**: Use kebab-case for directory names (e.g., `src/core`, `src/adapters`).
+3. **Classes**: Use PascalCase for class names (e.g., `PromptService`, `FileAdapter`).
+4. **Interfaces**: Use PascalCase for interface names (e.g., `StorageAdapter`, `PromptService`).
+5. **Types**: Use PascalCase for type names (e.g., `Prompt`, `ListPromptsOptions`).
+6. **Functions and Methods**: Use camelCase for function and method names (e.g., `getPrompt`, `savePrompt`).
+7. **Variables**: Use camelCase for variable names (e.g., `promptsDir`, `storageAdapter`).
+8. **Constants**: Use UPPER_SNAKE_CASE for constants (e.g., `MAX_PROMPTS`, `DEFAULT_PAGE_SIZE`).
+9. **Enums**: Use PascalCase for enum names and values (e.g., `LogLevel.Info`, `StorageType.File`).
+10. **Boolean Variables**: Prefix with "is", "has", or "should" (e.g., `isTemplate`, `hasError`).
+
+### Type Definitions
+
+1. **Interface vs Type**: Prefer interfaces for object shapes that can be implemented or extended. Use types for unions, intersections, or other complex types.
+   
+   ```typescript
+   // Prefer interface for object shapes
+   interface Prompt {
+     id: string;
+     name: string;
+     content: string;
+     // ...
+   }
+   
+   // Use type for unions, intersections, etc.
+   type PromptId = string;
+   type TemplateVariables = Record<string, string | number | boolean>;
+   type StorageType = 'file' | 'postgres' | 'memory';
+   ```
+
+2. **Export Types**: Always export type definitions that are used by multiple files.
+
+3. **Type vs Interface for API Contracts**: Use interfaces for public API contracts to allow extension.
+
+4. **Use Descriptive Types**: Avoid using `any` whenever possible. Use precise types or create custom types.
+
+   ```typescript
+   // Bad
+   function processData(data: any): any {
+     // ...
+   }
+   
+   // Good
+   function processData(data: PromptData): ProcessedResult {
+     // ...
+   }
+   ```
+
+5. **ReadOnly**: Use readonly for properties that shouldn't be modified after initialization.
+
+   ```typescript
+   interface Config {
+     readonly apiKey: string;
+     readonly maxRetries: number;
+   }
+   ```
+
+### Code Organization
+
+1. **Import Order**: Group imports in the following order, separated by an empty line:
+   - External libraries
+   - Project modules
+   - Relative imports
+
+   ```typescript
+   // External libraries
+   import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+   import { z } from "zod";
+   
+   // Project modules
+   import { Prompt, ListPromptsOptions } from "../core/types";
+   import { ValidationError } from "../core/errors";
+   
+   // Relative imports
+   import { validatePrompt } from "./validators";
+   ```
+
+2. **File Structure**: Structure each file consistently:
+   - Imports
+   - Interfaces/Types
+   - Constants
+   - Functions/Classes
+   - Exports
+
+   ```typescript
+   // Imports
+   import { z } from "zod";
+   import { Prompt } from "../core/types";
+   
+   // Interfaces/Types
+   interface ValidateOptions {
+     strict: boolean;
+   }
+   
+   // Constants
+   const DEFAULT_OPTIONS: ValidateOptions = {
+     strict: true
+   };
+   
+   // Functions/Classes
+   export function validatePrompt(prompt: Prompt, options: ValidateOptions = DEFAULT_OPTIONS): boolean {
+     // Implementation...
+   }
+   
+   // Exports (if not using named exports above)
+   ```
+
+3. **Maximum File Length**: Keep files under 300 lines. If a file grows larger, consider splitting it into multiple files.
+
+4. **Directory Structure**: Organize files by feature or component, not by type:
+
+   ```
+   ✅ Good:
+   src/
+     core/
+       types.ts
+       errors.ts
+     services/
+       prompt-service.ts
+       sync-service.ts
+     adapters/
+       file-adapter.ts
+       postgres-adapter.ts
+   
+   ❌ Bad:
+   src/
+     interfaces/
+     models/
+     services/
+     utils/
+   ```
+
+### Functions and Methods
+
+1. **Function Length**: Keep functions under 30 lines. If a function grows larger, consider splitting it into multiple functions.
+
+2. **Parameter Count**: Limit the number of parameters to 3. If you need more, use an options object.
+
+   ```typescript
+   // Bad
+   function searchPrompts(
+     tags: string[],
+     isTemplate: boolean,
+     category: string,
+     search: string,
+     sort: string,
+     order: 'asc' | 'desc',
+     limit: number,
+     offset: number
+   ): Promise<Prompt[]> {
+     // ...
+   }
+   
+   // Good
+   function searchPrompts(options: SearchOptions): Promise<Prompt[]> {
+     // ...
+   }
+   ```
+
+3. **Function Naming**: Use descriptive names that explain what the function does.
+
+4. **Async/Await**: Always use async/await instead of Promises with then/catch.
+
+   ```typescript
+   // Bad
+   function getPrompt(id: string): Promise<Prompt> {
+     return storage.getPrompt(id).then(prompt => {
+       return prompt;
+     }).catch(error => {
+       throw error;
+     });
+   }
+   
+   // Good
+   async function getPrompt(id: string): Promise<Prompt> {
+     try {
+       return await storage.getPrompt(id);
+     } catch (error) {
+       throw error;
+     }
+   }
+   ```
+
+5. **Error Handling**: Use try/catch blocks for error handling in async functions.
+
+   ```typescript
+   async function getPrompt(id: string): Promise<Prompt> {
+     try {
+       return await storage.getPrompt(id);
+     } catch (error) {
+       // Handle error appropriately
+       logger.error(`Error getting prompt: ${id}`, { error });
+       throw new NotFoundError(`Prompt not found: ${id}`);
+     }
+   }
+   ```
+
+### Classes
+
+1. **Class Structure**: Structure classes consistently:
+   - Properties
+   - Constructor
+   - Public methods
+   - Private/protected methods
+   - Static methods
+
+   ```typescript
+   class PromptService {
+     // Properties
+     private storage: StorageAdapter;
+     private logger: Logger;
+     
+     // Constructor
+     constructor(storage: StorageAdapter, logger: Logger) {
+       this.storage = storage;
+       this.logger = logger;
+     }
+     
+     // Public methods
+     public async getPrompt(id: string): Promise<Prompt> {
+       // ...
+     }
+     
+     // Private/protected methods
+     private validatePrompt(prompt: Prompt): boolean {
+       // ...
+     }
+     
+     // Static methods
+     static createDefaultService(): PromptService {
+       // ...
+     }
+   }
+   ```
+
+2. **Method Length**: Keep methods under 30 lines. If a method grows larger, consider splitting it into multiple methods.
+
+3. **Single Responsibility**: Each class should have a single responsibility.
+
+4. **Dependency Injection**: Use dependency injection to provide dependencies to classes.
+
+   ```typescript
+   // Bad
+   class PromptService {
+     private storage = new FileAdapter('./prompts');
+     
+     // ...
+   }
+   
+   // Good
+   class PromptService {
+     constructor(private storage: StorageAdapter) {
+       // ...
+     }
+     
+     // ...
+   }
+   ```
+
+### Comments
+
+1. **Code Documentation**: Use JSDoc comments for classes, interfaces, methods, and functions:
+
+   ```typescript
+   /**
+    * Represents a service for managing prompts
+    */
+   export class PromptService {
+     /**
+      * Get a prompt by ID
+      * 
+      * @param id - The prompt ID
+      * @returns The prompt with the specified ID
+      * @throws {NotFoundError} If the prompt is not found
+      */
+     async getPrompt(id: string): Promise<Prompt> {
+       // ...
+     }
+   }
+   ```
+
+2. **Inline Comments**: Use inline comments to explain complex logic or non-obvious code.
+
+   ```typescript
+   // Calculate the elapsed time in milliseconds
+   const elapsed = endTime - startTime;
+   
+   // If the result is not in the cache, fetch it from the server
+   if (!cache.has(key)) {
+     // ...
+   }
+   ```
+
+3. **TODO Comments**: Mark incomplete code with TODO comments, including a reference to an issue if applicable.
+
+   ```typescript
+   // TODO: Implement caching for better performance (#123)
+   ```
+
+4. **Comment Style**: Use `//` for single-line comments and `/* */` for multi-line comments.
+
+### Error Handling
+
+1. **Custom Error Classes**: Use custom error classes that extend the base Error class.
+
+   ```typescript
+   export class NotFoundError extends Error {
+     constructor(message: string) {
+       super(message);
+       this.name = 'NotFoundError';
+     }
+   }
+   ```
+
+2. **Error Messages**: Provide clear and descriptive error messages.
+
+   ```typescript
+   // Bad
+   throw new Error('Invalid');
+   
+   // Good
+   throw new ValidationError(`Invalid prompt: ${prompt.id} is missing required field 'content'`);
+   ```
+
+3. **Error Propagation**: Catch and handle errors at appropriate levels.
+
+   ```typescript
+   async function getPrompt(id: string): Promise<Prompt> {
+     try {
+       return await storage.getPrompt(id);
+     } catch (error) {
+       if (error instanceof NotFoundError) {
+         // Propagate not found errors
+         throw error;
+       }
+       
+       // Log and wrap other errors
+       logger.error(`Error getting prompt: ${id}`, { error });
+       throw new StorageError(`Failed to get prompt: ${id}`, error instanceof Error ? error : undefined);
+     }
+   }
+   ```
+
+### Asynchronous Code
+
+1. **Async/Await**: Use async/await for asynchronous code instead of Promises with then/catch.
+
+2. **Promise.all**: Use Promise.all for parallel execution of multiple promises.
+
+   ```typescript
+   async function getPrompts(ids: string[]): Promise<Prompt[]> {
+     return Promise.all(ids.map(id => getPrompt(id)));
+   }
+   ```
+
+3. **Error Handling**: Always handle errors in async functions.
+
+   ```typescript
+   async function getPrompt(id: string): Promise<Prompt> {
+     try {
+       return await storage.getPrompt(id);
+     } catch (error) {
+       // Handle error
+     }
+   }
+   ```
+
+## Formatting
+
+The project uses ESLint and Prettier for code formatting and linting. The following rules are enforced:
+
+### Indentation
+
+- Use 2 spaces for indentation.
+- Use soft tabs (spaces) instead of hard tabs.
+
+### Line Length
+
+- Maximum line length is 100 characters.
+- For lines that exceed this limit, break them after operators.
+
+### Quotes
+
+- Use single quotes for string literals.
+- Use backticks for template literals.
+
+```typescript
+const name = 'John';
+const greeting = `Hello, ${name}!`;
+```
+
+### Semicolons
+
+- Always use semicolons.
+
+### Commas
+
+- Use trailing commas in multiline object and array literals.
+
+```typescript
+const options = {
+  strict: true,
+  timeout: 1000,
+};
+
+const items = [
+  'item1',
+  'item2',
+  'item3',
+];
+```
+
+### Braces
+
+- Always use braces for control statements (if, for, while, etc.).
+- Opening brace on the same line.
+
+```typescript
+if (condition) {
+  // ...
+} else {
+  // ...
+}
+```
+
+### Spacing
+
+- Add space after keywords (if, for, while, etc.).
+- Add space before and after operators.
+- Add space after commas.
+- No space after function name in function calls.
+
+```typescript
+if (condition) {
+  const result = a + b;
+  console.log(result);
+}
+
+function foo(a, b) {
+  return a + b;
+}
+```
+
+### Empty Lines
+
+- Add empty line before return statement.
+- Add empty line between logical blocks of code.
+- Add empty line between method definitions.
+
+```typescript
+function process(data: string): string {
+  // Process data
+  const processed = transform(data);
+  
+  return processed;
+}
+
+class Processor {
+  constructor(private options: Options) {
+    // Initialize
+  }
+  
+  process(data: string): string {
+    // Process data
+    
+    return result;
+  }
+  
+  validate(data: string): boolean {
+    // Validate data
+    
+    return isValid;
+  }
+}
+```
+
+## ESLint Configuration
+
+The project uses ESLint with the following configuration:
+
+```javascript
+// .eslintrc.js
+module.exports = {
+  parser: '@typescript-eslint/parser',
+  parserOptions: {
+    ecmaVersion: 2020,
+    sourceType: 'module',
+  },
+  extends: [
+    'eslint:recommended',
+    'plugin:@typescript-eslint/recommended',
+    'prettier/@typescript-eslint',
+    'plugin:prettier/recommended',
+  ],
+  rules: {
+    // Enforce named exports
+    'import/prefer-default-export': 'off',
+    
+    // Require explicit return types on functions and class methods
+    '@typescript-eslint/explicit-function-return-type': 'error',
+    
+    // Disallow unused variables
+    '@typescript-eslint/no-unused-vars': ['error', { 
+      argsIgnorePattern: '^_',
+      varsIgnorePattern: '^_',
+    }],
+    
+    // Require consistent type definitions
+    '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
+    
+    // Enforce consistent naming convention
+    '@typescript-eslint/naming-convention': [
+      'error',
+      {
+        selector: 'default',
+        format: ['camelCase'],
+      },
+      {
+        selector: 'variable',
+        format: ['camelCase', 'UPPER_CASE'],
+      },
+      {
+        selector: 'parameter',
+        format: ['camelCase'],
+        leadingUnderscore: 'allow',
+      },
+      {
+        selector: 'memberLike',
+        modifiers: ['private'],
+        format: ['camelCase'],
+        leadingUnderscore: 'allow',
+      },
+      {
+        selector: 'typeLike',
+        format: ['PascalCase'],
+      },
+      {
+        selector: 'enum',
+        format: ['PascalCase'],
+      },
+      {
+        selector: 'enumMember',
+        format: ['PascalCase'],
+      },
+    ],
+    
+    // Require explicit member accessibility modifiers
+    '@typescript-eslint/explicit-member-accessibility': [
+      'error',
+      { accessibility: 'explicit' }
+    ],
+    
+    // Disallow any type
+    '@typescript-eslint/no-explicit-any': 'error',
+    
+    // Enforce consistent line breaks
+    'object-curly-newline': ['error', {
+      ObjectExpression: { minProperties: 4, multiline: true },
+      ObjectPattern: { minProperties: 4, multiline: true },
+      ImportDeclaration: { minProperties: 4, multiline: true },
+      ExportDeclaration: { minProperties: 4, multiline: true },
+    }],
+  },
+};
+```
+
+## Prettier Configuration
+
+The project uses Prettier with the following configuration:
+
+```javascript
+// .prettierrc.js
+module.exports = {
+  semi: true,
+  trailingComma: 'all',
+  singleQuote: true,
+  printWidth: 100,
+  tabWidth: 2,
+  arrowParens: 'avoid',
+};
+```
+
+## VSCode Configuration
+
+For Visual Studio Code users, use the following settings:
+
+```json
+// .vscode/settings.json
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": true
+  },
+  "eslint.validate": [
+    "javascript",
+    "typescript"
+  ],
+  "typescript.tsdk": "node_modules/typescript/lib"
+}
+```
+
+## Git Hooks
+
+Use Husky and lint-staged to enforce code style and formatting on commits:
+
+```json
+// package.json (excerpt)
+{
+  "husky": {
+    "hooks": {
+      "pre-commit": "lint-staged"
+    }
+  },
+  "lint-staged": {
+    "*.{js,ts}": [
+      "eslint --fix",
+      "prettier --write"
+    ]
+  }
+}
+```
+
+## Best Practices
+
+1. **Avoid Magic Numbers**: Use named constants for numeric values.
+
+   ```typescript
+   // Bad
+   if (age < 18) {
+     // ...
+   }
+   
+   // Good
+   const MINIMUM_AGE = 18;
+   
+   if (age < MINIMUM_AGE) {
+     // ...
+   }
+   ```
+
+2. **Avoid Deep Nesting**: Keep nesting to a minimum. Extract nested code into separate functions.
+
+   ```typescript
+   // Bad
+   function processData(data: Data): Result {
+     if (data.valid) {
+       if (data.type === 'A') {
+         if (data.value > 0) {
+           // ...
+         } else {
+           // ...
+         }
+       } else {
+         // ...
+       }
+     } else {
+       // ...
+     }
+   }
+   
+   // Good
+   function processData(data: Data): Result {
+     if (!data.valid) {
+       return handleInvalidData(data);
+     }
+     
+     if (data.type === 'A') {
+       return processTypeA(data);
+     }
+     
+     return processOtherTypes(data);
+   }
+   
+   function processTypeA(data: Data): Result {
+     if (data.value > 0) {
+       return processPositiveValue(data);
+     }
+     
+     return processNonPositiveValue(data);
+   }
+   ```
+
+3. **Early Returns**: Use early returns to avoid deep nesting.
+
+   ```typescript
+   // Bad
+   function processPrompt(prompt: Prompt): ProcessedPrompt {
+     if (prompt.valid) {
+       if (prompt.isTemplate) {
+         // Process template...
+       } else {
+         // Process regular prompt...
+       }
+     } else {
+       throw new ValidationError('Invalid prompt');
+     }
+   }
+   
+   // Good
+   function processPrompt(prompt: Prompt): ProcessedPrompt {
+     if (!prompt.valid) {
+       throw new ValidationError('Invalid prompt');
+     }
+     
+     if (prompt.isTemplate) {
+       return processTemplate(prompt);
+     }
+     
+     return processRegularPrompt(prompt);
+   }
+   ```
+
+4. **Destructuring**: Use object and array destructuring when appropriate.
+
+   ```typescript
+   // Bad
+   function processPrompt(prompt: Prompt): void {
+     const id = prompt.id;
+     const name = prompt.name;
+     const content = prompt.content;
+     
+     // ...
+   }
+   
+   // Good
+   function processPrompt(prompt: Prompt): void {
+     const { id, name, content } = prompt;
+     
+     // ...
+   }
+   ```
+
+5. **Template Literals**: Use template literals instead of string concatenation.
+
+   ```typescript
+   // Bad
+   const message = 'Hello, ' + name + '!';
+   
+   // Good
+   const message = `Hello, ${name}!`;
+   ```
+
+6. **Default Parameters**: Use default parameters instead of conditional assignments.
+
+   ```typescript
+   // Bad
+   function createPrompt(name: string, content: string, isTemplate?: boolean): Prompt {
+     if (isTemplate === undefined) {
+       isTemplate = false;
+     }
+     
+     // ...
+   }
+   
+   // Good
+   function createPrompt(name: string, content: string, isTemplate: boolean = false): Prompt {
+     // ...
+   }
+   ```
+
+7. **Optional Chaining**: Use optional chaining for potentially undefined or null values.
+
+   ```typescript
+   // Bad
+   const name = user && user.profile && user.profile.name;
+   
+   // Good
+   const name = user?.profile?.name;
+   ```
+
+8. **Nullish Coalescing**: Use nullish coalescing for default values.
+
+   ```typescript
+   // Bad
+   const name = user.name || 'Anonymous';
+   
+   // Good
+   const name = user.name ?? 'Anonymous';
+   ```
+
+These guidelines ensure a consistent, readable, and maintainable codebase for the MCP-Prompts project. All developers should follow these standards to maintain the quality of the code.

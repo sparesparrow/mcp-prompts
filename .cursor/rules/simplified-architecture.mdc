@@ -1,0 +1,732 @@
+---
+description: Guidelines for refactoring the MCP-Prompts codebase with a focus on simplicity, integration, and best practices
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+  - "*.json"
+  - "README.md"
+---
+
+# MCP Prompts Refactoring Guide
+
+This rule provides a comprehensive guide for refactoring the MCP-Prompts project to create a simpler, more maintainable codebase that better aligns with MCP architecture principles and integrates effectively with other MCP tools.
+
+## Core Principles
+
+1. **Radical Simplification**: Reduce complexity and file count dramatically
+2. **Integration-First**: Design for seamless integration with other MCP servers
+3. **Standard Adherence**: Follow MCP server implementation patterns
+4. **Core Functionality Focus**: Emphasize essential features, make others optional
+
+## Recommended File Structure
+
+The project should follow this minimal structure:
+
+```
+/
+├── .cursor/rules/           # Cursor rules for AI-assisted development
+├── src/                     # Source code
+│   ├── adapters/            # MCP server adapters
+│   ├── core/                # Core types and interfaces
+│   ├── services/            # Business logic services
+│   ├── tools/               # MCP tools implementation
+│   ├── config.ts            # Configuration management
+│   └── index.ts             # Main entry point
+├── .env.example             # Example environment configuration
+├── .gitignore               # Git ignore file
+├── docker-compose.yml       # Basic Docker Compose configuration
+├── docker-compose.full.yml  # Extended Docker Compose configuration
+├── Dockerfile               # Production Dockerfile
+├── Dockerfile.dev           # Development Dockerfile
+├── package.json             # NPM package configuration
+├── README.md                # Project documentation
+└── tsconfig.json            # TypeScript configuration
+```
+
+## Core Code Implementation
+
+### 1. Unified Type Definitions
+
+Consolidate all types into a single file:
+
+```typescript
+// src/core/types.ts
+export interface Prompt {
+  id: string;
+  name: string;
+  description?: string;
+  content: string;
+  isTemplate: boolean;
+  variables?: string[];
+  tags?: string[];
+  category?: string;
+  createdAt: string;
+  updatedAt: string;
+  version: number;
+}
+
+export interface TemplateVariables {
+  [key: string]: string | number | boolean;
+}
+
+export interface ApplyTemplateResult {
+  content: string;
+  originalPrompt: Prompt;
+  appliedVariables: TemplateVariables;
+  missingVariables?: string[];
+}
+
+export interface ListPromptsOptions {
+  tags?: string[];
+  isTemplate?: boolean;
+  category?: string;
+  search?: string;
+  sort?: string;
+  order?: 'asc' | 'desc';
+  limit?: number;
+  offset?: number;
+}
+
+export interface StorageAdapter {
+  getPrompt(id: string): Promise<Prompt>;
+  savePrompt(prompt: Prompt): Promise<void>;
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  deletePrompt(id: string): Promise<void>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+}
+
+export interface PromptService {
+  getPrompt(id: string): Promise<Prompt>;
+  addPrompt(prompt: Partial<Prompt>): Promise<Prompt>;
+  updatePrompt(id: string, prompt: Partial<Prompt>): Promise<Prompt>;
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  deletePrompt(id: string): Promise<void>;
+  applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+}
+```
+
+### 2. Storage Adapters
+
+Create minimal, focused adapters:
+
+```typescript
+// src/adapters/file-adapter.ts
+import fs from 'fs/promises';
+import path from 'path';
+import { Prompt, StorageAdapter, ListPromptsOptions } from '../core/types';
+import { slugify, extractVariables } from '../core/utils';
+
+export class FileAdapter implements StorageAdapter {
+  private promptsDir: string;
+  
+  constructor(promptsDir: string) {
+    this.promptsDir = promptsDir;
+  }
+  
+  async connect(): Promise<void> {
+    await fs.mkdir(this.promptsDir, { recursive: true });
+  }
+  
+  async disconnect(): Promise<void> {
+    // No-op for file adapter
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      const filePath = path.join(this.promptsDir, `${id}.json`);
+      const content = await fs.readFile(filePath, 'utf8');
+      return JSON.parse(content) as Prompt;
+    } catch (error) {
+      throw new Error(`Prompt not found: ${id}`);
+    }
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
+    await fs.writeFile(filePath, JSON.stringify(prompt, null, 2), 'utf8');
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    const files = await fs.readdir(this.promptsDir);
+    const jsonFiles = files.filter(file => file.endsWith('.json'));
+    
+    const prompts = await Promise.all(
+      jsonFiles.map(async file => {
+        const filePath = path.join(this.promptsDir, file);
+        const content = await fs.readFile(filePath, 'utf8');
+        return JSON.parse(content) as Prompt;
+      })
+    );
+    
+    return this.filterPrompts(prompts, options);
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    const filePath = path.join(this.promptsDir, `${id}.json`);
+    await fs.unlink(filePath);
+  }
+  
+  private filterPrompts(prompts: Prompt[], options?: ListPromptsOptions): Prompt[] {
+    if (!options) return prompts;
+    
+    let filtered = prompts;
+    
+    if (options.tags && options.tags.length > 0) {
+      filtered = filtered.filter(prompt => 
+        prompt.tags && options.tags?.some(tag => prompt.tags.includes(tag))
+      );
+    }
+    
+    if (options.isTemplate !== undefined) {
+      filtered = filtered.filter(prompt => prompt.isTemplate === options.isTemplate);
+    }
+    
+    if (options.category) {
+      filtered = filtered.filter(prompt => prompt.category === options.category);
+    }
+    
+    if (options.search) {
+      const search = options.search.toLowerCase();
+      filtered = filtered.filter(prompt => 
+        prompt.name.toLowerCase().includes(search) ||
+        (prompt.description && prompt.description.toLowerCase().includes(search)) ||
+        prompt.content.toLowerCase().includes(search)
+      );
+    }
+    
+    if (options.sort) {
+      const sortField = options.sort as keyof Prompt;
+      const sortOrder = options.order === 'desc' ? -1 : 1;
+      
+      filtered.sort((a, b) => {
+        const aValue = a[sortField];
+        const bValue = b[sortField];
+        
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          return sortOrder * aValue.localeCompare(bValue);
+        }
+        
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+        return 0;
+      });
+    }
+    
+    if (options.limit || options.offset) {
+      const offset = options.offset || 0;
+      const limit = options.limit || filtered.length;
+      filtered = filtered.slice(offset, offset + limit);
+    }
+    
+    return filtered;
+  }
+}
+```
+
+### 3. MCP Server Implementation
+
+Create a simple MCP server implementation:
+
+```typescript
+// src/index.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { z } from "zod";
+import { PromptService } from "./services/prompt-service.js";
+import { FileAdapter } from "./adapters/file-adapter.js";
+import { getConfig } from "./config.js";
+
+async function main() {
+  try {
+    // Load configuration
+    const config = getConfig();
+    
+    // Create server
+    const server = new Server({
+      name: "mcp-prompts",
+      version: "1.0.0",
+    });
+    
+    // Initialize storage adapter
+    const storageAdapter = new FileAdapter(config.promptsDir);
+    await storageAdapter.connect();
+    
+    // Initialize service
+    const promptService = new PromptService(storageAdapter);
+    
+    // Add prompt tool
+    server.tool(
+      "add_prompt",
+      {
+        prompt: z.object({
+          name: z.string(),
+          description: z.string().optional(),
+          content: z.string(),
+          isTemplate: z.boolean().default(false),
+          tags: z.array(z.string()).optional(),
+          category: z.string().optional()
+        })
+      },
+      async ({ prompt }) => {
+        try {
+          const result = await promptService.addPrompt(prompt);
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Prompt added with ID: ${result.id}` 
+            }]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Error adding prompt: ${error.message}` 
+            }]
+          };
+        }
+      }
+    );
+    
+    // Get prompt tool
+    server.tool(
+      "get_prompt",
+      {
+        id: z.string()
+      },
+      async ({ id }) => {
+        try {
+          const prompt = await promptService.getPrompt(id);
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify(prompt, null, 2) 
+            }]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Error retrieving prompt: ${error.message}` 
+            }]
+          };
+        }
+      }
+    );
+    
+    // List prompts tool
+    server.tool(
+      "list_prompts",
+      {
+        tags: z.array(z.string()).optional(),
+        isTemplate: z.boolean().optional(),
+        category: z.string().optional(),
+        search: z.string().optional(),
+        limit: z.number().optional(),
+        offset: z.number().optional()
+      },
+      async (options) => {
+        try {
+          const prompts = await promptService.listPrompts(options);
+          return {
+            content: [{ 
+              type: "text", 
+              text: JSON.stringify({ prompts }, null, 2) 
+            }]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Error listing prompts: ${error.message}` 
+            }]
+          };
+        }
+      }
+    );
+    
+    // Apply template tool
+    server.tool(
+      "apply_template",
+      {
+        id: z.string(),
+        variables: z.record(z.union([z.string(), z.number(), z.boolean()]))
+      },
+      async ({ id, variables }) => {
+        try {
+          const result = await promptService.applyTemplate(id, variables);
+          return {
+            content: [{ 
+              type: "text", 
+              text: result.content 
+            }]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Error applying template: ${error.message}` 
+            }]
+          };
+        }
+      }
+    );
+    
+    // Delete prompt tool
+    server.tool(
+      "delete_prompt",
+      {
+        id: z.string()
+      },
+      async ({ id }) => {
+        try {
+          await promptService.deletePrompt(id);
+          return {
+            content: [{ 
+              type: "text", 
+              text: `Prompt deleted: ${id}` 
+            }]
+          };
+        } catch (error) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Error deleting prompt: ${error.message}` 
+            }]
+          };
+        }
+      }
+    );
+    
+    // Connect to transport
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    
+    console.error("MCP Prompts server started");
+  } catch (error) {
+    console.error("Error starting server:", error);
+    process.exit(1);
+  }
+}
+
+main();
+```
+
+### 4. Prompt Service
+
+Implement a simple prompt service:
+
+```typescript
+// src/services/prompt-service.ts
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  Prompt, 
+  StorageAdapter, 
+  PromptService as PromptServiceInterface,
+  ListPromptsOptions,
+  TemplateVariables,
+  ApplyTemplateResult
+} from '../core/types';
+import { extractVariables, slugify } from '../core/utils';
+
+export class PromptService implements PromptServiceInterface {
+  constructor(private storage: StorageAdapter) {}
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    return this.storage.getPrompt(id);
+  }
+  
+  async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    if (!data.content) {
+      throw new Error('Content is required');
+    }
+    
+    const now = new Date().toISOString();
+    const id = data.id || slugify(data.name || '') || uuidv4();
+    
+    const prompt: Prompt = {
+      id,
+      name: data.name || id,
+      description: data.description,
+      content: data.content,
+      isTemplate: data.isTemplate || false,
+      tags: data.tags || [],
+      category: data.category,
+      createdAt: now,
+      updatedAt: now,
+      version: 1
+    };
+    
+    if (prompt.isTemplate) {
+      prompt.variables = data.variables || extractVariables(prompt.content);
+    }
+    
+    await this.storage.savePrompt(prompt);
+    return prompt;
+  }
+  
+  async updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt> {
+    const existing = await this.storage.getPrompt(id);
+    
+    const updated: Prompt = {
+      ...existing,
+      ...data,
+      id: existing.id, // ID cannot be changed
+      updatedAt: new Date().toISOString(),
+      version: existing.version + 1
+    };
+    
+    if (updated.isTemplate && data.content) {
+      updated.variables = data.variables || extractVariables(updated.content);
+    }
+    
+    await this.storage.savePrompt(updated);
+    return updated;
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    return this.storage.listPrompts(options);
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    await this.storage.deletePrompt(id);
+  }
+  
+  async applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult> {
+    const prompt = await this.storage.getPrompt(id);
+    
+    if (!prompt.isTemplate) {
+      throw new Error('Prompt is not a template');
+    }
+    
+    const templateVariables = prompt.variables || extractVariables(prompt.content);
+    const missingVariables = templateVariables.filter(v => !variables[v]);
+    
+    let content = prompt.content;
+    for (const [key, value] of Object.entries(variables)) {
+      const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+      content = content.replace(regex, String(value));
+    }
+    
+    return {
+      content,
+      originalPrompt: prompt,
+      appliedVariables: variables,
+      missingVariables: missingVariables.length > 0 ? missingVariables : undefined
+    };
+  }
+}
+```
+
+### 5. Utility Functions
+
+Keep utilities minimal and focused:
+
+```typescript
+// src/core/utils.ts
+export function slugify(str: string): string {
+  return str
+    .toLowerCase()
+    .replace(/[^\w\s-]/g, '')
+    .replace(/\s+/g, '-')
+    .replace(/-+/g, '-')
+    .trim();
+}
+
+export function extractVariables(content: string): string[] {
+  const matches = content.match(/\{\{([^}]+)\}\}/g) || [];
+  return matches
+    .map(match => match.replace(/\{\{|\}\}/g, '').trim())
+    .filter((value, index, self) => self.indexOf(value) === index);
+}
+```
+
+### 6. Configuration
+
+Implement a simple configuration system:
+
+```typescript
+// src/config.ts
+export interface Config {
+  promptsDir: string;
+  storageType: 'file' | 'memory' | 'postgres';
+  logLevel: 'info' | 'debug' | 'error';
+}
+
+export function getConfig(): Config {
+  return {
+    promptsDir: process.env.PROMPTS_DIR || './prompts',
+    storageType: (process.env.STORAGE_TYPE || 'file') as 'file' | 'memory' | 'postgres',
+    logLevel: (process.env.LOG_LEVEL || 'info') as 'info' | 'debug' | 'error'
+  };
+}
+```
+
+## Integration with Other MCP Servers
+
+### 1. Package.json Configuration
+
+```json
+{
+  "name": "mcp-prompts",
+  "version": "1.0.0",
+  "description": "MCP server for managing prompts and templates",
+  "main": "build/index.js",
+  "bin": {
+    "mcp-prompts": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node build/index.js",
+    "dev": "ts-node-dev --respawn src/index.ts",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
+    "uuid": "^9.0.0",
+    "zod": "^3.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^18.0.0",
+    "@types/uuid": "^9.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0",
+    "jest": "^29.0.0",
+    "ts-jest": "^29.0.0",
+    "@types/jest": "^29.0.0"
+  },
+  "files": [
+    "build",
+    "README.md"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
+```
+
+### 2. Docker Compose for Integration
+
+```yaml
+# docker-compose.full.yml
+version: '3.8'
+
+services:
+  mcp-prompts:
+    build: .
+    volumes:
+      - ./prompts:/app/prompts
+    environment:
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+      - LOG_LEVEL=info
+    stdin_open: true
+    tty: true
+
+  filesystem-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-filesystem /prompts
+    volumes:
+      - ./prompts:/prompts
+
+  memory-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-memory
+    volumes:
+      - ./data:/data
+
+  github-server:
+    image: node:18-alpine
+    command: npx -y @modelcontextprotocol/server-github
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN:-}
+```
+
+### 3. Claude Desktop Configuration
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "npx",
+      "args": ["-y", "mcp-prompts"]
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"]
+    },
+    "memory": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-memory"]
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "your-token-here"
+      }
+    }
+  }
+}
+```
+
+## Implementation Strategy
+
+Follow this approach to refactor the codebase:
+
+1. **Define Core Types**: Start by defining essential types
+2. **Create Storage Layer**: Implement file storage adapter first
+3. **Build Service Layer**: Create the prompt service
+4. **Implement MCP Tools**: Add MCP tools one by one
+5. **Add Configuration**: Implement flexible configuration
+6. **Add Tests**: Create tests for each component
+7. **Improve Documentation**: Update README and other docs
+8. **Add Docker Support**: Create Docker files for deployment
+
+## Best Practices
+
+1. **Minimal Dependencies**: Keep external dependencies to a minimum
+2. **Clear Interfaces**: Define clear interfaces for all components
+3. **Proper Error Handling**: Implement comprehensive error handling
+4. **Strong Typing**: Use TypeScript's type system effectively
+5. **Documentation**: Document public APIs and configuration options
+6. **Testing**: Write tests for core functionality
+7. **Separation of Concerns**: Keep different responsibilities in separate modules
+8. **Configuration**: Use environment variables for configuration
+9. **Code Reuse**: Avoid duplication and reuse code where appropriate
+10. **Progressive Enhancement**: Start with core features, add advanced ones later
+
+## Specific Refactorings
+
+### Type Consolidation
+
+- Move all types from separate files into a single `types.ts`
+- Remove duplicated or overly similar types
+- Use consistent naming conventions
+
+### Utility Functions
+
+- Create a single `utils.ts` file with focused utilities
+- Remove rarely used or duplicated utilities
+- Keep utilities pure and testable
+
+### Simplified Prompt Management
+
+- Focus on core operations: get, add, update, list, delete
+- Implement template application as a service method
+- Keep validation logic simple and consistent
+
+### MCP Integration
+
+- Use the latest MCP SDK patterns
+- Implement tools following MCP best practices
+- Prepare for integration with other MCP servers
+
+## Conclusion
+
+By following this refactoring guide, the MCP-Prompts project will be transformed into a simpler, more maintainable codebase that better follows MCP architecture principles and integrates effectively with other MCP tools. The refactored codebase will be easier to understand, extend, and deploy, while still providing all essential functionality.

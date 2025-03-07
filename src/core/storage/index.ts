@@ -1,37 +1,45 @@
-import { Config, FileStorageConfig, PgAIStorageConfig } from '../config';
 import { PromptStorage } from '../types';
 import { FileStorageProvider } from './file-storage';
 import { PgAIStorageProvider } from './pgai-storage';
+import { PostgreSQLStorageProvider } from './pg-storage';
 
 /**
- * Creates the appropriate storage provider based on config
+ * Create a prompt storage provider based on the configuration
+ * @param options Configuration options
+ * @returns A prompt storage provider
  */
-export function createStorageProvider(config: Config): PromptStorage {
-  // Type guard to check for PGAI config
-  function isPgAIConfig(config: any): config is PgAIStorageConfig {
-    return config.type === 'pgai';
-  }
-
-  // Type guard to check for file config
-  function isFileConfig(config: any): config is FileStorageConfig {
-    return config.type === 'file';
-  }
-
-  const storageConfig = config.storage;
-
-  if (isPgAIConfig(storageConfig)) {
-    console.log('Using PGAI storage provider');
-    const pgOptions = storageConfig.options;
-    return new PgAIStorageProvider(pgOptions.connectionString);
-  } else if (isFileConfig(storageConfig)) {
-    console.log('Using file storage provider');
-    const fileOptions = storageConfig.options;
-    return new FileStorageProvider(fileOptions.baseDir);
-  } else {
-    throw new Error(`Unsupported storage type: ${(storageConfig as any).type}`);
+export function createStorageProvider(options: {
+  storageType?: string;
+  promptsDir?: string;
+  databaseUrl?: string;
+}): PromptStorage {
+  const { storageType, promptsDir, databaseUrl } = options;
+  
+  // Log storage configuration (without sensitive details)
+  console.log(`Creating storage provider of type: ${storageType || 'file'}`);
+  
+  // Create the appropriate storage provider
+  switch (storageType?.toLowerCase()) {
+    case 'pgai':
+      if (!databaseUrl) {
+        throw new Error('DATABASE_URL environment variable is required for PGAI storage');
+      }
+      return new PgAIStorageProvider(databaseUrl);
+    
+    case 'postgres':
+    case 'postgresql':
+      if (!databaseUrl) {
+        throw new Error('DATABASE_URL environment variable is required for PostgreSQL storage');
+      }
+      return new PostgreSQLStorageProvider(databaseUrl);
+    
+    case 'file':
+    default:
+      return new FileStorageProvider(promptsDir || './prompts');
   }
 }
 
 // Re-export storage providers
 export { FileStorageProvider } from './file-storage';
-export { PgAIStorageProvider } from './pgai-storage'; 
+export { PgAIStorageProvider } from './pgai-storage';
+export { PostgreSQLStorageProvider } from './pg-storage'; 

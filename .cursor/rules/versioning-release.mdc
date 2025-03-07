@@ -1,0 +1,619 @@
+---
+description: Guidelines for versioning and release management of the MCP-Prompts server
+globs:
+  - "package.json"
+  - "CHANGELOG.md"
+  - ".github/workflows/*.yml"
+---
+
+# Versioning and Release Management
+
+This rule provides guidelines for version numbering, release processes, and distribution management for the MCP-Prompts server.
+
+## Semantic Versioning
+
+The MCP-Prompts project follows [Semantic Versioning](https://semver.org/) (SemVer) for version numbering:
+
+```
+MAJOR.MINOR.PATCH
+```
+
+Where:
+- **MAJOR**: Incremented for incompatible API changes
+- **MINOR**: Incremented for backward-compatible new functionality
+- **PATCH**: Incremented for backward-compatible bug fixes
+
+### Version Examples
+
+- `1.0.0`: Initial stable release
+- `1.1.0`: Added new features without breaking changes
+- `1.1.1`: Bug fixes for version 1.1.0
+- `2.0.0`: Changes that break backward compatibility
+
+### Pre-release Versions
+
+For pre-release versions, use the following format:
+
+```
+MAJOR.MINOR.PATCH-PRERELEASE
+```
+
+Where `PRERELEASE` can be:
+- `alpha.N`: Early development versions
+- `beta.N`: Feature-complete versions for testing
+- `rc.N`: Release candidates
+
+Examples:
+- `1.0.0-alpha.1`: First alpha release of 1.0.0
+- `1.0.0-beta.3`: Third beta release of 1.0.0
+- `1.0.0-rc.1`: First release candidate of 1.0.0
+
+## Version Control Strategy
+
+### Branching Model
+
+The project uses a simplified GitFlow branching model:
+
+- `main`: Production-ready code
+- `develop`: Latest development changes
+- `feature/*`: New features
+- `fix/*`: Bug fixes
+- `release/*`: Release preparation
+- `hotfix/*`: Urgent fixes for production
+
+### Branch Naming Conventions
+
+- Feature branches: `feature/add-github-sync`
+- Bug fix branches: `fix/template-variable-extraction`
+- Release branches: `release/v1.2.0`
+- Hotfix branches: `hotfix/v1.1.1`
+
+### Commit Message Format
+
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Types:
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation changes
+- `style`: Changes that don't affect code meaning (formatting, etc.)
+- `refactor`: Code changes that neither fix bugs nor add features
+- `perf`: Performance improvements
+- `test`: Adding or correcting tests
+- `chore`: Changes to the build process or auxiliary tools
+
+Examples:
+- `feat(storage): add PostgreSQL adapter`
+- `fix(template): fix variable extraction for nested templates`
+- `docs(readme): update installation instructions`
+
+## Changelog Management
+
+Maintain a `CHANGELOG.md` file in the root of the repository:
+
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- New feature A
+- New feature B
+
+### Changed
+- Improvement C
+- Updated dependency D
+
+### Fixed
+- Bug fix E
+- Bug fix F
+
+## [1.1.0] - 2023-08-15
+
+### Added
+- GitHub integration (#24)
+- Support for categories (#26)
+
+### Changed
+- Improved error handling (#27)
+- Enhanced documentation (#28)
+
+### Fixed
+- Issue with template variables (#29)
+- Memory leak in long-running instances (#30)
+
+## [1.0.0] - 2023-06-01
+
+Initial stable release.
+
+### Added
+- Core prompt management functionality
+- Template support with variable substitution
+- File-based storage
+```
+
+### Updating the Changelog
+
+- Keep an `[Unreleased]` section at the top for upcoming changes
+- When releasing, rename `[Unreleased]` to the new version number and add the release date
+- Create a new empty `[Unreleased]` section
+- Group changes by type: `Added`, `Changed`, `Fixed`, `Removed`, `Security`
+- Reference issue or pull request numbers where applicable
+
+## Release Process
+
+### 1. Prepare Release
+
+1. Create a release branch from `develop`:
+   ```bash
+   git checkout develop
+   git pull
+   git checkout -b release/v1.2.0
+   ```
+
+2. Update version in `package.json`:
+   ```json
+   {
+     "name": "mcp-prompts",
+     "version": "1.2.0",
+     ...
+   }
+   ```
+
+3. Update `CHANGELOG.md`:
+   - Rename `[Unreleased]` to `[1.2.0]`
+   - Add release date
+   - Create a new empty `[Unreleased]` section
+
+4. Commit the changes:
+   ```bash
+   git add package.json CHANGELOG.md
+   git commit -m "chore(release): prepare v1.2.0"
+   ```
+
+5. Push the release branch:
+   ```bash
+   git push origin release/v1.2.0
+   ```
+
+6. Create a pull request to `main`
+
+### 2. Review and Testing
+
+1. Review the pull request
+2. Run comprehensive tests
+3. Address any issues by making fixes in the release branch
+4. Rebuild and retest as needed
+
+### 3. Finalize Release
+
+1. Merge the release branch into `main`:
+   ```bash
+   git checkout main
+   git merge release/v1.2.0
+   ```
+
+2. Tag the release:
+   ```bash
+   git tag -a v1.2.0 -m "Release v1.2.0"
+   ```
+
+3. Push to remote:
+   ```bash
+   git push origin main
+   git push origin v1.2.0
+   ```
+
+4. Merge the release branch back into `develop`:
+   ```bash
+   git checkout develop
+   git merge release/v1.2.0
+   git push origin develop
+   ```
+
+5. Delete the release branch:
+   ```bash
+   git branch -d release/v1.2.0
+   git push origin --delete release/v1.2.0
+   ```
+
+### 4. Publish Release
+
+1. Create a GitHub release from the tag
+2. Include release notes from the changelog
+3. Publish to npm:
+   ```bash
+   npm publish
+   ```
+
+## Continuous Integration
+
+Configure GitHub Actions for CI/CD:
+
+```yaml
+# .github/workflows/ci.yml
+name: CI
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    strategy:
+      matrix:
+        node-version: [16.x, 18.x]
+    
+    steps:
+    - uses: actions/checkout@v3
+    
+    - name: Use Node.js ${{ matrix.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ matrix.node-version }}
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Lint
+      run: npm run lint
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Test
+      run: npm test
+    
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+```
+
+## Automated Release Workflow
+
+Create a GitHub Action for automated releases:
+
+```yaml
+# .github/workflows/release.yml
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+    
+    - name: Use Node.js
+      uses: actions/setup-node@v3
+      with:
+        node-version: '18.x'
+        registry-url: 'https://registry.npmjs.org'
+    
+    - name: Install dependencies
+      run: npm ci
+    
+    - name: Build
+      run: npm run build
+    
+    - name: Test
+      run: npm test
+    
+    - name: Generate release notes
+      id: release_notes
+      run: |
+        VERSION=${GITHUB_REF#refs/tags/v}
+        echo "version=$VERSION" >> $GITHUB_OUTPUT
+        
+        # Extract release notes from CHANGELOG.md
+        NOTES=$(awk "/## \\[$VERSION\\]/,/## \\[/" CHANGELOG.md | grep -v "## \\[" | sed '/^$/d')
+        echo "notes<<EOF" >> $GITHUB_OUTPUT
+        echo "$NOTES" >> $GITHUB_OUTPUT
+        echo "EOF" >> $GITHUB_OUTPUT
+    
+    - name: Create GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        name: Release ${{ steps.release_notes.outputs.version }}
+        body: ${{ steps.release_notes.outputs.notes }}
+        draft: false
+        prerelease: false
+    
+    - name: Publish to npm
+      run: npm publish
+      env:
+        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+## Versioning in Docker
+
+### Dockerfile
+
+```dockerfile
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Use ARG for build-time variables
+ARG VERSION
+ARG BUILD_DATE
+ARG VCS_REF
+
+# Set version label
+LABEL org.label-schema.version="${VERSION}"
+LABEL org.label-schema.build-date="${BUILD_DATE}"
+LABEL org.label-schema.vcs-ref="${VCS_REF}"
+LABEL org.label-schema.schema-version="1.0"
+LABEL org.label-schema.name="mcp-prompts"
+LABEL org.label-schema.description="MCP server for managing prompts and templates"
+LABEL org.label-schema.url="https://github.com/yourusername/mcp-prompts"
+LABEL org.label-schema.vcs-url="https://github.com/yourusername/mcp-prompts"
+
+# Copy package files
+COPY package*.json ./
+RUN npm ci
+
+# Copy source files
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Runtime stage
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy labels from build stage
+COPY --from=build /app/*.json ./
+COPY --from=build /app/build ./build
+
+# Install production dependencies
+RUN npm ci --omit=dev
+
+# Create prompt directory
+RUN mkdir -p /app/prompts
+
+# Set environment variables
+ENV NODE_ENV=production
+ENV PORT=3000
+
+# Use non-root user for security
+USER node
+
+# Start the server
+CMD ["node", "build/index.js"]
+```
+
+### Docker Compose Build
+
+```yaml
+# docker-compose.yml
+version: '3.8'
+
+services:
+  mcp-prompts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        - VERSION=${VERSION:-dev}
+        - BUILD_DATE=${BUILD_DATE:-unknown}
+        - VCS_REF=${VCS_REF:-unknown}
+    volumes:
+      - ./prompts:/app/prompts
+    environment:
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+    stdin_open: true
+    tty: true
+```
+
+### Docker Release Script
+
+```bash
+#!/bin/bash
+# scripts/docker-release.sh
+
+set -e
+
+# Get version from package.json
+VERSION=$(node -p "require('./package.json').version")
+BUILD_DATE=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
+VCS_REF=$(git rev-parse --short HEAD)
+
+# Build the Docker image
+docker build \
+  --build-arg VERSION="$VERSION" \
+  --build-arg BUILD_DATE="$BUILD_DATE" \
+  --build-arg VCS_REF="$VCS_REF" \
+  -t "mcp-prompts:$VERSION" \
+  -t "mcp-prompts:latest" \
+  .
+
+# Push to Docker Hub (if credentials are available)
+if [ -n "$DOCKER_USERNAME" ] && [ -n "$DOCKER_PASSWORD" ]; then
+  echo "$DOCKER_PASSWORD" | docker login -u "$DOCKER_USERNAME" --password-stdin
+  
+  docker tag "mcp-prompts:$VERSION" "$DOCKER_USERNAME/mcp-prompts:$VERSION"
+  docker tag "mcp-prompts:latest" "$DOCKER_USERNAME/mcp-prompts:latest"
+  
+  docker push "$DOCKER_USERNAME/mcp-prompts:$VERSION"
+  docker push "$DOCKER_USERNAME/mcp-prompts:latest"
+  
+  echo "Published Docker images: $DOCKER_USERNAME/mcp-prompts:$VERSION and $DOCKER_USERNAME/mcp-prompts:latest"
+else
+  echo "Docker Hub credentials not found. Images built locally only."
+  echo "Built Docker images: mcp-prompts:$VERSION and mcp-prompts:latest"
+fi
+```
+
+## Hot Fixes
+
+For urgent fixes to production:
+
+1. Create a hotfix branch from `main`:
+   ```bash
+   git checkout main
+   git checkout -b hotfix/v1.2.1
+   ```
+
+2. Make the necessary fixes
+
+3. Update version in `package.json`:
+   ```json
+   {
+     "name": "mcp-prompts",
+     "version": "1.2.1",
+     ...
+   }
+   ```
+
+4. Update `CHANGELOG.md`
+
+5. Commit the changes:
+   ```bash
+   git add .
+   git commit -m "fix: description of the fix"
+   ```
+
+6. Push the branch and create a pull request to `main`
+
+7. After review and approval, merge to `main`
+
+8. Tag the release:
+   ```bash
+   git tag -a v1.2.1 -m "Hotfix v1.2.1"
+   git push origin v1.2.1
+   ```
+
+9. Merge the hotfix into `develop` as well:
+   ```bash
+   git checkout develop
+   git merge hotfix/v1.2.1
+   git push origin develop
+   ```
+
+## Distribution Channels
+
+### NPM Package
+
+Publish to npm registry for Node.js users:
+
+```json
+// package.json
+{
+  "name": "mcp-prompts",
+  "version": "1.2.0",
+  "description": "MCP server for managing prompts and templates",
+  "main": "build/index.js",
+  "bin": {
+    "mcp-prompts": "./build/index.js"
+  },
+  "files": [
+    "build",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=16.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/mcp-prompts.git"
+  },
+  "keywords": [
+    "mcp",
+    "prompt",
+    "template",
+    "llm",
+    "anthropic",
+    "claude"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "scripts": {
+    "prepublishOnly": "npm run build && npm test"
+  }
+}
+```
+
+### Docker Images
+
+Publish Docker images to Docker Hub:
+
+1. Add Docker release to GitHub Action:
+
+```yaml
+# .github/workflows/release.yml (additional steps)
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v2
+    
+    - name: Login to Docker Hub
+      uses: docker/login-action@v2
+      with:
+        username: ${{ secrets.DOCKER_USERNAME }}
+        password: ${{ secrets.DOCKER_PASSWORD }}
+    
+    - name: Build and push Docker images
+      uses: docker/build-push-action@v4
+      with:
+        context: .
+        push: true
+        tags: |
+          ${{ secrets.DOCKER_USERNAME }}/mcp-prompts:latest
+          ${{ secrets.DOCKER_USERNAME }}/mcp-prompts:${{ steps.release_notes.outputs.version }}
+        build-args: |
+          VERSION=${{ steps.release_notes.outputs.version }}
+          BUILD_DATE=${{ github.event.release.published_at }}
+          VCS_REF=${{ github.sha }}
+```
+
+## Version Management Best Practices
+
+1. **Be Conservative with Major Versions**: Major version increments indicate breaking changes, which should be minimized.
+
+2. **Communicate Changes Clearly**: Update documentation, changelog, and release notes to clearly communicate changes.
+
+3. **Maintain Backward Compatibility**: Try to maintain backward compatibility whenever possible.
+
+4. **Deprecate Before Removing**: Mark features as deprecated before removing them in a future major version.
+
+5. **Test Thoroughly Before Release**: Ensure comprehensive testing before each release.
+
+6. **Automate Version Management**: Use tools to automate version updates and release notes.
+
+7. **Document Breaking Changes**: Clearly document any breaking changes and provide migration guides.
+
+8. **Follow a Predictable Release Schedule**: Establish a regular release cadence.
+
+9. **Support Multiple Versions**: Be prepared to backport critical fixes to older versions.
+
+10. **Get Feedback on Release Candidates**: Use pre-releases to gather feedback before final releases.
+
+## Conclusion
+
+Following these versioning and release management guidelines will help maintain a consistent, reliable, and well-documented release process for the MCP-Prompts project. This ensures that users can confidently upgrade to new versions and understand the changes being made.

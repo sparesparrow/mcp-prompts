@@ -1,0 +1,1080 @@
+---
+description: Guidelines for implementing robust error handling in the MCP-Prompts server
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+---
+
+# Error Handling in MCP-Prompts
+
+This rule provides guidelines for implementing robust error handling throughout the MCP-Prompts server, ensuring a resilient and user-friendly experience.
+
+## Core Principles
+
+1. **Be Explicit**: Errors should clearly communicate what went wrong.
+2. **Be Informative**: Provide enough information to diagnose and fix issues.
+3. **Be Consistent**: Use a consistent error handling approach throughout the codebase.
+4. **Be Graceful**: Recover from errors when possible, fail gracefully when not.
+5. **Be Secure**: Don't expose sensitive information in error messages.
+
+## Error Types
+
+Define custom error types to represent different categories of errors:
+
+```typescript
+// src/core/errors.ts
+export class BaseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = this.constructor.name;
+    Error.captureStackTrace(this, this.constructor);
+  }
+}
+
+export class NotFoundError extends BaseError {
+  constructor(resource: string, id: string) {
+    super(`${resource} not found: ${id}`);
+  }
+}
+
+export class ValidationError extends BaseError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class TemplateError extends BaseError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class StorageError extends BaseError {
+  constructor(message: string, public readonly cause?: Error) {
+    super(message);
+  }
+}
+
+export class ConfigurationError extends BaseError {
+  constructor(message: string) {
+    super(message);
+  }
+}
+
+export class ExternalServiceError extends BaseError {
+  constructor(service: string, message: string, public readonly cause?: Error) {
+    super(`Error in ${service}: ${message}`);
+  }
+}
+```
+
+## Error Handling in Storage Adapters
+
+Implement consistent error handling in storage adapters:
+
+```typescript
+// src/adapters/file-adapter.ts
+import fs from 'fs/promises';
+import path from 'path';
+import { Prompt, StorageAdapter } from '../core/types';
+import { NotFoundError, StorageError } from '../core/errors';
+
+export class FileAdapter implements StorageAdapter {
+  private promptsDir: string;
+  
+  constructor(promptsDir: string) {
+    this.promptsDir = promptsDir;
+  }
+  
+  async connect(): Promise<void> {
+    try {
+      await fs.mkdir(this.promptsDir, { recursive: true });
+    } catch (error) {
+      throw new StorageError(
+        `Failed to create prompts directory: ${this.promptsDir}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      const filePath = path.join(this.promptsDir, `${id}.json`);
+      const content = await fs.readFile(filePath, 'utf8');
+      return JSON.parse(content) as Prompt;
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new NotFoundError('Prompt', id);
+      }
+      
+      throw new StorageError(
+        `Failed to read prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async savePrompt(prompt: Prompt): Promise<void> {
+    try {
+      const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
+      await fs.writeFile(filePath, JSON.stringify(prompt, null, 2), 'utf8');
+    } catch (error) {
+      throw new StorageError(
+        `Failed to save prompt: ${prompt.id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    try {
+      const files = await fs.readdir(this.promptsDir);
+      const jsonFiles = files.filter(file => file.endsWith('.json'));
+      
+      const promptsPromises = jsonFiles.map(async file => {
+        try {
+          const filePath = path.join(this.promptsDir, file);
+          const content = await fs.readFile(filePath, 'utf8');
+          return JSON.parse(content) as Prompt;
+        } catch (error) {
+          // Log the error but continue processing other files
+          console.error(`Error reading prompt file: ${file}`, error);
+          return null;
+        }
+      });
+      
+      const prompts = (await Promise.all(promptsPromises)).filter(Boolean) as Prompt[];
+      return this.filterPrompts(prompts, options);
+    } catch (error) {
+      throw new StorageError(
+        'Failed to list prompts',
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  async deletePrompt(id: string): Promise<void> {
+    try {
+      const filePath = path.join(this.promptsDir, `${id}.json`);
+      await fs.unlink(filePath);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+        throw new NotFoundError('Prompt', id);
+      }
+      
+      throw new StorageError(
+        `Failed to delete prompt: ${id}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  // Other methods...
+}
+```
+
+## Error Handling in Services
+
+Implement validation and proper error handling in services:
+
+```typescript
+// src/services/prompt-service.ts
+import { v4 as uuidv4 } from 'uuid';
+import { 
+  Prompt, 
+  StorageAdapter, 
+  PromptService as PromptServiceInterface,
+  TemplateVariables,
+  ApplyTemplateResult
+} from '../core/types';
+import { 
+  ValidationError, 
+  TemplateError, 
+  NotFoundError
+} from '../core/errors';
+import { extractVariables, slugify } from '../core/utils';
+
+export class PromptService implements PromptServiceInterface {
+  constructor(private storage: StorageAdapter) {}
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    if (!id) {
+      throw new ValidationError('Prompt ID is required');
+    }
+    
+    return this.storage.getPrompt(id);
+  }
+  
+  async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    // Validate required fields
+    if (!data.content) {
+      throw new ValidationError('Content is required');
+    }
+    
+    if (!data.name && !data.id) {
+      throw new ValidationError('Either name or ID is required');
+    }
+    
+    const now = new Date().toISOString();
+    const id = data.id || slugify(data.name || '') || uuidv4();
+    
+    // Validate ID format
+    if (!/^[a-z0-9-]+$/.test(id)) {
+      throw new ValidationError('ID must contain only lowercase letters, numbers, and hyphens');
+    }
+    
+    // Create the prompt object
+    const prompt: Prompt = {
+      id,
+      name: data.name || id,
+      description: data.description,
+      content: data.content,
+      isTemplate: data.isTemplate || false,
+      tags: data.tags || [],
+      category: data.category,
+      createdAt: now,
+      updatedAt: now,
+      version: 1
+    };
+    
+    // Extract variables if it's a template
+    if (prompt.isTemplate) {
+      prompt.variables = data.variables || extractVariables(prompt.content);
+      
+      // Validate that template has variables
+      if (!prompt.variables || prompt.variables.length === 0) {
+        throw new ValidationError('Template must contain variables');
+      }
+    }
+    
+    try {
+      // Check if prompt already exists
+      try {
+        await this.storage.getPrompt(id);
+        throw new ValidationError(`Prompt with ID "${id}" already exists`);
+      } catch (error) {
+        // Ignore NotFoundError as that's what we expect
+        if (!(error instanceof NotFoundError)) {
+          throw error;
+        }
+      }
+      
+      // Save the prompt
+      await this.storage.savePrompt(prompt);
+      return prompt;
+    } catch (error) {
+      // Re-throw ValidationError and NotFoundError
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      // Wrap other errors
+      throw new Error(`Failed to add prompt: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt> {
+    if (!id) {
+      throw new ValidationError('Prompt ID is required');
+    }
+    
+    try {
+      // Get the existing prompt
+      const existing = await this.storage.getPrompt(id);
+      
+      // Create updated prompt
+      const updated: Prompt = {
+        ...existing,
+        ...data,
+        id: existing.id, // ID cannot be changed
+        updatedAt: new Date().toISOString(),
+        version: existing.version + 1
+      };
+      
+      // Extract variables if it's a template and content changed
+      if (updated.isTemplate && data.content) {
+        updated.variables = data.variables || extractVariables(updated.content);
+        
+        // Validate that template has variables
+        if (!updated.variables || updated.variables.length === 0) {
+          throw new ValidationError('Template must contain variables');
+        }
+      }
+      
+      // Save the updated prompt
+      await this.storage.savePrompt(updated);
+      return updated;
+    } catch (error) {
+      // Re-throw ValidationError and NotFoundError
+      if (error instanceof ValidationError || error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      // Wrap other errors
+      throw new Error(`Failed to update prompt: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  async applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult> {
+    if (!id) {
+      throw new ValidationError('Template ID is required');
+    }
+    
+    if (!variables || Object.keys(variables).length === 0) {
+      throw new ValidationError('Variables are required');
+    }
+    
+    try {
+      // Get the prompt
+      const prompt = await this.storage.getPrompt(id);
+      
+      // Check if it's a template
+      if (!prompt.isTemplate) {
+        throw new TemplateError('Prompt is not a template');
+      }
+      
+      // Extract variables from the template
+      const templateVariables = prompt.variables || extractVariables(prompt.content);
+      const missingVariables = templateVariables.filter(v => !variables[v]);
+      
+      // Apply the variables
+      let content = prompt.content;
+      for (const [key, value] of Object.entries(variables)) {
+        const regex = new RegExp(`\\{\\{\\s*${key}\\s*\\}\\}`, 'g');
+        content = content.replace(regex, String(value));
+      }
+      
+      // Check if any variables are still present in the content
+      const remainingVars = extractVariables(content);
+      if (remainingVars.length > 0) {
+        const missingVars = remainingVars.filter(v => !variables[v]);
+        if (missingVars.length > 0) {
+          return {
+            content,
+            originalPrompt: prompt,
+            appliedVariables: variables,
+            missingVariables: missingVars
+          };
+        }
+      }
+      
+      // Return the result
+      return {
+        content,
+        originalPrompt: prompt,
+        appliedVariables: variables,
+        missingVariables: missingVariables.length > 0 ? missingVariables : undefined
+      };
+    } catch (error) {
+      // Re-throw ValidationError, TemplateError, and NotFoundError
+      if (error instanceof ValidationError || 
+          error instanceof TemplateError || 
+          error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      // Wrap other errors
+      throw new Error(`Failed to apply template: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  // Other methods...
+}
+```
+
+## Error Handling in MCP Tools
+
+Provide clear error responses in MCP tool implementations:
+
+```typescript
+// src/tools/prompt-tools.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { z } from "zod";
+import { PromptService } from "../services/prompt-service";
+import { 
+  ValidationError, 
+  NotFoundError, 
+  TemplateError, 
+  StorageError 
+} from "../core/errors";
+import { logger } from "../utils/logger";
+
+export function setupPromptTools(server: Server, promptService: PromptService) {
+  // Add prompt tool
+  server.tool(
+    "add_prompt",
+    {
+      prompt: z.object({
+        name: z.string().optional(),
+        id: z.string().optional(),
+        description: z.string().optional(),
+        content: z.string(),
+        isTemplate: z.boolean().default(false),
+        tags: z.array(z.string()).optional(),
+        category: z.string().optional(),
+        variables: z.array(z.string()).optional()
+      })
+    },
+    async ({ prompt }) => {
+      try {
+        const result = await promptService.addPrompt(prompt);
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Prompt added successfully with ID: ${result.id}` 
+          }]
+        };
+      } catch (error) {
+        // Log the error
+        logger.error('Error adding prompt', { error });
+        
+        // Format error response based on error type
+        if (error instanceof ValidationError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Validation error: ${error.message}` 
+            }]
+          };
+        }
+        
+        if (error instanceof StorageError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Storage error: ${error.message}` 
+            }]
+          };
+        }
+        
+        // Generic error response
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error adding prompt: ${error instanceof Error ? error.message : String(error)}` 
+          }]
+        };
+      }
+    }
+  );
+  
+  // Get prompt tool
+  server.tool(
+    "get_prompt",
+    {
+      id: z.string()
+    },
+    async ({ id }) => {
+      try {
+        const prompt = await promptService.getPrompt(id);
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(prompt, null, 2) 
+          }]
+        };
+      } catch (error) {
+        // Log the error
+        logger.error('Error getting prompt', { id, error });
+        
+        // Format error response based on error type
+        if (error instanceof NotFoundError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Prompt not found: ${id}` 
+            }]
+          };
+        }
+        
+        if (error instanceof ValidationError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Validation error: ${error.message}` 
+            }]
+          };
+        }
+        
+        if (error instanceof StorageError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Storage error: ${error.message}` 
+            }]
+          };
+        }
+        
+        // Generic error response
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error retrieving prompt: ${error instanceof Error ? error.message : String(error)}` 
+          }]
+        };
+      }
+    }
+  );
+  
+  // Apply template tool with detailed error handling
+  server.tool(
+    "apply_template",
+    {
+      id: z.string(),
+      variables: z.record(z.union([z.string(), z.number(), z.boolean()]))
+    },
+    async ({ id, variables }) => {
+      try {
+        const result = await promptService.applyTemplate(id, variables);
+        
+        // If there are missing variables, include them in the response
+        if (result.missingVariables && result.missingVariables.length > 0) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Template application incomplete. Missing variables: ${result.missingVariables.join(', ')}` 
+            }]
+          };
+        }
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: result.content 
+          }]
+        };
+      } catch (error) {
+        // Log the error
+        logger.error('Error applying template', { id, variables, error });
+        
+        // Format error response based on error type
+        if (error instanceof NotFoundError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Template not found: ${id}` 
+            }]
+          };
+        }
+        
+        if (error instanceof TemplateError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Template error: ${error.message}` 
+            }]
+          };
+        }
+        
+        if (error instanceof ValidationError) {
+          return {
+            isError: true,
+            content: [{ 
+              type: "text", 
+              text: `Validation error: ${error.message}` 
+            }]
+          };
+        }
+        
+        // Generic error response
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+              text: `Error applying template: ${error instanceof Error ? error.message : String(error)}`
+          }]
+        };
+      }
+    }
+  );
+  
+  // Other tools...
+}
+```
+
+## Logging and Monitoring
+
+Implement a robust logging system:
+
+```typescript
+// src/utils/logger.ts
+interface LoggerOptions {
+  level: 'debug' | 'info' | 'warn' | 'error';
+  enableConsole: boolean;
+}
+
+class Logger {
+  private level: string;
+  private enableConsole: boolean;
+  
+  constructor(options: LoggerOptions) {
+    this.level = options.level;
+    this.enableConsole = options.enableConsole;
+  }
+  
+  private shouldLog(level: string): boolean {
+    const levels = ['debug', 'info', 'warn', 'error'];
+    const currentLevelIndex = levels.indexOf(this.level);
+    const targetLevelIndex = levels.indexOf(level);
+    
+    return targetLevelIndex >= currentLevelIndex;
+  }
+  
+  private formatMessage(level: string, message: string, meta?: any): string {
+    const timestamp = new Date().toISOString();
+    const metaStr = meta ? ` ${JSON.stringify(meta)}` : '';
+    
+    return `[${timestamp}] ${level.toUpperCase()}: ${message}${metaStr}`;
+  }
+  
+  private formatError(error: unknown): any {
+    if (error instanceof Error) {
+      return {
+        name: error.name,
+        message: error.message,
+        stack: error.stack
+      };
+    }
+    
+    return { message: String(error) };
+  }
+  
+  debug(message: string, meta?: any): void {
+    if (!this.shouldLog('debug')) return;
+    
+    const formattedMessage = this.formatMessage('debug', message, meta);
+    
+    if (this.enableConsole) {
+      console.debug(formattedMessage);
+    }
+    
+    // Add additional log destinations here (file, service, etc.)
+  }
+  
+  info(message: string, meta?: any): void {
+    if (!this.shouldLog('info')) return;
+    
+    const formattedMessage = this.formatMessage('info', message, meta);
+    
+    if (this.enableConsole) {
+      console.info(formattedMessage);
+    }
+    
+    // Add additional log destinations here
+  }
+  
+  warn(message: string, meta?: any): void {
+    if (!this.shouldLog('warn')) return;
+    
+    const formattedMessage = this.formatMessage('warn', message, meta);
+    
+    if (this.enableConsole) {
+      console.warn(formattedMessage);
+    }
+    
+    // Add additional log destinations here
+  }
+  
+  error(message: string, meta?: any): void {
+    if (!this.shouldLog('error')) return;
+    
+    // Format error objects
+    if (meta && meta.error) {
+      meta = {
+        ...meta,
+        error: this.formatError(meta.error)
+      };
+    }
+    
+    const formattedMessage = this.formatMessage('error', message, meta);
+    
+    if (this.enableConsole) {
+      console.error(formattedMessage);
+    }
+    
+    // Add additional log destinations here
+  }
+}
+
+// Create logger instance based on environment
+export const logger = new Logger({
+  level: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
+  enableConsole: process.env.NODE_ENV !== 'test'
+});
+```
+
+## Error Handling in Main Application
+
+Implement global error handling in the main application:
+
+```typescript
+// src/index.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { PromptService } from "./services/prompt-service.js";
+import { setupPromptTools } from "./tools/prompt-tools.js";
+import { createStorageAdapter } from "./adapters/storage-adapter.js";
+import { logger } from "./utils/logger.js";
+import { ConfigurationError } from "./core/errors.js";
+
+// Global uncaught exception handler
+process.on('uncaughtException', (error) => {
+  logger.error('Uncaught exception', { error });
+  process.exit(1);
+});
+
+// Global unhandled rejection handler
+process.on('unhandledRejection', (reason) => {
+  logger.error('Unhandled rejection', { reason });
+});
+
+async function main() {
+  try {
+    logger.info('Starting MCP Prompts server');
+    
+    // Validate environment
+    const storageType = process.env.STORAGE_TYPE || 'file';
+    if (!['file', 'memory', 'postgres'].includes(storageType)) {
+      throw new ConfigurationError(`Invalid storage type: ${storageType}`);
+    }
+    
+    // Initialize server
+    const server = new Server({
+      name: "mcp-prompts",
+      version: "1.0.0"
+    });
+    
+    // Initialize storage adapter
+    logger.info('Initializing storage adapter', { type: storageType });
+    const storageAdapter = createStorageAdapter(storageType);
+    
+    try {
+      await storageAdapter.connect();
+      logger.info('Storage adapter connected successfully');
+    } catch (error) {
+      logger.error('Failed to connect to storage', { error });
+      throw new ConfigurationError(`Failed to connect to storage: ${error instanceof Error ? error.message : String(error)}`);
+    }
+    
+    // Initialize service
+    const promptService = new PromptService(storageAdapter);
+    
+    // Set up tools
+    setupPromptTools(server, promptService);
+    
+    // Start server
+    logger.info('Starting MCP transport');
+    const transport = new StdioServerTransport();
+    
+    await server.connect(transport);
+    
+    logger.info('MCP Prompts server started successfully');
+    
+    // Handle graceful shutdown
+    const shutdown = async () => {
+      logger.info('Shutting down MCP Prompts server');
+      
+      try {
+        await storageAdapter.disconnect();
+        logger.info('Storage adapter disconnected successfully');
+      } catch (error) {
+        logger.error('Error disconnecting from storage', { error });
+      }
+      
+      process.exit(0);
+    };
+    
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
+  } catch (error) {
+    logger.error('Failed to start server', { error });
+    
+    if (error instanceof ConfigurationError) {
+      console.error(`Configuration error: ${error.message}`);
+      process.exit(1);
+    }
+    
+    console.error(`Fatal error: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+}
+
+main();
+```
+
+## Error Handling in APIs and External Integrations
+
+When integrating with external services, implement proper error handling:
+
+```typescript
+// src/adapters/external-service-adapter.ts
+import axios, { AxiosError } from 'axios';
+import { ExternalServiceError } from '../core/errors';
+import { logger } from '../utils/logger';
+import { backOff } from 'exponential-backoff';
+
+export class ExternalServiceAdapter {
+  private baseUrl: string;
+  private apiKey: string;
+  
+  constructor(baseUrl: string, apiKey: string) {
+    this.baseUrl = baseUrl;
+    this.apiKey = apiKey;
+  }
+  
+  async fetchData(endpoint: string, params?: Record<string, any>): Promise<any> {
+    try {
+      // Use exponential backoff for retries
+      const result = await backOff(
+        async () => {
+          const response = await axios.get(`${this.baseUrl}/${endpoint}`, {
+            params,
+            headers: {
+              'Authorization': `Bearer ${this.apiKey}`,
+              'Accept': 'application/json'
+            },
+            timeout: 5000 // 5 second timeout
+          });
+          
+          return response.data;
+        },
+        {
+          numOfAttempts: 3,
+          startingDelay: 1000,
+          timeMultiple: 2,
+          retry: (error) => {
+            // Only retry on certain error types
+            if (axios.isAxiosError(error)) {
+              const status = error.response?.status || 0;
+              // Retry on timeouts, rate limits, and server errors
+              return error.code === 'ECONNABORTED' || 
+                     status === 429 || 
+                     (status >= 500 && status < 600);
+            }
+            return false;
+          }
+        }
+      );
+      
+      return result;
+    } catch (error) {
+      // Log the error
+      logger.error('Error fetching data from external service', {
+        endpoint,
+        params,
+        error
+      });
+      
+      // Wrap and rethrow
+      if (axios.isAxiosError(error)) {
+        const status = error.response?.status;
+        const message = error.response?.data?.message || error.message;
+        
+        if (status === 401 || status === 403) {
+          throw new ExternalServiceError('ExternalService', 'Authentication failed. Check your API key.');
+        }
+        
+        if (status === 404) {
+          throw new ExternalServiceError('ExternalService', `Resource not found: ${endpoint}`);
+        }
+        
+        if (status === 429) {
+          throw new ExternalServiceError('ExternalService', 'Rate limit exceeded. Please try again later.');
+        }
+        
+        if (status && status >= 500) {
+          throw new ExternalServiceError('ExternalService', 'External service is currently unavailable.');
+        }
+        
+        throw new ExternalServiceError('ExternalService', `Request failed: ${message}`);
+      }
+      
+      throw new ExternalServiceError(
+        'ExternalService',
+        `Unexpected error: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error : undefined
+      );
+    }
+  }
+  
+  // Additional methods...
+}
+```
+
+## Input Validation with Zod
+
+Use Zod for robust input validation:
+
+```typescript
+// src/utils/validators.ts
+import { z } from 'zod';
+import { ValidationError } from '../core/errors';
+
+// Prompt schema
+export const promptSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().min(1, 'Name is required'),
+  description: z.string().optional(),
+  content: z.string().min(1, 'Content is required'),
+  isTemplate: z.boolean().default(false),
+  variables: z.array(z.string()).optional(),
+  tags: z.array(z.string()).default([]),
+  category: z.string().optional(),
+  createdAt: z.string().optional(),
+  updatedAt: z.string().optional(),
+  version: z.number().optional()
+});
+
+// Template variables schema
+export const templateVariablesSchema = z.record(
+  z.string(),
+  z.union([z.string(), z.number(), z.boolean()])
+);
+
+// List prompts options schema
+export const listPromptsOptionsSchema = z.object({
+  tags: z.array(z.string()).optional(),
+  isTemplate: z.boolean().optional(),
+  category: z.string().optional(),
+  search: z.string().optional(),
+  sort: z.string().optional(),
+  order: z.enum(['asc', 'desc']).optional(),
+  limit: z.number().int().positive().optional(),
+  offset: z.number().int().nonnegative().optional()
+});
+
+// Validator function
+export function validate<T>(schema: z.ZodSchema<T>, data: unknown): T {
+  try {
+    return schema.parse(data);
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      const issues = error.errors.map(issue => `${issue.path.join('.')}: ${issue.message}`).join(', ');
+      throw new ValidationError(`Validation failed: ${issues}`);
+    }
+    throw error;
+  }
+}
+```
+
+## Testing Error Handling
+
+Write tests to verify error handling:
+
+```typescript
+// src/services/prompt-service.test.ts
+import { PromptService } from '../services/prompt-service';
+import { MockStorageAdapter } from '../tests/mocks/storage-adapter.mock';
+import { ValidationError, NotFoundError, TemplateError } from '../core/errors';
+
+describe('PromptService', () => {
+  let service: PromptService;
+  let mockAdapter: MockStorageAdapter;
+  
+  beforeEach(() => {
+    mockAdapter = new MockStorageAdapter();
+    service = new PromptService(mockAdapter);
+  });
+  
+  describe('addPrompt', () => {
+    it('should throw ValidationError when content is missing', async () => {
+      // Arrange
+      const promptData = {
+        name: 'Test Prompt'
+        // content is missing
+      };
+      
+      // Act & Assert
+      await expect(service.addPrompt(promptData)).rejects.toThrow(ValidationError);
+      await expect(service.addPrompt(promptData)).rejects.toThrow('Content is required');
+    });
+    
+    it('should throw ValidationError when neither name nor id is provided', async () => {
+      // Arrange
+      const promptData = {
+        content: 'Test content'
+        // name and id are missing
+      };
+      
+      // Act & Assert
+      await expect(service.addPrompt(promptData)).rejects.toThrow(ValidationError);
+      await expect(service.addPrompt(promptData)).rejects.toThrow('Either name or ID is required');
+    });
+    
+    it('should throw ValidationError when template has no variables', async () => {
+      // Arrange
+      const promptData = {
+        name: 'Test Template',
+        content: 'This is a template without variables',
+        isTemplate: true
+      };
+      
+      // Act & Assert
+      await expect(service.addPrompt(promptData)).rejects.toThrow(ValidationError);
+      await expect(service.addPrompt(promptData)).rejects.toThrow('Template must contain variables');
+    });
+    
+    // More tests...
+  });
+  
+  describe('applyTemplate', () => {
+    it('should throw NotFoundError when template does not exist', async () => {
+      // Arrange
+      mockAdapter.getPrompt.mockRejectedValue(new NotFoundError('Prompt', 'non-existent'));
+      
+      // Act & Assert
+      await expect(service.applyTemplate('non-existent', { var: 'value' })).rejects.toThrow(NotFoundError);
+    });
+    
+    it('should throw TemplateError when prompt is not a template', async () => {
+      // Arrange
+      mockAdapter.getPrompt.mockResolvedValue({
+        id: 'not-template',
+        name: 'Not a Template',
+        content: 'This is not a template',
+        isTemplate: false,
+        createdAt: '2023-01-01T00:00:00Z',
+        updatedAt: '2023-01-01T00:00:00Z',
+        version: 1
+      });
+      
+      // Act & Assert
+      await expect(service.applyTemplate('not-template', { var: 'value' })).rejects.toThrow(TemplateError);
+      await expect(service.applyTemplate('not-template', { var: 'value' })).rejects.toThrow('Prompt is not a template');
+    });
+    
+    // More tests...
+  });
+  
+  // More test suites...
+});
+```
+
+## Best Practices
+
+1. **Be Specific**: Use specific error types for different failure scenarios.
+2. **Propagate Errors Carefully**: Only re-throw errors that are expected at higher levels.
+3. **Log Errors**: Log all errors with appropriate context for debugging.
+4. **Validate Inputs**: Validate all inputs as early as possible.
+5. **Handle Asynchronous Errors**: Use try/catch with async/await for asynchronous operations.
+6. **Provide Context**: Include relevant context in error messages.
+7. **Sanitize Errors**: Don't expose sensitive information in error messages.
+8. **Use Consistent Error Responses**: Use a consistent format for error responses.
+9. **Test Error Handling**: Write tests for error cases.
+10. **Document Error Responses**: Document expected error responses for API consumers.
+
+## Conclusion
+
+Implementing robust error handling throughout the MCP-Prompts server ensures a resilient and user-friendly experience. By using custom error types, consistent error handling patterns, and proper input validation, you can create a system that gracefully handles unexpected situations and provides helpful feedback to users and developers.

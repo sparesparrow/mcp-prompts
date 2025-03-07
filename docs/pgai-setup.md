@@ -1,191 +1,176 @@
-# Setting Up PostgreSQL with PGAI for MCP Prompts Server
+# MCP Prompts Server - Storage Adapters
 
-This guide provides instructions for setting up PostgreSQL with the PGAI extension to enable the enhanced prompt management capabilities of the MCP Prompts Server.
+This document describes the storage adapter architecture in the MCP Prompts Server and provides details on the implemented file-based storage as well as plans for future adapters.
 
-## Prerequisites
+## Storage Adapter Architecture
 
-- PostgreSQL 14 or higher
-- Database administration privileges
-- Node.js 18 or higher
+The MCP Prompts Server uses a storage adapter pattern to abstract the persistence layer from the business logic. This allows for different storage implementations while maintaining the same interface.
 
-## Installation Steps
+### StorageAdapter Interface
 
-### 1. Install PostgreSQL
-
-```bash
-# Install PostgreSQL
-sudo apt update
-sudo apt install postgresql postgresql-contrib
-
-# Verify installation
-sudo systemctl status postgresql
-```
-
-### 2. Create Database and User
-
-```bash
-# Login to PostgreSQL
-sudo -u postgres psql
-
-# Create a database for MCP Prompts
-CREATE DATABASE mcp_prompts;
-
-# Create a user (optional, you can use postgres)
-CREATE USER mcp_user WITH ENCRYPTED PASSWORD 'your_secure_password';
-
-# Grant privileges
-GRANT ALL PRIVILEGES ON DATABASE mcp_prompts TO mcp_user;
-
-# Exit PostgreSQL
-\q
-```
-
-### 3. Install Vector Extension
-
-```bash
-# Install required packages
-sudo apt install postgresql-server-dev-14 build-essential git
-
-# Clone and install pgvector
-git clone https://github.com/pgvector/pgvector.git
-cd pgvector
-make
-sudo make install
-
-# Connect to the database
-sudo -u postgres psql -d mcp_prompts
-
-# Create the extension
-CREATE EXTENSION vector;
-
-# Verify installation
-\dx
-
-# Exit PostgreSQL
-\q
-```
-
-### 4. Install PGAI Extension
-
-```bash
-# Clone and install PGAI
-git clone https://github.com/pgai/pgai.git
-cd pgai
-make
-sudo make install
-
-# Connect to the database
-sudo -u postgres psql -d mcp_prompts
-
-# Create the extension
-CREATE EXTENSION pgai;
-
-# Verify installation
-\dx
-
-# Exit PostgreSQL
-\q
-```
-
-### 5. Update Configuration
-
-Update your configuration file at `config/pgai.json` with the correct connection string:
-
-```json
-{
-  "server": {
-    "port": 3000,
-    "host": "localhost",
-    "logLevel": "info"
-  },
-  "storage": {
-    "type": "pgai",
-    "options": {
-      "connectionString": "postgresql://username:password@localhost:5432/mcp_prompts",
-      "poolSize": 10,
-      "sslMode": false
-    }
-  }
+```typescript
+export interface StorageAdapter {
+  /** Get a prompt by ID */
+  getPrompt(id: string): Promise<Prompt>;
+  
+  /** Save a prompt (create or update) */
+  savePrompt(prompt: Prompt): Promise<void>;
+  
+  /** List prompts with optional filtering */
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  
+  /** Delete a prompt by ID */
+  deletePrompt(id: string): Promise<void>;
+  
+  /** Connect to the storage backend */
+  connect(): Promise<void>;
+  
+  /** Disconnect from the storage backend */
+  disconnect(): Promise<void>;
 }
 ```
 
-Replace `username` and `password` with your PostgreSQL credentials.
+## File Storage Adapter
 
-### 6. Install Node.js Dependencies
+The current implementation uses a simple file-based storage adapter that persists prompts as JSON files in a configurable directory.
 
-```bash
-# Install PostgreSQL client for Node.js
-npm run install:deps
+### Implementation
+
+The file storage adapter is implemented in `src/adapters/file-adapter.ts`:
+
+```typescript
+export class FileAdapter implements StorageAdapter {
+  private promptsDir: string;
+  
+  constructor(promptsDir: string) {
+    this.promptsDir = promptsDir;
+  }
+  
+  async connect(): Promise<void> {
+    await fs.mkdir(this.promptsDir, { recursive: true });
+  }
+  
+  async getPrompt(id: string): Promise<Prompt> {
+    const filePath = path.join(this.promptsDir, `${id}.json`);
+    const content = await fs.readFile(filePath, 'utf8');
+    return JSON.parse(content) as Prompt;
+  }
+  
+  // Additional methods implemented...
+}
 ```
 
-## Testing the Setup
+### Configuration
 
-Run the PGAI test to verify the connection:
+The file storage adapter is configured through environment variables:
 
-```bash
-npm run pgai:test
+```
+STORAGE_TYPE=file
+PROMPTS_DIR=./prompts
 ```
 
-## Migrating Prompts
+### Benefits and Limitations
 
-After setting up the database, you can migrate prompts:
+**Benefits:**
+- Simple setup with no external dependencies
+- Easy to understand and debug
+- Works well for development and small deployments
+- Files can be manually inspected and edited
 
-```bash
-# Migrate selected prompts
-npm run pgai:migrate
+**Limitations:**
+- Limited scalability for large prompt collections
+- No built-in querying capabilities beyond basic filtering
+- No concurrent access protection
+- No transaction support
 
-# Or migrate improved prompts
-npm run pgai:migrate:improved
+## Planned Future Adapters
+
+### PostgreSQL Adapter
+
+A PostgreSQL adapter is planned to provide more robust storage for larger deployments:
+
+```typescript
+export class PostgresAdapter implements StorageAdapter {
+  private pool: Pool;
+  
+  constructor(connectionString: string) {
+    this.pool = new Pool({ connectionString });
+  }
+  
+  async connect(): Promise<void> {
+    // Set up schema if needed
+  }
+  
+  // Implementation of interface methods...
+}
 ```
 
-## Troubleshooting
+**Features:**
+- Scalable for large prompt collections
+- Improved query performance
+- Full-text search capabilities
+- Concurrent access support
+- Transaction support
 
-### Connection Issues
+### In-Memory Adapter
 
-If you encounter connection problems:
+An in-memory adapter will be useful for testing and lightweight deployments:
 
-1. Check if PostgreSQL is running:
-   ```bash
-   sudo systemctl status postgresql
-   ```
+```typescript
+export class MemoryAdapter implements StorageAdapter {
+  private prompts: Map<string, Prompt> = new Map();
+  
+  async connect(): Promise<void> {
+    // No-op for in-memory adapter
+  }
+  
+  // Implementation of interface methods...
+}
+```
 
-2. Verify the connection string in your configuration.
+**Features:**
+- Extremely fast performance
+- No external dependencies
+- Useful for testing and development
+- Optional persistence to disk on shutdown
 
-3. Ensure the user has appropriate permissions:
-   ```bash
-   sudo -u postgres psql
-   GRANT ALL PRIVILEGES ON DATABASE mcp_prompts TO username;
-   ```
+## Adapter Selection
 
-### Extension Issues
+The storage adapter is selected based on the `STORAGE_TYPE` environment variable in `config.ts`:
 
-If extension installation fails:
+```typescript
+// Current implementation
+if (config.storage.type === 'file') {
+  storageAdapter = new FileAdapter(config.storage.promptsDir);
+} else if (config.storage.type === 'postgres') {
+  throw new Error('PostgreSQL adapter not implemented yet');
+} else if (config.storage.type === 'memory') {
+  throw new Error('Memory adapter not implemented yet');
+}
+```
 
-1. Check PostgreSQL version compatibility
-2. Look for error messages in the PostgreSQL logs:
-   ```bash
-   sudo journalctl -u postgresql
-   ```
+## Implementation Guidelines for New Adapters
 
-3. Verify required development packages are installed:
-   ```bash
-   sudo apt install postgresql-server-dev-$(pg_config --version | grep -oP '\d+' | head -1)
-   ```
+When implementing a new storage adapter:
 
-## Running with Docker
+1. Create a new file in `src/adapters/` for your adapter
+2. Implement the `StorageAdapter` interface
+3. Provide proper error handling
+4. Handle connections and disconnections appropriately
+5. Implement filtering in `listPrompts` according to the interface
+6. Add adapter selection in `src/index.ts`
+7. Update configuration options in `src/config.ts`
+8. Add appropriate tests in `src/tests/`
 
-If you prefer using Docker, you can use the following command:
+## Migration Between Adapters
+
+In the future, migration utilities will be added to facilitate moving prompts between different storage adapters:
 
 ```bash
-docker run -d \
-  --name postgres-pgai \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_DB=mcp_prompts \
-  -p 5432:5432 \
-  postgres:14
+# Example future CLI commands
+npm run migrate --from=file --to=postgres
+npm run backup --adapter=postgres --out=backup.json
+npm run restore --adapter=postgres --in=backup.json
+```
 
-# Then connect to it and install extensions
-docker exec -it postgres-pgai psql -U postgres -d mcp_prompts -c 'CREATE EXTENSION vector;'
-docker exec -it postgres-pgai psql -U postgres -d mcp_prompts -c 'CREATE EXTENSION pgai;'
-``` 
+These utilities will make it easier to switch between adapters as your needs change. 

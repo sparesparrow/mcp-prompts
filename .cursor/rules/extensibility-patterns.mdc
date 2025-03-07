@@ -1,0 +1,1505 @@
+---
+description: Guidelines for implementing extensibility patterns in the MCP-Prompts server
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+---
+
+# Extensibility Patterns for MCP-Prompts
+
+This rule provides guidance on designing and implementing extensibility patterns in the MCP-Prompts server to support future enhancements and customizations without requiring significant changes to the core codebase.
+
+## Extensibility Principles
+
+1. **Open/Closed Principle**: Systems should be open for extension but closed for modification.
+2. **Plugin Architecture**: Design systems as a collection of loosely coupled plugins.
+3. **Registration Mechanism**: Provide a way to register new functionality.
+4. **Configuration-Driven**: Allow behavior changes through configuration rather than code changes.
+5. **Clear Extension Points**: Define clear interfaces for extensions.
+
+## Core Extension Points
+
+The MCP-Prompts server should have the following extension points:
+
+### 1. Storage Adapters
+
+Design storage adapters to allow different storage backends:
+
+```typescript
+// src/core/types.ts
+export interface StorageAdapter {
+  /**
+   * Connect to the storage backend
+   */
+  connect(): Promise<void>;
+  
+  /**
+   * Disconnect from the storage backend
+   */
+  disconnect(): Promise<void>;
+  
+  /**
+   * Get a prompt by ID
+   * 
+   * @param id - The ID of the prompt to retrieve
+   * @returns The prompt with the specified ID
+   * @throws {NotFoundError} If the prompt doesn't exist
+   */
+  getPrompt(id: string): Promise<Prompt>;
+  
+  /**
+   * Save a prompt
+   * 
+   * @param prompt - The prompt to save
+   */
+  savePrompt(prompt: Prompt): Promise<void>;
+  
+  /**
+   * List prompts with optional filtering
+   * 
+   * @param options - Options for filtering, sorting, and pagination
+   * @returns Array of prompts matching the criteria
+   */
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  
+  /**
+   * Delete a prompt by ID
+   * 
+   * @param id - The ID of the prompt to delete
+   * @throws {NotFoundError} If the prompt doesn't exist
+   */
+  deletePrompt(id: string): Promise<void>;
+}
+```
+
+### 2. Template Processors
+
+Design template processors to support different template formats and processing logic:
+
+```typescript
+// src/core/types.ts
+export interface TemplateProcessor {
+  /**
+   * Check if this processor can handle the given template
+   * 
+   * @param template - The template to check
+   * @returns True if this processor can handle the template, false otherwise
+   */
+  canProcess(template: Prompt): boolean;
+  
+  /**
+   * Extract variables from the template
+   * 
+   * @param template - The template to extract variables from
+   * @returns Array of variable names
+   */
+  extractVariables(template: Prompt): string[];
+  
+  /**
+   * Apply variables to the template
+   * 
+   * @param template - The template to apply variables to
+   * @param variables - The variables to apply
+   * @returns The result of applying the variables to the template
+   */
+  applyTemplate(template: Prompt, variables: TemplateVariables): ApplyTemplateResult;
+}
+```
+
+### 3. Validation Rules
+
+Design a validation system that can be extended with custom rules:
+
+```typescript
+// src/core/types.ts
+export interface ValidationRule<T> {
+  /**
+   * Check if this rule applies to the given object
+   * 
+   * @param obj - The object to check
+   * @returns True if this rule applies to the object, false otherwise
+   */
+  appliesTo(obj: unknown): obj is T;
+  
+  /**
+   * Validate the object
+   * 
+   * @param obj - The object to validate
+   * @returns Validation result
+   */
+  validate(obj: T): ValidationResult;
+}
+
+export interface ValidationResult {
+  /**
+   * Whether the validation passed
+   */
+  valid: boolean;
+  
+  /**
+   * Error message if validation failed
+   */
+  error?: string;
+}
+```
+
+### 4. MCP Tool Extensions
+
+Design an extensible system for registering MCP tools:
+
+```typescript
+// src/core/types.ts
+export interface ToolDefinition {
+  /**
+   * Name of the tool
+   */
+  name: string;
+  
+  /**
+   * Description of the tool
+   */
+  description: string;
+  
+  /**
+   * Schema for tool parameters
+   */
+  schema: unknown;
+  
+  /**
+   * Handler function for the tool
+   */
+  handler: ToolHandler;
+}
+
+export type ToolHandler = (params: any) => Promise<ToolResult>;
+
+export interface ToolResult {
+  /**
+   * Whether the tool execution resulted in an error
+   */
+  isError?: boolean;
+  
+  /**
+   * Content returned by the tool
+   */
+  content: ToolContent[];
+}
+
+export interface ToolContent {
+  /**
+   * Type of content
+   */
+  type: string;
+  
+  /**
+   * Text content
+   */
+  text: string;
+}
+```
+
+## Implementation of Extension Points
+
+### 1. Storage Adapter Registry
+
+Implement a registry for storage adapters:
+
+```typescript
+// src/adapters/storage-registry.ts
+import { StorageAdapter } from '../core/types';
+
+/**
+ * Registry for storage adapters
+ */
+export class StorageAdapterRegistry {
+  private adapters: Map<string, StorageAdapterFactory> = new Map();
+  
+  /**
+   * Register a storage adapter factory
+   * 
+   * @param type - Type of the storage adapter
+   * @param factory - Factory function to create the adapter
+   */
+  register(type: string, factory: StorageAdapterFactory): void {
+    this.adapters.set(type, factory);
+  }
+  
+  /**
+   * Create a storage adapter of the specified type
+   * 
+   * @param type - Type of the storage adapter to create
+   * @param options - Options for the adapter
+   * @returns A new storage adapter instance
+   * @throws {Error} If the adapter type is not registered
+   */
+  create(type: string, options: Record<string, any>): StorageAdapter {
+    const factory = this.adapters.get(type);
+    
+    if (!factory) {
+      throw new Error(`Storage adapter type not registered: ${type}`);
+    }
+    
+    return factory(options);
+  }
+  
+  /**
+   * Get all registered adapter types
+   * 
+   * @returns Array of registered adapter types
+   */
+  getTypes(): string[] {
+    return Array.from(this.adapters.keys());
+  }
+}
+
+/**
+ * Factory function to create a storage adapter
+ */
+export type StorageAdapterFactory = (options: Record<string, any>) => StorageAdapter;
+
+/**
+ * Global storage adapter registry
+ */
+export const storageAdapterRegistry = new StorageAdapterRegistry();
+```
+
+### 2. Template Processor Registry
+
+Implement a registry for template processors:
+
+```typescript
+// src/templates/processor-registry.ts
+import { TemplateProcessor, Prompt } from '../core/types';
+
+/**
+ * Registry for template processors
+ */
+export class TemplateProcessorRegistry {
+  private processors: TemplateProcessor[] = [];
+  
+  /**
+   * Register a template processor
+   * 
+   * @param processor - The template processor to register
+   */
+  register(processor: TemplateProcessor): void {
+    this.processors.push(processor);
+  }
+  
+  /**
+   * Get a processor for the given template
+   * 
+   * @param template - The template to get a processor for
+   * @returns The first processor that can handle the template
+   * @throws {Error} If no processor can handle the template
+   */
+  getProcessor(template: Prompt): TemplateProcessor {
+    const processor = this.processors.find(p => p.canProcess(template));
+    
+    if (!processor) {
+      throw new Error(`No template processor found for template: ${template.id}`);
+    }
+    
+    return processor;
+  }
+  
+  /**
+   * Get all registered processors
+   * 
+   * @returns Array of registered processors
+   */
+  getAll(): TemplateProcessor[] {
+    return [...this.processors];
+  }
+}
+
+/**
+ * Global template processor registry
+ */
+export const templateProcessorRegistry = new TemplateProcessorRegistry();
+```
+
+### 3. Validation Rule Registry
+
+Implement a registry for validation rules:
+
+```typescript
+// src/validation/rule-registry.ts
+import { ValidationRule, ValidationResult } from '../core/types';
+
+/**
+ * Registry for validation rules
+ */
+export class ValidationRuleRegistry {
+  private rules: ValidationRule<any>[] = [];
+  
+  /**
+   * Register a validation rule
+   * 
+   * @param rule - The validation rule to register
+   */
+  register<T>(rule: ValidationRule<T>): void {
+    this.rules.push(rule);
+  }
+  
+  /**
+   * Validate an object using all applicable rules
+   * 
+   * @param obj - The object to validate
+   * @returns The first failed validation result, or a valid result if all rules pass
+   */
+  validate<T>(obj: T): ValidationResult {
+    // Find all rules that apply to this object
+    const applicableRules = this.rules.filter(rule => rule.appliesTo(obj));
+    
+    // Apply each rule in order
+    for (const rule of applicableRules) {
+      const result = rule.validate(obj);
+      
+      if (!result.valid) {
+        return result;
+      }
+    }
+    
+    // All rules passed
+    return { valid: true };
+  }
+  
+  /**
+   * Get all registered rules
+   * 
+   * @returns Array of registered rules
+   */
+  getAll(): ValidationRule<any>[] {
+    return [...this.rules];
+  }
+}
+
+/**
+ * Global validation rule registry
+ */
+export const validationRuleRegistry = new ValidationRuleRegistry();
+```
+
+### 4. Tool Registry
+
+Implement a registry for MCP tools:
+
+```typescript
+// src/tools/tool-registry.ts
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { ToolDefinition } from '../core/types';
+
+/**
+ * Registry for MCP tools
+ */
+export class ToolRegistry {
+  private tools: ToolDefinition[] = [];
+  
+  /**
+   * Register a tool
+   * 
+   * @param tool - The tool definition to register
+   */
+  register(tool: ToolDefinition): void {
+    // Check if tool with the same name already exists
+    const existing = this.tools.find(t => t.name === tool.name);
+    
+    if (existing) {
+      throw new Error(`Tool already registered: ${tool.name}`);
+    }
+    
+    this.tools.push(tool);
+  }
+  
+  /**
+   * Register all tools with the MCP server
+   * 
+   * @param server - The MCP server to register tools with
+   */
+  registerWithServer(server: Server): void {
+    for (const tool of this.tools) {
+      server.tool(tool.name, tool.schema, tool.handler);
+    }
+  }
+  
+  /**
+   * Get a tool by name
+   * 
+   * @param name - The name of the tool to get
+   * @returns The tool definition, or undefined if not found
+   */
+  getTool(name: string): ToolDefinition | undefined {
+    return this.tools.find(t => t.name === name);
+  }
+  
+  /**
+   * Get all registered tools
+   * 
+   * @returns Array of registered tools
+   */
+  getAll(): ToolDefinition[] {
+    return [...this.tools];
+  }
+}
+
+/**
+ * Global tool registry
+ */
+export const toolRegistry = new ToolRegistry();
+```
+
+## Extension Registration
+
+Implement a central place to register extensions:
+
+```typescript
+// src/extensions/index.ts
+import { storageAdapterRegistry } from '../adapters/storage-registry';
+import { templateProcessorRegistry } from '../templates/processor-registry';
+import { validationRuleRegistry } from '../validation/rule-registry';
+import { toolRegistry } from '../tools/tool-registry';
+
+import { FileAdapter } from '../adapters/file-adapter';
+import { PostgresAdapter } from '../adapters/postgres-adapter';
+import { MemoryAdapter } from '../adapters/memory-adapter';
+
+import { StandardTemplateProcessor } from '../templates/standard-processor';
+import { MarkdownTemplateProcessor } from '../templates/markdown-processor';
+
+import { PromptValidationRule } from '../validation/prompt-rule';
+import { TemplateValidationRule } from '../validation/template-rule';
+
+import { addPromptTool } from '../tools/prompt-tools';
+import { getPromptTool } from '../tools/prompt-tools';
+import { listPromptsTool } from '../tools/prompt-tools';
+import { applyTemplateTool } from '../tools/prompt-tools';
+import { deletePromptTool } from '../tools/prompt-tools';
+
+/**
+ * Register all built-in extensions
+ */
+export function registerBuiltinExtensions(): void {
+  // Register storage adapters
+  storageAdapterRegistry.register('file', options => 
+    new FileAdapter(options.promptsDir || './prompts')
+  );
+  
+  storageAdapterRegistry.register('postgres', options => 
+    new PostgresAdapter(options.connectionString || process.env.DATABASE_URL)
+  );
+  
+  storageAdapterRegistry.register('memory', options => 
+    new MemoryAdapter(options.persistPath)
+  );
+  
+  // Register template processors
+  templateProcessorRegistry.register(new StandardTemplateProcessor());
+  templateProcessorRegistry.register(new MarkdownTemplateProcessor());
+  
+  // Register validation rules
+  validationRuleRegistry.register(new PromptValidationRule());
+  validationRuleRegistry.register(new TemplateValidationRule());
+  
+  // Register tools
+  toolRegistry.register(addPromptTool);
+  toolRegistry.register(getPromptTool);
+  toolRegistry.register(listPromptsTool);
+  toolRegistry.register(applyTemplateTool);
+  toolRegistry.register(deletePromptTool);
+}
+
+/**
+ * Load and register extensions from external plugins
+ * 
+ * @param pluginDirs - Directories to search for plugins
+ */
+export async function loadExternalExtensions(pluginDirs: string[] = ['./plugins']): Promise<void> {
+  // Implementation to dynamically load and register external plugins
+  // This would typically scan the plugin directories, require each plugin, and call a registration function
+}
+```
+
+## Plugin System
+
+Implement a plugin system to allow third-party extensions:
+
+```typescript
+// src/plugins/types.ts
+import { StorageAdapter, TemplateProcessor, ValidationRule, ToolDefinition } from '../core/types';
+
+/**
+ * Interface for a plugin
+ */
+export interface Plugin {
+  /**
+   * Name of the plugin
+   */
+  name: string;
+  
+  /**
+   * Version of the plugin
+   */
+  version: string;
+  
+  /**
+   * Register the plugin with the system
+   * 
+   * @param registry - Registry to register extensions with
+   */
+  register(registry: PluginRegistry): void;
+}
+
+/**
+ * Registry for a plugin to register extensions with
+ */
+export interface PluginRegistry {
+  /**
+   * Register a storage adapter factory
+   * 
+   * @param type - Type of the storage adapter
+   * @param factory - Factory function to create the adapter
+   */
+  registerStorageAdapter(type: string, factory: (options: any) => StorageAdapter): void;
+  
+  /**
+   * Register a template processor
+   * 
+   * @param processor - The template processor to register
+   */
+  registerTemplateProcessor(processor: TemplateProcessor): void;
+  
+  /**
+   * Register a validation rule
+   * 
+   * @param rule - The validation rule to register
+   */
+  registerValidationRule<T>(rule: ValidationRule<T>): void;
+  
+  /**
+   * Register a tool
+   * 
+   * @param tool - The tool definition to register
+   */
+  registerTool(tool: ToolDefinition): void;
+}
+```
+
+```typescript
+// src/plugins/registry.ts
+import { storageAdapterRegistry, StorageAdapterFactory } from '../adapters/storage-registry';
+import { templateProcessorRegistry } from '../templates/processor-registry';
+import { validationRuleRegistry } from '../validation/rule-registry';
+import { toolRegistry } from '../tools/tool-registry';
+import { StorageAdapter, TemplateProcessor, ValidationRule, ToolDefinition } from '../core/types';
+import { Plugin, PluginRegistry } from './types';
+
+/**
+ * Registry for plugins
+ */
+export class PluginManager implements PluginRegistry {
+  private plugins: Map<string, Plugin> = new Map();
+  
+  /**
+   * Register a plugin
+   * 
+   * @param plugin - The plugin to register
+   * @throws {Error} If a plugin with the same name is already registered
+   */
+  registerPlugin(plugin: Plugin): void {
+    if (this.plugins.has(plugin.name)) {
+      throw new Error(`Plugin already registered: ${plugin.name}`);
+    }
+    
+    this.plugins.set(plugin.name, plugin);
+    
+    // Let the plugin register its extensions
+    plugin.register(this);
+  }
+  
+  /**
+   * Register a storage adapter factory
+   * 
+   * @param type - Type of the storage adapter
+   * @param factory - Factory function to create the adapter
+   */
+  registerStorageAdapter(type: string, factory: (options: any) => StorageAdapter): void {
+    storageAdapterRegistry.register(type, factory);
+  }
+  
+  /**
+   * Register a template processor
+   * 
+   * @param processor - The template processor to register
+   */
+  registerTemplateProcessor(processor: TemplateProcessor): void {
+    templateProcessorRegistry.register(processor);
+  }
+  
+  /**
+   * Register a validation rule
+   * 
+   * @param rule - The validation rule to register
+   */
+  registerValidationRule<T>(rule: ValidationRule<T>): void {
+    validationRuleRegistry.register(rule);
+  }
+  
+  /**
+   * Register a tool
+   * 
+   * @param tool - The tool definition to register
+   */
+  registerTool(tool: ToolDefinition): void {
+    toolRegistry.register(tool);
+  }
+  
+  /**
+   * Get all registered plugins
+   * 
+   * @returns Map of plugin names to plugin instances
+   */
+  getPlugins(): Map<string, Plugin> {
+    return new Map(this.plugins);
+  }
+}
+
+/**
+ * Global plugin manager
+ */
+export const pluginManager = new PluginManager();
+```
+
+## Configuration-Driven Extensibility
+
+Implement a configuration system to allow behavior changes through configuration:
+
+```typescript
+// src/config/types.ts
+export interface CoreConfig {
+  /**
+   * Storage configuration
+   */
+  storage: StorageConfig;
+  
+  /**
+   * Template configuration
+   */
+  templates: TemplateConfig;
+  
+  /**
+   * Validation configuration
+   */
+  validation: ValidationConfig;
+  
+  /**
+   * Plugin configuration
+   */
+  plugins: PluginConfig;
+  
+  /**
+   * Logging configuration
+   */
+  logging: LoggingConfig;
+}
+
+export interface StorageConfig {
+  /**
+   * Type of storage adapter to use
+   */
+  type: string;
+  
+  /**
+   * Options for the storage adapter
+   */
+  options: Record<string, any>;
+}
+
+export interface TemplateConfig {
+  /**
+   * Default template variable delimiter
+   * 
+   * @default "{{"
+   */
+  startDelimiter: string;
+  
+  /**
+   * Default template variable end delimiter
+   * 
+   * @default "}}"
+   */
+  endDelimiter: string;
+  
+  /**
+   * Whether to allow HTML in templates
+   * 
+   * @default false
+   */
+  allowHtml: boolean;
+}
+
+export interface ValidationConfig {
+  /**
+   * Whether to validate prompts on save
+   * 
+   * @default true
+   */
+  validateOnSave: boolean;
+  
+  /**
+   * Whether to use strict validation
+   * 
+   * @default false
+   */
+  strict: boolean;
+}
+
+export interface PluginConfig {
+  /**
+   * Directories to search for plugins
+   * 
+   * @default ["./plugins"]
+   */
+  dirs: string[];
+  
+  /**
+   * Plugins to enable
+   * 
+   * @default []
+   */
+  enabled: string[];
+}
+
+export interface LoggingConfig {
+  /**
+   * Log level
+   * 
+   * @default "info"
+   */
+  level: 'debug' | 'info' | 'warn' | 'error';
+  
+  /**
+   * Whether to log to console
+   * 
+   * @default true
+   */
+  console: boolean;
+  
+  /**
+   * Whether to log to file
+   * 
+   * @default false
+   */
+  file: boolean;
+  
+  /**
+   * Log file path
+   * 
+   * @default "./logs/mcp-prompts.log"
+   */
+  filePath: string;
+}
+```
+
+```typescript
+// src/config/index.ts
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import { CoreConfig } from './types';
+
+/**
+ * Default configuration
+ */
+const defaultConfig: CoreConfig = {
+  storage: {
+    type: 'file',
+    options: {
+      promptsDir: './prompts'
+    }
+  },
+  templates: {
+    startDelimiter: '{{',
+    endDelimiter: '}}',
+    allowHtml: false
+  },
+  validation: {
+    validateOnSave: true,
+    strict: false
+  },
+  plugins: {
+    dirs: ['./plugins'],
+    enabled: []
+  },
+  logging: {
+    level: 'info',
+    console: true,
+    file: false,
+    filePath: './logs/mcp-prompts.log'
+  }
+};
+
+/**
+ * Load configuration from file and environment variables
+ * 
+ * @param configPath - Path to the configuration file
+ * @returns The loaded configuration
+ */
+export async function loadConfig(configPath: string = './config.json'): Promise<CoreConfig> {
+  let config = { ...defaultConfig };
+  
+  // Try to load config from file
+  try {
+    const fileContent = await fs.readFile(configPath, 'utf8');
+    const fileConfig = JSON.parse(fileContent);
+    
+    // Deep merge with default config
+    config = mergeConfigs(config, fileConfig);
+  } catch (error) {
+    console.warn(`Could not load config from ${configPath}:`, error);
+    console.info('Using default configuration');
+  }
+  
+  // Override with environment variables
+  config = overrideWithEnv(config);
+  
+  return config;
+}
+
+/**
+ * Deep merge two configurations
+ * 
+ * @param target - Target configuration
+ * @param source - Source configuration
+ * @returns Merged configuration
+ */
+function mergeConfigs(target: any, source: any): any {
+  const result = { ...target };
+  
+  for (const key in source) {
+    if (source[key] instanceof Object && key in target && target[key] instanceof Object) {
+      result[key] = mergeConfigs(target[key], source[key]);
+    } else {
+      result[key] = source[key];
+    }
+  }
+  
+  return result;
+}
+
+/**
+ * Override configuration with environment variables
+ * 
+ * @param config - Configuration to override
+ * @returns Overridden configuration
+ */
+function overrideWithEnv(config: CoreConfig): CoreConfig {
+  // Clone the config
+  const result = JSON.parse(JSON.stringify(config)) as CoreConfig;
+  
+  // Override storage configuration
+  if (process.env.STORAGE_TYPE) {
+    result.storage.type = process.env.STORAGE_TYPE;
+  }
+  
+  if (process.env.PROMPTS_DIR) {
+    result.storage.options.promptsDir = process.env.PROMPTS_DIR;
+  }
+  
+  // Override logging configuration
+  if (process.env.LOG_LEVEL) {
+    result.logging.level = process.env.LOG_LEVEL as 'debug' | 'info' | 'warn' | 'error';
+  }
+  
+  if (process.env.LOG_CONSOLE) {
+    result.logging.console = process.env.LOG_CONSOLE === 'true';
+  }
+  
+  if (process.env.LOG_FILE) {
+    result.logging.file = process.env.LOG_FILE === 'true';
+  }
+  
+  if (process.env.LOG_FILE_PATH) {
+    result.logging.filePath = process.env.LOG_FILE_PATH;
+  }
+  
+  // Override plugin configuration
+  if (process.env.PLUGIN_DIRS) {
+    result.plugins.dirs = process.env.PLUGIN_DIRS.split(',');
+  }
+  
+  if (process.env.ENABLED_PLUGINS) {
+    result.plugins.enabled = process.env.ENABLED_PLUGINS.split(',');
+  }
+  
+  return result;
+}
+```
+
+## Examples of Extensions
+
+### 1. Custom Storage Adapter
+
+Example of a custom storage adapter:
+
+```typescript
+// src/adapters/redis-adapter.ts
+import { StorageAdapter, Prompt, ListPromptsOptions } from '../core/types';
+import { NotFoundError, StorageError } from '../core/errors';
+import * as Redis from 'redis';
+
+/**
+ * Storage adapter that stores prompts in Redis
+ */
+export class RedisAdapter implements StorageAdapter {
+  private client: Redis.RedisClientType;
+  private connected: boolean = false;
+  private readonly keyPrefix: string;
+  
+  /**
+   * Create a new Redis adapter
+   * 
+   * @param options - Redis connection options
+   */
+  constructor(private readonly options: RedisAdapterOptions) {
+    this.keyPrefix = options.keyPrefix || 'mcp-prompts:';
+  }
+  
+  /**
+   * Connect to Redis
+   */
+  async connect(): Promise<void> {
+    if (this.connected) {
+      return;
+    }
+    
+    try {
+      this.client = Redis.createClient({
+        url: this.options.url,
+        password: this.options.password
+      });
+      
+      await this.client.connect();
+      this.connected = true;
+    } catch (error) {
+      throw new StorageError(`Failed to connect to Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Disconnect from Redis
+   */
+  async disconnect(): Promise<void> {
+    if (!this.connected) {
+      return;
+    }
+    
+    try {
+      await this.client.quit();
+      this.connected = false;
+    } catch (error) {
+      throw new StorageError(`Failed to disconnect from Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Get a prompt by ID
+   * 
+   * @param id - The ID of the prompt to retrieve
+   * @returns The prompt with the specified ID
+   * @throws {NotFoundError} If the prompt doesn't exist
+   */
+  async getPrompt(id: string): Promise<Prompt> {
+    this.ensureConnected();
+    
+    try {
+      const key = this.getPromptKey(id);
+      const data = await this.client.get(key);
+      
+      if (!data) {
+        throw new NotFoundError('Prompt', id);
+      }
+      
+      return JSON.parse(data) as Prompt;
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      throw new StorageError(`Failed to get prompt from Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Save a prompt
+   * 
+   * @param prompt - The prompt to save
+   */
+  async savePrompt(prompt: Prompt): Promise<void> {
+    this.ensureConnected();
+    
+    try {
+      const key = this.getPromptKey(prompt.id);
+      await this.client.set(key, JSON.stringify(prompt));
+      
+      // Add to index sets
+      await this.updateIndices(prompt);
+    } catch (error) {
+      throw new StorageError(`Failed to save prompt to Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * List prompts with optional filtering
+   * 
+   * @param options - Options for filtering, sorting, and pagination
+   * @returns Array of prompts matching the criteria
+   */
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    this.ensureConnected();
+    
+    try {
+      // Start with all prompt IDs
+      let promptIds: string[] = [];
+      
+      // Get prompt IDs based on filters
+      if (options) {
+        promptIds = await this.getFilteredPromptIds(options);
+      } else {
+        // Get all prompt IDs
+        const keys = await this.client.keys(`${this.keyPrefix}prompt:*`);
+        promptIds = keys.map(key => key.replace(`${this.keyPrefix}prompt:`, ''));
+      }
+      
+      // Get prompts by ID
+      const prompts: Prompt[] = [];
+      
+      for (const id of promptIds) {
+        try {
+          const prompt = await this.getPrompt(id);
+          prompts.push(prompt);
+        } catch (error) {
+          if (!(error instanceof NotFoundError)) {
+            throw error;
+          }
+          // Skip not found prompts
+        }
+      }
+      
+      // Apply sorting
+      if (options?.sort) {
+        this.sortPrompts(prompts, options);
+      }
+      
+      // Apply pagination
+      if (options?.offset !== undefined || options?.limit !== undefined) {
+        const offset = options.offset || 0;
+        const limit = options.limit || prompts.length;
+        return prompts.slice(offset, offset + limit);
+      }
+      
+      return prompts;
+    } catch (error) {
+      throw new StorageError(`Failed to list prompts from Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Delete a prompt by ID
+   * 
+   * @param id - The ID of the prompt to delete
+   * @throws {NotFoundError} If the prompt doesn't exist
+   */
+  async deletePrompt(id: string): Promise<void> {
+    this.ensureConnected();
+    
+    try {
+      // Get the prompt first to ensure it exists and to get its metadata
+      const prompt = await this.getPrompt(id);
+      
+      // Remove from index sets
+      await this.removeFromIndices(prompt);
+      
+      // Delete the prompt
+      const key = this.getPromptKey(id);
+      const deleted = await this.client.del(key);
+      
+      if (deleted === 0) {
+        throw new NotFoundError('Prompt', id);
+      }
+    } catch (error) {
+      if (error instanceof NotFoundError) {
+        throw error;
+      }
+      
+      throw new StorageError(`Failed to delete prompt from Redis: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  
+  /**
+   * Ensure the client is connected
+   * 
+   * @throws {Error} If the client is not connected
+   */
+  private ensureConnected(): void {
+    if (!this.connected) {
+      throw new Error('Redis client is not connected');
+    }
+  }
+  
+  /**
+   * Get the Redis key for a prompt
+   * 
+   * @param id - The prompt ID
+   * @returns The Redis key
+   */
+  private getPromptKey(id: string): string {
+    return `${this.keyPrefix}prompt:${id}`;
+  }
+  
+  /**
+   * Update indices for a prompt
+   * 
+   * @param prompt - The prompt to update indices for
+   */
+  private async updateIndices(prompt: Prompt): Promise<void> {
+    // Add to template index if it's a template
+    if (prompt.isTemplate) {
+      await this.client.sAdd(`${this.keyPrefix}index:template`, prompt.id);
+    } else {
+      await this.client.sRem(`${this.keyPrefix}index:template`, prompt.id);
+    }
+    
+    // Add to category index
+    if (prompt.category) {
+      await this.client.sAdd(`${this.keyPrefix}index:category:${prompt.category}`, prompt.id);
+    }
+    
+    // Add to tag indices
+    if (prompt.tags && prompt.tags.length > 0) {
+      for (const tag of prompt.tags) {
+        await this.client.sAdd(`${this.keyPrefix}index:tag:${tag}`, prompt.id);
+      }
+    }
+  }
+  
+  /**
+   * Remove a prompt from indices
+   * 
+   * @param prompt - The prompt to remove from indices
+   */
+  private async removeFromIndices(prompt: Prompt): Promise<void> {
+    // Remove from template index
+    await this.client.sRem(`${this.keyPrefix}index:template`, prompt.id);
+    
+    // Remove from category index
+    if (prompt.category) {
+      await this.client.sRem(`${this.keyPrefix}index:category:${prompt.category}`, prompt.id);
+    }
+    
+    // Remove from tag indices
+    if (prompt.tags && prompt.tags.length > 0) {
+      for (const tag of prompt.tags) {
+        await this.client.sRem(`${this.keyPrefix}index:tag:${tag}`, prompt.id);
+      }
+    }
+  }
+  
+  /**
+   * Get prompt IDs based on filter options
+   * 
+   * @param options - Filter options
+   * @returns Array of prompt IDs matching the filter
+   */
+  private async getFilteredPromptIds(options: ListPromptsOptions): Promise<string[]> {
+    const sets: string[] = [];
+    
+    // Filter by template status
+    if (options.isTemplate !== undefined) {
+      if (options.isTemplate) {
+        sets.push(`${this.keyPrefix}index:template`);
+      } else {
+        // For non-templates, we need to use a different approach
+        // since we don't have a "non-template" set
+        // We'll handle this later
+      }
+    }
+    
+    // Filter by category
+    if (options.category) {
+      sets.push(`${this.keyPrefix}index:category:${options.category}`);
+    }
+    
+    // Filter by tags
+    if (options.tags && options.tags.length > 0) {
+      for (const tag of options.tags) {
+        sets.push(`${this.keyPrefix}index:tag:${tag}`);
+      }
+    }
+    
+    let ids: string[] = [];
+    
+    if (sets.length > 0) {
+      // Get intersection of all sets
+      ids = await this.client.sInter(sets);
+    } else {
+      // Get all prompt IDs
+      const keys = await this.client.keys(`${this.keyPrefix}prompt:*`);
+      ids = keys.map(key => key.replace(`${this.keyPrefix}prompt:`, ''));
+    }
+    
+    // Handle non-template filter
+    if (options.isTemplate === false) {
+      const templateIds = await this.client.sMembers(`${this.keyPrefix}index:template`);
+      ids = ids.filter(id => !templateIds.includes(id));
+    }
+    
+    // Handle search filter - requires loading all prompts
+    if (options.search) {
+      const prompts: Prompt[] = [];
+      
+      for (const id of ids) {
+        try {
+          const prompt = await this.getPrompt(id);
+          prompts.push(prompt);
+        } catch (error) {
+          if (!(error instanceof NotFoundError)) {
+            throw error;
+          }
+          // Skip not found prompts
+        }
+      }
+      
+      // Filter by search
+      const search = options.search.toLowerCase();
+      const filtered = prompts.filter(prompt => 
+        prompt.name.toLowerCase().includes(search) ||
+        (prompt.description && prompt.description.toLowerCase().includes(search)) ||
+        prompt.content.toLowerCase().includes(search)
+      );
+      
+      return filtered.map(prompt => prompt.id);
+    }
+    
+    return ids;
+  }
+  
+  /**
+   * Sort prompts
+   * 
+   * @param prompts - Prompts to sort
+   * @param options - Sort options
+   */
+  private sortPrompts(prompts: Prompt[], options: ListPromptsOptions): void {
+    if (!options.sort) {
+      return;
+    }
+    
+    const field = options.sort;
+    const order = options.order === 'desc' ? -1 : 1;
+    
+    prompts.sort((a, b) => {
+      const aValue = (a as any)[field];
+      const bValue = (b as any)[field];
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return order * aValue.localeCompare(bValue);
+      }
+      
+      if (aValue < bValue) return -1 * order;
+      if (aValue > bValue) return 1 * order;
+      return 0;
+    });
+  }
+}
+
+/**
+ * Options for Redis adapter
+ */
+export interface RedisAdapterOptions {
+  /**
+   * Redis connection URL
+   */
+  url: string;
+  
+  /**
+   * Redis password
+   */
+  password?: string;
+  
+  /**
+   * Key prefix for Redis keys
+   * 
+   * @default "mcp-prompts:"
+   */
+  keyPrefix?: string;
+}
+```
+
+### 2. Custom Template Processor
+
+Example of a custom template processor:
+
+```typescript
+// src/templates/handlebars-processor.ts
+import { TemplateProcessor, Prompt, TemplateVariables, ApplyTemplateResult } from '../core/types';
+import * as Handlebars from 'handlebars';
+
+/**
+ * Template processor that uses Handlebars
+ */
+export class HandlebarsTemplateProcessor implements TemplateProcessor {
+  /**
+   * Check if this processor can handle the given template
+   * 
+   * @param template - The template to check
+   * @returns True if this processor can handle the template, false otherwise
+   */
+  canProcess(template: Prompt): boolean {
+    // Check if the template has a "handlebars" tag
+    return template.tags?.includes('handlebars') || false;
+  }
+  
+  /**
+   * Extract variables from the template
+   * 
+   * @param template - The template to extract variables from
+   * @returns Array of variable names
+   */
+  extractVariables(template: Prompt): string[] {
+    // Parse the template to extract variable names
+    const ast = Handlebars.parse(template.content);
+    const variables = new Set<string>();
+    
+    // Traverse the AST to find variables
+    this.traverseAst(ast, variables);
+    
+    return Array.from(variables);
+  }
+  
+  /**
+   * Apply variables to the template
+   * 
+   * @param template - The template to apply variables to
+   * @param variables - The variables to apply
+   * @returns The result of applying the variables to the template
+   */
+  applyTemplate(template: Prompt, variables: TemplateVariables): ApplyTemplateResult {
+    // Compile the template
+    const compiledTemplate = Handlebars.compile(template.content);
+    
+    // Apply the variables
+    const content = compiledTemplate(variables);
+    
+    // Check for missing variables
+    const templateVariables = this.extractVariables(template);
+    const missingVariables = templateVariables.filter(v => !(v in variables));
+    
+    return {
+      content,
+      originalPrompt: template,
+      appliedVariables: variables,
+      missingVariables: missingVariables.length > 0 ? missingVariables : undefined
+    };
+  }
+  
+  /**
+   * Traverse the Handlebars AST to find variables
+   * 
+   * @param node - AST node
+   * @param variables - Set to collect variables
+   */
+  private traverseAst(node: any, variables: Set<string>): void {
+    if (node.type === 'MustacheStatement' || node.type === 'SubExpression') {
+      if (node.path.type === 'PathExpression' && !node.path.data) {
+        variables.add(node.path.parts[0]);
+      }
+    }
+    
+    // Recursively traverse child nodes
+    if (node.program) {
+      this.traverseAst(node.program, variables);
+    }
+    
+    if (node.inverse) {
+      this.traverseAst(node.inverse, variables);
+    }
+    
+    if (node.body) {
+      for (const child of node.body) {
+        this.traverseAst(child, variables);
+      }
+    }
+    
+    if (node.params) {
+      for (const param of node.params) {
+        this.traverseAst(param, variables);
+      }
+    }
+    
+    if (node.hash && node.hash.pairs) {
+      for (const pair of node.hash.pairs) {
+        this.traverseAst(pair.value, variables);
+      }
+    }
+  }
+}
+```
+
+### 3. Custom Plugin
+
+Example of a custom plugin:
+
+```typescript
+// plugins/redis-plugin/index.ts
+import { Plugin, PluginRegistry } from '../../src/plugins/types';
+import { RedisAdapter, RedisAdapterOptions } from './redis-adapter';
+import { RedisTemplateProcessor } from './redis-template-processor';
+
+/**
+ * Redis plugin for MCP-Prompts
+ */
+export class RedisPlugin implements Plugin {
+  /**
+   * Name of the plugin
+   */
+  readonly name = 'redis-plugin';
+  
+  /**
+   * Version of the plugin
+   */
+  readonly version = '1.0.0';
+  
+  /**
+   * Register the plugin with the system
+   * 
+   * @param registry - Registry to register extensions with
+   */
+  register(registry: PluginRegistry): void {
+    // Register Redis storage adapter
+    registry.registerStorageAdapter('redis', (options: RedisAdapterOptions) => {
+      return new RedisAdapter(options);
+    });
+    
+    // Register Redis template processor
+    registry.registerTemplateProcessor(new RedisTemplateProcessor());
+  }
+}
+
+// Export plugin instance
+export default new RedisPlugin();
+```
+
+## Best Practices for Extensibility
+
+1. **Design for Extension**: Always design components with extension in mind.
+2. **Clear Interfaces**: Define clear interfaces for extension points.
+3. **Dependency Injection**: Use dependency injection to allow substituting implementations.
+4. **Registry Pattern**: Use registries to manage extensions.
+5. **Configuration Over Convention**: Prefer configuration over convention for flexibility.
+6. **Plugin System**: Implement a plugin system for third-party extensions.
+7. **Documentation**: Document extension points and how to use them.
+8. **Testing**: Test extensibility by implementing test extensions.
+9. **Backward Compatibility**: Maintain backward compatibility for extensions.
+10. **Forward Compatibility**: Design for forward compatibility by using versioning.
+
+By following these extensibility patterns, the MCP-Prompts server can be easily extended with new functionality without requiring significant changes to the core codebase.

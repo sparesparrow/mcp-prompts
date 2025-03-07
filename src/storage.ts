@@ -247,7 +247,10 @@ export class PgAIStorageProvider implements PromptStorage {
       throw new Error('PostgreSQL (pg) package is not installed. Run "npm install pg" to use PGAI storage.');
     }
     
-    this.pool = new Pool({ connectionString });
+    this.pool = new Pool({ 
+      connectionString,
+      ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false 
+    });
     this.tableName = tableName;
     this.schema = schema;
     
@@ -296,9 +299,12 @@ export class PgAIStorageProvider implements PromptStorage {
           tags TEXT[],
           is_template BOOLEAN NOT NULL,
           variables TEXT[],
+          category TEXT NOT NULL DEFAULT 'development',
           created_at TIMESTAMP NOT NULL,
           updated_at TIMESTAMP NOT NULL,
           version INT NOT NULL,
+          usage_count INT DEFAULT 0,
+          last_used TIMESTAMP,
           metadata JSONB,
           embedding VECTOR(1536)
         )
@@ -335,7 +341,18 @@ export class PgAIStorageProvider implements PromptStorage {
         return null;
       }
       
+      // Update usage count and last_used timestamp
+      await client.query(
+        `UPDATE ${this.schema}.${this.tableName} 
+         SET usage_count = usage_count + 1, last_used = NOW() 
+         WHERE id = $1`,
+        [id]
+      );
+      
       return this.rowToPrompt(result.rows[0]);
+    } catch (error) {
+      console.error(`Error getting prompt with ID ${id}:`, error);
+      throw error;
     } finally {
       client.release();
     }
@@ -362,6 +379,11 @@ export class PgAIStorageProvider implements PromptStorage {
         params.push(options.tags);
       }
       
+      if (options?.category) {
+        conditions.push(`category = $${params.length + 1}`);
+        params.push(options.category);
+      }
+      
       if (options?.templatesOnly) {
         conditions.push(`is_template = $${params.length + 1}`);
         params.push(true);
@@ -378,6 +400,9 @@ export class PgAIStorageProvider implements PromptStorage {
       const result = await client.query(query, params);
       
       return result.rows.map((row: any) => this.rowToPrompt(row));
+    } catch (error) {
+      console.error('Error listing prompts:', error);
+      throw error;
     } finally {
       client.release();
     }
@@ -407,6 +432,8 @@ export class PgAIStorageProvider implements PromptStorage {
       // Convert prompt to row format
       const updatedPrompt: Prompt = {
         ...prompt,
+        category: prompt.category || 'development',
+        usage_count: prompt.usage_count || 0,
         createdAt: prompt.createdAt instanceof Date ? prompt.createdAt : new Date(prompt.createdAt || Date.now()),
         updatedAt: new Date()
       };
@@ -419,11 +446,12 @@ export class PgAIStorageProvider implements PromptStorage {
       // Insert or update the prompt
       await client.query(`
         INSERT INTO ${this.schema}.${this.tableName}
-        (id, name, content, description, tags, is_template, variables, created_at, updated_at, version, metadata, embedding)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        (id, name, content, description, tags, is_template, variables, category, created_at, updated_at, version, usage_count, last_used, metadata, embedding)
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
         ON CONFLICT (id) DO UPDATE
         SET name = $2, content = $3, description = $4, tags = $5, is_template = $6, 
-            variables = $7, updated_at = $9, version = $10, metadata = $11, embedding = $12
+            variables = $7, category = $8, updated_at = $10, version = $11, 
+            metadata = $14, embedding = $15
       `, [
         updatedPrompt.id,
         updatedPrompt.name,
@@ -432,9 +460,12 @@ export class PgAIStorageProvider implements PromptStorage {
         updatedPrompt.tags || [],
         updatedPrompt.isTemplate,
         updatedPrompt.variables || [],
+        updatedPrompt.category,
         updatedPrompt.createdAt,
         updatedPrompt.updatedAt,
         updatedPrompt.version,
+        updatedPrompt.usage_count,
+        updatedPrompt.last_used ? new Date(updatedPrompt.last_used) : null,
         updatedPrompt.metadata || {},
         embedding
       ]);
@@ -446,6 +477,7 @@ export class PgAIStorageProvider implements PromptStorage {
     } catch (error) {
       // Rollback the transaction
       await client.query('ROLLBACK');
+      console.error('Error adding/updating prompt:', error);
       throw error;
     } finally {
       client.release();
@@ -518,21 +550,24 @@ export class PgAIStorageProvider implements PromptStorage {
   /**
    * Convert a database row to a Prompt object
    * @param row The database row
-   * @returns The prompt object
+   * @returns Prompt object
    */
-  private rowToPrompt(row: Record<string, any>): Prompt {
+  private rowToPrompt(row: any): Prompt {
     return {
       id: row.id,
       name: row.name,
-      description: row.description || '',
       content: row.content,
-      tags: row.tags || [],
-      createdAt: row.created_at ? new Date(row.created_at) : new Date(),
-      updatedAt: row.updated_at ? new Date(row.updated_at) : new Date(),
-      isTemplate: row.is_template || false,
-      variables: row.variables || [],
-      version: row.version || 1,
-      metadata: row.metadata || {}
+      description: row.description,
+      tags: row.tags,
+      isTemplate: row.is_template,
+      variables: row.variables,
+      category: row.category,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      version: row.version,
+      usage_count: row.usage_count,
+      last_used: row.last_used ? row.last_used.toISOString() : null,
+      metadata: row.metadata
     };
   }
 }

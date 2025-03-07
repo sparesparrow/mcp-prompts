@@ -1,14 +1,10 @@
 # MCP Prompts Guide
 
-This guide explains how to create, manage, and use prompts with the MCP Prompts server.
+This guide explains how to create, manage, and use prompts with the simplified MCP Prompts server.
 
-## Prompt Formats
+## Prompt Formats and Structure
 
-The MCP Prompts server supports two formats for prompts:
-
-### JSON Format
-
-JSON is the native format used by the server internally:
+The MCP Prompts server uses a simple JSON structure for prompts:
 
 ```json
 {
@@ -18,160 +14,183 @@ JSON is the native format used by the server internally:
   "content": "The actual prompt text that will be sent to the model",
   "isTemplate": false,
   "tags": ["tag1", "tag2", "tag3"],
-  "createdAt": "2024-03-05T12:00:00Z",
-  "updatedAt": "2024-03-05T12:00:00Z",
+  "category": "development",
+  "createdAt": "2024-03-07T12:00:00.000Z",
+  "updatedAt": "2024-03-07T12:00:00.000Z",
   "version": 1
 }
 ```
 
-For templates, include a `variables` array:
+### Key Fields
 
-```json
-{
-  "id": "my-template-id",
-  "name": "My Template Name",
-  "description": "A description of what this template does",
-  "content": "This template accepts a {{variable_name}} that you can use",
-  "isTemplate": true,
-  "variables": ["variable_name"],
-  "tags": ["template", "customizable"],
-  "createdAt": "2024-03-05T12:00:00Z",
-  "updatedAt": "2024-03-05T12:00:00Z",
-  "version": 1
-}
-```
+- **id**: Unique identifier for the prompt (generated automatically if not provided)
+- **name**: Human-readable name
+- **description**: Optional description of what the prompt does
+- **content**: The actual prompt text
+- **isTemplate**: Whether this is a template with variables
+- **tags**: Array of strings for categorization
+- **category**: Broad category for organization
+- **createdAt**: Timestamp when the prompt was created
+- **updatedAt**: Timestamp when the prompt was last updated
+- **version**: Version number of the prompt
 
-### Markdown Format
+## Working with Templates
 
-Markdown format is more human-readable:
-
-```markdown
-# My Prompt Name
-
-A description of what this prompt does
-
-## Tags
-
-- tag1
-- tag2
-- tag3
-
-## Content
-
-```
-The actual prompt text that will be sent to the model
-```
-
-## Metadata
-
-- ID: my-prompt-id
-- Version: 1
-- Created: 2024-03-05T12:00:00Z
-- Updated: 2024-03-05T12:00:00Z
-```
-
-## Creating Prompts
-
-### Manually
-
-1. Create a JSON or Markdown file in the `prompts` directory
-2. Follow the format examples above
-3. Ensure the prompt has a unique ID
-
-### Using the API
-
-```javascript
-const result = await client.callTool('add_prompt', {
-  prompt: {
-    name: "My New Prompt",
-    description: "A description of the prompt",
-    content: "The prompt content",
-    isTemplate: false,
-    tags: ["tag1", "tag2"]
-  }
-});
-```
-
-### From Raw Prompts
-
-Use the processing script to extract prompts from source files:
-
-```bash
-npm run prompt:process
-```
-
-## Using Templates
-
-Templates contain placeholders in the format `{{variable_name}}` that will be replaced when the template is applied.
+Templates allow you to create reusable prompts with variables that can be filled in at runtime.
 
 ### Creating Templates
 
-Define variables in your template content and include them in the `variables` array:
+To create a template, set `isTemplate` to `true` and include variables in the content using double curly braces:
 
 ```json
 {
-  "id": "greeting-template",
-  "name": "Greeting Template",
-  "description": "A customizable greeting",
-  "content": "Hello {{name}}, welcome to {{place}}!",
+  "name": "Bug Report Template",
+  "description": "Template for submitting bug reports",
+  "content": "## Bug Report\n\n### Description\n{{description}}\n\n### Steps to Reproduce\n{{steps}}\n\n### Expected Behavior\n{{expected}}\n\n### Actual Behavior\n{{actual}}\n\n### Environment\n{{environment}}",
   "isTemplate": true,
-  "variables": ["name", "place"],
-  "tags": ["greeting", "template"],
-  "createdAt": "2024-03-05T12:00:00Z",
-  "updatedAt": "2024-03-05T12:00:00Z",
-  "version": 1
+  "tags": ["bug", "template", "documentation"],
+  "category": "development"
 }
 ```
 
 ### Applying Templates
 
-Apply templates by providing values for the variables:
+To apply a template, use the `apply_template` tool with the template ID and variables:
 
-```javascript
-const result = await client.callTool('apply_template', {
-  id: "greeting-template",
-  variables: {
-    name: "John",
-    place: "Paris"
+```json
+{
+  "id": "bug-report-template",
+  "variables": {
+    "description": "The save button doesn't work when clicked",
+    "steps": "1. Open the application\n2. Navigate to the settings page\n3. Make a change\n4. Click the save button",
+    "expected": "The settings should be saved and a confirmation message displayed",
+    "actual": "Nothing happens when the save button is clicked",
+    "environment": "Windows 10, Chrome 121"
+  }
+}
+```
+
+## Using MCP Tools for Prompt Management
+
+### Adding a Prompt
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "add_prompt",
+  arguments: {
+    prompt: {
+      name: "Bug Report Template",
+      description: "Template for submitting bug reports",
+      content: "## Bug Report\n\n### Description\n{{description}}\n\n### Steps to Reproduce\n{{steps}}\n\n### Expected Behavior\n{{expected}}\n\n### Actual Behavior\n{{actual}}\n\n### Environment\n{{environment}}",
+      isTemplate: true,
+      tags: ["bug", "template", "documentation"],
+      category: "development"
+    }
   }
 });
-// result.content will be "Hello John, welcome to Paris!"
+```
+
+### Getting a Prompt
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "get_prompt",
+  arguments: {
+    id: "bug-report-template"
+  }
+});
+```
+
+### Updating a Prompt
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "update_prompt",
+  arguments: {
+    id: "bug-report-template",
+    prompt: {
+      tags: ["bug", "template", "documentation", "updated"],
+      description: "Updated template for submitting bug reports"
+    }
+  }
+});
+```
+
+### Listing Prompts
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "list_prompts",
+  arguments: {
+    tags: ["template"],
+    category: "development",
+    isTemplate: true
+  }
+});
+```
+
+### Applying a Template
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "apply_template",
+  arguments: {
+    id: "bug-report-template",
+    variables: {
+      "description": "The save button doesn't work",
+      "steps": "1. Click save button",
+      "expected": "Data should save",
+      "actual": "Nothing happens",
+      "environment": "Chrome on Windows"
+    }
+  }
+});
+```
+
+### Deleting a Prompt
+
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "delete_prompt",
+  arguments: {
+    id: "bug-report-template"
+  }
+});
 ```
 
 ## Best Practices
 
-1. **Use descriptive IDs and names** - Make your prompts easy to find and understand
-2. **Add relevant tags** - Tags help categorize and filter prompts
-3. **Keep prompts focused** - Each prompt should have a clear purpose
-4. **Include examples** - In descriptions or content, show how to use the prompt
-5. **Use templates for flexibility** - Templates allow for customization
-6. **Version your prompts** - Increment the version when making significant changes
-7. **Organize by domain** - Group related prompts together
+### Naming Conventions
 
-## Advanced Usage
+- Use descriptive, consistent naming
+- Consider using prefixes for related prompts
+- Make names clear and searchable
 
-### Prompt Chaining
+### Template Variables
 
-You can chain prompts by referencing other prompts in your prompt content. This is particularly useful for complex workflows:
+- Use clear, descriptive variable names
+- Include default values in documentation
+- Group related variables
 
-```
-{{reference:another-prompt-id}}
+### Organization with Tags and Categories
 
-Now I will continue with more instructions...
-```
+- Use tags for fine-grained organization
+- Use categories for broad organization
+- Be consistent with tag and category naming
 
-### Conditional Content
+### Content Quality
 
-For templates, you can include conditional sections:
+- Write clear, concise prompts
+- Include examples where helpful
+- Consider edge cases in templates
+- Update prompts regularly based on feedback
 
-```
-{{#if advanced_mode}}
-Here are advanced instructions...
-{{else}}
-Here are basic instructions...
-{{/if}}
-```
+## Conclusion
 
-### Organizing Large Prompt Collections
-
-For large collections, consider organizing prompts in subdirectories by category or function. The server will recursively scan all subdirectories in the `prompts` folder. 
+This guide covers the basics of creating and managing prompts with the MCP Prompts server. By following these practices, you can build a well-organized library of prompts to enhance your interactions with Claude and other LLMs. 

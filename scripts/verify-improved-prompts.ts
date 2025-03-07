@@ -1,192 +1,143 @@
-#!/usr/bin/env node
-
 /**
- * Verify Improved Prompts in PGAI
- * This script verifies that the improved prompts are available in the PGAI database
+ * Verify Migrated Prompts Script
+ * This script verifies that prompts were correctly migrated to PostgreSQL
  */
 
-import { createConfig } from '../src/core';
-import { createStorageProvider } from '../src/storage';
+import { Pool } from 'pg';
+import fs from 'fs';
+import path from 'path';
+import dotenv from 'dotenv';
 
-// List of improved prompt IDs to verify
-const IMPROVED_PROMPT_IDS = [
-  'enhanced-code-review',
-  'advanced-code-refactoring',
-  'intelligent-debugging',
-  'system-architecture-designer',
-  'comprehensive-data-analyzer',
-  'advanced-content-analyzer',
-  'comprehensive-research-assistant',
-  'topic-modeling-specialist',
-  'contextual-translator',
-  'strategic-foresight-planner',
-  'question-generation-specialist',
-  'follow-up-question-generator'
-];
+// Load environment variables
+dotenv.config();
 
-// Categories for organization in console output
-const CATEGORIES = {
-  'development': [
-    'enhanced-code-review',
-    'advanced-code-refactoring',
-    'intelligent-debugging'
-  ],
-  'design': [
-    'system-architecture-designer'
-  ],
-  'analysis': [
-    'comprehensive-data-analyzer',
-    'advanced-content-analyzer'
-  ],
-  'research': [
-    'comprehensive-research-assistant',
-    'topic-modeling-specialist'
-  ],
-  'language': [
-    'contextual-translator'
-  ],
-  'planning': [
-    'strategic-foresight-planner'
-  ],
-  'productivity': [
-    'question-generation-specialist',
-    'follow-up-question-generator'
-  ]
-};
+const DATABASE_URL = process.env.DATABASE_URL;
+const PROMPTS_DIR = process.env.PROMPTS_DIR || path.join(process.cwd(), 'prompts');
 
-/**
- * Parse command line arguments
- */
-function parseArgs(): { connectionString: string } {
-  const args = process.argv.slice(2);
-  let connectionString = 'postgresql://postgres:postgres@localhost:5432/mcp_prompts';
-  
-  for (let i = 0; i < args.length; i++) {
-    const arg = args[i];
-    
-    if (arg === '--connection' || arg === '-c') {
-      if (i + 1 < args.length) {
-        connectionString = args[i + 1];
-        i++;
-      }
-    }
-  }
-  
-  return { connectionString };
+if (!DATABASE_URL) {
+  console.error('Error: DATABASE_URL environment variable is required');
+  process.exit(1);
 }
 
+// Create a database connection pool
+const pool = new Pool({
+  connectionString: DATABASE_URL,
+  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
 /**
- * Verify improved prompts in PGAI database
+ * Verify that prompts were correctly migrated to PostgreSQL
  */
-async function verifyImprovedPrompts(connectionString: string): Promise<void> {
-  console.log('Verifying improved prompts in PGAI database...\n');
-  
-  // Create PGAI storage provider
-  const pgaiConfig = createConfig({
-    storage: {
-      type: 'pgai',
-      options: {
-        connectionString
-      }
-    }
-  });
-  
-  const pgaiStorage = createStorageProvider(pgaiConfig);
+async function verifyMigratedPrompts() {
+  console.log('Starting verification of migrated prompts...');
+
+  // Check if the prompts directory exists
+  if (!fs.existsSync(PROMPTS_DIR)) {
+    console.error(`Error: Prompts directory ${PROMPTS_DIR} does not exist`);
+    return;
+  }
+
+  // Connect to the database
+  const client = await pool.connect();
   
   try {
-    // Get all prompts from PGAI
-    console.log('Fetching prompts from database...');
-    const allPrompts = await pgaiStorage.listPrompts();
-    console.log(`Found ${allPrompts.length} prompts in PGAI database\n`);
+    // Get count of prompts in the database
+    const dbCountResult = await client.query('SELECT COUNT(*) FROM prompts');
+    const dbPromptCount = parseInt(dbCountResult.rows[0].count, 10);
     
-    // Check if improved prompts are in the database
-    let foundCount = 0;
-    let missingCount = 0;
-    const missingPrompts: string[] = [];
+    // Get all JSON files from the prompts directory
+    const promptFiles = findAllPromptFiles(PROMPTS_DIR);
+    const filePromptCount = promptFiles.length;
     
-    console.log('Checking for improved prompts by category:');
+    console.log(`Prompts in database: ${dbPromptCount}`);
+    console.log(`Prompts in file system: ${filePromptCount}`);
     
-    // Check each category
-    for (const [category, promptIds] of Object.entries(CATEGORIES)) {
-      console.log(`\n${category.toUpperCase()} CATEGORY:`);
-      
-      for (const id of promptIds) {
-        const found = allPrompts.some(p => p.id === id);
-        
-        if (found) {
-          const prompt = allPrompts.find(p => p.id === id);
-          console.log(`  ✓ ${prompt?.name} (${id})`);
-          foundCount++;
-        } else {
-          console.log(`  ✗ Missing: ${id}`);
-          missingCount++;
-          missingPrompts.push(id);
-        }
-      }
+    if (dbPromptCount < filePromptCount) {
+      console.warn(`Warning: There are fewer prompts in the database than in the file system. Some prompts may not have been migrated.`);
     }
     
-    // Summary
-    console.log('\n--- VERIFICATION SUMMARY ---');
-    console.log(`Total improved prompts: ${IMPROVED_PROMPT_IDS.length}`);
-    console.log(`Found in database: ${foundCount}`);
-    console.log(`Missing from database: ${missingCount}`);
-    
-    if (missingCount > 0) {
-      console.log('\nMissing prompts:');
-      missingPrompts.forEach(id => console.log(`  - ${id}`));
-      console.log('\nTo add the missing prompts, run:');
-      console.log('  npm run pgai:migrate:improved');
-    } else if (foundCount === IMPROVED_PROMPT_IDS.length) {
-      console.log('\n✅ All improved prompts are available in the PGAI database!');
-    }
-    
-    // Perform a quick semantic search test if prompts are found
-    if (foundCount > 0) {
-      console.log('\n--- QUICK SEARCH TEST ---');
-      console.log('Performing semantic search for "code review"...');
-      
+    // Verify specific prompts by ID
+    console.log('\nVerifying specific prompts by ID...');
+    for (const file of promptFiles.slice(0, 5)) { // Check the first 5 prompts as a sample
       try {
-        // Check if the storage provider supports semantic search
-        if (typeof pgaiStorage.searchPromptsByContent === 'function') {
-          const searchResults = await pgaiStorage.searchPromptsByContent('code review');
-          
-          if (searchResults.length > 0) {
-            console.log(`Found ${searchResults.length} results:`);
-            searchResults.slice(0, 3).forEach(prompt => {
-              console.log(`  - ${prompt.name} (${prompt.id})`);
-            });
-            console.log('✅ Semantic search is working!');
-          } else {
-            console.log('No results found. Semantic search may not be working properly.');
-          }
+        // Read and parse the prompt file
+        const content = fs.readFileSync(file, 'utf-8');
+        const filePrompt = JSON.parse(content);
+        
+        // Query the database for this prompt
+        const dbPromptResult = await client.query('SELECT * FROM prompts WHERE id = $1', [filePrompt.id]);
+        
+        if (dbPromptResult.rows.length === 0) {
+          console.error(`Error: Prompt ${filePrompt.id} (${filePrompt.name}) not found in the database`);
         } else {
-          console.log('This storage provider does not support semantic search.');
+          console.log(`✓ Verified prompt ${filePrompt.id}: ${filePrompt.name}`);
         }
       } catch (error) {
-        console.error('Error performing semantic search:', error);
+        console.error(`Error verifying prompt from file ${file}:`, error);
       }
     }
     
+    // Verify the database structure
+    console.log('\nVerifying database structure...');
+    try {
+      const columnsResult = await client.query(`
+        SELECT column_name, data_type 
+        FROM information_schema.columns 
+        WHERE table_name = 'prompts'
+      `);
+      
+      const columns = columnsResult.rows.map((row: any) => row.column_name);
+      
+      // Check for required columns
+      const requiredColumns = [
+        'id', 'name', 'content', 'is_template', 'category', 
+        'usage_count', 'last_used', 'created_at', 'updated_at'
+      ];
+      
+      for (const column of requiredColumns) {
+        if (columns.includes(column)) {
+          console.log(`✓ Column ${column} exists`);
+        } else {
+          console.error(`✗ Column ${column} is missing`);
+        }
+      }
+    } catch (error) {
+      console.error('Error verifying database structure:', error);
+    }
+    
+    console.log('\nVerification completed');
   } finally {
-    await pgaiStorage.close();
+    client.release();
+    await pool.end();
   }
 }
 
 /**
- * Main function
+ * Find all prompt JSON files in the specified directory and its subdirectories
  */
-async function main() {
-  const { connectionString } = parseArgs();
+function findAllPromptFiles(dir: string): string[] {
+  let results: string[] = [];
+
+  const items = fs.readdirSync(dir);
   
-  try {
-    await verifyImprovedPrompts(connectionString);
-  } catch (error) {
-    console.error('Verification failed:', error);
-    process.exit(1);
+  for (const item of items) {
+    const itemPath = path.join(dir, item);
+    const stat = fs.statSync(itemPath);
+
+    if (stat.isDirectory()) {
+      // Recursively search subdirectories
+      results = results.concat(findAllPromptFiles(itemPath));
+    } else if (item.endsWith('.json')) {
+      // Add JSON files to the results
+      results.push(itemPath);
+    }
   }
+
+  return results;
 }
 
-// Run the main function
-if (require.main === module) {
-  main();
-} 
+// Execute the verification
+verifyMigratedPrompts().catch(error => {
+  console.error('Unhandled error during verification:', error);
+  process.exit(1);
+}); 

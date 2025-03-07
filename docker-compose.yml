@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # PostgreSQL database with PGAI extension
+  # PostgreSQL database
   postgres:
     image: postgres:14
     container_name: mcp-postgres
@@ -33,17 +33,19 @@ services:
       - "3000:3000"
     environment:
       - NODE_ENV=production
+      - DATABASE_URL=postgresql://postgres:postgres@postgres:5432/mcp_prompts
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+      - PORT=3000
+      - HOST=0.0.0.0
+      - LOG_LEVEL=info
     volumes:
       - ./config:/app/config
       - ./prompts:/app/prompts
       - ./logs:/app/logs
-    command: >
-      sh -c "
-        echo 'Waiting for PostgreSQL to be ready...' &&
-        sleep 5 &&
-        npm run pgai:migrate:improved &&
-        npm start
-      "
+    command: ["docker/startup.sh"]
+    stdin_open: true
+    tty: true
 
 volumes:
   postgres_data: 

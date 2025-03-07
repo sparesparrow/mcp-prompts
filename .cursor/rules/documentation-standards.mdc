@@ -1,0 +1,763 @@
+---
+description: Guidelines for documenting the MCP-Prompts server for developers, users, and contributors
+globs:
+  - "README.md"
+  - "docs/**/*.md"
+  - "src/**/*.ts"
+  - "src/**/*.js"
+---
+
+# Documentation Standards for MCP-Prompts
+
+This rule provides guidelines for documenting the MCP-Prompts server to ensure clarity, completeness, and consistency across all documentation.
+
+## Documentation Philosophy
+
+1. **Clarity First**: Documentation should be clear and accessible to its intended audience.
+2. **Completeness**: Documentation should cover all essential aspects of the project.
+3. **Consistency**: Use consistent terminology, format, and structure.
+4. **Keep Updated**: Documentation should evolve alongside the codebase.
+5. **Reference and Guide**: Documentation should serve both as a reference and as a guide.
+
+## Documentation Types
+
+### 1. Project Documentation
+
+The primary documentation in README.md and docs/ directory:
+
+```markdown
+# MCP-Prompts
+
+MCP-Prompts is a Model Context Protocol (MCP) server for managing, storing, and providing prompts and templates for LLM interactions.
+
+## Features
+
+- **Core Functionality**: Create, retrieve, update, and delete prompts
+- **Template Support**: Use templates with variable substitution
+- **Storage Options**: File-based storage with extensible storage adapters
+- **MCP Integration**: Seamless integration with other MCP servers
+- **Docker Support**: Easy deployment with Docker
+- **Extensibility**: Modular design for easy extension
+
+## Installation
+
+### Prerequisites
+
+- Node.js 18 or later
+- Docker (optional, for containerized deployment)
+
+### Quick Setup
+
+```bash
+# Install from npm
+npm install -g mcp-prompts
+
+# Run the server
+mcp-prompts
+```
+
+### Docker Setup
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mcp-prompts.git
+cd mcp-prompts
+
+# Build and run with Docker Compose
+docker-compose up -d
+```
+
+## Configuration
+
+MCP-Prompts can be configured using environment variables:
+
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `STORAGE_TYPE` | Storage adapter type (file, postgres) | `file` |
+| `PROMPTS_DIR` | Directory for prompt storage | `./prompts` |
+| `LOG_LEVEL` | Logging level (debug, info, warn, error) | `info` |
+| `FILESYSTEM_SERVER_ENABLED` | Enable filesystem MCP server integration | `false` |
+| `MEMORY_SERVER_ENABLED` | Enable memory MCP server integration | `false` |
+| `GITHUB_SERVER_ENABLED` | Enable GitHub MCP server integration | `false` |
+
+## Usage
+
+### MCP Tools
+
+MCP-Prompts exposes the following tools:
+
+#### add_prompt
+
+Add a new prompt or update an existing one.
+
+```json
+{
+  "prompt": {
+    "name": "Code Review",
+    "content": "Please review the following code:\n\n{{code}}",
+    "description": "A template for requesting code reviews",
+    "isTemplate": true,
+    "tags": ["code", "review"]
+  }
+}
+```
+
+#### get_prompt
+
+Get a prompt by ID.
+
+```json
+{
+  "id": "code-review"
+}
+```
+
+#### list_prompts
+
+List prompts with optional filtering.
+
+```json
+{
+  "tags": ["code", "review"],
+  "isTemplate": true,
+  "limit": 10
+}
+```
+
+#### apply_template
+
+Apply variables to a template.
+
+```json
+{
+  "id": "code-review",
+  "variables": {
+    "code": "function add(a, b) { return a + b; }"
+  }
+}
+```
+
+#### delete_prompt
+
+Delete a prompt by ID.
+
+```json
+{
+  "id": "code-review"
+}
+```
+
+### Claude Desktop Integration
+
+To use MCP-Prompts with Claude Desktop:
+
+1. Install MCP-Prompts globally: `npm install -g mcp-prompts`
+2. Update your Claude Desktop configuration:
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "mcp-prompts",
+      "args": []
+    }
+  }
+}
+```
+
+## Development
+
+### Setup Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mcp-prompts.git
+cd mcp-prompts
+
+# Install dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+### Project Structure
+
+```
+mcp-prompts/
+├── src/               # Source code
+│   ├── adapters/      # Storage adapters
+│   ├── core/          # Core types and interfaces
+│   ├── services/      # Business logic services
+│   ├── tools/         # MCP tool implementations
+│   └── index.ts       # Main entry point
+├── tests/             # Test files
+├── docs/              # Documentation
+└── docker/            # Docker configuration
+```
+
+### Testing
+
+```bash
+# Run all tests
+npm test
+
+# Run specific tests
+npm test -- --grep "prompt service"
+```
+
+## Contributing
+
+We welcome contributions! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+```
+
+### 2. API Documentation
+
+Document the API using [TypeDoc](https://typedoc.org/) or JSDoc:
+
+```typescript
+/**
+ * Represents a prompt or template in the system
+ */
+export interface Prompt {
+  /** Unique identifier for the prompt */
+  id: string;
+  
+  /** Display name for the prompt */
+  name: string;
+  
+  /** Optional description of the prompt's purpose */
+  description?: string;
+  
+  /** The actual prompt content */
+  content: string;
+  
+  /** Whether this prompt is a template with variable substitution */
+  isTemplate: boolean;
+  
+  /** 
+   * List of variable names for templates.
+   * Only present if isTemplate is true.
+   */
+  variables?: string[];
+  
+  /** Tags for categorization and filtering */
+  tags?: string[];
+  
+  /** Category for organization */
+  category?: string;
+  
+  /** ISO timestamp of creation date */
+  createdAt: string;
+  
+  /** ISO timestamp of last update */
+  updatedAt: string;
+  
+  /** Version number for tracking changes */
+  version: number;
+}
+
+/**
+ * Service for managing prompts
+ */
+export interface PromptService {
+  /**
+   * Get a prompt by ID
+   * 
+   * @param id - Unique identifier of the prompt
+   * @returns The prompt with the specified ID
+   * @throws NotFoundError if the prompt doesn't exist
+   */
+  getPrompt(id: string): Promise<Prompt>;
+  
+  /**
+   * Add a new prompt
+   * 
+   * @param data - Partial prompt data to create
+   * @returns The newly created prompt
+   * @throws ValidationError if the data is invalid
+   */
+  addPrompt(data: Partial<Prompt>): Promise<Prompt>;
+  
+  /**
+   * Update an existing prompt
+   * 
+   * @param id - ID of the prompt to update
+   * @param data - Partial prompt data to update
+   * @returns The updated prompt
+   * @throws NotFoundError if the prompt doesn't exist
+   * @throws ValidationError if the data is invalid
+   */
+  updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
+  
+  /**
+   * List prompts with optional filtering
+   * 
+   * @param options - Options for filtering, sorting, and pagination
+   * @returns Array of prompts matching the criteria
+   */
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  
+  /**
+   * Delete a prompt by ID
+   * 
+   * @param id - ID of the prompt to delete
+   * @throws NotFoundError if the prompt doesn't exist
+   */
+  deletePrompt(id: string): Promise<void>;
+  
+  /**
+   * Apply variables to a template prompt
+   * 
+   * @param id - ID of the template prompt
+   * @param variables - Variables to apply to the template
+   * @returns Result of applying the template, including substituted content
+   * @throws NotFoundError if the prompt doesn't exist
+   * @throws TemplateError if the prompt is not a template
+   */
+  applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+}
+```
+
+### 3. MCP Tool Documentation
+
+Document MCP tools using consistent formats:
+
+```typescript
+// src/tools/prompt-tools.ts
+
+/**
+ * Set up prompt-related MCP tools
+ * 
+ * This function adds the following tools to the MCP server:
+ * - add_prompt: Add a new prompt or update an existing one
+ * - get_prompt: Get a prompt by ID
+ * - list_prompts: List prompts with filtering options
+ * - apply_template: Apply variables to a template prompt
+ * - delete_prompt: Delete a prompt by ID
+ * 
+ * @param server - The MCP server instance
+ * @param promptService - The prompt service implementation
+ */
+export function setupPromptTools(server: Server, promptService: PromptService) {
+  // Add prompt tool
+  /**
+   * Add a new prompt or update an existing one
+   * 
+   * Request format:
+   * ```json
+   * {
+   *   "prompt": {
+   *     "name": "My Prompt",
+   *     "content": "Prompt content",
+   *     "description": "Optional description",
+   *     "isTemplate": false,
+   *     "tags": ["tag1", "tag2"],
+   *     "category": "general"
+   *   }
+   * }
+   * ```
+   * 
+   * Response format on success:
+   * ```json
+   * {
+   *   "content": [
+   *     {
+   *       "type": "text",
+   *       "text": "Prompt added with ID: prompt-id"
+   *     }
+   *   ]
+   * }
+   * ```
+   * 
+   * Response format on error:
+   * ```json
+   * {
+   *   "isError": true,
+   *   "content": [
+   *     {
+   *       "type": "text",
+   *       "text": "Error message"
+   *     }
+   *   ]
+   * }
+   * ```
+   */
+  server.tool(
+    "add_prompt",
+    {
+      prompt: z.object({
+        name: z.string(),
+        content: z.string(),
+        description: z.string().optional(),
+        isTemplate: z.boolean().default(false),
+        tags: z.array(z.string()).optional(),
+        category: z.string().optional()
+      })
+    },
+    async ({ prompt }) => {
+      // Implementation...
+    }
+  );
+  
+  // Other tools...
+}
+```
+
+### 4. Changelog
+
+Maintain a clear changelog:
+
+```markdown
+# Changelog
+
+All notable changes to this project will be documented in this file.
+
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
+and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+### Added
+- Support for HTTP transport
+- Improved error handling with custom error types
+
+### Changed
+- Refactored storage adapters for better consistency
+- Updated dependencies to latest versions
+
+### Fixed
+- Issue with template variable extraction
+- Race condition in concurrent prompt updates
+
+## [1.1.0] - 2023-08-15
+
+### Added
+- GitHub integration for prompt synchronization
+- Tagging system for prompts
+- Support for categories
+
+### Changed
+- Improved logging system
+- Enhanced error messages
+
+### Fixed
+- Memory leak in long-running instances
+- Issue with special characters in prompt IDs
+
+## [1.0.0] - 2023-06-01
+
+### Added
+- Initial release
+- Core prompt management functionality
+- Template support with variable substitution
+- File-based storage
+```
+
+### 5. Architecture Documentation
+
+Document the system architecture with diagrams and explanations:
+
+```markdown
+# MCP-Prompts Architecture
+
+## Overview
+
+MCP-Prompts follows a layered architecture with clear separation of concerns:
+
+```
++---------------------+
+|   MCP Tools Layer   |
++---------------------+
+          |
++---------------------+
+|   Service Layer     |
++---------------------+
+          |
++---------------------+
+|   Adapter Layer     |
++---------------------+
+          |
++---------------------+
+|   Storage Layer     |
++---------------------+
+```
+
+## Layers
+
+### 1. MCP Tools Layer
+
+This layer exposes the MCP tools that clients can call:
+
+- `add_prompt`: Add or update prompts
+- `get_prompt`: Retrieve prompts
+- `list_prompts`: List and filter prompts
+- `apply_template`: Apply template variables
+- `delete_prompt`: Delete prompts
+
+### 2. Service Layer
+
+This layer contains the business logic for prompt management:
+
+- `PromptService`: Core service for managing prompts
+- `MetadataService`: Handles prompt metadata
+- `SyncService`: Manages synchronization with external systems
+
+### 3. Adapter Layer
+
+This layer handles integration with other MCP servers:
+
+- `FileSystemAdapter`: Integrates with the Filesystem MCP server
+- `MemoryAdapter`: Integrates with the Memory MCP server
+- `GitHubAdapter`: Integrates with the GitHub MCP server
+
+### 4. Storage Layer
+
+This layer handles data persistence:
+
+- `FileAdapter`: Stores prompts as files
+- `PostgresAdapter`: Stores prompts in PostgreSQL
+
+## Data Flow
+
+1. Client calls an MCP tool
+2. Tool handler validates input
+3. Tool handler calls appropriate service method
+4. Service method implements business logic
+5. Service method calls storage adapter methods
+6. Storage adapter interacts with storage layer
+7. Results flow back up through the layers
+
+## Integration Points
+
+MCP-Prompts can integrate with several other MCP servers:
+
+- **Filesystem MCP Server**: For reading and writing prompt files
+- **Memory MCP Server**: For storing metadata and caching
+- **GitHub MCP Server**: For synchronizing prompts with GitHub repositories
+
+## Configuration
+
+The system is configured through environment variables:
+
+- `STORAGE_TYPE`: Determines which storage adapter to use
+- `PROMPTS_DIR`: Directory for prompt storage
+- `*_SERVER_ENABLED`: Toggle integration with specific MCP servers
+```
+
+## Documentation Standards
+
+### Code Documentation
+
+#### Class and Interface Documentation
+
+```typescript
+/**
+ * Represents a service for managing prompts
+ * 
+ * The PromptService implements the core business logic for prompt management,
+ * including creating, retrieving, updating, and deleting prompts, as well as
+ * template variable substitution.
+ * 
+ * @example
+ * ```ts
+ * const storage = new FileAdapter('./prompts');
+ * const service = new PromptService(storage);
+ * 
+ * // Add a new prompt
+ * const prompt = await service.addPrompt({
+ *   name: 'My Prompt',
+ *   content: 'Hello, world!'
+ * });
+ * 
+ * // Get the prompt
+ * const retrieved = await service.getPrompt(prompt.id);
+ * ```
+ */
+export class PromptService implements PromptServiceInterface {
+  // Implementation...
+}
+```
+
+#### Method Documentation
+
+```typescript
+/**
+ * Apply variables to a template prompt
+ * 
+ * This method takes a template prompt ID and a set of variables, then applies
+ * the variables to the template by replacing all occurrences of {{variableName}}
+ * with the corresponding value.
+ * 
+ * @param id - The ID of the template prompt to apply variables to
+ * @param variables - An object mapping variable names to values
+ * @returns The result of applying the template, including the substituted content
+ * 
+ * @throws {ValidationError} If the ID or variables are invalid
+ * @throws {NotFoundError} If the prompt with the given ID doesn't exist
+ * @throws {TemplateError} If the prompt is not a template
+ * 
+ * @example
+ * ```ts
+ * // Apply variables to a template
+ * const result = await service.applyTemplate('greeting-template', {
+ *   name: 'John',
+ *   company: 'Acme Inc.'
+ * });
+ * 
+ * console.log(result.content);
+ * // Output: Hello, John from Acme Inc.!
+ * ```
+ */
+async applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult> {
+  // Implementation...
+}
+```
+
+#### Constants and Types Documentation
+
+```typescript
+/**
+ * Storage types supported by the system
+ * 
+ * @property file - File-based storage using the local filesystem
+ * @property memory - In-memory storage (non-persistent)
+ * @property postgres - PostgreSQL database storage
+ */
+export enum StorageType {
+  FILE = 'file',
+  MEMORY = 'memory',
+  POSTGRES = 'postgres'
+}
+
+/**
+ * Configuration options for list operations
+ * 
+ * These options allow filtering, sorting, and paginating prompts.
+ */
+export interface ListPromptsOptions {
+  /** Filter prompts by tag */
+  tags?: string[];
+  
+  /** Filter prompts by template status */
+  isTemplate?: boolean;
+  
+  /** Filter prompts by category */
+  category?: string;
+  
+  /** 
+   * Search term to match against name, description, or content 
+   * The search is case-insensitive and matches partial strings.
+   */
+  search?: string;
+  
+  /** 
+   * Field to sort by
+   * @default 'name'
+   */
+  sort?: string;
+  
+  /** 
+   * Sort direction
+   * @default 'asc'
+   */
+  order?: 'asc' | 'desc';
+  
+  /** 
+   * Maximum number of prompts to return
+   * @default Unlimited
+   */
+  limit?: number;
+  
+  /** 
+   * Number of prompts to skip
+   * @default 0
+   */
+  offset?: number;
+}
+```
+
+### File Documentation
+
+Every file should have a header comment:
+
+```typescript
+/**
+ * MCP-Prompts Storage Adapter
+ * 
+ * This file contains the interface and implementations for prompt storage adapters.
+ * The adapters provide an abstraction layer for different storage backends.
+ * 
+ * @module adapters/storage
+ */
+
+// Imports...
+
+// Code...
+```
+
+## Documentation Generation
+
+Use TypeDoc to generate API documentation:
+
+```json
+// typedoc.json
+{
+  "entryPoints": ["src/index.ts"],
+  "out": "docs/api",
+  "name": "MCP-Prompts API Documentation",
+  "readme": "README.md",
+  "includeVersion": true,
+  "excludeExternals": true,
+  "excludePrivate": true,
+  "excludeProtected": true,
+  "theme": "default"
+}
+```
+
+Add to package.json:
+
+```json
+{
+  "scripts": {
+    "docs": "typedoc",
+    "docs:watch": "typedoc --watch"
+  }
+}
+```
+
+## Documentation Best Practices
+
+1. **Document As You Code**: Write documentation alongside code, not after.
+2. **Use Examples**: Include practical examples in documentation.
+3. **Keep It Current**: Update documentation when code changes.
+4. **Document Why, Not Just What**: Explain reasoning behind design decisions.
+5. **Consider the Audience**: Write documentation for the appropriate audience (developers, users, etc.).
+6. **Include Diagrams**: Use visual aids for complex concepts.
+7. **Specify Types**: Always document parameter and return types.
+8. **Document Exceptions**: Clearly document exceptions and error cases.
+9. **Link Related Concepts**: Create cross-references between related documentation.
+10. **Validate Documentation**: Ensure documentation is correct and up-to-date.
+
+## Documentation Review Checklist
+
+Before submitting documentation, ensure:
+
+- [ ] All public APIs are documented
+- [ ] Examples are provided for complex functionality
+- [ ] Parameter and return types are specified
+- [ ] Exceptions and error cases are documented
+- [ ] Code samples are tested and working
+- [ ] Links to related documentation are included
+- [ ] No technical inaccuracies or outdated information
+- [ ] No spelling or grammar errors
+- [ ] Documentation follows the project's style guide
+- [ ] Generated documentation builds without errors
+
+## Conclusion
+
+Good documentation is essential for the success of the MCP-Prompts project. By following these standards and best practices, we can create documentation that is clear, consistent, and helpful for all audiences.

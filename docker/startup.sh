@@ -10,15 +10,17 @@ done
 
 echo "PostgreSQL is up - executing migrations"
 
-# Run PGAI migrations
-echo "Running PGAI migrations..."
-node build/scripts/pgai-utils.js migrate
+# Run schema migration
+echo "Running schema migration..."
+node build/scripts/migrate-schema.js
 
-# Run improved prompts migration if needed
-if [ "$MIGRATE_IMPROVED_PROMPTS" = "true" ]; then
-  echo "Migrating improved prompts collection..."
-  node build/scripts/migrate-prompts.js
-fi
+# Run prompts migration
+echo "Migrating prompts to PostgreSQL..."
+node build/scripts/migrate-prompts.js
+
+# Verify migration
+echo "Verifying migration..."
+node build/scripts/verify-improved-prompts.js
 
 # Start the MCP Prompts Server
 echo "Starting MCP Prompts Server..."

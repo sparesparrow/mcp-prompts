@@ -1,50 +1,73 @@
 # Changelog
 
-## [1.1.0] - 2025-03-05
+## [1.3.0] - 2024-03-07
 
-### Code Structure Improvements
-- Consolidated utility functions with storage module to reduce file count
-- Removed redundant utils directory
-- Fixed server.connect method in main file
-- Streamlined the project structure
+### Added
+- Implemented simplified architecture following SOLID principles
+- Added unified core types in a single file
+- Implemented focused storage adapters
+- Created streamlined prompt service
+- Added streamlined MCP server implementation with tools
+- Added Docker and Docker Compose integration for easier deployment
 
-### Script Organization
-- Renamed npm scripts with consistent `prompt:` prefix convention
-- Organized scripts into logical groups
-- Added shorthand commands for common operations
-- Improved script documentation
+### Changed
+- Completely refactored codebase for simplicity and maintainability
+- Reduced file count and complexity
+- Improved error handling with proper types
+- Updated imports to use .js extensions for ESM compatibility
+- Simplified configuration management
+- Made Docker configuration more flexible
 
-### Configuration Updates
-- Enhanced tsconfig.json with better TypeScript options
-- Updated .gitignore to be more comprehensive
-- Restructured package.json with cleaner organization
-- Added rimraf for cross-platform directory cleanup
+### Removed
+- Removed complex CLI interface in favor of focused MCP tools
+- Removed unnecessary utilities and functions
+- Removed legacy scripts and pipeline tools
 
-### Testing Improvements
-- Added basic unit tests for core functionality
-- Created test directory structure
-- Added test README with documentation
-- Ensured CI pipeline tests include export/import features
+## [1.2.0] - 2024-03-06
 
-### Documentation
-- Added detailed README files in key directories
-- Updated main README with new command names
-- Added comprehensive descriptions for all features
-- Created this changelog file to track project history
+### Added
+- PostgreSQL integration for centralized prompt storage
+- Added 'category' field for better prompt organization
+- Usage analytics tracking with 'usage_count' and 'last_used' fields
+- New 'prompt_analytics' tool for viewing prompt usage statistics
+- Category filtering in 'list_prompts' tool
+- Comprehensive setup script for database initialization
+- Docker and Docker Compose support with PostgreSQL
+- Detailed documentation on categories and analytics features
+- Integration tests for category and analytics functionality
 
-### CI/CD Pipeline
-- Added GitHub Actions workflow for CI
-- Set up automated testing for Node 18 and 20
-- Added package generation for releases
-- Improved linting checks
+### Changed
+- Migrated storage from file-based to PostgreSQL
+- Improved error messages with helpful suggestions
+- Enhanced security with SSL support for database connections
+- Updated all MCP tools to use the standard response format
+- Improved error handling with more detailed logs
 
-## [1.0.0] - 2025-03-04
+### Fixed
+- Fixed inconsistent response formats across tools
+- Improved error handling in asynchronous operations
+- Added proper type assertions in test files
 
-Initial release of the MCP Prompts Server with:
+## [1.1.0] - 2024-03-01
 
-- Basic prompt storage and retrieval
+### Added
+- PGAI vector search for semantic prompt discovery
+- Support for embeddings in PostgreSQL
+- Improved prompts collection with professional templates
+- Batch processing capabilities for prompt collections
+
+### Changed
+- Enhanced prompt processing pipeline
+- Improved command-line interface with more options
+- Better error handling and validation
+
+## [1.0.0] - 2024-02-15
+
+### Added
+- Initial release of MCP Prompts Server
+- Basic prompt management capabilities (add, edit, get, list, delete)
 - Template variable substitution
-- Raw prompt processing
+- Tag-based organization
+- File-based storage
 - Import/export functionality
-- Tag management
-- Folder organization 
+- MCP protocol compatibility

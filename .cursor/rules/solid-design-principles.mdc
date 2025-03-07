@@ -1,0 +1,512 @@
+ ---
+description: Guidelines for applying SOLID design principles to the MCP-Prompts project
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
+  - "src/**/*.py"
+---
+
+# SOLID Design Principles for MCP-Prompts
+
+This rule provides guidance on applying SOLID design principles to the MCP-Prompts project, ensuring a maintainable, extensible, and robust codebase.
+
+## Overview of SOLID Principles
+
+SOLID is an acronym for five design principles that make software designs more understandable, flexible, and maintainable:
+
+1. **S**ingle Responsibility Principle (SRP)
+2. **O**pen/Closed Principle (OCP)
+3. **L**iskov Substitution Principle (LSP)
+4. **I**nterface Segregation Principle (ISP)
+5. **D**ependency Inversion Principle (DIP)
+
+## Single Responsibility Principle (SRP)
+
+Each class or module should have only one reason to change, meaning it should have only one job or responsibility.
+
+### Implementation in MCP-Prompts
+
+```typescript
+// BAD: One class handling multiple responsibilities
+class PromptManager {
+  // Filesystem operations
+  readPromptFile(path: string): string { /* ... */ }
+  writePromptFile(path: string, content: string): void { /* ... */ }
+  
+  // Prompt conversion
+  convertToMDX(prompt: Prompt): string { /* ... */ }
+  convertFromMDX(content: string): Prompt { /* ... */ }
+  
+  // Prompt management
+  addPrompt(prompt: Prompt): void { /* ... */ }
+  getPrompt(id: string): Prompt { /* ... */ }
+  
+  // GitHub synchronization
+  syncWithGitHub(): void { /* ... */ }
+}
+
+// GOOD: Separate classes with single responsibilities
+class PromptFileSystem {
+  readFile(path: string): string { /* ... */ }
+  writeFile(path: string, content: string): void { /* ... */ }
+}
+
+class PromptConverter {
+  toMDX(prompt: Prompt): string { /* ... */ }
+  fromMDX(content: string): Prompt { /* ... */ }
+}
+
+class PromptRepository {
+  constructor(
+    private fileSystem: PromptFileSystem,
+    private converter: PromptConverter
+  ) {}
+  
+  addPrompt(prompt: Prompt): void { /* ... */ }
+  getPrompt(id: string): Prompt { /* ... */ }
+}
+
+class GitHubSynchronizer {
+  constructor(private repository: PromptRepository) {}
+  
+  sync(): void { /* ... */ }
+}
+```
+
+### Guidelines for SRP
+
+1. **Identify Responsibilities**: Identify distinct responsibilities in your code and separate them into different classes or modules.
+2. **Cohesion**: Keep related functionality together in the same class.
+3. **Size**: Keep classes and functions small and focused.
+4. **Naming**: Name classes and methods to clearly indicate their responsibility.
+
+## Open/Closed Principle (OCP)
+
+Software entities (classes, modules, functions) should be open for extension but closed for modification.
+
+### Implementation in MCP-Prompts
+
+```typescript
+// BAD: Hard to extend without modifying
+class PromptConverter {
+  convert(prompt: Prompt, format: string): string {
+    if (format === 'markdown') {
+      // Convert to markdown
+    } else if (format === 'mdx') {
+      // Convert to MDX
+    } else if (format === 'json') {
+      // Convert to JSON
+    }
+    // Need to modify this method to add new formats
+  }
+}
+
+// GOOD: Open for extension, closed for modification
+abstract class PromptFormatConverter {
+  abstract canConvert(format: string): boolean;
+  abstract convert(prompt: Prompt): string;
+}
+
+class MarkdownConverter extends PromptFormatConverter {
+  canConvert(format: string): boolean {
+    return format === 'markdown';
+  }
+  
+  convert(prompt: Prompt): string {
+    // Convert to markdown
+  }
+}
+
+class MDXConverter extends PromptFormatConverter {
+  canConvert(format: string): boolean {
+    return format === 'mdx';
+  }
+  
+  convert(prompt: Prompt): string {
+    // Convert to MDX
+  }
+}
+
+class JSONConverter extends PromptFormatConverter {
+  canConvert(format: string): boolean {
+    return format === 'json';
+  }
+  
+  convert(prompt: Prompt): string {
+    // Convert to JSON
+  }
+}
+
+// Usage: Can add new converters without modifying existing code
+class ConverterRegistry {
+  private converters: PromptFormatConverter[] = [];
+  
+  registerConverter(converter: PromptFormatConverter): void {
+    this.converters.push(converter);
+  }
+  
+  getConverter(format: string): PromptFormatConverter {
+    const converter = this.converters.find(c => c.canConvert(format));
+    if (!converter) {
+      throw new Error(`No converter found for format: ${format}`);
+    }
+    return converter;
+  }
+}
+```
+
+### Guidelines for OCP
+
+1. **Use Abstraction**: Define abstract classes or interfaces for behavior that may vary.
+2. **Inheritance**: Use inheritance to extend functionality without modifying existing code.
+3. **Composition**: Prefer composition over inheritance when appropriate.
+4. **Plugin Architecture**: Consider a plugin architecture for extensible features.
+
+## Liskov Substitution Principle (LSP)
+
+Subtypes must be substitutable for their base types without altering the correctness of the program.
+
+### Implementation in MCP-Prompts
+
+```typescript
+// BAD: Violates LSP
+class BaseStorage {
+  save(prompt: Prompt): void {
+    // Base implementation
+  }
+}
+
+class PostgresStorage extends BaseStorage {
+  save(prompt: Prompt): void {
+    // Implementation that works differently from the base
+    if (!prompt.id) {
+      throw new Error('ID is required'); // This precondition is not in the base class
+    }
+    // Save to PostgreSQL
+  }
+}
+
+// GOOD: Follows LSP
+interface StorageAdapter {
+  save(prompt: Prompt): Promise<void>;
+  get(id: string): Promise<Prompt>;
+}
+
+class FileSystemStorage implements StorageAdapter {
+  async save(prompt: Prompt): Promise<void> {
+    // Save to filesystem
+  }
+  
+  async get(id: string): Promise<Prompt> {
+    // Get from filesystem
+  }
+}
+
+class PostgresStorage implements StorageAdapter {
+  async save(prompt: Prompt): Promise<void> {
+    // Save to PostgreSQL
+  }
+  
+  async get(id: string): Promise<Prompt> {
+    // Get from PostgreSQL
+  }
+}
+
+// Both implementations can be used interchangeably
+function useStorage(storage: StorageAdapter): void {
+  // Works with any storage implementation
+}
+```
+
+### Guidelines for LSP
+
+1. **Contract**: Define a clear contract for base types and ensure all subtypes adhere to it.
+2. **Preconditions**: Subtypes should not strengthen preconditions.
+3. **Postconditions**: Subtypes should not weaken postconditions.
+4. **Exceptions**: Subtypes should not throw new exceptions not thrown by the base type.
+5. **Testing**: Test subtypes with the same tests used for the base type.
+
+## Interface Segregation Principle (ISP)
+
+Clients should not be forced to depend on interfaces they do not use.
+
+### Implementation in MCP-Prompts
+
+```typescript
+// BAD: One large interface that forces clients to implement methods they don't need
+interface PromptManager {
+  addPrompt(prompt: Prompt): void;
+  getPrompt(id: string): Prompt;
+  listPrompts(): Prompt[];
+  deletePrompt(id: string): void;
+  convertPrompt(prompt: Prompt, format: string): string;
+  syncPrompts(): void;
+  speakPrompt(prompt: Prompt): void;
+}
+
+// GOOD: Segregated interfaces
+interface PromptReader {
+  getPrompt(id: string): Prompt;
+  listPrompts(): Prompt[];
+}
+
+interface PromptWriter {
+  addPrompt(prompt: Prompt): void;
+  deletePrompt(id: string): void;
+}
+
+interface PromptConverter {
+  convert(prompt: Prompt, format: string): string;
+}
+
+interface PromptSynchronizer {
+  sync(): void;
+}
+
+interface PromptSpeaker {
+  speak(prompt: Prompt): void;
+}
+
+// Classes can implement only the interfaces they need
+class BasicPromptManager implements PromptReader, PromptWriter {
+  getPrompt(id: string): Prompt { /* ... */ }
+  listPrompts(): Prompt[] { /* ... */ }
+  addPrompt(prompt: Prompt): void { /* ... */ }
+  deletePrompt(id: string): void { /* ... */ }
+}
+
+class ReadOnlyPromptManager implements PromptReader {
+  getPrompt(id: string): Prompt { /* ... */ }
+  listPrompts(): Prompt[] { /* ... */ }
+}
+
+// Clients only depend on the interfaces they need
+function promptViewer(reader: PromptReader) {
+  // Only needs read capabilities
+}
+
+function promptEditor(writer: PromptWriter) {
+  // Only needs write capabilities
+}
+```
+
+### Guidelines for ISP
+
+1. **Small Interfaces**: Define small, focused interfaces with related methods.
+2. **Client-Specific Interfaces**: Design interfaces based on client needs.
+3. **Method Grouping**: Group related methods in the same interface.
+4. **Interface Composition**: Compose interfaces to build more complex ones when needed.
+
+## Dependency Inversion Principle (DIP)
+
+High-level modules should not depend on low-level modules. Both should depend on abstractions. Abstractions should not depend on details. Details should depend on abstractions.
+
+### Implementation in MCP-Prompts
+
+```typescript
+// BAD: High-level module depends on low-level module
+class FilesystemPromptRepository {
+  // Low-level details of file operations
+}
+
+class PromptService {
+  constructor(private repository: FilesystemPromptRepository) {}
+  
+  // Uses FilesystemPromptRepository directly
+}
+
+// GOOD: Both depend on abstraction
+interface PromptRepository {
+  save(prompt: Prompt): Promise<void>;
+  findById(id: string): Promise<Prompt>;
+  findAll(): Promise<Prompt[]>;
+  delete(id: string): Promise<void>;
+}
+
+class FilesystemPromptRepository implements PromptRepository {
+  async save(prompt: Prompt): Promise<void> { /* ... */ }
+  async findById(id: string): Promise<Prompt> { /* ... */ }
+  async findAll(): Promise<Prompt[]> { /* ... */ }
+  async delete(id: string): Promise<void> { /* ... */ }
+}
+
+class PostgresPromptRepository implements PromptRepository {
+  async save(prompt: Prompt): Promise<void> { /* ... */ }
+  async findById(id: string): Promise<Prompt> { /* ... */ }
+  async findAll(): Promise<Prompt[]> { /* ... */ }
+  async delete(id: string): Promise<void> { /* ... */ }
+}
+
+class PromptService {
+  constructor(private repository: PromptRepository) {}
+  
+  // Uses the abstraction, not the concrete implementation
+  async getPrompt(id: string): Promise<Prompt> {
+    return this.repository.findById(id);
+  }
+}
+```
+
+### Dependency Injection
+
+Use dependency injection to provide dependencies to classes:
+
+```typescript
+// Simple dependency injection container
+class Container {
+  private services: Map<string, any> = new Map();
+  
+  register<T>(id: string, service: T): void {
+    this.services.set(id, service);
+  }
+  
+  resolve<T>(id: string): T {
+    const service = this.services.get(id);
+    if (!service) {
+      throw new Error(`Service not found: ${id}`);
+    }
+    return service as T;
+  }
+}
+
+// Usage
+const container = new Container();
+
+// Register services
+container.register<PromptRepository>(
+  'promptRepository',
+  new FilesystemPromptRepository()
+);
+container.register<PromptConverter>(
+  'promptConverter',
+  new MarkdownPromptConverter()
+);
+
+// Create service with dependencies
+const repository = container.resolve<PromptRepository>('promptRepository');
+const converter = container.resolve<PromptConverter>('promptConverter');
+
+const service = new PromptService(repository, converter);
+```
+
+### Guidelines for DIP
+
+1. **Depend on Abstractions**: Both high-level and low-level modules should depend on abstractions.
+2. **Inversion of Control**: Use inversion of control to decouple modules.
+3. **Dependency Injection**: Use dependency injection to provide dependencies.
+4. **Interface Ownership**: The client should own the interface, not the implementation.
+
+## SOLID in the MCP-Prompts Project
+
+### Applying to Project Structure
+
+```
+src/
+  domain/               # Core domain models and interfaces
+    models/             # Domain models (Prompt, Tag, etc.)
+    interfaces/         # Core abstractions (Repository, Converter, etc.)
+  
+  infrastructure/       # Implementation details
+    adapters/           # MCP server adapters
+      filesystem/       # Filesystem MCP server adapter
+      memory/           # Memory MCP server adapter
+      postgres/         # PostgreSQL MCP server adapter
+      github/           # GitHub MCP server adapter
+    
+    converters/         # Format converters
+      markdown/         # Markdown format converter
+      mdx/              # MDX format converter
+      json/             # JSON format converter
+    
+  application/          # Application services
+    services/           # Business logic services
+    dto/                # Data transfer objects
+  
+  presentation/         # API and UI layers
+    http/               # HTTP API
+    cli/                # Command-line interface
+```
+
+### Example Implementation
+
+```typescript
+// src/domain/interfaces/prompt-repository.ts
+export interface PromptRepository {
+  findById(id: string): Promise<Prompt>;
+  findAll(filter?: PromptFilter): Promise<Prompt[]>;
+  save(prompt: Prompt): Promise<void>;
+  delete(id: string): Promise<void>;
+}
+
+// src/domain/interfaces/prompt-converter.ts
+export interface PromptConverter {
+  canConvert(format: string): boolean;
+  convert(prompt: Prompt, format: string): Promise<string>;
+  parse(content: string, format: string): Promise<Prompt>;
+}
+
+// src/domain/interfaces/prompt-synchronizer.ts
+export interface PromptSynchronizer {
+  sync(): Promise<SyncResult>;
+}
+
+// src/infrastructure/adapters/filesystem/filesystem-repository.ts
+export class FilesystemRepository implements PromptRepository {
+  constructor(
+    private filesystemServer: FilesystemServer,
+    private converter: PromptConverter
+  ) {}
+  
+  // Implementation of PromptRepository interface
+}
+
+// src/infrastructure/adapters/postgres/postgres-repository.ts
+export class PostgresRepository implements PromptRepository {
+  constructor(private postgresServer: PostgresServer) {}
+  
+  // Implementation of PromptRepository interface
+}
+
+// src/infrastructure/converters/markdown/markdown-converter.ts
+export class MarkdownConverter implements PromptConverter {
+  canConvert(format: string): boolean {
+    return format === 'md' || format === 'markdown';
+  }
+  
+  // Implementation of PromptConverter interface
+}
+
+// src/application/services/prompt-service.ts
+export class PromptService {
+  constructor(
+    private repository: PromptRepository,
+    private converters: PromptConverter[],
+    private synchronizer?: PromptSynchronizer
+  ) {}
+  
+  // Application logic using the dependencies
+}
+
+// src/presentation/http/controllers/prompt-controller.ts
+export class PromptController {
+  constructor(private promptService: PromptService) {}
+  
+  // HTTP route handlers
+}
+```
+
+## Best Practices for SOLID
+
+1. **Start Simple**: Don't over-engineer from the beginning. Start simple and refactor as needed.
+2. **Iterative Approach**: Apply SOLID principles iteratively as the codebase grows.
+3. **Balance**: Find the right balance between abstraction and concreteness.
+4. **Testing**: Write tests to ensure conformance to SOLID principles.
+5. **Refactoring**: Continuously refactor to improve design.
+
+By applying SOLID principles to the MCP-Prompts project, you create a codebase that is:
+
+- **Maintainable**: Easy to understand and modify
+- **Extensible**: Easy to add new features
+- **Testable**: Easy to write unit tests
+- **Flexible**: Easy to change implementations
+- **Robust**: Resistant to breaking changes
