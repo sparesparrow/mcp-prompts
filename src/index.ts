@@ -3,7 +3,7 @@
  * Main entry point for the MCP Prompts Server
  */
 
-import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { z } from "zod";
 import { PromptService } from "./services/prompt-service.js";
@@ -20,7 +20,7 @@ async function main() {
     validateConfig(config);
     
     // Create MCP server
-    const server = new Server({
+    const server = new McpServer({
       name: config.server.name,
       version: config.server.version,
     });
@@ -45,6 +45,7 @@ async function main() {
     // Add prompt tool
     server.tool(
       "add_prompt",
+      "Add a new prompt",
       {
         prompt: z.object({
           name: z.string(),
@@ -52,11 +53,13 @@ async function main() {
           content: z.string(),
           isTemplate: z.boolean().default(false),
           tags: z.array(z.string()).optional(),
-          category: z.string().optional()
-        })
+          variables: z.array(z.string()).optional(),
+          category: z.string().optional(),
+        }),
       },
-      async ({ prompt }) => {
+      async (args) => {
         try {
+          const { prompt } = args;
           const result = await promptService.addPrompt(prompt);
           return {
             content: [{ 
@@ -79,11 +82,13 @@ async function main() {
     // Get prompt tool
     server.tool(
       "get_prompt",
+      "Get a prompt by ID",
       {
-        id: z.string()
+        id: z.string(),
       },
-      async ({ id }) => {
+      async (args) => {
         try {
+          const { id } = args;
           const prompt = await promptService.getPrompt(id);
           return {
             content: [{ 
@@ -106,6 +111,7 @@ async function main() {
     // Update prompt tool
     server.tool(
       "update_prompt",
+      "Update an existing prompt",
       {
         id: z.string(),
         prompt: z.object({
@@ -114,16 +120,18 @@ async function main() {
           content: z.string().optional(),
           isTemplate: z.boolean().optional(),
           tags: z.array(z.string()).optional(),
-          category: z.string().optional()
-        })
+          variables: z.array(z.string()).optional(),
+          category: z.string().optional(),
+        }),
       },
-      async ({ id, prompt }) => {
+      async (args) => {
         try {
-          const result = await promptService.updatePrompt(id, prompt);
+          const { id, prompt } = args;
+          await promptService.updatePrompt(id, prompt);
           return {
             content: [{ 
               type: "text", 
-              text: `Prompt updated: ${result.id}` 
+              text: `Prompt updated successfully` 
             }]
           };
         } catch (error: any) {
@@ -141,6 +149,7 @@ async function main() {
     // List prompts tool
     server.tool(
       "list_prompts",
+      "List all prompts",
       {
         tags: z.array(z.string()).optional(),
         isTemplate: z.boolean().optional(),
@@ -149,10 +158,11 @@ async function main() {
         sort: z.string().optional(),
         order: z.enum(['asc', 'desc']).optional(),
         limit: z.number().int().positive().optional(),
-        offset: z.number().int().nonnegative().optional()
+        offset: z.number().int().nonnegative().optional(),
       },
-      async (options) => {
+      async (args) => {
         try {
+          const options = args;
           const prompts = await promptService.listPrompts(options);
           return {
             content: [{ 
@@ -175,12 +185,14 @@ async function main() {
     // Apply template tool
     server.tool(
       "apply_template",
+      "Apply variables to a prompt template",
       {
         id: z.string(),
-        variables: z.record(z.union([z.string(), z.number(), z.boolean()]))
+        variables: z.record(z.union([z.string(), z.number(), z.boolean()])),
       },
-      async ({ id, variables }) => {
+      async (args) => {
         try {
+          const { id, variables } = args;
           const result = await promptService.applyTemplate(id, variables);
           return {
             content: [{ 
@@ -203,16 +215,18 @@ async function main() {
     // Delete prompt tool
     server.tool(
       "delete_prompt",
+      "Delete a prompt",
       {
-        id: z.string()
+        id: z.string(),
       },
-      async ({ id }) => {
+      async (args) => {
         try {
+          const { id } = args;
           await promptService.deletePrompt(id);
           return {
             content: [{ 
               type: "text", 
-              text: `Prompt deleted: ${id}` 
+              text: `Prompt deleted successfully` 
             }]
           };
         } catch (error: any) {
@@ -227,16 +241,15 @@ async function main() {
       }
     );
     
-    // Connect to transport
+    // Start the server
     const transport = new StdioServerTransport();
     await server.connect(transport);
     
-    console.error("MCP Prompts server started");
-  } catch (error: any) {
-    console.error("Error starting server:", error.message);
+    console.log(`MCP Prompts server started`);
+  } catch (error) {
+    console.error('Failed to start MCP Prompts server:', error);
     process.exit(1);
   }
 }
 
-// Start the server
 main();
