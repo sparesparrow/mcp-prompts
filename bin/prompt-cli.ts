@@ -1,277 +1,265 @@
 #!/usr/bin/env node
 
 /**
- * Prompt Management CLI
+ * MCP Prompts CLI
  * 
- * A unified command line interface for managing prompts, including:
- * - Importing prompts from various sources
- * - Exporting prompts to different formats
- * - Processing raw prompts
- * - Managing tags
+ * A simple command line interface for the MCP Prompts server.
  */
 
-import * as promptManagement from '../src/core/prompt-management';
+import { Command } from 'commander';
+import path from 'path';
+import fs from 'fs/promises';
+import { FileAdapter } from '../src/adapters/file-adapter';
+import { PromptService } from '../src/services/prompt-service';
+import { getConfig, validateConfig } from '../src/config';
 
-// Get command and arguments
-const args = process.argv.slice(2);
-const command = args[0];
+const program = new Command();
 
-// Help function
-function showHelp() {
-  console.log(`
-MCP Prompts CLI
+// Setup the program
+program
+  .name('mcp-prompts')
+  .description('Command line interface for MCP Prompts')
+  .version('1.0.0');
 
-Usage: 
-  npx prompt-cli <command> [options]
-
-Commands:
-  import       Import prompts from a file or directory
-  export       Export prompts to a file
-  process      Process raw prompts
-  tags         Manage prompt tags
-  organize     Organize prompts into categories
-  pipeline     Run the complete prompt processing pipeline
-
-Options:
-  Run a command with --help to see command-specific options
-  `);
-}
-
-// Show help if no command is provided
-if (!command) {
-  showHelp();
-  process.exit(0);
-}
-
-// Handle import command
-async function handleImport() {
-  const source = args.find(arg => !arg.startsWith('-') && arg !== 'import')
-    || args.find(arg => arg.startsWith('--source='))?.split('=')[1];
-  const skipConfirm = args.includes('--yes') || args.includes('-y');
-  const dryRun = args.includes('--dry-run');
-  const force = args.includes('--force') || args.includes('-f');
-  const showHelp = args.includes('--help') || args.includes('-h');
+// Function to get prompt service
+async function getPromptService() {
+  const config = getConfig();
+  validateConfig(config);
   
-  if (showHelp) {
-    console.log(`
-Import prompts from a file or directory
-
-Usage:
-  npx prompt-cli import <source> [options]
-
-Options:
-  --source=<path>   Source file or directory (can also be provided as first argument)
-  --dry-run         Show what would be imported without making changes
-  --force, -f       Force import even if prompts already exist
-  --yes, -y         Skip confirmation prompt
-  --help, -h        Show this help
-    `);
-    return;
+  // Initialize storage adapter
+  let storageAdapter;
+  if (config.storage.type === 'file') {
+    storageAdapter = new FileAdapter(config.storage.promptsDir);
+  } else {
+    throw new Error(`Storage type not supported: ${config.storage.type}`);
   }
   
-  await promptManagement.runImport({
-    source,
-    skipConfirm,
-    dryRun,
-    force
-  });
+  await storageAdapter.connect();
+  return new PromptService(storageAdapter);
 }
 
-// Handle export command
-async function handleExport() {
-  const format = args.find(arg => arg.startsWith('--format='))?.split('=')[1] || 'json';
-  const tags = args.find(arg => arg.startsWith('--tags='))?.split('=')[1]?.split(',') || [];
-  const outFile = args.find(arg => arg.startsWith('--out='))?.split('=')[1];
-  const showHelp = args.includes('--help') || args.includes('-h');
-  
-  if (showHelp) {
-    console.log(`
-Export prompts to a file
-
-Usage:
-  npx prompt-cli export [options]
-
-Options:
-  --format=<format>   Export format (json, markdown) [default: json]
-  --tags=<tags>       Filter by tags (comma-separated)
-  --out=<file>        Output file path
-  --help, -h          Show this help
-    `);
-    return;
-  }
-  
-  await promptManagement.runExport({
-    format: format as any,
-    tags,
-    outFile
-  });
-}
-
-// Handle process command
-function handleProcess() {
-  const shouldCleanup = !args.includes('--no-cleanup');
-  const shouldBackup = args.includes('--backup');
-  const rawPromptsFile = args.find(arg => arg.startsWith('--file='))?.split('=')[1];
-  const showHelp = args.includes('--help') || args.includes('-h');
-  
-  if (showHelp) {
-    console.log(`
-Process raw prompts from a text file
-
-Usage:
-  npx prompt-cli process [options]
-
-Options:
-  --file=<path>     Raw prompts file path [default: ./rawprompts.txt]
-  --backup          Create a backup of the raw prompts file
-  --no-cleanup      Do not delete the raw prompts file after processing
-  --help, -h        Show this help
-    `);
-    return;
-  }
-  
-  promptManagement.processRawPrompts({
-    shouldCleanup,
-    shouldBackup,
-    rawPromptsFile
-  });
-}
-
-// Handle tags command
-async function handleTags() {
-  const action = args[1] || 'list';
-  const tag = args.find(arg => arg.startsWith('--tag='))?.split('=')[1];
-  const newTag = args.find(arg => arg.startsWith('--new-tag='))?.split('=')[1];
-  const promptIds = args.find(arg => arg.startsWith('--prompts='))?.split('=')[1]?.split(',') || [];
-  const showHelp = args.includes('--help') || args.includes('-h');
-  
-  if (showHelp) {
-    console.log(`
-Manage prompt tags
-
-Usage:
-  npx prompt-cli tags <action> [options]
-
-Actions:
-  list              List all tags (default)
-  add               Add a tag to prompts
-  remove            Remove a tag from prompts
-  rename            Rename a tag
-
-Options:
-  --tag=<tag>           Tag to add, remove, or rename
-  --new-tag=<tag>       New tag name (for rename action)
-  --prompts=<ids>       Prompt IDs (comma-separated, for add/remove actions)
-  --help, -h            Show this help
-    `);
-    return;
-  }
-  
-  await promptManagement.manageTags({
-    action: action as any,
-    tag,
-    newTag,
-    promptIds
-  });
-}
-
-// Handle organize command
-async function handleOrganize() {
-  const dryRun = args.includes('--dry-run');
-  const force = args.includes('--force') || args.includes('-f');
-  const verbose = args.includes('--verbose') || args.includes('-v');
-  const showHelp = args.includes('--help') || args.includes('-h');
-  
-  if (showHelp) {
-    console.log(`
-Organize prompts into categories
-
-Usage:
-  npx prompt-cli organize [options]
-
-Options:
-  --dry-run         Show what would be organized without making changes
-  --force, -f       Force organization (overwrite existing files)
-  --verbose, -v     Show detailed output
-  --help, -h        Show this help
-    `);
-    return;
-  }
-  
-  await promptManagement.organizePrompts({
-    dryRun,
-    force,
-    verbose
-  });
-}
-
-// Handle pipeline command
-async function handlePipeline() {
-  const dryRun = args.includes('--dry-run');
-  const verbose = args.includes('--verbose') || args.includes('-v');
-  const shouldCleanup = !args.includes('--no-cleanup');
-  const shouldBackup = !args.includes('--no-backup');
-  const showHelp = args.includes('--help') || args.includes('-h');
-  
-  if (showHelp) {
-    console.log(`
-Run the complete prompt processing pipeline
-
-Usage:
-  npx prompt-cli pipeline [options]
-
-Options:
-  --dry-run         Show what would happen without making changes
-  --verbose, -v     Show detailed output
-  --no-cleanup      Do not delete the raw prompts file after processing
-  --no-backup       Do not create a backup of the raw prompts file
-  --help, -h        Show this help
-    `);
-    return;
-  }
-  
-  await promptManagement.runPipeline({
-    dryRun,
-    verbose,
-    shouldCleanup,
-    shouldBackup
-  });
-}
-
-// Run the appropriate command
-(async () => {
-  try {
-    switch (command) {
-      case 'import':
-        await handleImport();
-        break;
-      case 'export':
-        await handleExport();
-        break;
-      case 'process':
-        handleProcess();
-        break;
-      case 'tags':
-        await handleTags();
-        break;
-      case 'organize':
-        await handleOrganize();
-        break;
-      case 'pipeline':
-        await handlePipeline();
-        break;
-      case '--help':
-      case '-h':
-        showHelp();
-        break;
-      default:
-        console.error(`Unknown command: ${command}`);
-        showHelp();
-        process.exit(1);
+// List prompts command
+program
+  .command('list')
+  .description('List all prompts')
+  .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
+  .option('-c, --category <category>', 'Filter by category')
+  .option('-T, --template', 'Show only templates')
+  .option('-s, --search <term>', 'Search term')
+  .action(async (options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      const listOptions = {
+        tags: options.tags ? options.tags.split(',') : undefined,
+        category: options.category,
+        isTemplate: options.template === true ? true : undefined,
+        search: options.search
+      };
+      
+      const prompts = await promptService.listPrompts(listOptions);
+      console.log(JSON.stringify(prompts, null, 2));
+    } catch (error: any) {
+      console.error('Error listing prompts:', error.message);
+      process.exit(1);
     }
-  } catch (error: unknown) {
-    const errorMessage = error instanceof Error ? error.message : String(error);
-    console.error(`Error: ${errorMessage}`);
-    process.exit(1);
-  }
-})(); 
+  });
+
+// Get a prompt command
+program
+  .command('get')
+  .description('Get a prompt by ID')
+  .argument('<id>', 'Prompt ID')
+  .action(async (id) => {
+    try {
+      const promptService = await getPromptService();
+      const prompt = await promptService.getPrompt(id);
+      console.log(JSON.stringify(prompt, null, 2));
+    } catch (error: any) {
+      console.error('Error getting prompt:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Add a prompt command
+program
+  .command('add')
+  .description('Add a new prompt')
+  .requiredOption('-n, --name <name>', 'Prompt name')
+  .requiredOption('-c, --content <content>', 'Prompt content')
+  .option('-d, --description <description>', 'Prompt description')
+  .option('-t, --tags <tags>', 'Comma-separated tags')
+  .option('-C, --category <category>', 'Prompt category')
+  .option('-T, --template', 'Mark as template')
+  .action(async (options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      const prompt = {
+        name: options.name,
+        content: options.content,
+        description: options.description,
+        tags: options.tags ? options.tags.split(',') : undefined,
+        category: options.category,
+        isTemplate: options.template === true
+      };
+      
+      const result = await promptService.addPrompt(prompt);
+      console.log(`Prompt added with ID: ${result.id}`);
+    } catch (error: any) {
+      console.error('Error adding prompt:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Update a prompt command
+program
+  .command('update')
+  .description('Update an existing prompt')
+  .argument('<id>', 'Prompt ID')
+  .option('-n, --name <name>', 'New name')
+  .option('-c, --content <content>', 'New content')
+  .option('-d, --description <description>', 'New description')
+  .option('-t, --tags <tags>', 'New comma-separated tags')
+  .option('-C, --category <category>', 'New category')
+  .option('-T, --template <boolean>', 'Mark as template (true/false)')
+  .action(async (id, options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      const updateData: any = {};
+      if (options.name) updateData.name = options.name;
+      if (options.content) updateData.content = options.content;
+      if (options.description) updateData.description = options.description;
+      if (options.tags) updateData.tags = options.tags.split(',');
+      if (options.category) updateData.category = options.category;
+      if (options.template) updateData.isTemplate = options.template === 'true';
+      
+      const result = await promptService.updatePrompt(id, updateData);
+      console.log(`Prompt updated: ${result.id}`);
+    } catch (error: any) {
+      console.error('Error updating prompt:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Delete a prompt command
+program
+  .command('delete')
+  .description('Delete a prompt')
+  .argument('<id>', 'Prompt ID')
+  .action(async (id) => {
+    try {
+      const promptService = await getPromptService();
+      await promptService.deletePrompt(id);
+      console.log(`Prompt deleted: ${id}`);
+    } catch (error: any) {
+      console.error('Error deleting prompt:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Apply a template command
+program
+  .command('apply')
+  .description('Apply a template prompt')
+  .argument('<id>', 'Template ID')
+  .requiredOption('-v, --variables <variables>', 'JSON string of variables')
+  .action(async (id, options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      let variables;
+      try {
+        variables = JSON.parse(options.variables);
+      } catch (error: any) {
+        throw new Error('Invalid JSON for variables');
+      }
+      
+      const result = await promptService.applyTemplate(id, variables);
+      console.log(result.content);
+    } catch (error: any) {
+      console.error('Error applying template:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Import prompts command
+program
+  .command('import')
+  .description('Import prompts from a JSON file')
+  .argument('<file>', 'JSON file containing prompts')
+  .option('-y, --yes', 'Skip confirmation')
+  .action(async (file, options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      // Read file
+      const content = await fs.readFile(file, 'utf8');
+      const prompts = JSON.parse(content);
+      
+      if (!Array.isArray(prompts)) {
+        throw new Error('File does not contain an array of prompts');
+      }
+      
+      // Confirm import
+      if (!options.yes) {
+        console.log(`About to import ${prompts.length} prompts.`);
+        console.log('Press Ctrl+C to cancel or Enter to continue...');
+        await new Promise(resolve => process.stdin.once('data', resolve));
+      }
+      
+      // Import prompts
+      for (const promptData of prompts) {
+        try {
+          const result = await promptService.addPrompt(promptData);
+          console.log(`Imported prompt: ${result.id}`);
+        } catch (error: any) {
+          console.error(`Error importing prompt: ${error.message}`);
+        }
+      }
+      
+      console.log('Import completed');
+    } catch (error: any) {
+      console.error('Error importing prompts:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Export prompts command
+program
+  .command('export')
+  .description('Export prompts to a JSON file')
+  .argument('[file]', 'Output file (default: prompts.json)', 'prompts.json')
+  .option('-t, --tags <tags>', 'Filter by tags (comma-separated)')
+  .option('-c, --category <category>', 'Filter by category')
+  .option('-T, --template', 'Export only templates')
+  .action(async (file, options) => {
+    try {
+      const promptService = await getPromptService();
+      
+      const listOptions = {
+        tags: options.tags ? options.tags.split(',') : undefined,
+        category: options.category,
+        isTemplate: options.template === true ? true : undefined
+      };
+      
+      const prompts = await promptService.listPrompts(listOptions);
+      
+      const outputPath = path.resolve(file);
+      await fs.writeFile(outputPath, JSON.stringify(prompts, null, 2), 'utf8');
+      
+      console.log(`Exported ${prompts.length} prompts to ${outputPath}`);
+    } catch (error: any) {
+      console.error('Error exporting prompts:', error.message);
+      process.exit(1);
+    }
+  });
+
+// Parse the command line arguments
+program.parse();
+
+// If no arguments are provided, show help
+if (process.argv.length === 2) {
+  program.help();
+} 

@@ -15,13 +15,11 @@ const readline = require('readline');
 // Configuration
 const config = {
   buildDir: 'build',
-  tempDirs: ['temp-*', 'processed_prompts'],
+  tempDirs: ['temp-*'],
   installDirs: [
     { src: 'build', dest: 'build' },
     { src: 'bin', dest: 'bin' },
-    { src: 'prompts/examples', dest: 'prompts/examples' },
-    { src: 'prompts/curated', dest: 'prompts/curated' },
-    { src: 'prompts/README.md', dest: 'prompts/README.md' }
+    { src: 'prompts', dest: 'prompts' }
   ],
   globalInstallName: 'mcp-prompts'
 };
@@ -35,160 +33,163 @@ const options = {
   global: args.includes('--global') || args.includes('-g'),
   docker: args.includes('--docker') || args.includes('-d'),
   help: args.includes('--help') || args.includes('-h'),
-  processPrompts: args.includes('--process-prompts') || args.includes('-p'),
   verbose: args.includes('--verbose') || args.includes('-v')
 };
 
-// Helper functions
+// Logging utility
 function log(message, type = 'info') {
   const colors = {
-    info: '\x1b[36m%s\x1b[0m',    // Cyan
-    success: '\x1b[32m%s\x1b[0m',  // Green
-    warning: '\x1b[33m%s\x1b[0m',  // Yellow
-    error: '\x1b[31m%s\x1b[0m'     // Red
+    info: '\x1b[36m', // cyan
+    success: '\x1b[32m', // green
+    warning: '\x1b[33m', // yellow
+    error: '\x1b[31m', // red
+    reset: '\x1b[0m' // reset
   };
+
+  if (!options.verbose && type === 'info') return;
   
-  if (type === 'error') {
-    console.error(colors[type], message);
-  } else {
-    console.log(colors[type], message);
-  }
+  console.log(`${colors[type]}[${type.toUpperCase()}]${colors.reset} ${message}`);
 }
 
+// Execute a shell command
 function execute(command, silent = false) {
   try {
-    if (options.verbose && !silent) {
-      log(`Executing: ${command}`, 'info');
-    }
-    return execSync(command, { stdio: silent ? 'ignore' : 'inherit' });
+    log(`Executing: ${command}`, 'info');
+    const output = execSync(command, { encoding: 'utf8', stdio: silent ? 'pipe' : 'inherit' });
+    return { success: true, output };
   } catch (error) {
-    log(`Error executing command: ${command}`, 'error');
-    if (options.verbose) {
-      console.error(error);
+    if (!silent) {
+      log(`Command failed: ${error.message}`, 'error');
     }
-    return false;
+    return { success: false, error };
   }
 }
 
+// Confirm an action with the user
 function confirmAction(message) {
-  if (options.force) return true;
-  
-  const rl = readline.createInterface({
-    input: process.stdin,
-    output: process.stdout
-  });
-  
-  return new Promise(resolve => {
-    rl.question(`${message} (y/N): `, answer => {
+  return new Promise((resolve) => {
+    const rl = readline.createInterface({
+      input: process.stdin,
+      output: process.stdout
+    });
+
+    rl.question(`${message} (y/N): `, (answer) => {
       rl.close();
       resolve(answer.toLowerCase() === 'y');
     });
   });
 }
 
-// Main functions
+// Clean the build directory and temporary files
 async function clean() {
-  log('Cleaning build artifacts...', 'info');
+  log('Cleaning build artifacts and temporary files...', 'info');
   
+  // Remove build directory
   if (fs.existsSync(config.buildDir)) {
-    if (!options.force) {
-      const confirmed = await confirmAction(`Are you sure you want to delete the ${config.buildDir} directory?`);
-      if (!confirmed) {
-        log('Clean operation cancelled.', 'warning');
-        return false;
-      }
-    }
+    log(`Removing ${config.buildDir}/`, 'info');
+    fs.rmSync(config.buildDir, { recursive: true, force: true });
+  }
+  
+  // Remove temporary directories
+  for (const tempPattern of config.tempDirs) {
+    const tempDirs = fs.readdirSync('.')
+      .filter(file => {
+        const isMatch = file.match(new RegExp(tempPattern.replace('*', '.*')));
+        const isDir = fs.statSync(file).isDirectory();
+        return isMatch && isDir;
+      });
     
-    try {
-      execute(`rimraf ${config.buildDir}`);
-      log(`Removed ${config.buildDir} directory.`, 'success');
-    } catch (error) {
-      log(`Failed to remove ${config.buildDir} directory.`, 'error');
-      return false;
+    for (const tempDir of tempDirs) {
+      log(`Removing ${tempDir}/`, 'info');
+      fs.rmSync(tempDir, { recursive: true, force: true });
     }
   }
   
-  // Clean temporary directories
-  for (const tempDir of config.tempDirs) {
-    execute(`rimraf ${tempDir}`, !options.verbose);
-  }
-  
-  log('Clean completed successfully.', 'success');
+  log('Clean completed successfully', 'success');
   return true;
 }
 
+// Build the project using TypeScript compiler
 async function build() {
-  log('Building MCP Prompts Server...', 'info');
+  log('Building project...', 'info');
   
-  // Run TypeScript compiler
-  const result = execute('tsc');
-  if (!result) {
-    log('Build failed.', 'error');
+  const result = execute('npx tsc');
+  
+  if (result.success) {
+    log('Build completed successfully', 'success');
+    return true;
+  } else {
+    log('Build failed', 'error');
     return false;
   }
-  
-  // Make scripts executable
-  execute('chmod +x bin/*.js scripts/*.ts bin/*.ts');
-  
-  log('Build completed successfully.', 'success');
-  return true;
 }
 
+// Install the built project
 async function install() {
-  log('Installing MCP Prompts Server...', 'info');
+  log('Installing the project...', 'info');
   
   if (options.global) {
-    // Global installation
-    log('Performing global installation...', 'info');
-    execute('npm install -g .');
-    log(`MCP Prompts Server installed globally as '${config.globalInstallName}'.`, 'success');
-  } else if (options.docker) {
-    // Docker installation
-    log('Building Docker image...', 'info');
-    execute('docker build -t mcp-prompts .');
-    log('Docker image built successfully.', 'success');
+    // Perform global npm installation
+    log('Installing globally...', 'info');
+    
+    if (options.force) {
+      execute(`npm uninstall -g ${config.globalInstallName}`);
+    }
+    
+    const result = execute(`npm install -g`);
+    if (!result.success) {
+      log('Global installation failed', 'error');
+      return false;
+    }
   } else {
-    // Local installation
-    log('Performing local installation...', 'info');
-    execute('npm install');
-    log('Local installation completed.', 'success');
+    // Perform local installation
+    log('No local installation needed for this project', 'info');
   }
   
+  log('Installation completed successfully', 'success');
   return true;
 }
 
-async function processPrompts() {
-  log('Processing prompts...', 'info');
-  execute('npm run prompt:process');
-  log('Prompts processed successfully.', 'success');
-  return true;
+// Build Docker image
+async function buildDocker() {
+  log('Building Docker image...', 'info');
+  
+  const result = execute('docker build -t mcp-prompts .');
+  
+  if (result.success) {
+    log('Docker build completed successfully', 'success');
+    return true;
+  } else {
+    log('Docker build failed', 'error');
+    return false;
+  }
 }
 
+// Show help message
 function showHelp() {
   console.log(`
-MCP Prompts Server Build Tools
+MCP Prompts Build Tools
 
 Usage: node build-tools.js [options]
 
 Options:
-  -c, --clean            Clean build artifacts
-  -i, --install          Install the server
-  -f, --force            Force operations without confirmation
-  -g, --global           Install globally
-  -d, --docker           Build Docker image
-  -p, --process-prompts  Process raw prompts
-  -v, --verbose          Show verbose output
-  -h, --help             Show this help message
+  --clean, -c       Clean build artifacts and temporary files
+  --install, -i     Install the project after building
+  --force, -f       Force reinstallation if it already exists
+  --global, -g      Install globally
+  --docker, -d      Build Docker image
+  --verbose, -v     Show verbose output
+  --help, -h        Show this help message
 
 Examples:
-  node build-tools.js --clean --install        Clean and install locally
-  node build-tools.js --global                 Install globally
-  node build-tools.js --docker                 Build Docker image
-  node build-tools.js --process-prompts        Process prompts
+  node build-tools.js                   # Just build the project
+  node build-tools.js --clean           # Clean and then build
+  node build-tools.js --install --force # Force reinstallation
+  node build-tools.js --docker          # Build Docker image
   `);
 }
 
-// Main execution
+// Main function
 async function main() {
   if (options.help) {
     showHelp();
@@ -199,32 +200,32 @@ async function main() {
   
   if (options.clean) {
     success = await clean();
-    if (!success) return;
+    if (!success && !options.force) return;
   }
   
-  if (success && !options.clean) {
+  if (success || options.force) {
     success = await build();
-    if (!success) return;
+    if (!success && !options.force) return;
   }
   
-  if (success && options.install) {
+  if ((success || options.force) && options.install) {
     success = await install();
-    if (!success) return;
   }
   
-  if (success && options.processPrompts) {
-    success = await processPrompts();
-    if (!success) return;
+  if ((success || options.force) && options.docker) {
+    success = await buildDocker();
   }
   
   if (success) {
-    log('All operations completed successfully.', 'success');
+    log('All operations completed successfully', 'success');
+  } else {
+    log('Some operations failed', 'error');
+    process.exit(1);
   }
 }
 
 // Run the main function
 main().catch(error => {
-  log('An unexpected error occurred:', 'error');
-  console.error(error);
+  log(`An unexpected error occurred: ${error.message}`, 'error');
   process.exit(1);
 }); 
