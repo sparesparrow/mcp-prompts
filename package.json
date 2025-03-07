@@ -33,6 +33,7 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.6.0",
+    "commander": "^11.1.0",
     "dotenv": "^16.4.7",
     "pg": "^8.13.3",
     "uuid": "^11.1.0",
