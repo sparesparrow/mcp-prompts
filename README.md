@@ -1,13 +1,15 @@
-# MCP Prompts Server
+# MCP Prompt Manager
 
-An MCP server for managing prompts and templates using a simplified architecture following SOLID principles.
+An MCP server for managing prompts and templates with project orchestration capabilities.
 
 ## Features
 
-- **Simplified Architecture**: Clean, maintainable codebase with SOLID principles
 - **Prompt Management**: Create, retrieve, update, and delete prompts
 - **Template Support**: Create prompts with variables that can be filled in at runtime
-- **Focused Storage Adapters**: File storage adapter with extensibility for PostgreSQL
+- **Project Orchestration**: Automate software project creation using templates and design patterns
+- **Multiple Storage Options**: File storage and PostgreSQL database adapters
+- **Database Export/Import**: Tools for exporting prompts to PostgreSQL database
+- **Backup and Restore**: Create backups and restore from backups
 - **MCP Protocol Integration**: Seamless integration with Model Context Protocol
 - **Docker Support**: Easy deployment with Docker and Docker Compose
 - **Categories**: Organize prompts by category (e.g., 'development', 'project-orchestration')
@@ -17,63 +19,83 @@ An MCP server for managing prompts and templates using a simplified architecture
 ### Prerequisites
 
 - Node.js 18 or later
+- PostgreSQL (optional for database storage)
 - Docker (optional for containerized deployment)
 
-### Quick Setup
+### Installation from NPM
 
-Clone the repository and run the setup script:
+The easiest way to use MCP Prompt Manager is via the NPM registry:
 
 ```bash
-git clone https://github.com/yourusername/mcp-prompts.git
-cd mcp-prompts
-./setup.sh
+# Install globally
+npm install -g @sparesparrow/mcp-prompt-manager
+
+# Or run directly with npx without installation
+npx @sparesparrow/mcp-prompt-manager
 ```
 
-The setup script will:
-1. Install dependencies
-2. Create the necessary directories
-3. Build the application
-4. Set up environment variables
+### Claude Desktop Configuration
 
-### Manual Setup
+Add the following to your Claude Desktop configuration file (usually located at `~/.config/Claude/config.json`):
 
-#### 1. Install dependencies
+```json
+{
+  "mcpServers": {
+    "prompt-manager-ts": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@sparesparrow/mcp-prompt-manager"
+      ]
+    }
+  }
+}
+```
+
+### Manual Setup from Source
+
+If you prefer to build from source:
+
+#### 1. Clone the repository
+
+```bash
+git clone https://github.com/sparesparrow/mcp-prompt-manager.git
+cd mcp-prompt-manager
+```
+
+#### 2. Install dependencies
 
 ```bash
 npm install
 ```
 
-#### 2. Configure environment variables
+#### 3. Configure environment variables
 
 Create a `.env` file in the root directory:
 
 ```
 # Storage configuration
+# Possible values: file, postgres, memory
 STORAGE_TYPE=file
+
+# File storage configuration
 PROMPTS_DIR=./prompts
 
+# PostgreSQL storage configuration
+# Required when STORAGE_TYPE=postgres
+PG_CONNECTION_STRING=postgresql://localhost/mydb
+
 # Server configuration
-SERVER_NAME=mcp-prompts
-SERVER_VERSION=1.0.0
+SERVER_NAME=mcp-prompt-manager
+SERVER_VERSION=1.1.0
 LOG_LEVEL=info
 ```
 
-#### 3. Build the application
+#### 4. Build and run the application
 
 ```bash
 npm run build
-```
-
-### Docker Setup
-
-The project can be deployed using Docker:
-
-```bash
-# Build and start with Docker Compose
-npm run docker:up
-
-# Stop the containers
-npm run docker:down
+npm start
 ```
 
 ## Usage
@@ -81,18 +103,23 @@ npm run docker:down
 ### Starting the Server
 
 ```bash
-# Start the server
-npm start
+# If installed globally:
+mcp-prompt-manager
 
-# Start in development mode (with auto-reload)
-npm run dev
+# If using npx:
+npx @sparesparrow/mcp-prompt-manager
+
+# If running from source:
+npm start
 ```
 
 ### MCP Tools
 
-The MCP Prompts Server exposes the following tools:
+The MCP Prompt Manager exposes the following tools:
 
-#### `add_prompt`
+#### Prompt Management Tools
+
+##### `add_prompt`
 
 Add a new prompt.
 
@@ -109,7 +136,7 @@ Add a new prompt.
 }
 ```
 
-#### `get_prompt`
+##### `get_prompt`
 
 Get a prompt by ID.
 
@@ -119,7 +146,7 @@ Get a prompt by ID.
 }
 ```
 
-#### `update_prompt`
+##### `update_prompt`
 
 Update an existing prompt.
 
@@ -134,7 +161,7 @@ Update an existing prompt.
 }
 ```
 
-#### `list_prompts`
+##### `list_prompts`
 
 List all prompts with optional filtering.
 
@@ -149,7 +176,7 @@ List all prompts with optional filtering.
 }
 ```
 
-#### `apply_template`
+##### `apply_template`
 
 Apply variables to a template prompt.
 
@@ -163,7 +190,7 @@ Apply variables to a template prompt.
 }
 ```
 
-#### `delete_prompt`
+##### `delete_prompt`
 
 Delete a prompt by ID.
 
@@ -173,6 +200,164 @@ Delete a prompt by ID.
 }
 ```
 
+#### Database Tools
+
+##### `export_prompts_to_db`
+
+Export all prompts from the file system to the PostgreSQL database.
+
+```json
+{}
+```
+
+##### `import_prompts_from_db`
+
+Import all prompts from the PostgreSQL database to the file system.
+
+```json
+{
+  "overwrite": true
+}
+```
+
+##### `sync_prompts`
+
+Synchronize prompts between the file system and PostgreSQL database.
+
+```json
+{}
+```
+
+##### `create_backup`
+
+Create a backup of all prompts.
+
+```json
+{}
+```
+
+##### `list_backups`
+
+List all available backups.
+
+```json
+{}
+```
+
+##### `restore_backup`
+
+Restore prompts from a backup.
+
+```json
+{
+  "timestamp": "2023-04-01T12-34-56-789Z"
+}
+```
+
+#### Project Orchestrator Tools
+
+##### `init_project_orchestrator`
+
+Initialize project orchestrator templates.
+
+```json
+{}
+```
+
+##### `create_project`
+
+Create a new project using the project orchestrator.
+
+```json
+{
+  "project_name": "My New Project",
+  "project_idea": "A microservices-based e-commerce platform with user authentication, product catalog, and order processing capabilities.",
+  "output_directory": "/home/sparrow/projects/my-new-project"
+}
+```
+
+##### `list_project_templates`
+
+List available project templates.
+
+```json
+{}
+```
+
+##### `list_component_templates`
+
+List available component templates.
+
+```json
+{}
+```
+
+## Project Orchestration
+
+The Project Orchestrator feature enables automated software project creation using templates and design patterns.
+
+### How It Works
+
+1. **Templates**: The system includes predefined project templates and component templates for various software architectures and design patterns.
+
+2. **Project Creation Process**:
+   - Analyze the project idea to identify suitable design patterns
+   - Select the most appropriate project template
+   - Generate comprehensive project documentation and structure
+   - Create a detailed implementation plan
+
+3. **Generated Output**:
+   - Structured project directory
+   - README.md with implementation plan
+   - Basic configuration files
+   - Source code placeholders
+
+### Available Project Templates
+
+- **MicroservicesArchitectureProject**: Microservice-based architecture with multiple small, loosely coupled services
+- **EventDrivenArchitectureProject**: Architecture based on production and reaction to events
+- **RepositoryPatternProject**: Data access abstraction with Repository pattern
+- **CQRSProject**: Command Query Responsibility Segregation architecture
+- **ClientServerProject**: Basic client-server architecture
+- And many more design pattern implementations
+
+### Component Templates
+
+The system includes templates for various design patterns:
+- Factory Method
+- Abstract Factory
+- Builder
+- Singleton
+- Adapter
+- Decorator
+- Observer
+- Strategy
+- And many more
+
+### Using the Project Orchestrator
+
+1. First, initialize the project orchestrator templates:
+   ```
+   init_project_orchestrator
+   ```
+
+2. List available project templates to find the most suitable one:
+   ```
+   list_project_templates
+   ```
+
+3. Create a new project:
+   ```
+   create_project
+   {
+     "project_name": "EcommerceApp",
+     "project_idea": "An e-commerce application with user authentication, product catalog, and order processing.",
+     "output_directory": "/home/sparrow/projects/ecommerce-app"
+   }
+   ```
+
+4. Follow the implementation plan in the generated README.md file to develop your project.
+
 ## Storage Options
 
 The server supports multiple storage options:
@@ -181,39 +366,42 @@ The server supports multiple storage options:
 
 Stores prompts as JSON files in a directory. Simple and easy to set up, ideal for individual use or small teams.
 
-### Future Storage Options
+### PostgreSQL Storage
 
-The architecture is designed for easy extension to support other storage options like PostgreSQL or in-memory storage.
+Stores prompts in a PostgreSQL database. Suitable for production environments and teams with more complex requirements.
 
-## Simplified Architecture
+To use PostgreSQL storage:
 
-The project follows a simplified architecture with clear separation of concerns:
+1. Configure your database connection string in the `.env` file:
+   ```
+   STORAGE_TYPE=postgres
+   PG_CONNECTION_STRING=postgresql://username:password@hostname/database
+   ```
 
+2. The server will automatically create the necessary tables on startup.
+
+### Exporting and Importing Prompts
+
+Regardless of your primary storage configuration, you can export prompts to a PostgreSQL database for backup or sharing purposes using the database tools:
+
+- `export_prompts_to_db`: Export prompts from file storage to PostgreSQL
+- `import_prompts_from_db`: Import prompts from PostgreSQL to file storage
+- `sync_prompts`: Synchronize prompts between file storage and PostgreSQL
+
+Before exporting, ensure you have a valid PostgreSQL connection string in your environment variables:
 ```
-src/
-├── adapters/          # Storage adapters for persistence
-├── core/              # Core types and utilities
-├── services/          # Business logic services
-├── config.ts          # Configuration management
-└── index.ts           # Main entry point with MCP tools
+PG_CONNECTION_STRING=postgresql://localhost/mydb
 ```
 
-### SOLID Principles
+### Backups
 
-The codebase follows SOLID principles:
-- **Single Responsibility**: Each class has a single responsibility
-- **Open/Closed**: Extensible for new features without modifying existing code
-- **Liskov Substitution**: Storage adapters are interchangeable
-- **Interface Segregation**: Clean, focused interfaces
-- **Dependency Inversion**: High-level modules depend on abstractions
+The server includes robust backup functionality:
 
-## Integration with Other MCP Servers
+- Automatic backups are created before export/import operations
+- Manual backups can be created with the `create_backup` tool
+- Backups can be listed and restored with `list_backups` and `restore_backup`
 
-The MCP Prompts Server is designed to work seamlessly with other MCP servers. An extended Docker Compose configuration is provided in `docker-compose.full.yml` that demonstrates integration with:
-
-- Filesystem Server
-- Memory Server
-- GitHub Server
+All backups are stored in the `backups` directory with timestamped folders.
 
 ## Development
 
@@ -242,6 +430,34 @@ npm run build
 
 # Clean build artifacts
 npm run clean
+```
+
+### Publishing to NPM
+
+To publish to NPM registry:
+
+```bash
+# Ensure you're logged in to NPM
+npm login
+
+# Build and publish
+npm run build
+npm publish --access=public
+```
+
+### Docker Setup
+
+The project can be deployed using Docker:
+
+```bash
+# Build Docker image
+npm run docker:build
+
+# Build and start with Docker Compose
+npm run docker:up
+
+# Stop the containers
+npm run docker:down
 ```
 
 ## Contributing

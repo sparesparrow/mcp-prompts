@@ -1,12 +1,15 @@
 FROM node:18-alpine
 
+# Set working directory
 WORKDIR /app
 
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies but skip prepare scripts
+ENV npm_config_ignore_scripts=true
+RUN npm install
+ENV npm_config_ignore_scripts=false
 
 # Copy source code
 COPY . .
@@ -14,14 +17,24 @@ COPY . .
 # Build the application
 RUN npm run build
 
-# Create prompts directory
-RUN mkdir -p /app/prompts
+# Create data directory
+RUN mkdir -p /data
 
-# Set environment variables
-ENV NODE_ENV=production
-ENV STORAGE_TYPE=file
-ENV PROMPTS_DIR=/app/prompts
-ENV LOG_LEVEL=info
+# Create non-root user
+RUN addgroup -S mcp && adduser -S mcp -G mcp && \
+    chown -R mcp:mcp /app /data
 
-# Expose stdin and make terminal interactive
-ENTRYPOINT ["node", "build/index.js"] 
+# Switch to non-root user
+USER mcp
+
+# Environment variables
+ENV NODE_ENV=production \
+    STORAGE_TYPE=file \
+    PROMPTS_DIR=/data/prompts \
+    LOG_LEVEL=info
+
+# Volume for shared data
+VOLUME /data
+
+# Entry point
+CMD ["node", "/app/build/index.js"]

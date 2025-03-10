@@ -1,0 +1,405 @@
+---
+description: Guidelines for contributing to the MCP-Prompts project, including code standards, PR process, and community expectations
+globs:
+  - "CONTRIBUTING.md"
+  - "*.md"
+  - "src/**/*.ts"
+  - "src/**/*.js"
+---
+
+# MCP-Prompts Contribution Guidelines
+
+This rule provides comprehensive guidelines for contributing to the MCP-Prompts project, ensuring that all contributions maintain code quality, follow project conventions, and support the project's goals.
+
+## Contribution Principles
+
+1. **Quality First**: All contributions should maintain or improve code quality.
+2. **User-Centric**: Changes should benefit users and improve the overall experience.
+3. **Maintainable**: Code should be easy to understand, modify, and maintain.
+4. **Well-Tested**: All contributions should include appropriate tests.
+5. **Well-Documented**: All features should be properly documented.
+
+## Getting Started
+
+### Setting Up Development Environment
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/mcp-prompts.git
+cd mcp-prompts
+
+# Install dependencies
+npm install
+
+# Start the development server
+npm run dev
+```
+
+### Understanding the Codebase
+
+Before contributing, familiarize yourself with:
+
+- The MCP protocol and its core concepts
+- The project's architecture and design patterns
+- Existing code standards and conventions
+
+## Code Style Guidelines
+
+### TypeScript Guidelines
+
+- Use TypeScript features like interfaces, type aliases, and enums
+- Ensure proper typing for all variables, parameters, and return values
+- Avoid using `any` when possible; use more specific types
+- Use readonly properties for immutable values
+
+```typescript
+// GOOD
+interface PromptOptions {
+  readonly id: string;
+  tags?: string[];
+  isTemplate: boolean;
+}
+
+// BAD
+interface PromptOptions {
+  id: string;
+  tags: any;
+  isTemplate: boolean;
+}
+```
+
+### Naming Conventions
+
+- Use `camelCase` for variables, functions, and method names
+- Use `PascalCase` for class names, interfaces, and type aliases
+- Use `UPPER_SNAKE_CASE` for constants
+- Use descriptive names that clearly indicate purpose
+
+```typescript
+// GOOD
+const MAX_PROMPTS_PER_PAGE = 100;
+function applyTemplateVariables(template: string, variables: TemplateVariables): string {
+  // Implementation
+}
+
+// BAD
+const max = 100;
+function apply(t: string, v: any): string {
+  // Implementation
+}
+```
+
+### Code Organization
+
+- Keep files focused on a single responsibility
+- Group related files in directories
+- Export public API from index files
+- Limit file size (aim for under 300 lines)
+
+```typescript
+// src/adapters/index.ts
+export * from './file-adapter';
+export * from './postgres-adapter';
+export * from './storage-adapter';
+```
+
+### Comments and Documentation
+
+- Use JSDoc comments for public API
+- Add comments for complex logic
+- Avoid obvious comments that duplicate code
+- Document any non-obvious behavior
+
+```typescript
+/**
+ * Apply variables to a template prompt
+ * 
+ * @param template - The template string with variables in {{variable}} format
+ * @param variables - Object mapping variable names to values
+ * @returns The template with variables replaced with their values
+ * @throws {TemplateError} If a referenced variable is not provided
+ */
+function applyTemplateVariables(template: string, variables: Record<string, string>): string {
+  // Implementation
+}
+```
+
+## Pull Request Process
+
+### Before Creating a PR
+
+1. **Update Your Fork**: Ensure your fork is up to date with the main repository
+   ```bash
+   git remote add upstream https://github.com/mainrepo/mcp-prompts.git
+   git fetch upstream
+   git checkout main
+   git merge upstream/main
+   ```
+
+2. **Create a Feature Branch**: Work in a feature branch, not directly on `main`
+   ```bash
+   git checkout -b feature/your-feature-name
+   ```
+
+3. **Run Tests**: Ensure all tests pass
+   ```bash
+   npm test
+   ```
+
+4. **Lint Your Code**: Ensure code meets style guidelines
+   ```bash
+   npm run lint
+   ```
+
+### Creating a PR
+
+1. **Descriptive Title**: Use a clear, descriptive title
+   - Format: `[Type] Brief description`
+   - Example: `[Feature] Add support for nested templates`
+
+2. **Detailed Description**: Include:
+   - What changes were made
+   - Why changes were made
+   - How to test the changes
+   - Screenshots or examples (if applicable)
+   - Related issues (if applicable)
+
+3. **Keep PRs Focused**: Each PR should address a single concern
+   - Avoid mixing refactoring with new features
+   - Avoid mixing bug fixes with documentation changes
+
+4. **Review Your Changes**: Review your own PR before requesting reviews
+   ```bash
+   git diff upstream/main
+   ```
+
+### After Creating a PR
+
+1. **Respond to Feedback**: Address review comments promptly
+2. **Keep the PR Updated**: Resolve merge conflicts as they arise
+3. **Test Again After Changes**: Ensure tests still pass after addressing feedback
+
+## Commit Guidelines
+
+### Commit Message Format
+
+Follow the [Conventional Commits](https://www.conventionalcommits.org/) specification:
+
+```
+<type>(<scope>): <description>
+
+[optional body]
+
+[optional footer(s)]
+```
+
+Types:
+- `feat`: A new feature
+- `fix`: A bug fix
+- `docs`: Documentation only changes
+- `style`: Changes that do not affect the meaning of the code
+- `refactor`: A code change that neither fixes a bug nor adds a feature
+- `perf`: A code change that improves performance
+- `test`: Adding missing tests or correcting existing tests
+- `chore`: Changes to the build process or auxiliary tools
+
+Examples:
+- `feat(template): add support for default variable values`
+- `fix(storage): handle file not found errors gracefully`
+- `docs(readme): update installation instructions`
+
+### Commit Best Practices
+
+1. **Atomic Commits**: Each commit should represent a single logical change
+2. **Clear Messages**: Commit messages should clearly explain what changed and why
+3. **Reference Issues**: Reference related issues in commit messages
+   - Example: `fix(template): resolve variable substitution issue (#42)`
+
+## Testing Guidelines
+
+### Types of Tests
+
+1. **Unit Tests**: Test individual functions and methods
+2. **Integration Tests**: Test interactions between components
+3. **Functional Tests**: Test complete features
+4. **Performance Tests**: Test performance under load
+
+### Test File Organization
+
+- Place test files alongside implementation files
+- Use `.test.ts` or `.spec.ts` suffix for test files
+- Create dedicated test directories for complex test fixtures
+
+### Writing Good Tests
+
+1. **Arrange-Act-Assert**: Structure tests using the AAA pattern
+2. **Test One Concept**: Each test should focus on a single concept
+3. **Use Descriptive Names**: Test names should describe the behavior being tested
+4. **Avoid Test Interdependence**: Tests should not depend on each other
+
+```typescript
+// src/services/prompt-service.test.ts
+import { PromptService } from './prompt-service';
+import { MockStorageAdapter } from '../tests/mocks/storage-adapter.mock';
+
+describe('PromptService', () => {
+  let service: PromptService;
+  let mockAdapter: MockStorageAdapter;
+
+  beforeEach(() => {
+    mockAdapter = new MockStorageAdapter();
+    service = new PromptService(mockAdapter);
+  });
+
+  describe('getPrompt', () => {
+    it('should return a prompt by id', async () => {
+      // Arrange
+      const testPrompt = { id: 'test-1', name: 'Test', content: 'Content' };
+      mockAdapter.getPrompt.mockResolvedValue(testPrompt);
+
+      // Act
+      const result = await service.getPrompt('test-1');
+
+      // Assert
+      expect(mockAdapter.getPrompt).toHaveBeenCalledWith('test-1');
+      expect(result).toEqual(testPrompt);
+    });
+
+    it('should throw NotFoundError when prompt does not exist', async () => {
+      // Arrange
+      mockAdapter.getPrompt.mockRejectedValue(new NotFoundError('Prompt', 'test-1'));
+
+      // Act & Assert
+      await expect(service.getPrompt('test-1')).rejects.toThrow(NotFoundError);
+    });
+  });
+});
+```
+
+## Documentation Guidelines
+
+### Types of Documentation
+
+1. **Code Documentation**: Comments and JSDoc annotations
+2. **API Documentation**: Documentation of public API
+3. **User Documentation**: Guides and tutorials for users
+4. **Project Documentation**: Architecture, design decisions, etc.
+
+### Writing Good Documentation
+
+1. **Be Clear and Concise**: Use simple language and avoid jargon
+2. **Use Examples**: Include examples for complex concepts
+3. **Keep Updated**: Update documentation when code changes
+4. **Include Context**: Explain why, not just what
+
+Example in README:
+
+```markdown
+## Template Variables
+
+MCP-Prompts supports template variables using the `{{variable}}` syntax:
+
+```typescript
+// Add a template prompt
+const template = await promptService.addPrompt({
+  name: 'Greeting Template',
+  content: 'Hello, {{name}}!',
+  isTemplate: true
+});
+
+// Apply template variables
+const result = await promptService.applyTemplate(template.id, {
+  name: 'World'
+});
+console.log(result.content); // Output: Hello, World!
+```
+
+Variables can be used in any part of the prompt content. If a variable is not provided during template application, it will remain unchanged in the output.
+```
+
+## Issue Guidelines
+
+### Creating Issues
+
+1. **Use Issue Templates**: Follow the provided issue templates
+2. **Be Specific**: Provide detailed information
+3. **One Issue Per Report**: Create separate issues for separate concerns
+4. **Search First**: Check if the issue already exists before creating a new one
+
+### Bug Reports
+
+Include:
+- Steps to reproduce
+- Expected behavior
+- Actual behavior
+- Environment information (OS, Node.js version, etc.)
+- Screenshots or error logs (if applicable)
+
+### Feature Requests
+
+Include:
+- Clear description of the feature
+- Rationale for the feature
+- Example use cases
+- Potential implementation approaches (optional)
+
+## Community Guidelines
+
+### Communication
+
+1. **Be Respectful**: Treat all contributors with respect
+2. **Be Constructive**: Provide constructive feedback
+3. **Be Patient**: Remember that contributors have different expertise levels
+4. **Be Inclusive**: Use inclusive language and consider different perspectives
+
+### Mentoring
+
+1. **Help New Contributors**: Guide new contributors through the process
+2. **Provide Context**: Explain reasoning behind decisions
+3. **Share Knowledge**: Document tribal knowledge
+
+## Release Process Participation
+
+1. **Testing Release Candidates**: Help test release candidates
+2. **Reporting Issues**: Report any issues found during testing
+3. **Updating Documentation**: Ensure documentation is up to date for releases
+4. **Suggesting Release Notes**: Help identify notable changes for release notes
+
+## Code Review Guidelines
+
+### Giving Reviews
+
+1. **Focus on the Code**: Review the code, not the person
+2. **Be Specific**: Provide specific and actionable feedback
+3. **Explain Why**: Explain the reasoning behind your suggestions
+4. **Acknowledge Good Work**: Highlight well-implemented parts
+5. **Consider the Context**: Consider the scope and constraints of the PR
+
+### Receiving Reviews
+
+1. **Be Open to Feedback**: Treat feedback as an opportunity to improve
+2. **Ask for Clarification**: If feedback is unclear, ask questions
+3. **Explain Your Reasoning**: If you disagree, explain your perspective
+4. **Express Gratitude**: Thank reviewers for their time and feedback
+
+## Continuous Integration
+
+All contributions must pass continuous integration checks:
+
+1. **Tests**: All tests must pass
+2. **Linting**: Code must meet style guidelines
+3. **Type Checking**: TypeScript must compile without errors
+4. **Code Coverage**: Test coverage must not decrease
+
+## Security Considerations
+
+When contributing, keep security in mind:
+
+1. **Input Validation**: Validate all inputs
+2. **Output Sanitization**: Sanitize all outputs
+3. **Secure Defaults**: Use secure defaults
+4. **Report Vulnerabilities**: Report security vulnerabilities privately
+
+## Conclusion
+
+By following these guidelines, you can help ensure that the MCP-Prompts project maintains high quality, remains maintainable, and continues to meet the needs of its users. Thank you for your contributions!

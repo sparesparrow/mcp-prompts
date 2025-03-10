@@ -8,7 +8,10 @@ import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js"
 import { z } from "zod";
 import { PromptService } from "./services/prompt-service.js";
 import { FileAdapter } from "./adapters/file-adapter.js";
+import { PostgresAdapter } from "./adapters/postgres-adapter.js";
 import { getConfig, validateConfig } from "./config.js";
+import { setupDatabaseTools } from "./tools/database-tools.js";
+import { setupProjectOrchestratorTools } from "./tools/project-orchestrator-tools.js";
 
 /**
  * Main entry point for the MCP Prompts server
@@ -30,7 +33,10 @@ async function main() {
     if (config.storage.type === 'file') {
       storageAdapter = new FileAdapter(config.storage.promptsDir);
     } else if (config.storage.type === 'postgres') {
-      throw new Error('PostgreSQL adapter not implemented yet');
+      if (!config.storage.pgConnectionString) {
+        throw new Error('PostgreSQL connection string is required for postgres storage');
+      }
+      storageAdapter = new PostgresAdapter(config.storage.pgConnectionString);
     } else if (config.storage.type === 'memory') {
       throw new Error('Memory adapter not implemented yet');
     } else {
@@ -240,6 +246,12 @@ async function main() {
         }
       }
     );
+    
+    // Setup database tools
+    setupDatabaseTools(server);
+    
+    // Setup project orchestrator tools
+    setupProjectOrchestratorTools(server);
     
     // Start the server
     const transport = new StdioServerTransport();

@@ -1,8 +1,8 @@
 {
   "mcpServers": {
     "prompt-manager": {
-      "command": "node",
-      "args": ["/absolute/path/to/prompt-manager-mcp/build/index.js"]
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts"]
     }
   }
 }

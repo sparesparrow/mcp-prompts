@@ -1,0 +1,9 @@
+# Database connection
+DATABASE_URL=postgresql://localhost/mydb
+
+# File system paths
+PROMPTS_DIR=/home/sparrow/mcp/data/prompts/
+BACKUP_DIR=/home/sparrow/mcp/backups/prompts/
+
+# Logging level (debug, info, warn, error)
+LOG_LEVEL=info
