@@ -2,6 +2,10 @@
 
 An MCP server for managing prompts and templates with project orchestration capabilities.
 
+<a href="https://glama.ai/mcp/servers/i0z4f3pr82">
+  <img width="380" height="200" src="https://glama.ai/mcp/servers/i0z4f3pr82/badge" alt="Prompts Server MCP server" />
+</a>
+
 ## Features
 
 - **Prompt Management**: Create, retrieve, update, and delete prompts
