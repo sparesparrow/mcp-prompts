@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.15",
+  "version": "1.2.17",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
