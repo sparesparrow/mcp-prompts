@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.4",
+  "version": "1.2.6",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -16,9 +16,12 @@
     "test": "jest",
     "test:build": "./scripts/test/test-build.sh",
     "test:docker": "./scripts/test/test-docker-build.sh",
+    "test:postgres": "./scripts/test/run-postgres-tests.sh",
     "docker:build": "docker build -t sparesparrow/mcp-prompts:latest .",
     "docker:up": "docker-compose -f docker/docker-compose.yml up",
     "docker:down": "docker-compose -f docker/docker-compose.yml down",
+    "docker:postgres:up": "docker-compose -f docker/docker-compose.postgres.yml up",
+    "docker:postgres:down": "docker-compose -f docker/docker-compose.postgres.yml down",
     "publish:all": "./publish.sh",
     "test:package": "./scripts/test/test-published-package.sh",
     "test:integration": "node tests/integration/run-mcp-tests.js"
@@ -42,6 +45,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.7.0",
+    "axios": "^1.8.3",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.3.0",
     "pg": "^8.13.3",
@@ -55,6 +59,8 @@
     "@types/pg": "^8.11.11",
     "@types/uuid": "^9.0.7",
     "jest": "^29.7.0",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.9",
     "ts-jest": "^29.2.6",
     "tsc-esm-fix": "^3.1.2",
     "typescript": "^5.3.2"
