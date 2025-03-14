@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.10",
+  "version": "1.2.11",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -9,7 +9,7 @@
   },
   "scripts": {
     "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./scripts/build/fix-build.js && node ./scripts/build/ensure-config.js",
-    "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups && cp -f build/config.js build/ || echo 'No config.js to copy'",
+    "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups build/services && cp -f build/config.js build/ || echo 'No config.js to copy'",
     "start": "node build/index.js",
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && npm start\"",
     "prepare": "node -e \"process.env.CI || process.env.DOCKER_BUILD ? console.log('Skipping prepare in CI/Docker') : process.exit(1)\" || npm run build",
