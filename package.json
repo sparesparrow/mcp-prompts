@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.11",
+  "version": "1.2.13",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -9,15 +9,17 @@
   },
   "scripts": {
     "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./scripts/build/fix-build.js && node ./scripts/build/ensure-config.js",
-    "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups build/services && cp -f build/config.js build/ || echo 'No config.js to copy'",
+    "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups build/services build/core build/config && cp -rf config/* build/config/ || echo 'Warning: config directory not copied' && cp -f src/utils/config.js build/utils/ || echo 'Warning: src/utils/config.js not copied'",
     "start": "node build/index.js",
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && npm start\"",
     "prepare": "node -e \"process.env.CI || process.env.DOCKER_BUILD ? console.log('Skipping prepare in CI/Docker') : process.exit(1)\" || npm run build",
     "test": "jest",
     "test:build": "./scripts/test/test-build.sh",
     "test:docker": "./scripts/test/test-docker-build.sh",
+    "test:docker:fixed": "./scripts/test/test-fixed-docker.sh",
     "test:postgres": "./scripts/test/run-postgres-tests.sh",
     "docker:build": "docker build -t sparesparrow/mcp-prompts:latest .",
+    "docker:build:fixed": "docker build -t sparesparrow/mcp-prompts:latest -f docker/Dockerfile.fixed .",
     "docker:cleanup": "./scripts/docker/cleanup-networks.sh",
     "docker:up": "npm run docker:cleanup && docker-compose -f docker/docker-compose.yml up",
     "docker:down": "docker-compose -f docker/docker-compose.yml down",
@@ -31,9 +33,10 @@
     "test:pack": "npm pack && tar -tvf sparesparrow-mcp-prompts-*.tgz | grep -E 'config.js|index.js'"
   },
   "files": [
-    "build",
+    "build/**/*",
     "README.md",
-    "config.js"
+    "src/utils/config.js",
+    "config"
   ],
   "keywords": [
     "mcp",
@@ -49,7 +52,7 @@
     "access": "public"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@modelcontextprotocol/sdk": "1.6.0",
     "axios": "^1.8.3",
     "dotenv": "^16.4.7",
     "fs-extra": "^11.3.0",
@@ -75,6 +78,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/sparesparrow/mcp-prompt-manager.git"
+    "url": "git+https://github.com/sparesparrow/mcp-prompts.git"
   }
 }

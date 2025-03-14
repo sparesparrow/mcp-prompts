@@ -30,14 +30,20 @@
 
 - [x] Updated documentation:
   - Updated README.md with simplified architecture
-  - Updated USAGE.md with new tool formats
-  - Updated INSTALL.md with new installation options
-  - Updated all documentation in docs/ directory
+  - Added troubleshooting section with fallback mode information
+  - Added comprehensive project status and release checklist
+  - Organized Docker-related docs in docker/ directory
+
+- [x] Added SDK compatibility features:
+  - Implemented fallback mode for MCP SDK compatibility issues
+  - Added automatic ESM module fixes for Node.js compatibility
+  - Fixed integration tests to work with fallback mode
 
 ## In Progress
 
 - [ ] Comprehensive testing suite
-- [ ] Additional storage adapters (PostgreSQL, memory)
+- [x] Additional storage adapters (PostgreSQL, file)
+- [ ] Memory storage adapter
 - [ ] Enhanced documentation with JSDoc comments
 
 ## Planned Features
@@ -49,13 +55,16 @@
 
 ## Current Status
 
-The project has been successfully refactored to use a simplified architecture following SOLID principles. The codebase is now more maintainable, extensible, and easier to understand. The core functionality is working as expected, with a clean separation of concerns between the storage layer, business logic, and MCP tool implementations.
+The project has been successfully refactored to use a simplified architecture following SOLID principles. The codebase is now more maintainable, extensible, and easier to understand. Core functionality is working as expected, with clean separation of concerns between the storage layer, business logic, and MCP tool implementations.
+
+Recent improvements include SDK compatibility features with an automatic fallback mode that enables the server to work even when there are SDK version mismatches or missing functionality. Integration tests have been updated to support this fallback mode as well.
 
 ## Next Release
 
 The next release will focus on:
 
-1. Adding comprehensive test coverage
-2. Implementing PostgreSQL storage adapter
-3. Adding more examples and documentation
-4. Setting up CI/CD pipeline
+1. Expanding test coverage for core components
+2. Implementing a memory storage adapter
+3. Adding more examples and comprehensive documentation
+4. Setting up a complete CI/CD pipeline
+5. Enhancing error handling and logging

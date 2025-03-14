@@ -112,6 +112,9 @@ try {
       console.error(`❌ Error updating CHANGELOG.md:`, error);
     }
   }
+  
+  // Output ONLY the new version as the last line for capture by scripts
+  console.log(newVersion);
 } catch (error) {
   console.error('❌ Error updating version:', error);
   process.exit(1);

@@ -88,7 +88,7 @@ if [ "$DRY_RUN" = false ]; then
     exit 1
   fi
 
-  if ! docker login --get-user &> /dev/null; then
+  if ! docker info | grep -q "Username"; then
     print_warning "Not logged in to Docker Hub. Docker image won't be published."
     PUBLISH_DOCKER=false
   else
@@ -134,7 +134,7 @@ if [ "$DRY_RUN" = false ]; then
 
   # Run the test build script
   print_step "Running test build..."
-  ./test-build.sh
+  ./scripts/test/test-build.sh
   print_success "Test build successful"
 else
   print_warning "Skipping build in dry-run mode"
@@ -228,7 +228,7 @@ echo ""
 # Test the published package if requested
 if [ "$TEST_AFTER_PUBLISH" = true ] && [ "$DRY_RUN" = false ]; then
   print_step "Testing the published package with npx in Docker..."
-  ./test-published-package.sh
+  ./scripts/test/test-published-package.sh
   if [ $? -ne 0 ]; then
     print_error "Package testing failed!"
     exit 1

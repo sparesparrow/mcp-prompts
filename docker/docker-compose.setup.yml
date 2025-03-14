@@ -1,4 +1,4 @@
-version: '3.8'
+name: mcp-prompts-setup
 
 services:
   # PostgreSQL database for setup
@@ -18,12 +18,13 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
   # Setup container that runs setup.sh
   mcp-setup:
     build:
-      context: .
-      dockerfile: Dockerfile.setup
+      context: ..
+      dockerfile: docker/Dockerfile.setup
     container_name: mcp-setup
     depends_on:
       postgres-setup:
@@ -35,11 +36,12 @@ services:
       - PROMPTS_DIR=/data/prompts
       - LOG_LEVEL=debug
     volumes:
-      - ./prompts:/data/prompts
-      - ./logs:/data/logs
-      - ./backups:/data/backups
+      - ../prompts:/data/prompts
+      - ../logs:/data/logs
+      - ../backups:/data/backups
     tty: true
     stdin_open: true
 
 volumes:
-  postgres_setup_data: 
+  postgres_setup_data:
+    name: mcp-postgres-setup-data 

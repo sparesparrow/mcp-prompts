@@ -20,15 +20,19 @@ FROM node:20-alpine
 WORKDIR /app
 
 # Set NODE_ENV and other environment variables
-ENV NODE_ENV=production
-ENV STORAGE_TYPE=file
-ENV PROMPTS_DIR=/app/data/prompts
-ENV BACKUPS_DIR=/app/data/backups
+ENV NODE_ENV=production \
+    STORAGE_TYPE=file \
+    PROMPTS_DIR=/app/data/prompts \
+    BACKUPS_DIR=/app/data/backups
 
 # Copy only necessary files from the build stage
-COPY --from=build /app/build ./
+COPY --from=build /app/build ./build
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/package.json ./
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/README.md ./README.md
+
+# Explicitly copy package.json to build directory to fix path issues
+RUN cp ./package.json ./build/package.json
 
 # Create a non-root user with a home directory
 RUN adduser -D -h /home/mcprompts mcprompts
@@ -58,5 +62,5 @@ EXPOSE 3003
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD wget -q --spider http://localhost:3003/health || exit 1
 
-# Run the application
-CMD ["node", "index.js"]
+# Run the application (ensure we're running from the root directory)
+CMD ["node", "build/index.js"]

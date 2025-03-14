@@ -21,10 +21,12 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { FileAdapter } from "../adapters/file-adapter.js";
 import { PostgresAdapter } from "../adapters/postgres-adapter.js";
-import { StorageAdapter } from "../adapters/storage-adapter.js";
+import { StorageAdapter } from "../core/types.js";
 import { Prompt } from "../types/prompt.js";
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
+import { Config } from "../config.js";
 
 /**
  * Setup database tools for the MCP server
@@ -515,8 +517,20 @@ ${result.fields ? `Columns: ${result.fields.map(f => f.name).join(', ')}` : ''}`
             description: prompt.description || undefined,
             isTemplate: prompt.isTemplate === true,
             tags: Array.isArray(prompt.tags) ? prompt.tags : [],
-            variables: Array.isArray(prompt.variables) ? prompt.variables : [],
-            category: prompt.category || undefined
+            variables: Array.isArray(prompt.variables) 
+              ? prompt.variables.map(v => {
+                  // If it's already a TemplateVariable object, use it
+                  if (typeof v === 'object' && v !== null && 'name' in v) {
+                    return v;
+                  }
+                  // Otherwise convert the string to a TemplateVariable
+                  return { name: v.toString(), required: false };
+                }) 
+              : [],
+            category: prompt.category || undefined,
+            createdAt: (prompt as any).createdAt || new Date().toISOString(),
+            updatedAt: (prompt as any).updatedAt || new Date().toISOString(),
+            version: (prompt as any).version || 1
           });
           
           importedCount++;

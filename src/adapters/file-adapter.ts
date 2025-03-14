@@ -14,6 +14,7 @@ import { slugify, extractVariables } from '../core/utils.js';
  */
 export class FileAdapter implements StorageAdapter {
   private promptsDir: string;
+  private _isConnected: boolean = false;
   
   /**
    * Create a new file adapter
@@ -30,6 +31,7 @@ export class FileAdapter implements StorageAdapter {
     try {
       await fs.ensureDir(this.promptsDir);
       console.log(`Connected to file storage at ${this.promptsDir}`);
+      this._isConnected = true;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to create prompts directory: ${errorMessage}`);
@@ -41,6 +43,15 @@ export class FileAdapter implements StorageAdapter {
    */
   async disconnect(): Promise<void> {
     // No-op for file adapter
+    this._isConnected = false;
+  }
+  
+  /**
+   * Check if connected to the storage
+   * @returns Promise that resolves to true if connected, false otherwise
+   */
+  async isConnected(): Promise<boolean> {
+    return this._isConnected;
   }
   
   /**
@@ -299,5 +310,38 @@ export class FileAdapter implements StorageAdapter {
     await this.savePrompt(updated);
     
     return updated;
+  }
+
+  /**
+   * Get all prompts from the storage
+   * This is a direct alias for listPrompts with no options
+   * @returns Array of all prompts
+   */
+  async getAllPrompts(): Promise<Prompt[]> {
+    return this.listPrompts();
+  }
+
+  /**
+   * Clear all prompts from the storage
+   */
+  async clearAll(): Promise<void> {
+    try {
+      // Get all files in the prompts directory
+      const files = await fs.readdir(this.promptsDir);
+      
+      // Filter for JSON files
+      const jsonFiles = files.filter(file => file.endsWith('.json'));
+      
+      // Delete each file
+      for (const file of jsonFiles) {
+        const filePath = path.join(this.promptsDir, file);
+        await fs.remove(filePath);
+      }
+      
+      console.log(`Cleared all prompts from ${this.promptsDir}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to clear all prompts: ${errorMessage}`);
+    }
   }
 } 

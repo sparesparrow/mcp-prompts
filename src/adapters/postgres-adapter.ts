@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+import { Pool, PoolClient } from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { Prompt, StorageAdapter, ListPromptsOptions } from '../core/types.js';
 
@@ -12,7 +12,8 @@ import { Prompt, StorageAdapter, ListPromptsOptions } from '../core/types.js';
  */
 export class PostgresAdapter implements StorageAdapter {
   private pool: Pool;
-  private connected: boolean = false;
+  private _isConnected: boolean = false;
+  private schemaInitialized: boolean = false;
   
   /**
    * Create a new PostgreSQL adapter
@@ -21,7 +22,13 @@ export class PostgresAdapter implements StorageAdapter {
   constructor(connectionString: string) {
     this.pool = new Pool({
       connectionString,
-      ssl: process.env.PG_SSL === 'true' ? { rejectUnauthorized: false } : undefined,
+      // Increase statement timeout to allow for schema initialization
+      statement_timeout: 30000,
+    });
+    
+    // Handle pool errors to prevent app crashes
+    this.pool.on('error', (err) => {
+      console.error('Unexpected error on idle client', err);
     });
   }
   
@@ -29,43 +36,27 @@ export class PostgresAdapter implements StorageAdapter {
    * Connect to the PostgreSQL database
    */
   async connect(): Promise<void> {
-    // Test connection
-    const client = await this.pool.connect();
     try {
-      // Create table if it doesn't exist
-      await client.query(`
-        CREATE TABLE IF NOT EXISTS prompts (
-          id TEXT PRIMARY KEY,
-          name TEXT NOT NULL,
-          description TEXT,
-          content TEXT NOT NULL,
-          is_template BOOLEAN NOT NULL DEFAULT FALSE,
-          variables TEXT[],
-          tags TEXT[],
-          category TEXT,
-          created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-          updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
-          version INTEGER NOT NULL DEFAULT 1
-        );
-      `);
-      
-      // Create index on name for faster searches
-      await client.query(`
-        CREATE INDEX IF NOT EXISTS prompts_name_idx ON prompts (name);
-      `);
-      
-      // Create index on category for faster filtering
-      await client.query(`
-        CREATE INDEX IF NOT EXISTS prompts_category_idx ON prompts (category);
-      `);
-      
-      this.connected = true;
-      console.log('Connected to PostgreSQL database');
+      // Test connection and ensure schema is initialized
+      const client = await this.pool.connect();
+      try {
+        // Test connection is working
+        await client.query('SELECT NOW()');
+        console.log('Connected to PostgreSQL database');
+        this._isConnected = true;
+        
+        // Initialize schema if not already done
+        if (!this.schemaInitialized) {
+          await this.initializeSchema(client);
+          this.schemaInitialized = true;
+        }
+      } finally {
+        client.release();
+      }
     } catch (error) {
+      this._isConnected = false;
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to connect to PostgreSQL database: ${errorMessage}`);
-    } finally {
-      client.release();
+      throw new Error(`Failed to connect to PostgreSQL: ${errorMessage}`);
     }
   }
   
@@ -73,104 +64,141 @@ export class PostgresAdapter implements StorageAdapter {
    * Disconnect from the PostgreSQL database
    */
   async disconnect(): Promise<void> {
-    await this.pool.end();
-    this.connected = false;
-    console.log('Disconnected from PostgreSQL database');
+    try {
+      await this.pool.end();
+      this._isConnected = false;
+      console.log('Disconnected from PostgreSQL database');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to disconnect from PostgreSQL: ${errorMessage}`);
+    }
   }
   
   /**
-   * Save a prompt to the PostgreSQL database
+   * Check if connected to the database
+   * @returns Promise that resolves to true if connected, false otherwise
+   */
+  async isConnected(): Promise<boolean> {
+    if (!this._isConnected) return false;
+    
+    try {
+      const client = await this.pool.connect();
+      try {
+        await client.query('SELECT 1');
+        return true;
+      } finally {
+        client.release();
+      }
+    } catch (error) {
+      console.error('PostgreSQL connection check failed:', error);
+      this._isConnected = false;
+      return false;
+    }
+  }
+  
+  /**
+   * Initialize the database schema
+   * @param client PostgreSQL client
+   */
+  private async initializeSchema(client: PoolClient): Promise<void> {
+    try {
+      // Start transaction
+      await client.query('BEGIN');
+      
+      // Create prompts table
+      await client.query(`
+        CREATE TABLE IF NOT EXISTS prompts (
+          id TEXT PRIMARY KEY,
+          name TEXT NOT NULL,
+          description TEXT,
+          content TEXT NOT NULL,
+          is_template BOOLEAN NOT NULL DEFAULT FALSE,
+          variables JSONB,
+          tags TEXT[],
+          category TEXT,
+          created_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          updated_at TIMESTAMP WITH TIME ZONE NOT NULL,
+          version INTEGER NOT NULL DEFAULT 1,
+          metadata JSONB
+        )
+      `);
+      
+      // Create index for faster searches
+      await client.query('CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts (name)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_prompts_category ON prompts (category)');
+      await client.query('CREATE INDEX IF NOT EXISTS idx_prompts_is_template ON prompts (is_template)');
+      
+      // Commit transaction
+      await client.query('COMMIT');
+      
+      console.log('PostgreSQL schema initialized');
+    } catch (error) {
+      // Rollback transaction
+      await client.query('ROLLBACK');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to initialize PostgreSQL schema: ${errorMessage}`);
+    }
+  }
+  
+  /**
+   * Save a prompt to the database
    * @param prompt Prompt to save
    */
   async savePrompt(prompt: Prompt): Promise<void> {
-    if (!this.connected) {
-      throw new Error('Not connected to database');
-    }
-    
-    const client = await this.pool.connect();
     try {
-      // Check if prompt exists
-      const checkResult = await client.query(
-        'SELECT id FROM prompts WHERE id = $1',
-        [prompt.id]
-      );
-      
-      // If prompt exists, update it
-      if (checkResult.rowCount && checkResult.rowCount > 0) {
-        await client.query(
-          `
-          UPDATE prompts SET
-            name = $1,
-            description = $2,
-            content = $3,
-            is_template = $4,
-            variables = $5,
-            tags = $6,
-            category = $7,
-            updated_at = NOW(),
-            version = version + 1
-          WHERE id = $8
-          `,
-          [
-            prompt.name,
-            prompt.description || null,
-            prompt.content,
-            prompt.isTemplate,
-            prompt.variables || null,
-            prompt.tags || null,
-            prompt.category || null,
-            prompt.id
-          ]
-        );
-      } else {
-        // Otherwise, insert a new prompt
-        await client.query(
-          `
-          INSERT INTO prompts (
-            id, name, description, content, is_template, variables, tags, category, created_at, updated_at, version
-          ) VALUES (
-            $1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11
-          )
-          `,
-          [
-            prompt.id || uuidv4(),
-            prompt.name,
-            prompt.description || null,
-            prompt.content,
-            prompt.isTemplate,
-            prompt.variables || null,
-            prompt.tags || null,
-            prompt.category || null,
-            prompt.createdAt || new Date().toISOString(),
-            prompt.updatedAt || new Date().toISOString(),
-            prompt.version || 1
-          ]
-        );
+      // Generate an ID if not provided
+      if (!prompt.id) {
+        prompt.id = uuidv4();
       }
+      
+      // Convert camelCase to snake_case for PostgreSQL
+      const values = [
+        prompt.id,
+        prompt.name,
+        prompt.description || null,
+        prompt.content,
+        prompt.isTemplate || false,
+        prompt.variables ? JSON.stringify(prompt.variables) : null,
+        prompt.tags ? JSON.stringify(prompt.tags) : null,
+        prompt.category || null,
+        prompt.createdAt,
+        prompt.updatedAt,
+        prompt.version || 1,
+        prompt.metadata ? JSON.stringify(prompt.metadata) : null
+      ];
+      
+      // Insert or update (upsert) the prompt
+      await this.pool.query(`
+        INSERT INTO prompts (
+          id, name, description, content, is_template, variables, tags, 
+          category, created_at, updated_at, version, metadata
+        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
+        ON CONFLICT (id) DO UPDATE SET
+          name = $2,
+          description = $3,
+          content = $4,
+          is_template = $5,
+          variables = $6,
+          tags = $7,
+          category = $8,
+          updated_at = $10,
+          version = $11,
+          metadata = $12
+      `, values);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to save prompt: ${errorMessage}`);
-    } finally {
-      client.release();
+      throw new Error(`Failed to save prompt to PostgreSQL: ${errorMessage}`);
     }
   }
   
   /**
-   * Get a prompt from the PostgreSQL database
+   * Get a prompt by ID
    * @param id Prompt ID
    * @returns The prompt
    */
   async getPrompt(id: string): Promise<Prompt> {
-    if (!this.connected) {
-      throw new Error('Not connected to database');
-    }
-    
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        'SELECT * FROM prompts WHERE id = $1',
-        [id]
-      );
+      const result = await this.pool.query('SELECT * FROM prompts WHERE id = $1', [id]);
       
       if (result.rows.length === 0) {
         throw new Error(`Prompt with ID ${id} not found`);
@@ -179,123 +207,130 @@ export class PostgresAdapter implements StorageAdapter {
       return this.rowToPrompt(result.rows[0]);
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to get prompt: ${errorMessage}`);
-    } finally {
-      client.release();
+      throw new Error(`Failed to get prompt from PostgreSQL: ${errorMessage}`);
     }
   }
   
   /**
-   * List prompts from the PostgreSQL database
-   * @param options Options for filtering and sorting
-   * @returns Array of prompts
+   * List prompts with filtering options
+   * @param options Filtering options
+   * @returns Array of prompts matching options
    */
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error('Not connected to database');
-    }
-    
-    const client = await this.pool.connect();
     try {
+      // Build the query based on options
       let query = 'SELECT * FROM prompts';
-      const params: any[] = [];
       const conditions: string[] = [];
+      const values: any[] = [];
       
-      // Apply filters
       if (options) {
         // Filter by template status
         if (options.isTemplate !== undefined) {
-          conditions.push(`is_template = $${params.length + 1}`);
-          params.push(options.isTemplate);
+          conditions.push(`is_template = $${values.length + 1}`);
+          values.push(options.isTemplate);
         }
         
         // Filter by category
         if (options.category) {
-          conditions.push(`category = $${params.length + 1}`);
-          params.push(options.category);
+          conditions.push(`category = $${values.length + 1}`);
+          values.push(options.category);
         }
         
-        // Filter by tags
+        // Filter by tags (all specified tags must be present)
         if (options.tags && options.tags.length > 0) {
-          conditions.push(`tags @> $${params.length + 1}`);
-          params.push(options.tags);
+          conditions.push(`tags @> $${values.length + 1}`);
+          values.push(JSON.stringify(options.tags));
         }
         
         // Filter by search term
         if (options.search) {
           conditions.push(`(
-            name ILIKE $${params.length + 1} OR
-            description ILIKE $${params.length + 1} OR
-            content ILIKE $${params.length + 1}
+            name ILIKE $${values.length + 1} OR
+            description ILIKE $${values.length + 1} OR
+            content ILIKE $${values.length + 1}
           )`);
-          params.push(`%${options.search}%`);
+          values.push(`%${options.search}%`);
         }
         
-        // Add WHERE clause if there are conditions
+        // Add conditions to query
         if (conditions.length > 0) {
           query += ' WHERE ' + conditions.join(' AND ');
         }
         
-        // Add ORDER BY clause
+        // Add sorting
         if (options.sort) {
-          const sortField = this.snakeCaseField(options.sort);
-          const sortOrder = options.order === 'desc' ? 'DESC' : 'ASC';
-          query += ` ORDER BY ${sortField} ${sortOrder}`;
+          // Map camelCase to snake_case for PostgreSQL
+          const sortField = this.camelToSnake(options.sort);
+          const order = options.order === 'desc' ? 'DESC' : 'ASC';
+          query += ` ORDER BY ${sortField} ${order}`;
         } else {
           // Default sort by updated_at
           query += ' ORDER BY updated_at DESC';
         }
         
-        // Add LIMIT and OFFSET
-        if (options.limit) {
-          query += ` LIMIT $${params.length + 1}`;
-          params.push(options.limit);
-        }
-        
-        if (options.offset) {
-          query += ` OFFSET $${params.length + 1}`;
-          params.push(options.offset);
+        // Add pagination
+        if (options.limit !== undefined) {
+          query += ` LIMIT $${values.length + 1}`;
+          values.push(options.limit);
+          
+          if (options.offset !== undefined) {
+            query += ` OFFSET $${values.length + 1}`;
+            values.push(options.offset);
+          }
         }
       } else {
         // Default sort by updated_at
         query += ' ORDER BY updated_at DESC';
       }
       
-      const result = await client.query(query, params);
-      
+      const result = await this.pool.query(query, values);
       return result.rows.map(row => this.rowToPrompt(row));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to list prompts: ${errorMessage}`);
-    } finally {
-      client.release();
+      throw new Error(`Failed to list prompts from PostgreSQL: ${errorMessage}`);
     }
   }
   
   /**
-   * Delete a prompt from the PostgreSQL database
+   * Delete a prompt
    * @param id Prompt ID
    */
   async deletePrompt(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error('Not connected to database');
-    }
-    
-    const client = await this.pool.connect();
     try {
-      const result = await client.query(
-        'DELETE FROM prompts WHERE id = $1',
-        [id]
-      );
+      const result = await this.pool.query('DELETE FROM prompts WHERE id = $1', [id]);
       
       if (result.rowCount === 0) {
         throw new Error(`Prompt with ID ${id} not found`);
       }
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to delete prompt: ${errorMessage}`);
-    } finally {
-      client.release();
+      throw new Error(`Failed to delete prompt from PostgreSQL: ${errorMessage}`);
+    }
+  }
+  
+  /**
+   * Get all prompts from storage
+   * @returns Array of all prompts
+   */
+  async getAllPrompts(): Promise<Prompt[]> {
+    try {
+      const result = await this.pool.query('SELECT * FROM prompts ORDER BY updated_at DESC');
+      return result.rows.map(row => this.rowToPrompt(row));
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to get all prompts from PostgreSQL: ${errorMessage}`);
+    }
+  }
+  
+  /**
+   * Clear all prompts from storage
+   */
+  async clearAll(): Promise<void> {
+    try {
+      await this.pool.query('DELETE FROM prompts');
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to clear all prompts from PostgreSQL: ${errorMessage}`);
     }
   }
   
@@ -311,21 +346,22 @@ export class PostgresAdapter implements StorageAdapter {
       description: row.description,
       content: row.content,
       isTemplate: row.is_template,
-      variables: row.variables,
-      tags: row.tags,
+      variables: row.variables ? row.variables : undefined,
+      tags: row.tags ? row.tags : undefined,
       category: row.category,
       createdAt: row.created_at.toISOString(),
       updatedAt: row.updated_at.toISOString(),
-      version: row.version
+      version: row.version,
+      metadata: row.metadata ? row.metadata : undefined
     };
   }
   
   /**
-   * Convert a camelCase field name to snake_case for PostgreSQL
-   * @param field Field name in camelCase
-   * @returns Field name in snake_case
+   * Convert camelCase to snake_case
+   * @param str String in camelCase
+   * @returns String in snake_case
    */
-  private snakeCaseField(field: string): string {
-    return field.replace(/([A-Z])/g, '_$1').toLowerCase();
+  private camelToSnake(str: string): string {
+    return str.replace(/([A-Z])/g, '_$1').toLowerCase();
   }
 }

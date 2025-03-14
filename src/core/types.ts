@@ -102,6 +102,12 @@ export interface ListPromptsOptions {
  */
 export interface StorageAdapter {
   /**
+   * Check if connected to the storage
+   * @returns Promise that resolves to true if connected, false otherwise
+   */
+  isConnected(): Promise<boolean>;
+  
+  /**
    * Connect to the storage
    */
   connect(): Promise<void>;
@@ -136,6 +142,17 @@ export interface StorageAdapter {
    * @param id Prompt ID
    */
   deletePrompt(id: string): Promise<void>;
+  
+  /**
+   * Get all prompts from storage
+   * @returns Array of all prompts
+   */
+  getAllPrompts(): Promise<Prompt[]>;
+  
+  /**
+   * Clear all prompts from storage
+   */
+  clearAll(): Promise<void>;
 }
 
 /**

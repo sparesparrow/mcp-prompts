@@ -1,19 +1,35 @@
-FROM node:18-alpine
+FROM node:20-alpine
 
-# Create app directory
-WORKDIR /test
+# Install git, bash, curl and PostgreSQL client for testing
+RUN apk add --no-cache git bash curl postgresql-client
+
+# Create app directories
+WORKDIR /app
+RUN mkdir -p /app/data/prompts /app/data/backups
 
 # Install MCP Inspector for testing
 RUN npm install -g @modelcontextprotocol/inspector
 
+# Copy package files first to leverage Docker caching
+COPY package*.json ./
+
+# Install dependencies
+RUN npm ci
+
+# Copy source files
+COPY . .
+
+# Build the application
+RUN npm run build
+
 # Set environment variables for testing
 ENV NODE_ENV=production \
     STORAGE_TYPE=file \
-    PROMPTS_DIR=/test/prompts \
+    PROMPTS_DIR=/app/data/prompts \
+    BACKUPS_DIR=/app/data/backups \
+    PORT=3003 \
+    HOST=0.0.0.0 \
     LOG_LEVEL=info
 
-# Create data directory
-RUN mkdir -p /test/prompts
-
-# Test command
-CMD ["sh", "-c", "echo 'Testing @sparesparrow/mcp-prompt-manager...' && npx -y @sparesparrow/mcp-prompt-manager"] 
+# Test command (default, can be overridden)
+CMD ["npm", "test"] 

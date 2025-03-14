@@ -1,0 +1,61 @@
+name: mcp-prompts-dev
+
+services:
+  # PostgreSQL database for development
+  postgres:
+    image: postgres:14
+    container_name: mcp-postgres-dev
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcp_prompts_dev
+    volumes:
+      - postgres_dev_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+
+  # MCP Prompts Server for development
+  mcp-prompts:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: build
+    container_name: mcp-prompts-dev
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=development
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=debug
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+    volumes:
+      - ../src:/app/src
+      - ../data:/app/data
+      - ../scripts:/app/scripts
+      - ../package.json:/app/package.json
+      - ../tsconfig.json:/app/tsconfig.json
+    ports:
+      - "3003:3003"
+    command: ["npm", "run", "dev"]
+    restart: unless-stopped
+
+volumes:
+  postgres_dev_data:
+    name: mcp-postgres-dev-data
+
+networks:
+  mcp-dev-network:
+    name: mcp-dev-network
+    driver: bridge 

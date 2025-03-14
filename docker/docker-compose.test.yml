@@ -1,11 +1,11 @@
-version: '3.8'
+name: mcp-prompts-test
 
 services:
   # Test container for running the published package with npx
   npx-test:
     build:
-      context: .
-      dockerfile: Dockerfile.test
+      context: ..
+      dockerfile: docker/Dockerfile.test
     container_name: mcp-prompts-npx-test
     environment:
       - NODE_ENV=production
@@ -13,7 +13,7 @@ services:
       - PROMPTS_DIR=/test/prompts
       - LOG_LEVEL=info
     volumes:
-      - ./prompts:/test/prompts
+      - ../prompts:/test/prompts
     ports:
       - "3000:3000"
     stdin_open: true
@@ -29,7 +29,7 @@ services:
       sh -c "npm install -g @modelcontextprotocol/inspector &&
              echo 'Waiting for npx-test to be ready...' &&
              sleep 5 &&
-             npx @modelcontextprotocol/inspector npx -y @sparesparrow/mcp-prompt-manager"
+             npx @modelcontextprotocol/inspector npx -y @sparesparrow/mcp-prompts"
     ports:
       - "3001:3001"
     environment:

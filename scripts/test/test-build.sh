@@ -49,11 +49,11 @@ chmod +x build/index.js
 
 # Step 4: Run the comprehensive build fixer
 echo "🔧 Running build fixer..."
-node fix-build.js
+node ./scripts/build/fix-build.js
 
 # Step 5: Fix the package.json in the build directory
 echo "📦 Fixing package.json in build directory..."
-node fix-package.js
+node ./scripts/build/fix-package.js
 
 echo "✅ Build process completed successfully"
 echo "📦 You can now test the built package with: cd build && npm link" 

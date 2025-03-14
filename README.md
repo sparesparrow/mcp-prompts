@@ -17,6 +17,7 @@ An MCP server for managing prompts and templates with project orchestration capa
 - **MCP Protocol Integration**: Seamless integration with Model Context Protocol
 - **Docker Support**: Easy deployment with Docker and Docker Compose
 - **Categories**: Organize prompts by category (e.g., 'development', 'project-orchestration')
+- **Health Checks**: HTTP server with health check endpoints for Docker and Kubernetes
 
 ## Node.js Compatibility
 
@@ -34,8 +35,11 @@ This package is designed to work with:
 The fastest way to use this package is with npx in a fresh container or environment:
 
 ```bash
-# Run directly without installation using npx
+# Run with file storage (default)
 npx -y @modelcontextprotocol/mcp-prompts
+
+# Run with PostgreSQL storage
+STORAGE_TYPE=postgres POSTGRES_CONNECTION_STRING=postgresql://user:password@localhost:5432/mcp_prompts npx -y @modelcontextprotocol/mcp-prompts
 
 # To test with MCP Inspector
 npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/mcp-prompts
@@ -44,11 +48,31 @@ npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/mcp-prompts
 ### Using Docker
 
 ```bash
-# Run in a Docker container with the official image
+# Run with file storage
 docker run -p 3003:3003 modelcontextprotocol/mcp-prompts:latest
 
-# Map a data volume for persistence
-docker run -p 3003:3003 -v $(pwd)/data:/app/data modelcontextprotocol/mcp-prompts:latest
+# Run with PostgreSQL storage
+docker run -p 3003:3003 \
+  -e STORAGE_TYPE=postgres \
+  -e POSTGRES_CONNECTION_STRING=postgresql://user:password@host:5432/mcp_prompts \
+  modelcontextprotocol/mcp-prompts:latest
+
+# For data persistence, map volumes
+docker run -p 3003:3003 \
+  -v mcp_prompts_data:/app/data \
+  modelcontextprotocol/mcp-prompts:latest
+```
+
+### Using Docker Compose with PostgreSQL
+
+We provide a ready-to-use Docker Compose configuration for running with PostgreSQL:
+
+```bash
+# Start the server with PostgreSQL
+docker-compose -f docker/docker-compose.postgres.yml up
+
+# Or use the npm script
+npm run docker:postgres:up
 ```
 
 ## Installation
@@ -580,6 +604,27 @@ docker-compose -f docker/docker-compose.yml down
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
+
+## Troubleshooting
+
+### SDK Compatibility
+
+The MCP Prompts Server is designed to handle SDK compatibility issues automatically:
+
+- **Fallback Mode**: If the server detects that `registerTool` is not available in the SDK, it will automatically switch to fallback mode, which implements a basic JSON-RPC interface over stdio.
+- **ESM Module Fixes**: The build process automatically fixes import paths for ESM modules to ensure compatibility across Node.js versions.
+
+### Common Issues
+
+If you encounter any of the following issues:
+
+1. **Connection Refused**: Ensure the server is running and the specified port is available.
+2. **Database Connection Errors**: Check your PostgreSQL connection string and ensure the database is running.
+3. **Permission Denied**: Make sure the user has permission to read/write to the specified directories.
+
+### Getting Help
+
+If you need further assistance, please open an issue on GitHub with details about your environment and the problem you're experiencing.
 
 ## License
 

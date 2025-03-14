@@ -1,0 +1,8 @@
+{
+  "name": "List Prompts Test",
+  "type": "tool",
+  "toolName": "list_prompts",
+  "arguments": {
+    "limit": 10
+  }
+} 
