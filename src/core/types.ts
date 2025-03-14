@@ -98,68 +98,45 @@ export interface ListPromptsOptions {
 }
 
 /**
- * Storage adapter interface for prompt storage
+ * Base storage adapter interface 
  */
 export interface StorageAdapter {
-  /**
-   * Check if connected to the storage
-   * @returns Promise that resolves to true if connected, false otherwise
-   */
-  isConnected(): Promise<boolean>;
-  
-  /**
-   * Connect to the storage
-   */
   connect(): Promise<void>;
-  
-  /**
-   * Disconnect from the storage
-   */
   disconnect(): Promise<void>;
+  isConnected(): boolean | Promise<boolean>;
   
-  /**
-   * Save a prompt to storage
-   * @param prompt Prompt to save
-   */
-  savePrompt(prompt: Prompt): Promise<void>;
-  
-  /**
-   * Get a prompt by ID
-   * @param id Prompt ID
-   * @returns The prompt
-   */
+  // Get a prompt by ID
   getPrompt(id: string): Promise<Prompt>;
   
-  /**
-   * List prompts with filtering options
-   * @param options Filtering options
-   * @returns Array of prompts matching options
-   */
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  
-  /**
-   * Delete a prompt
-   * @param id Prompt ID
-   */
-  deletePrompt(id: string): Promise<void>;
-  
-  /**
-   * Get all prompts from storage
-   * @returns Array of all prompts
-   */
+  // Get all prompts
   getAllPrompts(): Promise<Prompt[]>;
   
-  /**
-   * Clear all prompts from storage
-   */
-  clearAll(): Promise<void>;
+  // Create a new prompt - allow void or Prompt return type
+  savePrompt(prompt: Partial<Prompt>): Promise<Prompt | void>;
+  
+  // Update a prompt - make this optional since some adapters might not implement it
+  updatePrompt?(id: string, data: Partial<Prompt>): Promise<Prompt | void>;
+  
+  // Delete a prompt
+  deletePrompt(id: string): Promise<void>;
+  
+  // List prompts with filtering options
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  
+  // Clear all prompts - make this optional
+  clearAll?(): Promise<void>;
+  
+  // Backup operations - these are optional
+  backup?(): Promise<string>;
+  restore?(backupId: string): Promise<void>;
+  listBackups?(): Promise<string[]>;
 }
 
 /**
  * Template variables map
  * Maps variable names to their values
  */
-export type TemplateVariables = Record<string, string | number | boolean>;
+export type TemplateVariables = Record<string, string>;
 
 /**
  * Result of applying a template
@@ -224,4 +201,83 @@ export interface PromptService {
    * @returns The applied template result
    */
   applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+}
+
+/**
+ * Interface for creating a new prompt
+ */
+export interface CreatePromptParams {
+  id?: string;
+  name: string;
+  description?: string;
+  content: string;
+  tags?: string[];
+  isTemplate?: boolean;
+  variables?: string[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Interface for updating a prompt
+ */
+export interface UpdatePromptParams {
+  id: string;
+  name?: string;
+  description?: string;
+  content?: string;
+  tags?: string[];
+  isTemplate?: boolean;
+  variables?: string[];
+  metadata?: Record<string, any>;
+}
+
+/**
+ * Interface for listing prompts with filters
+ */
+export interface ListPromptsParams {
+  tags?: string[];
+  isTemplate?: boolean;
+  search?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/**
+ * Interface for applying template variables
+ */
+export interface ApplyTemplateParams {
+  id: string;
+  variables: Record<string, string>;
+}
+
+/**
+ * Response for tool operations
+ */
+export interface ToolResponse {
+  content: Array<{
+    type: string;
+    text: string;
+  }>;
+}
+
+/**
+ * MCP Tool Parameters
+ */
+export type AddPromptParams = CreatePromptParams;
+export type GetPromptParams = { id: string };
+export type DeletePromptParams = { id: string };
+
+/**
+ * MCP Request Handler Extra
+ */
+export interface McpRequestExtra {
+  arguments: any;
+  request: {
+    id: string;
+    method: string;
+    params: {
+      name: string;
+      arguments: any;
+    };
+  };
 } 

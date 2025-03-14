@@ -58,18 +58,36 @@ export class FileAdapter implements StorageAdapter {
    * Save a prompt to the file storage
    * @param prompt Prompt to save
    */
-  async savePrompt(prompt: Prompt): Promise<void> {
+  async savePrompt(prompt: Partial<Prompt>): Promise<Prompt> {
     try {
       // Ensure the prompt has an ID
-    if (!prompt.id) {
-      prompt.id = uuidv4();
-    }
-    
-      // Create the file path
-      const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
+      if (!prompt.id) {
+        prompt.id = uuidv4();
+      }
       
-      // Write the prompt to the file
-      await fs.writeJson(filePath, prompt, { spaces: 2 });
+      // Create timestamps if not provided
+      const now = new Date().toISOString();
+      if (!prompt.createdAt) {
+        prompt.createdAt = now;
+      }
+      if (!prompt.updatedAt) {
+        prompt.updatedAt = now;
+      }
+      
+      // Extract variables from content if it's a template
+      if (prompt.isTemplate && prompt.content) {
+        const extractedVars = extractVariables(prompt.content);
+        prompt.variables = extractedVars.map(name => ({ name }));
+      }
+      
+      // Ensure the prompt is a complete Prompt object
+      const fullPrompt = prompt as Prompt;
+      
+      // Write the prompt to disk
+      const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
+      await fs.writeJson(filePath, fullPrompt, { spaces: 2 });
+      
+      return fullPrompt;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       throw new Error(`Failed to save prompt: ${errorMessage}`);

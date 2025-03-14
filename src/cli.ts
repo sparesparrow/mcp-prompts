@@ -5,10 +5,37 @@
  * Command-line interface for the MCP Prompts server
  */
 
+// Redirect console logs to stderr to prevent breaking stdio protocol
+const originalConsoleLog = console.log;
+const originalConsoleInfo = console.info;
+console.log = (...args) => process.stderr.write(args.map(a => String(a)).join(' ') + '\n');
+console.info = (...args) => process.stderr.write(args.map(a => String(a)).join(' ') + '\n');
+
+// Add error handling for uncaught exceptions
+process.on('uncaughtException', (err) => {
+  process.stderr.write(`Uncaught exception: ${err.message}\n${err.stack}\n`);
+});
+
+process.on('unhandledRejection', (reason, promise) => {
+  process.stderr.write(`Unhandled rejection at: ${promise}, reason: ${reason}\n`);
+});
+
 import fs from 'fs-extra';
 import path from 'path';
 import { startServer } from './index.js';
 import { getConfig } from './config.js';
+import { fileURLToPath } from 'url';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { FileAdapter } from './adapters/file-adapter.js';
+import { PromptService } from './services/prompt-service.js';
+import { 
+  AddPromptParams, 
+  GetPromptParams, 
+  ListPromptsParams,
+  ToolResponse,
+  McpRequestExtra
+} from './core/types.js';
 
 // Define version for use in CLI options
 let packageVersion = '1.0.0';
@@ -68,34 +95,104 @@ Environment Variables:
  */
 async function main(): Promise<void> {
   try {
-    // Show version if requested
-    if (showVersion) {
-      console.log(`MCP Prompts Server v${packageVersion}`);
-      return;
-    }
-    
-    // Show help if requested
-    if (showHelp) {
-      displayHelp();
-      return;
-    }
-    
-    // Set HTTP_SERVER environment variable based on --http flag
-    if (httpMode) {
-      process.env.HTTP_SERVER = 'true';
-    }
-    
-    // Load configuration and start server
+    process.stderr.write('Starting MCP Prompts CLI...\n');
     const config = getConfig();
-    await startServer(config);
+    
+    // Use file adapter by default for CLI
+    const promptsDir = typeof config === 'object' && 'storage' in config && config.storage?.promptsDir
+      ? config.storage.promptsDir
+      : (config as any).promptsDir || path.join(process.env.HOME || '~', 'mcp/data/prompts');
+    
+    process.stderr.write(`Using file storage adapter with directory: ${promptsDir}\n`);
+    
+    // Ensure the prompts directory exists
+    await fs.ensureDir(promptsDir);
+    const storage = new FileAdapter(promptsDir);
+    
+    // Connect to storage
+    await storage.connect();
+    
+    // Initialize prompt service
+    const promptService = new PromptService(storage);
+    
+    // Initialize MCP server
+    const serverName = 'MCP Prompts CLI';
+    const serverVersion = process.env.npm_package_version || '1.0.0';
+    
+    const server = new McpServer({
+      name: serverName,
+      version: serverVersion
+    });
+    
+    // Register all tools
+    process.stderr.write('Registering MCP tools...\n');
+    
+    // Add prompt tool
+    server.tool('add_prompt', async (extra: any) => {
+      try {
+        const result = await promptService.addPrompt(extra.arguments);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (error) {
+        process.stderr.write(`Error in add_prompt: ${error}\n`);
+        throw error;
+      }
+    });
+    
+    // Get prompt tool
+    server.tool('get_prompt', async (extra: any) => {
+      try {
+        const result = await promptService.getPrompt(extra.arguments.id);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (error) {
+        process.stderr.write(`Error in get_prompt: ${error}\n`);
+        throw error;
+      }
+    });
+    
+    // List prompts tool
+    server.tool('list_prompts', async (extra: any) => {
+      try {
+        const result = await promptService.listPrompts(extra.arguments);
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] };
+      } catch (error) {
+        process.stderr.write(`Error in list_prompts: ${error}\n`);
+        throw error;
+      }
+    });
+    
+    // Connect to stdio transport
+    process.stderr.write('Connecting to stdio transport...\n');
+    const transport = new StdioServerTransport();
+    await server.connect(transport);
+    process.stderr.write('MCP Prompts CLI connected successfully to stdio transport\n');
+    
+    // Setup graceful shutdown
+    process.on('SIGINT', async () => {
+      process.stderr.write('Received SIGINT, shutting down gracefully...\n');
+      if (storage && typeof storage.disconnect === 'function') {
+        await storage.disconnect();
+      }
+      process.stderr.write('Shutdown complete\n');
+      process.exit(0);
+    });
+    
+    process.on('SIGTERM', async () => {
+      process.stderr.write('Received SIGTERM, shutting down gracefully...\n');
+      if (storage && typeof storage.disconnect === 'function') {
+        await storage.disconnect();
+      }
+      process.stderr.write('Shutdown complete\n');
+      process.exit(0);
+    });
+    
   } catch (error) {
-    console.error('Error starting MCP Prompts Server:', error);
+    process.stderr.write(`Failed to start CLI: ${error}\n`);
     process.exit(1);
   }
 }
 
 // Run the CLI
 main().catch(error => {
-  console.error('Error in MCP Prompts CLI:', error);
+  process.stderr.write(`Fatal error in main(): ${error}\n`);
   process.exit(1);
 }); 

@@ -1,0 +1,90 @@
+{
+  "name": "@sparesparrow/mcp-prompts",
+  "version": "1.2.19",
+  "description": "MCP server for managing prompts and templates with project orchestration capabilities",
+  "type": "module",
+  "main": "build/index.js",
+  "bin": {
+    "mcp-prompts": "./build/cli.js"
+  },
+  "scripts": {
+    "build": "echo 'Script build disabled for publishing'",
+    "copy-static-files": "echo 'Script copy-static-files disabled for publishing'",
+    "start": "node build/index.js",
+    "debug": "NODE_ENV=development node --trace-warnings build/index.js 2> server-debug.log",
+    "debug:cli": "NODE_ENV=development node --trace-warnings build/cli.js 2> cli-debug.log",
+    "dev": "echo 'Script dev disabled for publishing'",
+    "cli": "node build/cli.js",
+    "test:inspector": "npx @modelcontextprotocol/inspector node ./build/index.js",
+    "test:inspector:cli": "npx @modelcontextprotocol/inspector node ./build/cli.js",
+    "prepare": "echo 'Script prepare disabled for publishing'",
+    "test": "jest",
+    "test:build": "echo 'Script test:build disabled for publishing'",
+    "test:docker": "echo 'Script test:docker disabled for publishing'",
+    "test:docker:fixed": "echo 'Script test:docker:fixed disabled for publishing'",
+    "test:postgres": "echo 'Script test:postgres disabled for publishing'",
+    "docker:build": "echo 'Script docker:build disabled for publishing'",
+    "docker:build:fixed": "echo 'Script docker:build:fixed disabled for publishing'",
+    "docker:cleanup": "echo 'Script docker:cleanup disabled for publishing'",
+    "docker:up": "echo 'Script docker:up disabled for publishing'",
+    "docker:down": "echo 'Script docker:down disabled for publishing'",
+    "docker:postgres:up": "echo 'Script docker:postgres:up disabled for publishing'",
+    "docker:postgres:down": "echo 'Script docker:postgres:down disabled for publishing'",
+    "publish:all": "echo 'Script publish:all disabled for publishing'",
+    "prepare-publish": "echo 'Script prepare-publish disabled for publishing'",
+    "publish:clean": "echo 'Script publish:clean disabled for publishing'",
+    "test:package": "echo 'Script test:package disabled for publishing'",
+    "test:integration": "echo 'Script test:integration disabled for publishing'",
+    "verify-package": "echo 'Script verify-package disabled for publishing'",
+    "prepublishOnly": "echo 'Script prepublishOnly disabled for publishing'",
+    "test:pack": "npm pack && tar -tvf sparesparrow-mcp-prompts-*.tgz | grep -E 'config.js|index.js'"
+  },
+  "files": [
+    "build/**/*",
+    "README.md",
+    "src/utils/config.js",
+    "config"
+  ],
+  "keywords": [
+    "mcp",
+    "prompt",
+    "manager",
+    "claude",
+    "anthropic",
+    "project-orchestrator"
+  ],
+  "author": "sparesparrow",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "1.6.0",
+    "axios": "^1.8.3",
+    "dotenv": "^16.4.7",
+    "fs-extra": "^11.3.0",
+    "pg": "^8.13.3",
+    "uuid": "^9.0.1",
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.14",
+    "@types/node": "^18.19.1",
+    "@types/pg": "^8.11.11",
+    "@types/uuid": "^9.0.7",
+    "jest": "^29.7.0",
+    "node-fetch": "^3.3.2",
+    "nodemon": "^3.1.9",
+    "ts-jest": "^29.2.6",
+    "tsc-esm-fix": "^3.1.2",
+    "typescript": "^5.3.2"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/sparesparrow/mcp-prompts.git"
+  }
+}

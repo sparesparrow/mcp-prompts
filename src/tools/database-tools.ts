@@ -664,6 +664,11 @@ ${result.fields ? `Columns: ${result.fields.map(f => f.name).join(', ')}` : ''}`
         }
         
         if (clearExisting) {
+          // Check if the clearAll method exists
+          if (typeof storageAdapter.clearAll !== 'function') {
+            throw new Error('The clearAll operation is not supported by the current storage adapter');
+          }
+          
           await storageAdapter.clearAll();
         }
         
@@ -720,6 +725,17 @@ ${result.fields ? `Columns: ${result.fields.map(f => f.name).join(', ')}` : ''}`
           };
         }
         
+        // Check if we have access to a storage adapter for the operation
+        if (!storageAdapter) {
+          throw new Error('No storage adapter available');
+        }
+
+        // Check if the clearAll method exists
+        if (typeof storageAdapter.clearAll !== 'function') {
+          throw new Error('The clearAll operation is not supported by the current storage adapter');
+        }
+
+        // Now it's safe to call clearAll
         await storageAdapter.clearAll();
         
         return {

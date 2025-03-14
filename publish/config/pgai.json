@@ -1,0 +1,15 @@
+{
+  "server": {
+    "port": 3000,
+    "host": "localhost",
+    "logLevel": "info"
+  },
+  "storage": {
+    "type": "pgai",
+    "options": {
+      "connectionString": "postgresql://postgres:postgres@localhost:5432/mcp_prompts",
+      "poolSize": 10,
+      "sslMode": false
+    }
+  }
+} 

@@ -143,51 +143,211 @@ export class PostgresAdapter implements StorageAdapter {
   /**
    * Save a prompt to the database
    * @param prompt Prompt to save
+   * @returns The saved prompt
    */
-  async savePrompt(prompt: Prompt): Promise<void> {
+  async savePrompt(prompt: Partial<Prompt>): Promise<Prompt> {
+    const client = await this.pool.connect();
     try {
-      // Generate an ID if not provided
+      await client.query('BEGIN');
+      
+      // Ensure the prompt has an ID
       if (!prompt.id) {
         prompt.id = uuidv4();
       }
       
-      // Convert camelCase to snake_case for PostgreSQL
-      const values = [
-        prompt.id,
-        prompt.name,
-        prompt.description || null,
-        prompt.content,
-        prompt.isTemplate || false,
-        prompt.variables ? JSON.stringify(prompt.variables) : null,
-        prompt.tags ? JSON.stringify(prompt.tags) : null,
-        prompt.category || null,
-        prompt.createdAt,
-        prompt.updatedAt,
-        prompt.version || 1,
-        prompt.metadata ? JSON.stringify(prompt.metadata) : null
-      ];
+      // Create timestamps if not provided
+      const now = new Date().toISOString();
+      if (!prompt.createdAt) {
+        prompt.createdAt = now;
+      }
+      if (!prompt.updatedAt) {
+        prompt.updatedAt = now;
+      }
       
-      // Insert or update (upsert) the prompt
-      await this.pool.query(`
+      // Extract variables if needed and convert to complete Prompt
+      const fullPrompt = prompt as Prompt;
+      
+      // Insert prompt into prompts table
+      const insertPromptQuery = `
         INSERT INTO prompts (
-          id, name, description, content, is_template, variables, tags, 
-          category, created_at, updated_at, version, metadata
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-        ON CONFLICT (id) DO UPDATE SET
+          id, name, description, content, is_template, created_at, updated_at, 
+          category, version, metadata
+        ) VALUES (
+          $1, $2, $3, $4, $5, $6, $7, $8, $9, $10
+        ) ON CONFLICT (id) DO UPDATE SET
           name = $2,
           description = $3,
           content = $4,
           is_template = $5,
-          variables = $6,
-          tags = $7,
+          updated_at = $7,
           category = $8,
-          updated_at = $10,
-          version = $11,
-          metadata = $12
-      `, values);
+          version = $9,
+          metadata = $10
+        RETURNING *
+      `;
+      
+      const promptResult = await client.query(insertPromptQuery, [
+        fullPrompt.id,
+        fullPrompt.name,
+        fullPrompt.description || null,
+        fullPrompt.content,
+        fullPrompt.isTemplate || false,
+        fullPrompt.createdAt,
+        fullPrompt.updatedAt,
+        fullPrompt.category || null,
+        fullPrompt.version || 1,
+        fullPrompt.metadata ? JSON.stringify(fullPrompt.metadata) : null
+      ]);
+      
+      // Handle tags
+      if (fullPrompt.tags && fullPrompt.tags.length > 0) {
+        // Delete existing tags
+        await client.query('DELETE FROM prompt_tags WHERE prompt_id = $1', [fullPrompt.id]);
+        
+        // Insert new tags
+        for (const tag of fullPrompt.tags) {
+          await client.query(
+            'INSERT INTO prompt_tags (prompt_id, tag) VALUES ($1, $2)',
+            [fullPrompt.id, tag]
+          );
+        }
+      }
+      
+      // Handle variables
+      if (fullPrompt.variables && fullPrompt.variables.length > 0) {
+        // Delete existing variables
+        await client.query('DELETE FROM prompt_variables WHERE prompt_id = $1', [fullPrompt.id]);
+        
+        // Insert new variables
+        for (const variable of fullPrompt.variables) {
+          await client.query(
+            `INSERT INTO prompt_variables 
+              (prompt_id, name, description, default_value, required, type) 
+             VALUES ($1, $2, $3, $4, $5, $6)`,
+            [
+              fullPrompt.id,
+              variable.name,
+              variable.description || null,
+              variable.default || null,
+              variable.required || false,
+              variable.type || 'string'
+            ]
+          );
+        }
+      }
+      
+      await client.query('COMMIT');
+      
+      // Fetch the complete prompt with all relations
+      return await this.getPrompt(fullPrompt.id);
     } catch (error) {
+      await client.query('ROLLBACK');
       const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error(`Failed to save prompt to PostgreSQL: ${errorMessage}`);
+      throw new Error(`Failed to save prompt: ${errorMessage}`);
+    } finally {
+      client.release();
+    }
+  }
+  
+  /**
+   * Update a prompt in the database
+   * @param id Prompt ID
+   * @param updates Partial prompt data to update
+   * @returns The updated prompt
+   */
+  async updatePrompt(id: string, updates: Partial<Prompt>): Promise<Prompt> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      
+      // Get existing prompt to merge with updates
+      const existingPrompt = await this.getPrompt(id);
+      
+      // Update timestamps
+      const now = new Date().toISOString();
+      updates.updatedAt = now;
+      
+      // Merge updates with existing prompt
+      const updatedPrompt = { ...existingPrompt, ...updates };
+      
+      // Update prompt in prompts table
+      const updatePromptQuery = `
+        UPDATE prompts SET
+          name = $2,
+          description = $3,
+          content = $4,
+          is_template = $5,
+          updated_at = $6,
+          category = $7,
+          version = $8,
+          metadata = $9
+        WHERE id = $1
+        RETURNING *
+      `;
+      
+      await client.query(updatePromptQuery, [
+        id,
+        updatedPrompt.name,
+        updatedPrompt.description || null,
+        updatedPrompt.content,
+        updatedPrompt.isTemplate || false,
+        updatedPrompt.updatedAt,
+        updatedPrompt.category || null,
+        (existingPrompt.version || 0) + 1, // Increment version
+        updatedPrompt.metadata ? JSON.stringify(updatedPrompt.metadata) : null
+      ]);
+      
+      // Handle tags
+      if (updates.tags !== undefined) {
+        // Delete existing tags
+        await client.query('DELETE FROM prompt_tags WHERE prompt_id = $1', [id]);
+        
+        // Insert new tags
+        if (updatedPrompt.tags && updatedPrompt.tags.length > 0) {
+          for (const tag of updatedPrompt.tags) {
+            await client.query(
+              'INSERT INTO prompt_tags (prompt_id, tag) VALUES ($1, $2)',
+              [id, tag]
+            );
+          }
+        }
+      }
+      
+      // Handle variables
+      if (updates.variables !== undefined) {
+        // Delete existing variables
+        await client.query('DELETE FROM prompt_variables WHERE prompt_id = $1', [id]);
+        
+        // Insert new variables
+        if (updatedPrompt.variables && updatedPrompt.variables.length > 0) {
+          for (const variable of updatedPrompt.variables) {
+            await client.query(
+              `INSERT INTO prompt_variables 
+                (prompt_id, name, description, default_value, required, type) 
+               VALUES ($1, $2, $3, $4, $5, $6)`,
+              [
+                id,
+                variable.name,
+                variable.description || null,
+                variable.default || null,
+                variable.required || false,
+                variable.type || 'string'
+              ]
+            );
+          }
+        }
+      }
+      
+      await client.query('COMMIT');
+      
+      // Fetch the complete updated prompt with all relations
+      return await this.getPrompt(id);
+    } catch (error) {
+      await client.query('ROLLBACK');
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to update prompt: ${errorMessage}`);
+    } finally {
+      client.release();
     }
   }
   

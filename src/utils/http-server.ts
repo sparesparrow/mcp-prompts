@@ -12,18 +12,20 @@ interface ServerOptions {
 }
 
 /**
- * Create an HTTP server for health checks and status endpoints
- * @param storage Storage adapter instance for checking connection status
- * @param storageType Type of storage being used
- * @param options Server options including port and host
- * @returns HTTP server instance
+ * Create an HTTP server for health checks
+ * @param {StorageAdapter} storage Storage adapter instance
+ * @param {string} storageType Storage type
+ * @param {Object} options Server options
+ * @param {number} options.port Server port (default: 3003)
+ * @param {string} options.host Server host (default: 0.0.0.0)
+ * @returns {http.Server} HTTP server instance
  */
 export function createHttpServer(
   storage: StorageAdapter,
   storageType: string,
-  options: ServerOptions = { port: 3003, host: '0.0.0.0' }
+  options: { port: number; host: string }
 ): http.Server {
-  const { port, host } = options;
+  const { port = 3003, host = '0.0.0.0' } = options;
   
   // Create HTTP server
   const server = http.createServer(async (req, res) => {
@@ -32,104 +34,136 @@ export function createHttpServer(
     res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     
-    // Handle preflight requests
+    // Handle OPTIONS requests
     if (req.method === 'OPTIONS') {
-      res.statusCode = 204;
+      res.writeHead(204);
       res.end();
       return;
     }
     
-    // Only handle GET requests
-    if (req.method !== 'GET') {
-      res.statusCode = 405;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ error: 'Method not allowed' }));
+    // Health check endpoint
+    if (req.url === '/health' || req.url === '/') {
+      try {
+        // Check if storage is connected
+        const isConnected = await storage.isConnected();
+        
+        if (isConnected) {
+          const healthInfo = {
+            status: 'ok',
+            timestamp: new Date().toISOString(),
+            storage: {
+              type: storageType,
+              connected: isConnected
+            },
+            version: process.env.npm_package_version || '1.0.0'
+          };
+          
+          res.writeHead(200, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify(healthInfo, null, 2));
+        } else {
+          res.writeHead(503, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({
+            status: 'error',
+            message: 'Storage not connected',
+            timestamp: new Date().toISOString()
+          }, null, 2));
+        }
+      } catch (error) {
+        // Handle error
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({
+          status: 'error',
+          message: error instanceof Error ? error.message : 'Unknown error',
+          timestamp: new Date().toISOString()
+        }, null, 2));
+      }
       return;
     }
     
-    // Handle different endpoints
-    const url = req.url || '/';
-    
-    try {
-      if (url === '/health' || url === '/healthz') {
-        await handleHealthCheck(req, res, storage);
-      } else if (url === '/status') {
-        await handleStatus(req, res, storage, storageType);
-      } else if (url === '/') {
-        // Root endpoint with basic info
-        res.statusCode = 200;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({
-          name: 'MCP Prompts Server',
-          version: process.env.npm_package_version || 'development',
-          status: 'running',
-          endpoints: ['/health', '/healthz', '/status']
-        }));
-      } else {
-        // Not found
-        res.statusCode = 404;
-        res.setHeader('Content-Type', 'application/json');
-        res.end(JSON.stringify({ error: 'Not found' }));
-      }
-    } catch (error) {
-      // Internal server error
-      console.error('HTTP server error:', error);
-      res.statusCode = 500;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ 
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      }));
-    }
+    // Handle not found
+    res.writeHead(404, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
+      status: 'error',
+      message: 'Not found',
+      timestamp: new Date().toISOString()
+    }, null, 2));
   });
   
-  // Start listening
-  server.listen(port, host, () => {
-    console.log(`HTTP server listening on ${host}:${port}`);
-  });
+  // Start HTTP server
+  server.listen(port, host);
   
   return server;
 }
 
 /**
- * Handle health check endpoint
- * @param req HTTP request
- * @param res HTTP response
- * @param storage Storage adapter
+ * Handle health check requests
+ * @param {http.IncomingMessage} req HTTP request
+ * @param {http.ServerResponse} res HTTP response
+ * @param {StorageAdapter} storage Storage adapter
  */
 async function handleHealthCheck(
   req: http.IncomingMessage,
   res: http.ServerResponse,
   storage: StorageAdapter
 ): Promise<void> {
-  let isConnected = false;
-  
   try {
     // Check if storage is connected
-    isConnected = await storage.isConnected();
+    const isConnected = await storage.isConnected();
+    
+    // Get version information
+    const version = process.env.npm_package_version || '1.0.0';
+    
+    // Try to get prompt count to further verify storage is working
+    let promptCount = 0;
+    let status = 'healthy';
+    let statusMessage = 'OK';
+    
+    try {
+      const prompts = await storage.getAllPrompts();
+      promptCount = prompts.length;
+    } catch (error) {
+      // Storage is connected but cannot retrieve prompts
+      status = 'degraded';
+      statusMessage = 'Storage is connected but cannot retrieve prompts';
+    }
     
     if (isConnected) {
-      // All good, return 200
-      res.statusCode = 200;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ status: 'healthy' }));
+      // Return health check response
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status,
+        statusMessage,
+        timestamp: new Date().toISOString(),
+        version,
+        uptime: Math.floor(process.uptime()),
+        storage: {
+          type: storage.constructor.name,
+          connected: isConnected,
+          promptCount
+        }
+      }));
     } else {
-      // Storage not connected, return 503
-      res.statusCode = 503;
-      res.setHeader('Content-Type', 'application/json');
-      res.end(JSON.stringify({ 
+      // Storage is not connected
+      res.writeHead(503, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
         status: 'unhealthy',
-        reason: 'Storage not connected'
+        statusMessage: 'Storage is not connected',
+        timestamp: new Date().toISOString(),
+        version,
+        uptime: Math.floor(process.uptime()),
+        storage: {
+          type: storage.constructor.name,
+          connected: isConnected
+        }
       }));
     }
   } catch (error) {
-    // Error checking connection, return 500
-    console.error('Health check error:', error);
-    res.statusCode = 500;
-    res.setHeader('Content-Type', 'application/json');
-    res.end(JSON.stringify({ 
+    // Error executing health check
+    res.writeHead(500, { 'Content-Type': 'application/json' });
+    res.end(JSON.stringify({
       status: 'error',
-      reason: error instanceof Error ? error.message : 'Unknown error'
+      statusMessage: error instanceof Error ? error.message : 'Unknown error',
+      timestamp: new Date().toISOString(),
     }));
   }
 }
