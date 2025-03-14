@@ -1,11 +1,11 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.1.12",
+  "version": "1.1.13",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "mcp-prompts": "./build/index.js"
+    "mcp-prompts": "./build/cli.js"
   },
   "scripts": {
     "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./fix-build.js",
