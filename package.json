@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.3",
+  "version": "1.2.4",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -8,7 +8,7 @@
     "mcp-prompts": "./build/cli.js"
   },
   "scripts": {
-    "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./scripts/build/fix-build.js",
+    "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./scripts/build/fix-build.js && node ./scripts/build/ensure-config.js",
     "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups",
     "start": "node build/index.js",
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && npm start\"",
@@ -50,9 +50,12 @@
   },
   "devDependencies": {
     "@types/fs-extra": "^11.0.4",
+    "@types/jest": "^29.5.14",
     "@types/node": "^18.19.1",
     "@types/pg": "^8.11.11",
     "@types/uuid": "^9.0.7",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.6",
     "tsc-esm-fix": "^3.1.2",
     "typescript": "^5.3.2"
   },
