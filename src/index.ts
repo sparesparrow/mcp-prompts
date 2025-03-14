@@ -1,267 +1,141 @@
+#!/usr/bin/env node
 /**
  * MCP Prompts Server
- * Main entry point for the MCP Prompts Server
+ * A server for managing prompts using the Model Context Protocol
+ * 
+ * NOTE: The shebang line above is critical for npx usage.
+ * DO NOT REMOVE as it allows the module to be executed directly when 
+ * installed globally or run via npx -y @sparesparrow/mcp-prompt-manager
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-import { z } from "zod";
-import { PromptService } from "./services/prompt-service.js";
-import { FileAdapter } from "./adapters/file-adapter.js";
-import { PostgresAdapter } from "./adapters/postgres-adapter.js";
-import { getConfig, validateConfig } from "./config.js";
-import { setupDatabaseTools } from "./tools/database-tools.js";
-import { setupProjectOrchestratorTools } from "./tools/project-orchestrator-tools.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
+import { z } from 'zod';
+import { setupPromptTools } from './tools/prompt-tools.js';
+import { setupDatabaseTools } from './tools/database-tools.js';
+import { setupProjectOrchestratorTools } from './tools/project-orchestrator-tools.js';
+import { getConfig } from './config.js';
+
+// Load package info
+import { readFileSync } from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname, join } from 'path';
+
+// Get package version from package.json
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+let packageVersion = '1.0.0';
+try {
+  const packageJson = JSON.parse(readFileSync(join(__dirname, '../package.json'), 'utf8'));
+  packageVersion = packageJson.version;
+} catch (error) {
+  console.warn('Could not read package.json:', error instanceof Error ? error.message : String(error));
+}
+
+// Welcome message
+console.log(`
++----------------------------------------------+
+|     MCP Prompts Server - v${packageVersion}              |
+|                                              |
+|  A streamlined server for managing prompts   |
+|  and templates with Model Context Protocol   |
++----------------------------------------------+
+`);
 
 /**
- * Main entry point for the MCP Prompts server
+ * Main function to start the MCP Prompts server
  */
 async function main() {
   try {
-    // Load and validate configuration
+    // Get configuration
     const config = getConfig();
-    validateConfig(config);
     
     // Create MCP server
     const server = new McpServer({
-      name: config.server.name,
-      version: config.server.version,
+      name: 'mcp-prompts',
+      version: packageVersion,
     });
     
-    // Initialize storage adapter
-    let storageAdapter;
-    if (config.storage.type === 'file') {
-      storageAdapter = new FileAdapter(config.storage.promptsDir);
-    } else if (config.storage.type === 'postgres') {
-      if (!config.storage.pgConnectionString) {
-        throw new Error('PostgreSQL connection string is required for postgres storage');
-      }
-      storageAdapter = new PostgresAdapter(config.storage.pgConnectionString);
-    } else if (config.storage.type === 'memory') {
-      throw new Error('Memory adapter not implemented yet');
-    } else {
-      throw new Error(`Unknown storage type: ${config.storage.type}`);
+    // Setup error handling
+    server.server.onerror = (error) => {
+      console.error('Server error:', error instanceof Error ? error.stack : String(error));
+    };
+    
+    // Setup tools with proper error handling
+    try {
+      await setupPromptTools(server);
+      console.log('Prompt tools initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize prompt tools:', error instanceof Error ? error.message : String(error));
     }
     
-    await storageAdapter.connect();
-    
-    // Initialize prompt service
-    const promptService = new PromptService(storageAdapter);
-    
-    // Add prompt tool
-    server.tool(
-      "add_prompt",
-      "Add a new prompt",
-      {
-        prompt: z.object({
-          name: z.string(),
-          description: z.string().optional(),
-          content: z.string(),
-          isTemplate: z.boolean().default(false),
-          tags: z.array(z.string()).optional(),
-          variables: z.array(z.string()).optional(),
-          category: z.string().optional(),
-        }),
-      },
-      async (args) => {
-        try {
-          const { prompt } = args;
-          const result = await promptService.addPrompt(prompt);
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Prompt added with ID: ${result.id}` 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error adding prompt: ${error.message}` 
-            }]
-          };
-        }
+    try {
+      await setupDatabaseTools(server);
+      console.log('Database tools initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize database tools:', error instanceof Error ? error.message : String(error));
+      if (config.storage.type === 'postgres') {
+        console.error('Make sure your PostgreSQL connection string is correct');
       }
-    );
+    }
     
-    // Get prompt tool
-    server.tool(
-      "get_prompt",
-      "Get a prompt by ID",
-      {
-        id: z.string(),
-      },
-      async (args) => {
-        try {
-          const { id } = args;
-          const prompt = await promptService.getPrompt(id);
-          return {
-            content: [{ 
-              type: "text", 
-              text: JSON.stringify(prompt, null, 2) 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error retrieving prompt: ${error.message}` 
-            }]
-          };
-        }
-      }
-    );
+    try {
+      await setupProjectOrchestratorTools(server);
+      console.log('Project orchestrator tools initialized successfully');
+    } catch (error) {
+      console.error('Failed to initialize project orchestrator tools:', error instanceof Error ? error.message : String(error));
+    }
     
-    // Update prompt tool
-    server.tool(
-      "update_prompt",
-      "Update an existing prompt",
-      {
-        id: z.string(),
-        prompt: z.object({
-          name: z.string().optional(),
-          description: z.string().optional(),
-          content: z.string().optional(),
-          isTemplate: z.boolean().optional(),
-          tags: z.array(z.string()).optional(),
-          variables: z.array(z.string()).optional(),
-          category: z.string().optional(),
-        }),
-      },
-      async (args) => {
-        try {
-          const { id, prompt } = args;
-          await promptService.updatePrompt(id, prompt);
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Prompt updated successfully` 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error updating prompt: ${error.message}` 
-            }]
-          };
-        }
-      }
-    );
-    
-    // List prompts tool
-    server.tool(
-      "list_prompts",
-      "List all prompts",
-      {
-        tags: z.array(z.string()).optional(),
-        isTemplate: z.boolean().optional(),
-        category: z.string().optional(),
-        search: z.string().optional(),
-        sort: z.string().optional(),
-        order: z.enum(['asc', 'desc']).optional(),
-        limit: z.number().int().positive().optional(),
-        offset: z.number().int().nonnegative().optional(),
-      },
-      async (args) => {
-        try {
-          const options = args;
-          const prompts = await promptService.listPrompts(options);
-          return {
-            content: [{ 
-              type: "text", 
-              text: JSON.stringify(prompts, null, 2) 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error listing prompts: ${error.message}` 
-            }]
-          };
-        }
-      }
-    );
-    
-    // Apply template tool
-    server.tool(
-      "apply_template",
-      "Apply variables to a prompt template",
-      {
-        id: z.string(),
-        variables: z.record(z.union([z.string(), z.number(), z.boolean()])),
-      },
-      async (args) => {
-        try {
-          const { id, variables } = args;
-          const result = await promptService.applyTemplate(id, variables);
-          return {
-            content: [{ 
-              type: "text", 
-              text: result.content 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error applying template: ${error.message}` 
-            }]
-          };
-        }
-      }
-    );
-    
-    // Delete prompt tool
-    server.tool(
-      "delete_prompt",
-      "Delete a prompt",
-      {
-        id: z.string(),
-      },
-      async (args) => {
-        try {
-          const { id } = args;
-          await promptService.deletePrompt(id);
-          return {
-            content: [{ 
-              type: "text", 
-              text: `Prompt deleted successfully` 
-            }]
-          };
-        } catch (error: any) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: `Error deleting prompt: ${error.message}` 
-            }]
-          };
-        }
-      }
-    );
-    
-    // Setup database tools
-    setupDatabaseTools(server);
-    
-    // Setup project orchestrator tools
-    setupProjectOrchestratorTools(server);
-    
-    // Start the server
+    // Connect server to transport
     const transport = new StdioServerTransport();
     await server.connect(transport);
     
-    console.log(`MCP Prompts server started`);
+    console.log(`\nMCP Prompts server v${packageVersion} started`);
+    console.log(`Server configuration:`);
+    console.log(`- Storage Type: ${config.storage.type}`);
+    console.log(`- Prompts Directory: ${config.storage.promptsDir}`);
+    
+    if (config.storage.type === 'postgres') {
+      try {
+        // Test database connection without exposing sensitive connection string
+        const pgConnectionStringMasked = config.storage.pgConnectionString?.replace(/\/\/([^:]+:[^@]+@)/g, '//*****:*****@') || 'Not configured';
+        console.log(`- PostgreSQL: ${pgConnectionStringMasked}`);
+      } catch (error) {
+        console.log(`- PostgreSQL: Configured but connection details hidden`);
+      }
+    }
+    
+    if (config.server.verbose) {
+      console.log(`- Verbose logging: Enabled`);
+    }
+    
+    console.log(`\nUse this MCP server with npx or as a library in your project`);
+    console.log(`Documentation: https://github.com/sparesparrow/mcp-prompt-manager`);
+
+    // Handle process termination gracefully
+    const exitHandler = async (signal) => {
+      console.log(`\nReceived ${signal}. Shutting down...`);
+      try {
+        await server.close();
+        console.log('Server shut down successfully');
+      } catch (error) {
+        console.error('Error shutting down server:', error instanceof Error ? error.message : String(error));
+      } finally {
+        process.exit(0);
+      }
+    };
+
+    process.on('SIGINT', () => exitHandler('SIGINT'));
+    process.on('SIGTERM', () => exitHandler('SIGTERM'));
+    process.on('uncaughtException', (error) => {
+      console.error('Uncaught Exception:', error instanceof Error ? error.stack : String(error));
+      exitHandler('uncaughtException').catch(() => process.exit(1));
+    });
   } catch (error) {
-    console.error('Failed to start MCP Prompts server:', error);
+    console.error('Failed to start server:', error instanceof Error ? error.stack : String(error));
     process.exit(1);
   }
 }
 
+// Start the server
 main();

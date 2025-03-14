@@ -1,0 +1,38 @@
+version: '3.8'
+
+services:
+  # Test container for running the published package with npx
+  npx-test:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: mcp-prompts-npx-test
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/test/prompts
+      - LOG_LEVEL=info
+    volumes:
+      - ./prompts:/test/prompts
+    ports:
+      - "3000:3000"
+    stdin_open: true
+    tty: true
+
+  # Test with MCP Inspector to verify functionality
+  mcp-inspector:
+    image: node:18-alpine
+    container_name: mcp-prompts-inspector
+    depends_on:
+      - npx-test
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/inspector &&
+             echo 'Waiting for npx-test to be ready...' &&
+             sleep 5 &&
+             npx @modelcontextprotocol/inspector npx -y @sparesparrow/mcp-prompt-manager"
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+    stdin_open: true
+    tty: true 

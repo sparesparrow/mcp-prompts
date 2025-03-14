@@ -20,6 +20,9 @@ RUN npm run build
 # Create data directory
 RUN mkdir -p /data
 
+# Ensure the index.js file is executable
+RUN chmod +x /app/build/index.js
+
 # Create non-root user
 RUN addgroup -S mcp && adduser -S mcp -G mcp && \
     chown -R mcp:mcp /app /data

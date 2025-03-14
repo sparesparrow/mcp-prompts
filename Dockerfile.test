@@ -1,0 +1,19 @@
+FROM node:18-alpine
+
+# Create app directory
+WORKDIR /test
+
+# Install MCP Inspector for testing
+RUN npm install -g @modelcontextprotocol/inspector
+
+# Set environment variables for testing
+ENV NODE_ENV=production \
+    STORAGE_TYPE=file \
+    PROMPTS_DIR=/test/prompts \
+    LOG_LEVEL=info
+
+# Create data directory
+RUN mkdir -p /test/prompts
+
+# Test command
+CMD ["sh", "-c", "echo 'Testing @sparesparrow/mcp-prompt-manager...' && npx -y @sparesparrow/mcp-prompt-manager"] 
