@@ -31,12 +31,13 @@ services:
       - PROMPTS_DIR=/app/data/prompts
       - BACKUPS_DIR=/app/data/backups
       - LOG_LEVEL=info
-      - HTTP_SERVER=true
+      - HTTP_SERVER=false
       - PORT=3003
       - HOST=0.0.0.0
     volumes:
       - mcp-data:/app/data
     ports:
+      - "3000:3000"
       - "3003:3003"
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/health"]

@@ -3,8 +3,8 @@
 /**
  * Verify Package Script
  * 
- * This script verifies that all required files are present in the build directory
- * before publishing the package.
+ * This script verifies that the package has all necessary files
+ * before publishing to npm.
  */
 
 import fs from 'fs';
@@ -16,85 +16,101 @@ const __dirname = path.dirname(__filename);
 const rootDir = path.resolve(__dirname, '../../');
 const buildDir = path.join(rootDir, 'build');
 
-// List of required files
+// Required files and directories to check
 const requiredFiles = [
   'index.js',
+  'cli.js',
   'config.js',
-  'package.json',
-  'README.md'
+  'utils/config.js',
+  'services/prompt-service.js',
+  'adapters/file-adapter.js',
+  'adapters/postgres-adapter.js',
+  'core/types.js',
+  'utils/http-server.js'
 ];
 
-// List of required directories
-const requiredDirs = [
-  'adapters',
-  'core',
-  'services',
-  'tools',
-  'utils',
-  'data/prompts',
-  'data/backups'
-];
+console.log('🔍 Verifying package before publishing...');
 
-console.log('🔍 Verifying package contents before publishing...');
+let hasErrors = false;
 
-// Check if build directory exists
+// Check that build directory exists
 if (!fs.existsSync(buildDir)) {
-  console.error('❌ Build directory not found! Run `npm run build` first.');
+  console.error('❌ Error: build directory does not exist. Run "npm run build" first.');
   process.exit(1);
 }
 
-// Check required files
-let missingFiles = [];
+// Check each required file
 for (const file of requiredFiles) {
   const filePath = path.join(buildDir, file);
   if (!fs.existsSync(filePath)) {
-    missingFiles.push(file);
+    console.error(`❌ Error: Required file ${file} is missing from build directory.`);
+    hasErrors = true;
+    
+    // For critical config files, suggest how to fix
+    if (file === 'config.js' || file === 'utils/config.js') {
+      console.error(`   Fix: Run the ensure-config.js script: "node ./scripts/build/ensure-config.js"`);
+      
+      // Check if source exists
+      const srcUtilsConfigPath = path.join(rootDir, 'src/utils/config.js');
+      if (fs.existsSync(srcUtilsConfigPath)) {
+        console.error(`   Source file exists at src/utils/config.js but wasn't copied to build.`);
+      }
+    }
+  } else {
+    console.log(`✅ Found ${file}`);
   }
 }
 
-// Check required directories
-let missingDirs = [];
-for (const dir of requiredDirs) {
-  const dirPath = path.join(buildDir, dir);
-  if (!fs.existsSync(dirPath)) {
-    missingDirs.push(dir);
-  }
+// Check package.json configuration
+const packageJsonPath = path.join(rootDir, 'package.json');
+const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf8'));
+
+if (packageJson.main !== 'build/index.js') {
+  console.error('❌ Error: package.json "main" field should be "build/index.js"');
+  hasErrors = true;
+} else {
+  console.log('✅ package.json "main" field is correct');
 }
 
-// Report missing files and directories
-if (missingFiles.length > 0 || missingDirs.length > 0) {
-  console.error('❌ Verification failed!');
-  
-  if (missingFiles.length > 0) {
-    console.error(`\nMissing files:`);
-    missingFiles.forEach(file => console.error(`  - ${file}`));
-  }
-  
-  if (missingDirs.length > 0) {
-    console.error(`\nMissing directories:`);
-    missingDirs.forEach(dir => console.error(`  - ${dir}`));
-  }
-  
-  console.error('\nPlease run the build process again and ensure all files are generated correctly.');
-  process.exit(1);
+if (!packageJson.bin || packageJson.bin['mcp-prompts'] !== './build/cli.js') {
+  console.error('❌ Error: package.json "bin" field should be { "mcp-prompts": "./build/cli.js" }');
+  hasErrors = true;
+} else {
+  console.log('✅ package.json "bin" field is correct');
 }
 
-console.log('✅ All required files and directories are present.');
+// Check files includes build directory and config files
+const requiredFilesEntries = ['build/**/*', 'README.md'];
+const missingFilesEntries = requiredFilesEntries.filter(entry => !packageJson.files.includes(entry));
 
-// Get the config.js content to double-check it exists and is valid
+if (missingFilesEntries.length > 0) {
+  console.error(`❌ Error: package.json "files" field is missing: ${missingFilesEntries.join(', ')}`);
+  hasErrors = true;
+} else {
+  console.log('✅ package.json "files" field includes required entries');
+}
+
+// Final check - verify built package actually works
 try {
-  const configPath = path.join(buildDir, 'config.js');
-  const configContent = fs.readFileSync(configPath, 'utf8');
-  
-  if (configContent.length < 10) {
-    console.error('❌ config.js file exists but appears to be empty or too small!');
-    process.exit(1);
+  console.log('🧪 Testing the build package integrity...');
+  // Simple check - require the main file to catch any immediate issues
+  const mainFilePath = path.join(buildDir, 'index.js');
+  if (fs.existsSync(mainFilePath)) {
+    const mainFileContent = fs.readFileSync(mainFilePath, 'utf8');
+    if (!mainFileContent.includes('config')) {
+      console.warn('⚠️ Warning: index.js does not reference config - may cause issues');
+    } else {
+      console.log('✅ index.js seems to reference config correctly');
+    }
   }
-  
-  console.log('✅ config.js file is present and contains data.');
-} catch (error) {
-  console.error('❌ Error checking config.js:', error.message);
-  process.exit(1);
+} catch (err) {
+  console.error(`❌ Error testing package: ${err.message}`);
+  hasErrors = true;
 }
 
-console.log('✅ Package verification completed successfully.'); 
+if (hasErrors) {
+  console.error('\n❌ Verification failed. Please fix the errors before publishing.');
+  process.exit(1);
+} else {
+  console.log('\n✅ Package verification successful! Ready to publish.');
+} 

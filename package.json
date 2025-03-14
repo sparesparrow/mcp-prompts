@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.13",
+  "version": "1.2.15",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -8,7 +8,7 @@
     "mcp-prompts": "./build/cli.js"
   },
   "scripts": {
-    "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./scripts/build/fix-build.js && node ./scripts/build/ensure-config.js",
+    "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js build/cli.js && node ./scripts/build/fix-build.js && node ./scripts/build/ensure-config.js",
     "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups build/services build/core build/config && cp -rf config/* build/config/ || echo 'Warning: config directory not copied' && cp -f src/utils/config.js build/utils/ || echo 'Warning: src/utils/config.js not copied'",
     "start": "node build/index.js",
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && npm start\"",

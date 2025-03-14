@@ -43,8 +43,8 @@ This checklist ensures that all necessary steps are completed before releasing a
 - [ ] Build and push Docker image (`npm run docker:build`)
 
 ### Post-Release Verification
-- [ ] Verify installation from npm (`npm install -g @sparesparrow/mcp-prompt-manager`)
-- [ ] Verify package can be run with npx (`npx @sparesparrow/mcp-prompt-manager`)
+- [ ] Verify installation from npm (`npm install -g @sparesparrow/mcp-prompts`)
+- [ ] Verify package can be run with npx (`npx @sparesparrow/mcp-prompts`)
 - [ ] Verify Docker image works as expected (`docker run sparesparrow/mcp-prompts:latest`)
 - [ ] Verify integration with Claude Desktop
 

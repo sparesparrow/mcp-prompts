@@ -42,12 +42,17 @@ const __dirname = path.dirname(__filename);
  * Start the MCP Prompts Server with the provided configuration
  * @param {ServerConfig | Config} config Server configuration
  */
-export async function startServer(config: ServerConfig | Config): Promise<void> {
-  console.log(`Starting MCP Prompts Server v${process.env.npm_package_version || 'development'}`);
+export async function startServer(config: Config | ServerConfig): Promise<void> {
+  console.log('Starting MCP Prompts Server v' + ('serverVersion' in config ? config.serverVersion : process.env.npm_package_version || 'development'));
+  console.log('Config:', {
+    storageType: config.storageType,
+    promptsDir: config.promptsDir,
+    storagePath: 'storage' in config ? config.storage?.promptsDir : undefined
+  });
   
-  // Determine storage type from either config format
+  // Initialize storage adapter based on configuration
   const storageType = 'storage' in config ? config.storage.type : config.storageType;
-  console.log(`Storage type: ${storageType}`);
+  console.log('Storage type:', storageType);
   
   // Initialize storage adapter based on type
   let storage: StorageAdapter;
@@ -108,6 +113,37 @@ export async function startServer(config: ServerConfig | Config): Promise<void> 
         tools: {}
       }
     });
+    
+    // Check if server has the registerTool method
+    if (typeof server.registerTool !== 'function') {
+      console.error('server.registerTool is not a function. Using fallback mode.');
+      console.log('Server running in fallback mode');
+      
+      // Fallback to basic mode - check if StdioServerTransport is available and has listen method
+      if (StdioServerTransport && typeof StdioServerTransport.prototype.listen === 'function') {
+        const transport = new StdioServerTransport();
+        transport.listen((message: any) => {
+          return handleFunction(message, promptService);
+        });
+      } else {
+        console.log('Running in minimal fallback mode');
+        // Create a minimal HTTP server for basic functionality
+        const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3003;
+        const host = process.env.HOST || '0.0.0.0';
+        const httpServer = createHttpServer(storage, storageType, { port, host });
+        console.log(`Minimal HTTP server started on ${host}:${port}`);
+      }
+      
+      // Handle shutdown
+      process.on('SIGINT', async () => {
+        await shutdown(storage, httpServer);
+      });
+      process.on('SIGTERM', async () => {
+        await shutdown(storage, httpServer);
+      });
+      
+      return; // Exit from the function early
+    }
     
     // Set up resource and tool handlers
     try {

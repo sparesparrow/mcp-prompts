@@ -20,7 +20,12 @@
     "noImplicitReturns": true,
     "allowSyntheticDefaultImports": true,
     "preserveSymlinks": true,
-    "preserveConstEnums": true
+    "preserveConstEnums": true,
+    "baseUrl": ".",
+    "paths": {
+      "*": ["node_modules/*"]
+    },
+    "isolatedModules": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "build", "**/*.test.ts", "**/*.spec.ts"]

@@ -91,10 +91,10 @@ The easiest way to use MCP Prompt Manager is via the NPM registry:
 
 ```bash
 # Install globally
-npm install -g @sparesparrow/mcp-prompt-manager
+npm install -g @sparesparrow/mcp-prompts
 
 # Or run directly with npx without installation
-npx @sparesparrow/mcp-prompt-manager
+npx @sparesparrow/mcp-prompts
 ```
 
 ### Manual Installation
@@ -139,11 +139,11 @@ Add the following to your Claude Desktop configuration file:
 ```json
 {
   "mcpServers": {
-    "prompt-manager-ts": {
+    "mcp-prompts": {
       "command": "npx",
       "args": [
         "-y",
-        "@sparesparrow/mcp-prompt-manager"
+        "@sparesparrow/mcp-prompts"
       ]
     }
   }
@@ -169,12 +169,12 @@ For a Docker-based installation:
 
 1. **Using the official Docker image**
    ```bash
-   docker run -p 3003:3003 -v $(pwd)/data:/app/data sparesparrow/mcp-prompt-manager:latest
+   docker run -p 3003:3003 -v $(pwd)/data:/app/data sparesparrow/mcp-prompts:latest
    ```
 
 2. **Or build your own image**
    ```bash
-   git clone https://github.com/sparesparrow/mcp-prompt-manager.git
+   git clone https://github.com/sparesparrow/mcp-prompts.git
    cd mcp-prompt-manager
    docker build -t mcp-prompt-manager:local .
    docker run -p 3003:3003 -v $(pwd)/data:/app/data mcp-prompt-manager:local

@@ -1,4 +1,4 @@
-FROM node:18
+FROM node:20
 
 # Set working directory
 WORKDIR /app
@@ -8,13 +8,13 @@ RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/ap
 
 # Copy package files and setup script
 COPY package*.json ./
-COPY setup-container.sh ./
+COPY docker/setup-container.sh ./
 COPY .env* ./
 COPY tsconfig.json ./
 
 # Copy source code
 COPY src ./src/
-COPY bin ./bin/
+COPY scripts ./scripts/
 
 # Make setup script executable
 RUN chmod +x setup-container.sh

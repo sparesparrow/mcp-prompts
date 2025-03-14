@@ -28,6 +28,8 @@ services:
       start_period: 5s
     stdin_open: true
     tty: true
+    networks:
+      - mcp-test-network
 
   # Test with MCP Inspector to verify functionality
   mcp-inspector:
@@ -46,3 +48,12 @@ services:
       - NODE_ENV=production
     stdin_open: true
     tty: true
+    networks:
+      - mcp-test-network
+
+networks:
+  mcp-test-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.28.0.0/16 

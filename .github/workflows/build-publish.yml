@@ -85,7 +85,7 @@ jobs:
           context: .
           push: true
           tags: |
-            sparesparrow/mcp-prompt-manager:latest
-            sparesparrow/mcp-prompt-manager:${{ env.VERSION }}
-          cache-from: type=registry,ref=sparesparrow/mcp-prompt-manager:latest
+            sparesparrow/mcp-prompts:latest
+            sparesparrow/mcp-prompts:${{ env.VERSION }}
+          cache-from: type=registry,ref=sparesparrow/mcp-prompts:latest
           cache-to: type=inline

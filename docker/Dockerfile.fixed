@@ -8,18 +8,17 @@ ENV DOCKER_BUILD=true
 # Copy package files first for better caching
 COPY package.json package-lock.json ./
 
-# Handle dependency discrepancies by using a more robust installation approach
-RUN npm ci --no-package-lock && \
-    npm install --no-save @modelcontextprotocol/sdk@1.6.0 && \
-    npm list @modelcontextprotocol/sdk
+# Remove existing lock file and install dependencies including the specific MCP SDK version
+RUN npm install --no-save @modelcontextprotocol/sdk@1.6.0 && \
+    npm install
 
-# Copy source files
+# Copy the rest of the source files
 COPY . .
 
 # Build the application
 RUN npm run build
 
-# Verify the build success
+# Check that the build files exist (cannot use require with ESM modules)
 RUN if [ ! -f "./build/index.js" ]; then \
       echo "❌ Build verification failed: index.js not found"; \
       exit 1; \
@@ -36,10 +35,7 @@ WORKDIR /app
 ENV NODE_ENV=production \
     STORAGE_TYPE=file \
     PROMPTS_DIR=/app/data/prompts \
-    BACKUPS_DIR=/app/data/backups \
-    HTTP_SERVER=false \
-    PORT=3003 \
-    HOST=0.0.0.0
+    BACKUPS_DIR=/app/data/backups
 
 # Copy only necessary files from the build stage
 COPY --from=build /app/build ./build
@@ -73,11 +69,11 @@ LABEL org.opencontainers.image.vendor="Model Context Protocol"
 LABEL org.opencontainers.image.licenses="MIT"
 
 # Expose the port
-EXPOSE 3000 3003
+EXPOSE 3003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD wget -q --spider http://localhost:3003/health || exit 1
 
-# Run the application
-CMD ["node", "build/index.js"]
+# Run the application (ensure we're running from the root directory)
+CMD ["node", "build/index.js"] 

@@ -48,8 +48,8 @@ Environment Variables:
   SERVER_NAME        Server name (default: 'MCP Prompts Server')
   SERVER_VERSION     Server version (default: package.json version)
   STORAGE_TYPE       Storage type: 'file' or 'postgres' (default: 'file')
-  PROMPTS_DIR        Directory for storing prompts (default: './data/prompts')
-  BACKUPS_DIR        Directory for backups (default: './data/backups')
+  PROMPTS_DIR        Directory for storing prompts (default: '~/mcp/data/prompts')
+  BACKUPS_DIR        Directory for backups (default: '~/mcp/data/backups')
   PORT               Port for HTTP server (default: 3003)
   LOG_LEVEL          Logging level: 'debug', 'info', 'warn', 'error' (default: 'info')
   

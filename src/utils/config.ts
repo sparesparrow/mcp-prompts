@@ -6,10 +6,14 @@
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
+import os from 'os';
 
 // Get current directory when using ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Get user home directory
+const userHomeDir = os.homedir();
 
 // Define the configuration type
 export interface ServerConfig {
@@ -48,7 +52,8 @@ export function getConfig(): ServerConfig {
   const config: ServerConfig = {
     port: parseInt(process.env.PORT || '3003', 10),
     storageType: (process.env.STORAGE_TYPE || 'file') as 'file' | 'postgres',
-    promptsDir: process.env.PROMPTS_DIR || path.resolve(process.cwd(), 'data', 'prompts'),
+    // Use the user's home directory for storing prompts by default
+    promptsDir: process.env.PROMPTS_DIR || path.join(userHomeDir, 'mcp', 'data', 'prompts'),
     logLevel: (process.env.LOG_LEVEL || 'info') as 'debug' | 'info' | 'warn' | 'error',
   };
 

@@ -524,7 +524,11 @@ ${result.fields ? `Columns: ${result.fields.map(f => f.name).join(', ')}` : ''}`
                     return v;
                   }
                   // Otherwise convert the string to a TemplateVariable
-                  return { name: v.toString(), required: false };
+                  return { 
+                    name: typeof v === 'string' ? v : String(v), 
+                    description: '',
+                    required: false 
+                  };
                 }) 
               : [],
             category: prompt.category || undefined,

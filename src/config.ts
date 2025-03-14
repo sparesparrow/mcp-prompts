@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 import fs from 'fs-extra';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import os from 'os';
 
 // Load environment variables from .env file
 dotenv.config();
@@ -14,6 +15,9 @@ dotenv.config();
 // Get current directory when using ES modules
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Get user home directory
+const userHomeDir = os.homedir();
 
 /**
  * Configuration for the MCP Prompts Server
@@ -62,11 +66,11 @@ export function getConfig(): Config {
     serverName: process.env.SERVER_NAME || 'MCP Prompts Server',
     serverVersion: version,
     storageType: (process.env.STORAGE_TYPE as 'file' | 'postgres' | 'memory') || 'file',
-    promptsDir: process.env.PROMPTS_DIR || path.resolve(process.cwd(), 'prompts'),
+    promptsDir: process.env.PROMPTS_DIR || path.join(userHomeDir, 'mcp', 'data', 'prompts'),
     storage: {
       type: (process.env.STORAGE_TYPE as 'file' | 'postgres' | 'memory') || 'file',
-      promptsDir: process.env.PROMPTS_DIR || path.resolve(process.cwd(), 'prompts'),
-      backupsDir: process.env.BACKUPS_DIR || path.resolve(process.cwd(), 'backups'),
+      promptsDir: process.env.PROMPTS_DIR || path.join(userHomeDir, 'mcp', 'data', 'prompts'),
+      backupsDir: process.env.BACKUPS_DIR || path.join(userHomeDir, 'mcp', 'data', 'backups'),
     }
   };
   

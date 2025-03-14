@@ -37,7 +37,7 @@ services:
       - PROMPTS_DIR=/app/data/prompts
       - BACKUPS_DIR=/app/data/backups
       - LOG_LEVEL=debug
-      - HTTP_SERVER=true
+      - HTTP_SERVER=false
       - PORT=3003
       - HOST=0.0.0.0
     volumes:
@@ -47,6 +47,7 @@ services:
       - ../package.json:/app/package.json
       - ../tsconfig.json:/app/tsconfig.json
     ports:
+      - "3000:3000"
       - "3003:3003"
     command: ["npm", "run", "dev"]
     restart: unless-stopped

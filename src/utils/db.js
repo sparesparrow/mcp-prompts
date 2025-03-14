@@ -215,7 +215,8 @@ export async function savePromptToDb(prompt, connectionString) {
           prompt.description || null,
           prompt.isTemplate || false,
           prompt.tags || [],
-          prompt.variables || [],
+          // Make sure variables is an array of valid TemplateVariable objects
+          Array.isArray(prompt.variables) ? prompt.variables : [],
           prompt.category || null,
           prompt.id
         ]
@@ -233,7 +234,8 @@ export async function savePromptToDb(prompt, connectionString) {
           prompt.description || null,
           prompt.isTemplate || false,
           prompt.tags || [],
-          prompt.variables || [],
+          // Make sure variables is an array of valid TemplateVariable objects
+          Array.isArray(prompt.variables) ? prompt.variables : [],
           prompt.category || null
         ]
       );
