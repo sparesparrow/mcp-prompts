@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.2.10] - 2025-03-14
+
+- Automated version bump
+
+
+
 ## [1.2.6] - 2025-03-14
 
 - Automated version bump
