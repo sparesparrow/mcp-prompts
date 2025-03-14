@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.18",
+  "version": "1.2.20",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
@@ -31,6 +31,8 @@
     "docker:postgres:up": "npm run docker:cleanup && docker-compose -f docker/docker-compose.postgres.yml up",
     "docker:postgres:down": "docker-compose -f docker/docker-compose.postgres.yml down",
     "publish:all": "./publish.sh",
+    "prepare-publish": "node ./scripts/publish/prepare-publish.js",
+    "publish:clean": "npm run prepare-publish && cd publish && npm publish --access public",
     "test:package": "./scripts/test/test-published-package.sh",
     "test:integration": "node tests/integration/run-mcp-tests.js",
     "verify-package": "node ./scripts/publish/verify-package.js",

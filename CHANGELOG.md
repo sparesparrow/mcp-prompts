@@ -1,10 +1,42 @@
 # Changelog
 
-## [1.2.18] - 2025-03-14
+## [1.2.20] - 2025-03-14
 
 - Automated version bump
 
 
+
+## [1.2.19] - 2024-03-16
+
+### Fixed
+- Fixed TypeScript errors in PostgresAdapter implementation
+- Enhanced savePrompt method to properly return the created prompt
+- Added updatePrompt method to the PostgresAdapter
+- Fixed StorageAdapter interface to include listPrompts and clearAll methods
+- Improved error handling in database-tools.ts for the clearAll method
+- Enhanced health check endpoint with more detailed information
+
+### Added
+- Added better documentation and error handling for health check endpoint
+
+## [1.2.18] - 2024-03-14
+
+### Added
+- Added HTTP server with health check endpoint
+- Added Docker container health checks
+- Added ESM module compatibility for Node.js 18-23+
+- Enhanced database tools with better error handling
+
+### Changed
+- Improved Docker build process with multi-stage builds
+- Streamlined configuration management
+- Optimized PostgreSQL adapter connection handling
+- Updated dependencies to latest versions
+
+### Fixed
+- Fixed issues with file adapter on certain file systems
+- Improved error messages for better debugging
+- Fixed template variable extraction
 
 ## [1.2.17] - 2025-03-14
 
