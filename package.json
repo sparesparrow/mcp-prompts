@@ -1,23 +1,25 @@
 {
-  "name": "@sparesparrow/mcp-prompt-manager",
-  "version": "1.1.9",
+  "name": "@sparesparrow/mcp-prompts",
+  "version": "1.1.12",
   "description": "MCP server for managing prompts and templates with project orchestration capabilities",
   "type": "module",
   "main": "build/index.js",
   "bin": {
-    "mcp-prompt-manager": "build/index.js"
+    "mcp-prompts": "./build/index.js"
   },
   "scripts": {
-    "build": "npx tsc && npm run copy-files && npm run make-executable",
-    "copy-files": "node -e \"const fs=require('fs');const path=require('path');const dirs=['build/src/utils','build/src'];dirs.forEach(dir=>{if(!fs.existsSync(dir)){fs.mkdirSync(dir,{recursive:true})}}); const files=['src/utils/db.js','src/config.js'];files.forEach(file=>{if(fs.existsSync(file)){fs.copyFileSync(file,'build/'+file)}});fs.copyFileSync('package.json','build/package.json');\"",
-    "make-executable": "chmod +x build/index.js",
+    "build": "npx tsc && npm run copy-static-files && chmod +x build/index.js && node ./fix-build.js",
+    "copy-static-files": "cp package.json build/ && cp README.md build/ && mkdir -p build/data/prompts build/data/backups",
     "start": "node build/index.js",
     "dev": "nodemon --watch src --ext ts,js --exec \"npm run build && npm start\"",
-    "prepare": "npm run build",
+    "prepare": "node -e \"process.env.CI || process.env.DOCKER_BUILD ? console.log('Skipping prepare in CI/Docker') : process.exit(1)\" || npm run build",
     "test": "jest",
-    "docker:build": "docker build -t mcp-prompts .",
-    "docker:up": "docker-compose up -d",
-    "docker:down": "docker-compose down"
+    "test:build": "./test-build.sh",
+    "test:docker": "./test-docker-build.sh",
+    "docker:build": "docker build -t sparesparrow/mcp-prompts:latest .",
+    "docker:up": "docker run -p 3003:3003 --name mcp-prompts sparesparrow/mcp-prompts:latest",
+    "docker:down": "docker stop mcp-prompts && docker rm mcp-prompts",
+    "publish:all": "./publish.sh"
   },
   "files": [
     "build",
@@ -49,6 +51,7 @@
     "@types/node": "^18.19.1",
     "@types/pg": "^8.11.11",
     "@types/uuid": "^9.0.7",
+    "tsc-esm-fix": "^3.1.2",
     "typescript": "^5.3.2"
   },
   "engines": {

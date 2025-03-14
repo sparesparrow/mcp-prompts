@@ -1,5 +1,30 @@
 # Changelog
 
+## [1.1.12] - 2025-03-14
+
+- Automated version bump
+
+
+
+## [Unreleased] - Coming Soon
+### Added
+- Added version compatibility check for Node.js
+- New build and Docker test scripts for better quality assurance
+- Integrated tsc-esm-fix for automatic .js extension handling
+- Added Node.js compatibility section to documentation
+
+### Fixed
+- Fixed CommonJS module imports for PostgreSQL client in ESM context
+- Corrected import statements for MCP SDK to include .js extensions
+- Fixed Docker container initialization
+- Improved build process to handle ESM compatibility issues
+- Enhanced publish script with comprehensive checks
+
+### Changed
+- Updated build process for better Node.js version compatibility
+- Improved error reporting in build scripts
+- Enhanced Docker container configuration
+
 ## [1.3.0] - 2024-03-07
 
 ### Added
