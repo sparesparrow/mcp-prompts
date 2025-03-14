@@ -1,142 +1,210 @@
 /**
- * Unified Type Definitions for MCP Prompts
- * 
- * This file contains all type definitions used throughout the project.
+ * Core Types
+ * Type definitions for the MCP Prompts Server
  */
 
 /**
- * Represents a prompt or template in the system
+ * Variable definition for templates
+ */
+export interface TemplateVariable {
+  /** The variable name in the template (without { }) */
+  name: string;
+  
+  /** Description of the variable */
+  description?: string;
+  
+  /** Default value for the variable */
+  default?: string;
+  
+  /** Whether the variable is required */
+  required?: boolean;
+  
+  /** Type of the variable */
+  type?: 'string' | 'number' | 'boolean' | 'array' | 'object';
+  
+  /** Possible values for the variable (for enum-like variables) */
+  options?: string[];
+}
+
+/**
+ * Prompt interface
+ * Represents a prompt in the system, either a template or a concrete prompt
  */
 export interface Prompt {
   /** Unique identifier for the prompt */
   id: string;
   
-  /** Display name for the prompt */
+  /** Human-readable name of the prompt */
   name: string;
   
-  /** Optional description */
+  /** Optional description of the prompt */
   description?: string;
   
   /** The actual prompt content */
   content: string;
   
-  /** Whether this is a template with variable substitution */
-  isTemplate: boolean;
+  /** Whether this is a template prompt */
+  isTemplate?: boolean;
   
-  /** List of variable names for templates */
-  variables?: string[];
+  /** For templates, the list of variables */
+  variables?: TemplateVariable[];
   
   /** Tags for categorization and filtering */
   tags?: string[];
   
-  /** Category for organization (e.g., 'development', 'project-orchestration') */
+  /** Primary category for organization */
   category?: string;
   
-  /** ISO timestamp of creation date */
+  /** Date when the prompt was created (ISO string) */
   createdAt: string;
   
-  /** ISO timestamp of last update */
+  /** Date when the prompt was last updated (ISO string) */
   updatedAt: string;
   
-  /** Version number for tracking changes */
-  version: number;
+  /** Version number, incremented on updates */
+  version?: number;
+  
+  /** Optional metadata for additional information */
+  metadata?: Record<string, any>;
 }
 
 /**
- * Variables for template substitution
- */
-export interface TemplateVariables {
-  [key: string]: string | number | boolean;
-}
-
-/**
- * Result of applying a template
- */
-export interface ApplyTemplateResult {
-  /** Applied content with variables substituted */
-  content: string;
-  
-  /** Original prompt that was used as template */
-  originalPrompt: Prompt;
-  
-  /** Variables that were applied to the template */
-  appliedVariables: TemplateVariables;
-  
-  /** Variables that were in the template but not provided */
-  missingVariables?: string[];
-}
-
-/**
- * Options for listing prompts with filtering and pagination
+ * Options for listing prompts
  */
 export interface ListPromptsOptions {
-  /** Filter prompts by tags */
-  tags?: string[];
-  
-  /** Filter prompts by template status */
+  /** Filter by template status */
   isTemplate?: boolean;
   
-  /** Filter prompts by category */
+  /** Filter by category */
   category?: string;
   
-  /** Search term to match against name, description, or content */
+  /** Filter by tags (prompts must include all specified tags) */
+  tags?: string[];
+  
+  /** Search term for name, description, and content */
   search?: string;
   
   /** Field to sort by */
   sort?: string;
   
-  /** Sort direction */
+  /** Sort order */
   order?: 'asc' | 'desc';
   
-  /** Maximum number of prompts to return */
-  limit?: number;
-  
-  /** Number of prompts to skip */
+  /** Pagination offset */
   offset?: number;
+  
+  /** Maximum number of results to return */
+  limit?: number;
 }
 
 /**
- * Storage adapter interface for different backend storage systems
+ * Storage adapter interface for prompt storage
  */
 export interface StorageAdapter {
-  /** Get a prompt by ID */
-  getPrompt(id: string): Promise<Prompt>;
-  
-  /** Save a prompt (create or update) */
-  savePrompt(prompt: Prompt): Promise<void>;
-  
-  /** List prompts with optional filtering */
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  
-  /** Delete a prompt by ID */
-  deletePrompt(id: string): Promise<void>;
-  
-  /** Connect to the storage backend */
+  /**
+   * Connect to the storage
+   */
   connect(): Promise<void>;
   
-  /** Disconnect from the storage backend */
+  /**
+   * Disconnect from the storage
+   */
   disconnect(): Promise<void>;
+  
+  /**
+   * Save a prompt to storage
+   * @param prompt Prompt to save
+   */
+  savePrompt(prompt: Prompt): Promise<void>;
+  
+  /**
+   * Get a prompt by ID
+   * @param id Prompt ID
+   * @returns The prompt
+   */
+  getPrompt(id: string): Promise<Prompt>;
+  
+  /**
+   * List prompts with filtering options
+   * @param options Filtering options
+   * @returns Array of prompts matching options
+   */
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  
+  /**
+   * Delete a prompt
+   * @param id Prompt ID
+   */
+  deletePrompt(id: string): Promise<void>;
 }
 
 /**
- * Prompt service interface for business logic
+ * Template variables map
+ * Maps variable names to their values
+ */
+export type TemplateVariables = Record<string, string | number | boolean>;
+
+/**
+ * Result of applying a template
+ */
+export interface ApplyTemplateResult {
+  /** The resulting content after applying variables */
+  content: string;
+  
+  /** The original prompt template */
+  originalPrompt: Prompt;
+  
+  /** The variables that were applied */
+  appliedVariables: TemplateVariables;
+  
+  /** Any variables that were missing from the input */
+  missingVariables?: string[];
+}
+
+/**
+ * Prompt service interface
  */
 export interface PromptService {
-  /** Get a prompt by ID */
+  /**
+   * Get a prompt by ID
+   * @param id Prompt ID
+   * @returns The prompt
+   */
   getPrompt(id: string): Promise<Prompt>;
   
-  /** Add a new prompt */
-  addPrompt(prompt: Partial<Prompt>): Promise<Prompt>;
+  /**
+   * Add a new prompt
+   * @param data Partial prompt data
+   * @returns The created prompt
+   */
+  addPrompt(data: Partial<Prompt>): Promise<Prompt>;
   
-  /** Update an existing prompt */
-  updatePrompt(id: string, prompt: Partial<Prompt>): Promise<Prompt>;
+  /**
+   * Update an existing prompt
+   * @param id Prompt ID
+   * @param data Updated prompt data
+   * @returns The updated prompt
+   */
+  updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
   
-  /** List prompts with optional filtering */
+  /**
+   * List prompts with optional filtering
+   * @param options Filter options
+   * @returns Filtered list of prompts
+   */
   listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
   
-  /** Delete a prompt by ID */
+  /**
+   * Delete a prompt
+   * @param id Prompt ID
+   */
   deletePrompt(id: string): Promise<void>;
   
-  /** Apply a template with variable substitution */
+  /**
+   * Apply a template
+   * @param id Template ID
+   * @param variables Variables to apply
+   * @returns The applied template result
+   */
   applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
 } 

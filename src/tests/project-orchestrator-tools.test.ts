@@ -2,14 +2,14 @@
  * Tests for project orchestrator tools
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { Server as McpServer } from "@modelcontextprotocol/sdk/dist/server/index.js";
 import { setupProjectOrchestratorTools } from "../tools/project-orchestrator-tools";
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
 // Mock dependencies
-jest.mock('@modelcontextprotocol/sdk/server/mcp.js', () => ({
+jest.mock('@modelcontextprotocol/sdk/dist/server/index.js', () => ({
   McpServer: jest.fn().mockImplementation(() => ({
     tool: jest.fn()
   }))

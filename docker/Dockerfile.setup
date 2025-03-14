@@ -1,0 +1,28 @@
+FROM node:18
+
+# Set working directory
+WORKDIR /app
+
+# Install PostgreSQL client
+RUN apt-get update && apt-get install -y postgresql-client && rm -rf /var/lib/apt/lists/*
+
+# Copy package files and setup script
+COPY package*.json ./
+COPY setup-container.sh ./
+COPY .env* ./
+COPY tsconfig.json ./
+
+# Copy source code
+COPY src ./src/
+COPY bin ./bin/
+
+# Make setup script executable
+RUN chmod +x setup-container.sh
+
+# Create data directories
+RUN mkdir -p /data/prompts /data/logs /data/backups
+
+# Install dependencies
+RUN npm install
+
+CMD ["./setup-container.sh"] 

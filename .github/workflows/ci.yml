@@ -37,10 +37,8 @@ jobs:
           mkdir -p prompts/examples
           echo '{"id":"test-prompt","name":"Test Prompt","content":"Test content","isTemplate":false,"tags":["test"],"createdAt":"2024-01-01T00:00:00.000Z","updatedAt":"2024-01-01T00:00:00.000Z","version":1}' > prompts/examples/test-prompt.json
       
-      - name: Test export functionality
-        run: npm run prompt:export -- --tags=test --out=test-export.json
-      
-      - name: Test import functionality
+      - name: Run integration tests
+        run: npm run test:integration
         run: npm run prompt:import:force -- --source=exports/test-export.json
 
   lint:

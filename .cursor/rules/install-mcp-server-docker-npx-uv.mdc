@@ -1,0 +1,427 @@
+---
+description: "Guidelines for installing MCP servers using Docker, npx, and uv package managers"
+globs:
+  - "*.js"
+  - "*.ts"
+  - "*.py"
+  - "Dockerfile"
+  - "package.json"
+  - "pyproject.toml"
+---
+
+# MCP Server Installation: Docker, npx, and uv
+
+This rule provides guidelines for installing and managing MCP servers using different approaches: Docker, npx, and uv. Each approach has specific advantages and use cases.
+
+## Core Concepts
+
+1. **Docker Installation**: Containerized approach with complete isolation
+2. **npx Installation**: NPM-based direct execution without explicit installation
+3. **uv Installation**: Fast Python package installation and virtual environment management
+
+## Docker Installation
+
+### Benefits
+
+1. **Isolation**: Complete environment isolation
+2. **Consistency**: Identical environments across deployments
+3. **Dependencies**: All dependencies bundled within the container
+4. **Security**: Strong isolation boundaries
+5. **Versioning**: Precise version control through image tags
+
+### Implementation
+
+#### Dockerfile for TypeScript MCP Server
+
+```dockerfile
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy and build source
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Production image
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and build output
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/build ./build
+
+# Install production dependencies
+RUN npm ci --omit=dev
+
+# Create volume mount points
+RUN mkdir -p /data
+
+# Use non-root user for security
+USER node
+
+# Set metadata
+LABEL org.opencontainers.image.source="https://github.com/your-org/mcp-server"
+LABEL org.opencontainers.image.description="MCP Server for XYZ"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Start server
+CMD ["node", "build/index.js"]
+```
+
+#### Dockerfile for Python MCP Server
+
+```dockerfile
+FROM python:3.11-slim AS build
+
+WORKDIR /app
+
+# Install build dependencies
+COPY pyproject.toml ./
+RUN pip install --no-cache-dir build && python -m build
+
+# Production image
+FROM python:3.11-slim
+
+WORKDIR /app
+
+# Copy and install the wheel
+COPY --from=build /app/dist/*.whl /tmp/
+RUN pip install --no-cache-dir /tmp/*.whl && rm /tmp/*.whl
+
+# Create volume mount points
+RUN mkdir -p /data
+
+# Use non-root user for security
+USER nobody
+
+# Set metadata
+LABEL org.opencontainers.image.source="https://github.com/your-org/mcp-server"
+LABEL org.opencontainers.image.description="MCP Server for XYZ"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Start server
+CMD ["python", "-m", "mcp_server"]
+```
+
+#### Building and Running with Docker
+
+```bash
+# Build the image
+docker build -t mcp-server:latest .
+
+# Run with stdio transport
+docker run -i --rm mcp-server:latest
+
+# Run with mounted volumes
+docker run -i --rm -v ./data:/data mcp-server:latest
+
+# Run with environment variables
+docker run -i --rm -e API_KEY=abc123 mcp-server:latest
+```
+
+#### Claude Desktop Configuration for Docker
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "-v", "${USER_HOME}/mcp/data:/data",
+        "-e", "NODE_ENV=production",
+        "mcp-server:latest"
+      ],
+      "env": {
+        "LOGGING_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+## npx Installation
+
+### Benefits
+
+1. **Simplicity**: No explicit installation step
+2. **Latest Version**: Always uses the latest published version
+3. **System Integration**: Direct access to local system resources
+4. **Minimal Setup**: Few configuration steps
+5. **Automatic Updates**: Automatically uses newer versions
+
+### Implementation
+
+#### Package.json Configuration for MCP Server
+
+```json
+{
+  "name": "@your-org/mcp-server",
+  "version": "1.0.0",
+  "description": "MCP Server for XYZ",
+  "type": "module",
+  "bin": {
+    "mcp-server": "./build/index.js"
+  },
+  "scripts": {
+    "build": "tsc && chmod +x build/index.js",
+    "prepublishOnly": "npm run build"
+  },
+  "files": [
+    "build"
+  ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^0.5.0"
+  }
+}
+```
+
+#### Node.js Shebang for MCP Server
+
+```typescript
+#!/usr/bin/env node
+// src/index.ts
+
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+
+// Create server instance
+const server = new Server({
+  name: "my-server",
+  version: "1.0.0"
+}, {
+  capabilities: {
+    resources: { subscribe: true },
+    tools: {},
+    prompts: {}
+  }
+});
+
+// Setup handlers
+// ...
+
+// Start server
+async function main() {
+  const transport = new StdioServerTransport();
+  await server.connect(transport);
+  console.error("Server started on stdio transport");
+}
+
+main().catch(err => {
+  console.error("Fatal error:", err);
+  process.exit(1);
+});
+```
+
+#### Running with npx
+
+```bash
+# Run latest version from npm registry
+npx -y @your-org/mcp-server
+
+# Run specific version from npm registry
+npx -y @your-org/mcp-server@1.0.0
+
+# Run with environment variables
+LOGGING_LEVEL=debug npx -y @your-org/mcp-server
+```
+
+#### Claude Desktop Configuration for npx
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@your-org/mcp-server"
+      ],
+      "env": {
+        "DATA_PATH": "${USER_HOME}/mcp/data",
+        "LOGGING_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+## uv Installation
+
+### Benefits
+
+1. **Speed**: Significantly faster package installation than pip
+2. **Dependency Resolution**: Better dependency resolution
+3. **Virtual Environments**: Integrated virtual environment management
+4. **Cache Optimization**: Optimized package caching
+5. **Compatibility**: Compatible with pip/PyPI ecosystem
+
+### Implementation
+
+#### pyproject.toml Configuration for Python MCP Server
+
+```toml
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "mcp-server"
+version = "0.1.0"
+description = "MCP Server for XYZ"
+readme = "README.md"
+requires-python = ">=3.9"
+dependencies = [
+    "mcp>=0.1.0",
+]
+
+[project.scripts]
+mcp-server = "mcp_server:main"
+```
+
+#### Python MCP Server Entry Point
+
+```python
+# mcp_server/__init__.py
+from mcp.server.fastmcp import FastMCP
+
+# Create an MCP server
+mcp = FastMCP("My Server")
+
+# Add resources, tools, prompts
+# ...
+
+def main():
+    """Main entry point"""
+    mcp.run()
+
+if __name__ == "__main__":
+    main()
+```
+
+#### Installing and Running with uv
+
+```bash
+# Create virtual environment and install
+uv venv
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+uv pip install mcp-server
+
+# Or install directly
+uv pip install mcp-server
+
+# Run the server
+mcp-server
+```
+
+#### Claude Desktop Configuration for uv
+
+```json
+{
+  "mcpServers": {
+    "my-server": {
+      "command": "bash",
+      "args": [
+        "-c",
+        "source ${USER_HOME}/.venv/bin/activate && mcp-server"
+      ],
+      "env": {
+        "PYTHONPATH": "${USER_HOME}/projects/mcp-server",
+        "LOGGING_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+## Combined Approach - Wrapper Script
+
+For flexibility across environments, a wrapper script can select the appropriate installation method:
+
+```bash
+#!/bin/bash
+# mcp-server-launcher.sh
+
+# Determine installation method
+if command -v docker &> /dev/null && [ -f "./Dockerfile" ]; then
+    echo "Using Docker installation method"
+    docker run -i --rm -v "$(pwd)/data:/data" mcp-server:latest
+elif command -v npx &> /dev/null; then
+    echo "Using npx installation method"
+    npx -y @your-org/mcp-server
+elif command -v uv &> /dev/null; then
+    echo "Using uv installation method"
+    if [ ! -d ".venv" ]; then
+        uv venv
+    fi
+    source .venv/bin/activate
+    if ! command -v mcp-server &> /dev/null; then
+        uv pip install mcp-server
+    fi
+    mcp-server
+else
+    echo "No supported installation method found"
+    exit 1
+fi
+```
+
+## Best Practices
+
+### Docker Best Practices
+
+1. **Multi-stage builds**: Separate build and runtime environments
+2. **Minimal base images**: Use Alpine or slim variants
+3. **Non-root users**: Run processes as non-privileged users
+4. **Version pinning**: Pin specific base image versions
+5. **Layer optimization**: Organize Dockerfile to optimize layer caching
+6. **Health checks**: Implement container health checks
+7. **Resource limits**: Set memory and CPU limits
+
+### npx Best Practices
+
+1. **Specify versions**: Use exact versions for production
+2. **Verify packages**: Use the `-y` flag cautiously
+3. **Registry security**: Consider using private registries
+4. **Cache management**: Be aware of npx caching behavior
+5. **Performance**: Consider startup time for frequently used servers
+6. **Exit handling**: Implement proper process exit handling
+7. **Dependency size**: Keep dependencies minimal
+
+### uv Best Practices
+
+1. **Virtual environments**: Always use dedicated virtual environments
+2. **Lockfiles**: Maintain lockfiles for dependency consistency
+3. **Offline mode**: Consider offline mode for production
+4. **Caching**: Configure appropriate cache locations
+5. **Integration**: Ensure proper integration with existing Python tools
+6. **Activation scripts**: Handle environment activation properly
+7. **Platform compatibility**: Test on all target platforms
+
+## Decision Matrix
+
+| Factor                  | Docker                  | npx                    | uv                     |
+|-------------------------|-------------------------|------------------------|------------------------|
+| **Isolation**           | ★★★★★                   | ★★                     | ★★★                    |
+| **Ease of setup**       | ★★                      | ★★★★★                  | ★★★★                   |
+| **Resource access**     | ★★                      | ★★★★★                  | ★★★★                   |
+| **Dependency handling** | ★★★★★                   | ★★★                    | ★★★★                   |
+| **Startup time**        | ★★                      | ★★★★                   | ★★★★★                  |
+| **Versioning**          | ★★★★★                   | ★★★                    | ★★★★                   |
+| **Cross-platform**      | ★★★★                    | ★★★                    | ★★                     |
+| **Security**            | ★★★★★                   | ★★                     | ★★★                    |
+| **CI/CD integration**   | ★★★★★                   | ★★★                    | ★★★                    |
+| **Resource usage**      | ★★                      | ★★★★                   | ★★★★★                  |
+
+## Recommended Scenarios
+
+- **Docker**: Production deployments, sensitive operations, multi-server setups
+- **npx**: Development, simple servers, JavaScript-focused environments
+- **uv**: Python-focused environments, data science integrations, fast installations

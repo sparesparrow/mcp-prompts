@@ -1,0 +1,951 @@
+---
+description: "Guidelines for implementing and deploying MCP servers with Server-Sent Events (SSE) transport"
+globs:
+  - "**/*.js"
+  - "**/*.ts"
+  - "**/*.py"
+  - "**/server.js"
+  - "**/server.ts"
+  - "**/sse.js"
+  - "**/sse.ts"
+---
+
+# MCP Server Implementation with SSE Transport
+
+This rule provides guidelines for developing, deploying, and managing MCP servers that use Server-Sent Events (SSE) transport instead of the default stdio transport.
+
+## Core Concepts
+
+1. **SSE Transport**: HTTP-based transport mechanism with server-to-client streaming
+2. **Client-Server Model**: Network-based client-server communication pattern
+3. **Authentication**: Security mechanisms for client validation
+4. **Scalability**: Patterns for scaling SSE-based MCP servers
+5. **Integration**: Methods for integrating with various clients
+
+## TypeScript Implementation
+
+### Server Setup with Express
+
+```typescript
+// src/sse.ts
+import express from "express";
+import cors from "cors";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { setupTools } from "./tools.js";
+import { setupResources } from "./resources.js";
+import { setupPrompts } from "./prompts.js";
+
+// Create Express app
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// Configure CORS
+const allowedOrigins = process.env.ALLOWED_ORIGINS 
+  ? process.env.ALLOWED_ORIGINS.split(",") 
+  : ["*"];
+
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.includes("*") || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error("Not allowed by CORS"));
+    }
+  }
+}));
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Create MCP server
+const server = new Server({
+  name: "mcp-server-sse",
+  version: "1.0.0"
+}, {
+  capabilities: {
+    resources: { subscribe: true, listChanged: true },
+    tools: { listChanged: true },
+    prompts: { listChanged: true }
+  }
+});
+
+// Setup handlers
+setupTools(server);
+setupResources(server);
+setupPrompts(server);
+
+// Setup authentication (optional)
+function authenticate(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  const authType = process.env.AUTH_TYPE || "none";
+  
+  if (authType === "none") {
+    return next();
+  }
+  
+  if (authType === "api-key" && apiKey === process.env.API_KEY) {
+    return next();
+  }
+  
+  return res.status(401).json({ error: "Unauthorized" });
+}
+
+// Set up connection endpoint
+app.get("/connect", authenticate, async (req, res) => {
+  try {
+    // Initialize SSE transport
+    const transport = new SSEServerTransport("/messages", res);
+    
+    // Log connection
+    console.error(`Client connected: ${req.ip}`);
+    
+    // Connect server to transport
+    await server.connect(transport);
+  } catch (error) {
+    console.error("Connection error:", error);
+    res.status(500).end();
+  }
+});
+
+// Set up message endpoint
+app.post("/messages", authenticate, express.json(), async (req, res) => {
+  try {
+    // Get client ID from request
+    const clientId = req.headers["x-client-id"];
+    if (!clientId) {
+      return res.status(400).json({ error: "Missing client ID" });
+    }
+    
+    // Find the transport for this client
+    const transport = server.getTransport(clientId);
+    if (!transport) {
+      return res.status(404).json({ error: "Client not found" });
+    }
+    
+    // Handle the message
+    await transport.handlePostMessage(req, res);
+  } catch (error) {
+    console.error("Message handling error:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// Start HTTP server
+app.listen(PORT, () => {
+  console.error(`MCP server listening on port ${PORT}`);
+  console.error(`Server is using SSE transport`);
+  console.error(`CORS allowed origins: ${allowedOrigins.join(", ")}`);
+});
+```
+
+### Client Usage
+
+```typescript
+// Client usage example
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { SSEClientTransport } from "@modelcontextprotocol/sdk/client/sse.js";
+
+async function connectToServer() {
+  // Initialize client
+  const client = new Client(
+    { name: "my-client", version: "1.0.0" },
+    { capabilities: {} }
+  );
+  
+  // Create SSE transport
+  const transport = new SSEClientTransport({
+    url: "http://localhost:3000",
+    connectEndpoint: "/connect",
+    messageEndpoint: "/messages",
+    headers: {
+      "X-API-Key": "your-api-key-here"
+    }
+  });
+  
+  // Connect to server
+  await client.connect(transport);
+  
+  // Use the client
+  const tools = await client.listTools();
+  console.log("Available tools:", tools);
+}
+
+connectToServer().catch(console.error);
+```
+
+## Python Implementation
+
+### Server Setup with FastAPI
+
+```python
+# src/sse.py
+import os
+import asyncio
+from fastapi import FastAPI, Request, Response, Header, HTTPException, Depends
+from fastapi.middleware.cors import CORSMiddleware
+from typing import Optional, List
+from mcp.server import Server, NotificationOptions
+from mcp.server.models import InitializationOptions
+from mcp.server.fastapi import add_mcp_routes
+
+# Create FastAPI app
+app = FastAPI()
+
+# Configure CORS
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=allowed_origins,
+    allow_credentials=True,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
+# Create MCP server
+server = Server("mcp-server-sse")
+
+# Setup handlers
+from .resources import register_resources
+from .tools import register_tools
+from .prompts import register_prompts
+
+register_resources(server)
+register_tools(server)
+register_prompts(server)
+
+# Authentication dependency
+async def authenticate(x_api_key: Optional[str] = Header(None)):
+    auth_type = os.getenv("AUTH_TYPE", "none")
+    
+    if auth_type == "none":
+        return True
+        
+    if auth_type == "api-key":
+        api_key = os.getenv("API_KEY", "")
+        if x_api_key == api_key:
+            return True
+    
+    raise HTTPException(status_code=401, detail="Unauthorized")
+
+# Add MCP routes with authentication
+add_mcp_routes(app, "/mcp", server, dependencies=[Depends(authenticate)])
+
+# Health check endpoint
+@app.get("/health")
+async def health_check():
+    return {"status": "ok"}
+
+# Run the server
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", "3000"))
+    uvicorn.run("sse:app", host="0.0.0.0", port=port, log_level="info")
+```
+
+### Client Usage
+
+```python
+# Client usage example
+import asyncio
+from mcp.client import Client
+from mcp.client.http import HttpClientParameters
+
+async def connect_to_server():
+    # Create client parameters
+    params = HttpClientParameters(
+        base_url="http://localhost:3000/mcp",
+        headers={"X-API-Key": "your-api-key-here"}
+    )
+    
+    # Create and initialize client
+    client = Client()
+    await client.connect_http(params)
+    
+    # Use the client
+    tools = await client.list_tools()
+    print("Available tools:", tools)
+
+if __name__ == "__main__":
+    asyncio.run(connect_to_server())
+```
+
+## Deployment Options
+
+### 1. Docker with Nginx
+
+```dockerfile
+# Dockerfile for SSE transport
+FROM node:18-alpine AS build
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm ci
+
+# Copy and build source
+COPY tsconfig.json ./
+COPY src ./src
+RUN npm run build
+
+# Production image
+FROM node:18-alpine
+
+WORKDIR /app
+
+# Copy package files and build output
+COPY --from=build /app/package*.json ./
+COPY --from=build /app/build ./build
+
+# Install production dependencies
+RUN npm ci --omit=dev
+
+# Use non-root user for security
+USER node
+
+# Expose port
+EXPOSE 3000
+
+# Start SSE server
+CMD ["node", "build/sse.js"]
+```
+
+```nginx
+# nginx.conf
+server {
+    listen 443 ssl;
+    server_name mcp.example.com;
+
+    ssl_certificate /etc/nginx/ssl/server.crt;
+    ssl_certificate_key /etc/nginx/ssl/server.key;
+    
+    # Enable HTTP/2
+    http2 on;
+    
+    # SSL configuration
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 10m;
+    
+    # Headers
+    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
+    
+    # Proxy settings for SSE
+    location / {
+        proxy_pass http://mcp-server:3000;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        
+        # SSE specific settings
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+    }
+}
+```
+
+### 2. Kubernetes Deployment
+
+```yaml
+# kubernetes/deployment.yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mcp-server-sse
+  labels:
+    app: mcp-server-sse
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: mcp-server-sse
+  template:
+    metadata:
+      labels:
+        app: mcp-server-sse
+    spec:
+      containers:
+      - name: mcp-server
+        image: ghcr.io/your-org/mcp-server-sse:v1.0.0
+        ports:
+        - containerPort: 3000
+        env:
+        - name: PORT
+          value: "3000"
+        - name: AUTH_TYPE
+          value: "api-key"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: mcp-server-secrets
+              key: api-key
+        - name: ALLOWED_ORIGINS
+          value: "https://app1.example.com,https://app2.example.com"
+        resources:
+          limits:
+            cpu: "1"
+            memory: "512Mi"
+          requests:
+            cpu: "0.2"
+            memory: "256Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mcp-server-sse
+spec:
+  selector:
+    app: mcp-server-sse
+  ports:
+  - port: 80
+    targetPort: 3000
+  type: ClusterIP
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: mcp-server-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "3600"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "3600"
+spec:
+  rules:
+  - host: mcp.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: mcp-server-sse
+            port:
+              number: 80
+  tls:
+  - hosts:
+    - mcp.example.com
+    secretName: mcp-tls-cert
+```
+
+### 3. AWS Lambda Deployment
+
+```typescript
+// src/lambda.ts
+import serverless from "serverless-http";
+import express from "express";
+import cors from "cors";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+import { setupTools } from "./tools.js";
+import { setupResources } from "./resources.js";
+import { setupPrompts } from "./prompts.js";
+
+// Create Express app
+const app = express();
+
+// Configure CORS
+app.use(cors({
+  origin: process.env.ALLOWED_ORIGINS?.split(",") || "*"
+}));
+
+// Parse JSON bodies
+app.use(express.json());
+
+// Create MCP server
+const server = new Server({
+  name: "mcp-server-lambda",
+  version: "1.0.0"
+}, {
+  capabilities: {
+    resources: { subscribe: true },
+    tools: {},
+    prompts: {}
+  }
+});
+
+// Setup handlers
+setupTools(server);
+setupResources(server);
+setupPrompts(server);
+
+// Authentication middleware
+function authenticate(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  
+  if (process.env.AUTH_TYPE === "api-key" && apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Unauthorized" });
+  }
+  
+  next();
+}
+
+// Set up connection endpoint
+app.get("/connect", authenticate, async (req, res) => {
+  const transport = new SSEServerTransport("/messages", res);
+  await server.connect(transport);
+});
+
+// Set up message endpoint
+app.post("/messages", authenticate, async (req, res) => {
+  const clientId = req.headers["x-client-id"];
+  const transport = server.getTransport(clientId);
+  
+  if (!transport) {
+    return res.status(404).json({ error: "Client not found" });
+  }
+  
+  await transport.handlePostMessage(req, res);
+});
+
+// Health check endpoint
+app.get("/health", (req, res) => {
+  res.json({ status: "ok" });
+});
+
+// Export the serverless handler
+export const handler = serverless(app);
+```
+
+```yaml
+# serverless.yml
+service: mcp-server-sse
+
+provider:
+  name: aws
+  runtime: nodejs18.x
+  region: us-east-1
+  memorySize: 256
+  timeout: 30
+  environment:
+    AUTH_TYPE: ${env:AUTH_TYPE, 'api-key'}
+    API_KEY: ${env:API_KEY, ''}
+    ALLOWED_ORIGINS: ${env:ALLOWED_ORIGINS, '*'}
+
+functions:
+  api:
+    handler: build/lambda.handler
+    events:
+      - httpApi:
+          path: /connect
+          method: get
+      - httpApi:
+          path: /messages
+          method: post
+      - httpApi:
+          path: /health
+          method: get
+```
+
+## Claude Desktop Integration
+
+### Configuration for SSE Transport
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-sse": {
+      "transport": "sse",
+      "url": "http://localhost:3000",
+      "connectEndpoint": "/connect",
+      "messageEndpoint": "/messages",
+      "headers": {
+        "X-API-Key": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### Alternative: Proxy Command
+
+```json
+{
+  "mcpServers": {
+    "mcp-server-sse": {
+      "command": "curl",
+      "args": [
+        "-X", "POST",
+        "-H", "Content-Type: application/json",
+        "-H", "X-API-Key: your-api-key-here",
+        "-d", "{\"clientId\": \"claude-desktop\"}",
+        "http://localhost:3000/connect"
+      ]
+    }
+  }
+}
+```
+
+## Authentication Methods
+
+### 1. API Key Authentication
+
+```typescript
+// Middleware for API key authentication
+function apiKeyAuth(req, res, next) {
+  const apiKey = req.headers["x-api-key"];
+  
+  if (!apiKey || apiKey !== process.env.API_KEY) {
+    return res.status(401).json({ error: "Invalid API key" });
+  }
+  
+  next();
+}
+
+// Apply to routes
+app.get("/connect", apiKeyAuth, async (req, res) => {
+  // Handler code
+});
+
+app.post("/messages", apiKeyAuth, async (req, res) => {
+  // Handler code
+});
+```
+
+### 2. JWT Authentication
+
+```typescript
+import jwt from "jsonwebtoken";
+
+// Middleware for JWT authentication
+function jwtAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing authorization header" });
+  }
+  
+  const token = authHeader.split(" ")[1];
+  
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    req.user = decoded;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: "Invalid token" });
+  }
+}
+
+// Apply to routes
+app.get("/connect", jwtAuth, async (req, res) => {
+  // Handler code
+});
+
+app.post("/messages", jwtAuth, async (req, res) => {
+  // Handler code
+});
+```
+
+### 3. OAuth 2.0 Integration
+
+```typescript
+import axios from "axios";
+
+// Middleware for OAuth 2.0 authentication
+async function oauthAuth(req, res, next) {
+  const authHeader = req.headers.authorization;
+  
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return res.status(401).json({ error: "Missing authorization header" });
+  }
+  
+  const token = authHeader.split(" ")[1];
+  
+  try {
+    // Validate token with OAuth provider
+    const response = await axios.get(process.env.OAUTH_INTROSPECTION_URL, {
+      headers: {
+        Authorization: `Bearer ${process.env.OAUTH_CLIENT_SECRET}`
+      },
+      params: {
+        token
+      }
+    });
+    
+    if (!response.data.active) {
+      return res.status(401).json({ error: "Invalid token" });
+    }
+    
+    req.user = response.data;
+    next();
+  } catch (error) {
+    return res.status(401).json({ error: "Token validation failed" });
+  }
+}
+
+// Apply to routes
+app.get("/connect", oauthAuth, async (req, res) => {
+  // Handler code
+});
+
+app.post("/messages", oauthAuth, async (req, res) => {
+  // Handler code
+});
+```
+
+## Scaling Considerations
+
+### 1. Connection Management
+
+```typescript
+// Store active connections in memory or distributed cache
+const connections = new Map();
+
+app.get("/connect", authenticate, async (req, res) => {
+  const clientId = req.headers["x-client-id"] || generateId();
+  
+  // Initialize SSE transport
+  const transport = new SSEServerTransport("/messages", res);
+  
+  // Store connection
+  connections.set(clientId, {
+    transport,
+    lastSeen: Date.now()
+  });
+  
+  // Set up cleanup on disconnect
+  res.on("close", () => {
+    connections.delete(clientId);
+    console.error(`Client disconnected: ${clientId}`);
+  });
+  
+  // Connect server to transport
+  await server.connect(transport);
+});
+```
+
+### 2. Load Balancing
+
+```nginx
+# nginx load balancing
+upstream mcp_servers {
+    # Simple round-robin
+    server mcp-server-1:3000;
+    server mcp-server-2:3000;
+    
+    # With sticky sessions (recommended)
+    # ip_hash;
+    # or
+    # sticky cookie srv_id expires=1h domain=.example.com path=/;
+}
+
+server {
+    listen 443 ssl;
+    server_name mcp.example.com;
+    
+    # SSL configuration
+    ssl_certificate /etc/nginx/ssl/server.crt;
+    ssl_certificate_key /etc/nginx/ssl/server.key;
+    
+    location / {
+        proxy_pass http://mcp_servers;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+        proxy_set_header Host $host;
+        
+        # SSE specific settings
+        proxy_set_header Connection "";
+        proxy_buffering off;
+        proxy_cache off;
+        proxy_read_timeout 86400s;
+    }
+}
+```
+
+### 3. Horizontal Scaling with Redis
+
+```typescript
+import express from "express";
+import Redis from "ioredis";
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
+
+// Create Redis clients
+const redis = new Redis(process.env.REDIS_URL);
+const redisSub = new Redis(process.env.REDIS_URL);
+
+// Create Express app
+const app = express();
+
+// Create MCP server
+const server = new Server({
+  name: "mcp-server-sse",
+  version: "1.0.0"
+}, {
+  capabilities: {
+    resources: { subscribe: true },
+    tools: {},
+    prompts: {}
+  }
+});
+
+// Set up connection endpoint
+app.get("/connect", authenticate, async (req, res) => {
+  const clientId = req.headers["x-client-id"] || generateId();
+  const instanceId = process.env.INSTANCE_ID || generateId();
+  
+  // Initialize SSE transport
+  const transport = new SSEServerTransport("/messages", res);
+  
+  // Store client-instance mapping in Redis
+  await redis.set(`client:${clientId}`, instanceId);
+  
+  // Set up cleanup on disconnect
+  res.on("close", async () => {
+    await redis.del(`client:${clientId}`);
+    console.error(`Client disconnected: ${clientId}`);
+  });
+  
+  // Connect server to transport
+  await server.connect(transport);
+});
+
+// Set up message endpoint
+app.post("/messages", authenticate, async (req, res) => {
+  const clientId = req.headers["x-client-id"];
+  
+  if (!clientId) {
+    return res.status(400).json({ error: "Missing client ID" });
+  }
+  
+  // Check if this instance handles this client
+  const instanceId = await redis.get(`client:${clientId}`);
+  const currentInstanceId = process.env.INSTANCE_ID || generateId();
+  
+  if (instanceId !== currentInstanceId) {
+    // Forward to the correct instance via Redis pub/sub
+    await redis.publish("message-forward", JSON.stringify({
+      clientId,
+      body: req.body
+    }));
+    return res.status(200).json({ forwarded: true });
+  }
+  
+  // Handle message locally
+  const transport = server.getTransport(clientId);
+  
+  if (!transport) {
+    return res.status(404).json({ error: "Client not found" });
+  }
+  
+  await transport.handlePostMessage(req, res);
+});
+
+// Subscribe to forwarded messages
+redisSub.subscribe("message-forward");
+redisSub.on("message", async (channel, message) => {
+  if (channel === "message-forward") {
+    const { clientId, body } = JSON.parse(message);
+    const transport = server.getTransport(clientId);
+    
+    if (transport) {
+      // Create a mock request and response
+      const mockReq = { body, headers: { "x-client-id": clientId } };
+      const mockRes = {
+        status: () => ({ json: () => {} }),
+        json: () => {}
+      };
+      
+      await transport.handlePostMessage(mockReq, mockRes);
+    }
+  }
+});
+```
+
+## Best Practices
+
+### 1. Security Guidelines
+
+1. **TLS Encryption**: Always use HTTPS in production
+2. **Authentication**: Implement proper authentication
+3. **CORS Configuration**: Restrict allowed origins
+4. **Rate Limiting**: Protect against DoS attacks
+5. **Input Validation**: Validate all client input
+6. **Content Security Policy**: Implement appropriate CSP headers
+7. **Request Logging**: Log authentication and access attempts
+8. **Dependency Management**: Keep dependencies updated for security patches
+
+### 2. Performance Optimization
+
+1. **Connection Pooling**: Reuse database connections
+2. **Response Compression**: Enable gzip/brotli compression
+3. **Caching**: Implement appropriate cache headers
+4. **Keep-Alive**: Configure proper keep-alive settings
+5. **HTTP/2**: Enable HTTP/2 for multiplexing
+6. **Memory Management**: Monitor and limit memory usage
+7. **CPU Optimization**: Profile and optimize CPU-intensive operations
+8. **Connection Timeouts**: Implement appropriate timeouts
+
+### 3. Monitoring and Debugging
+
+1. **Health Endpoints**: Implement comprehensive health checks
+2. **Metrics**: Collect usage and performance metrics
+3. **Logging**: Implement structured logging
+4. **Error Tracking**: Capture and report errors
+5. **Tracing**: Implement distributed tracing for requests
+6. **Alerting**: Set up alerts for critical issues
+7. **Documentation**: Maintain clear documentation for operation
+8. **Debugging Tools**: Implement diagnostic endpoints for troubleshooting
+
+## Comparative Analysis
+
+| Feature                   | stdio Transport          | SSE Transport            |
+|---------------------------|--------------------------|--------------------------|
+| **Network Model**         | Local process            | Client-server over HTTP  |
+| **Connection Scope**      | Single machine           | Network-wide             |
+| **Security**              | Process isolation        | HTTP security mechanisms |
+| **Scalability**           | Limited to local process | Horizontally scalable    |
+| **Client Compatibility**  | Local clients only       | Any HTTP client          |
+| **Authentication**        | OS-level                 | Application-level        |
+| **Deployment Options**    | Limited                  | Flexible                 |
+| **Load Balancing**        | Not applicable           | Fully supported          |
+| **Development Complexity**| Lower                    | Higher                   |
+| **Resource Usage**        | Lower                    | Higher                   |
+
+## Decision Criteria
+
+Choose SSE transport when:
+
+1. You need to serve multiple clients simultaneously
+2. Clients are located on different machines
+3. You need to scale horizontally
+4. You need to deploy behind load balancers
+5. You want to leverage HTTP-based security mechanisms
+6. You need cross-platform compatibility
+7. You're implementing a public-facing API
+
+Choose stdio transport when:
+
+1. You're running on a single machine
+2. You have a 1:1 relationship between server and client
+3. You need minimal latency
+4. You have simpler security requirements
+5. You want the simplest implementation
+6. You're integrating with local tooling
+7. You want to minimize resource usage

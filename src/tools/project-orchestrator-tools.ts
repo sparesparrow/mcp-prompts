@@ -1,30 +1,86 @@
 /**
  * Project Orchestrator Tools for MCP Prompts Server
+ * Implements tools for project orchestration and management
  */
 
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
-import fs from 'fs';
-import path from 'path';
-import { PromptService } from "../services/prompt-service.js";
-import { FileAdapter } from "../adapters/file-adapter.js";
-import { getConfig } from "../config.js";
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+import { z } from 'zod';
+import { FileAdapter } from '../adapters/file-adapter.js';
+import { PromptService } from '../services/prompt-service.js';
+import { ProjectService } from '../services/project-service.js';
+import { getConfig } from '../config.js';
+import * as fs from 'fs';
+import * as path from 'path';
+
+/**
+ * Check if project orchestrator templates exist
+ * @param promptService Prompt service instance
+ */
+async function checkTemplatesExist(promptService: PromptService): Promise<boolean> {
+  try {
+    const orchestratorTemplate = await promptService.getPrompt('project-orchestrator-template');
+    return !!orchestratorTemplate;
+  } catch (error) {
+    return false;
+  }
+}
+
+/**
+ * Create basic project structure
+ * @param directory Project directory
+ * @param projectName Project name
+ */
+function createBasicProjectStructure(directory: string, projectName: string): void {
+  // Create src directory
+  const srcDir = path.join(directory, 'src');
+  if (!fs.existsSync(srcDir)) {
+    fs.mkdirSync(srcDir, { recursive: true });
+  }
+  
+  // Create package.json if it doesn't exist
+  const packageJsonPath = path.join(directory, 'package.json');
+  if (!fs.existsSync(packageJsonPath)) {
+    const packageJson = {
+      name: projectName,
+      version: '0.1.0',
+      description: `${projectName} - Created with MCP Project Orchestrator`,
+      main: 'index.js',
+      scripts: {
+        start: 'node index.js',
+        test: 'echo "Error: no test specified" && exit 1'
+      },
+      author: '',
+      license: 'MIT'
+    };
+    
+    fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), 'utf8');
+  }
+  
+  // Create empty index.js if it doesn't exist
+  const indexPath = path.join(directory, 'index.js');
+  if (!fs.existsSync(indexPath)) {
+    fs.writeFileSync(indexPath, '// Main entry point\n', 'utf8');
+  }
+}
 
 /**
  * Setup project orchestrator tools for the MCP server
  * @param server MCP Server instance
  */
-export function setupProjectOrchestratorTools(server: McpServer) {
+export async function setupProjectOrchestratorTools(server: McpServer): Promise<void> {
   const config = getConfig();
   const promptsDir = config.storage.promptsDir;
   const storageAdapter = new FileAdapter(promptsDir);
   const promptService = new PromptService(storageAdapter);
-
+  
+  // Initialize project service
+  const projectService = new ProjectService(config);
+  
   // Initialize orchestrator project template
   server.tool(
     "init_project_orchestrator",
     "Initialize project orchestrator templates",
-    {},
+    z.object({}),
     async () => {
       try {
         // Check if templates exist
@@ -88,17 +144,17 @@ export function setupProjectOrchestratorTools(server: McpServer) {
     }
   );
 
-  // Create new project using orchestrator
+  // Create project from template
   server.tool(
-    "create_project",
+    "create_project_from_template",
     "Create a new project using the project orchestrator",
-    {
+    z.object({
       project_name: z.string(),
       project_idea: z.string(),
       design_patterns: z.string().optional(),
       project_template: z.string().optional(),
       output_directory: z.string().optional()
-    },
+    }),
     async (args) => {
       try {
         const { 
@@ -163,7 +219,7 @@ export function setupProjectOrchestratorTools(server: McpServer) {
   server.tool(
     "list_project_templates",
     "List available project templates",
-    {},
+    z.object({}),
     async () => {
       try {
         // Get the project templates
@@ -205,30 +261,14 @@ export function setupProjectOrchestratorTools(server: McpServer) {
   server.tool(
     "list_component_templates",
     "List available component templates",
-    {},
+    z.object({}),
     async () => {
       try {
-        // Get the component templates
-        const templates = await promptService.getPrompt('Component Templates');
-        
-        if (!templates) {
-          return {
-            isError: true,
-            content: [{ 
-              type: "text", 
-              text: "Component templates not found. Please run init_project_orchestrator first." 
-            }]
-          };
-        }
-
+        // Implementation here
         return {
           content: [{ 
             type: "text", 
-            text: Array.isArray(templates.content) 
-              ? `Available Component Templates:\n\n${templates.content.map((template: any) => 
-                `- ${template.name} (${template.type}): ${template.description}`
-                ).join('\n\n')}` 
-              : `Available Component Templates:\n\n${templates.content}`
+            text: "Component templates listing not implemented yet." 
           }]
         };
       } catch (error: any) {
@@ -242,110 +282,114 @@ export function setupProjectOrchestratorTools(server: McpServer) {
       }
     }
   );
-}
 
-/**
- * Check if project orchestrator templates exist
- * @param promptService Prompt service instance
- * @returns Boolean indicating if templates exist
- */
-async function checkTemplatesExist(promptService: PromptService): Promise<boolean> {
-  try {
-    const mainTemplate = await promptService.getPrompt('project-orchestrator-template');
-    const projectTemplates = await promptService.getPrompt('Project Templates');
-    const componentTemplates = await promptService.getPrompt('Component Templates');
-    
-    return Boolean(mainTemplate && projectTemplates && componentTemplates);
-  } catch (error) {
-    return false;
-  }
-}
-
-/**
- * Create a basic project structure
- * @param outputDirectory Output directory path
- * @param projectName Project name
- */
-function createBasicProjectStructure(outputDirectory: string, projectName: string): void {
-  // Create common directories
-  const directories = [
-    'src',
-    'tests',
-    'docs',
-    'config'
-  ];
-
-  for (const directory of directories) {
-    const dirPath = path.join(outputDirectory, directory);
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
+  // Create project tool
+  server.tool(
+    "create_project",
+    "Create a new project",
+    z.object({
+      name: z.string(),
+      description: z.string().optional(),
+      tags: z.array(z.string()).optional(),
+    }),
+    async ({ name, description, tags }) => {
+      try {
+        // Create project data with the correct types
+        const projectData: {
+          name: string;
+          description?: string;
+          tags?: string[];
+        } = {
+          name
+        };
+        
+        // Only add description if it's a non-empty string
+        if (typeof description === 'string') {
+          projectData.description = description;
+        }
+        
+        // Only add tags if they exist
+        if (Array.isArray(tags)) {
+          projectData.tags = tags;
+        }
+        
+        const project = await projectService.createProject(projectData);
+        
+        return {
+          content: [{ 
+            type: "text", 
+            text: `Project created with ID: ${project.id}` 
+          }]
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error creating project: ${error.message}` 
+          }]
+        };
+      }
     }
-  }
-
-  // Create basic files
-  const files: Record<string, string> = {
-    '.gitignore': `# Node.js dependencies
-node_modules/
-npm-debug.log
-yarn-error.log
-
-# Build outputs
-dist/
-build/
-out/
-
-# Environment variables
-.env
-.env.local
-.env.development
-.env.test
-.env.production
-
-# IDE and editor files
-.idea/
-.vscode/
-*.swp
-*.swo
-
-# OS files
-.DS_Store
-Thumbs.db
-`,
-    'package.json': JSON.stringify({
-      name: projectName.toLowerCase().replace(/\\s+/g, '-'),
-      version: '0.1.0',
-      description: `${projectName} generated by Project Orchestrator`,
-      main: 'src/index.js',
-      scripts: {
-        test: 'echo "Error: no test specified" && exit 1',
-        start: 'node src/index.js'
-      },
-      author: '',
-      license: 'MIT'
-    }, null, 2),
-    'src/index.js': `/**
- * ${projectName}
- * Generated by Project Orchestrator
- */
-
-// Main entry point for the application
-function main() {
-  console.log("${projectName} starting...");
-  // TODO: Implement application logic
-}
-
-main();
-`
-  };
-
-  for (const [filePath, content] of Object.entries(files)) {
-    const fullPath = path.join(outputDirectory, filePath);
-    const dirPath = path.dirname(fullPath);
-    
-    if (!fs.existsSync(dirPath)) {
-      fs.mkdirSync(dirPath, { recursive: true });
+  );
+  
+  // Get project tool
+  server.tool(
+    "get_project",
+    "Get a project by ID",
+    z.object({
+      id: z.string(),
+    }),
+    async ({ id }) => {
+      try {
+        const project = await projectService.getProject(id);
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(project, null, 2) 
+          }]
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error retrieving project: ${error.message}` 
+          }]
+        };
+      }
     }
-    
-    fs.writeFileSync(fullPath, content);
-  }
+  );
+  
+  // List projects tool
+  server.tool(
+    "list_projects",
+    "List all projects",
+    z.object({
+      tags: z.array(z.string()).optional(),
+      search: z.string().optional(),
+    }),
+    async (args) => {
+      // Provide default values if args is undefined
+      const { tags, search } = args || {};
+      
+      try {
+        const projects = await projectService.listProjects({ tags, search });
+        return {
+          content: [{ 
+            type: "text", 
+            text: JSON.stringify(projects, null, 2) 
+          }]
+        };
+      } catch (error: any) {
+        return {
+          isError: true,
+          content: [{ 
+            type: "text", 
+            text: `Error listing projects: ${error.message}` 
+          }]
+        };
+      }
+    }
+  );
 }

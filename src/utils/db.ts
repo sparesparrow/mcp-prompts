@@ -5,11 +5,7 @@ import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { v4 as uuidv4 } from 'uuid';
-
-// Database connection pool
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL || 'postgresql://localhost/mydb'
-});
+import { getConfig } from '../config.js';
 
 // Define prompt interface (matching existing structure)
 export interface Prompt {
@@ -25,45 +21,80 @@ export interface Prompt {
 
 // Initialize database with required schema
 export async function initDatabase(): Promise<void> {
-  const client = await pool.connect();
+  console.log("Initializing database...");
+  
   try {
-    await client.query(`
-      CREATE TABLE IF NOT EXISTS prompts (
-        id VARCHAR(255) PRIMARY KEY,
-        name VARCHAR(255) NOT NULL,
-        content TEXT NOT NULL,
-        description TEXT,
-        category VARCHAR(255),
-        tags TEXT[],
-        is_template BOOLEAN DEFAULT FALSE,
-        variables TEXT[],
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-      );
-      
-      CREATE INDEX IF NOT EXISTS idx_prompts_name ON prompts(name);
-      CREATE INDEX IF NOT EXISTS idx_prompts_category ON prompts(category);
-    `);
+    // Get configuration
+    const config = getConfig();
     
-    console.log('Database schema initialized successfully');
+    if (config.storage.type === 'postgres') {
+      // Create connection pool using the config
+      const pool = new Pool({
+        connectionString: config.storage.pgConnectionString,
+      });
+      
+      // Create schema if it doesn't exist
+      const client = await pool.connect();
+      try {
+        // Create tables if they don't exist
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS prompts (
+            id TEXT PRIMARY KEY,
+            name TEXT NOT NULL,
+            content TEXT NOT NULL,
+            description TEXT,
+            is_template BOOLEAN DEFAULT FALSE,
+            tags TEXT[],
+            variables TEXT[],
+            category TEXT,
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+          )
+        `);
+        
+        console.log("Database schema initialized successfully.");
+      } finally {
+        client.release();
+      }
+      
+      await pool.end();
+    } else if (config.storage.type === 'file') {
+      // Ensure the prompts directory exists
+      const promptsDir = config.storage.promptsDir;
+      if (!fs.existsSync(promptsDir)) {
+        fs.mkdirSync(promptsDir, { recursive: true });
+      }
+      console.log(`File storage initialized at ${promptsDir}`);
+    }
   } catch (error) {
-    console.error('Error initializing database schema:', error);
+    console.error('Error initializing database:', error instanceof Error ? error.message : String(error));
     throw error;
-  } finally {
-    client.release();
   }
 }
 
 // Save prompt to database
 export async function savePromptToDb(prompt: Prompt): Promise<string> {
+  const config = getConfig();
+  
+  if (config.storage.type !== 'postgres') {
+    throw new Error('Database storage not configured');
+  }
+  
+  const pool = new Pool({
+    connectionString: config.storage.pgConnectionString,
+  });
+  
   const client = await pool.connect();
+  
   try {
     const id = prompt.id || uuidv4();
     
-    await client.query(
-      `INSERT INTO prompts (
+    const query = `
+      INSERT INTO prompts (
         id, name, content, description, category, tags, is_template, variables
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ) VALUES (
+        $1, $2, $3, $4, $5, $6, $7, $8
+      ) 
       ON CONFLICT (id) DO UPDATE SET
         name = $2,
         content = $3,
@@ -72,139 +103,170 @@ export async function savePromptToDb(prompt: Prompt): Promise<string> {
         tags = $6,
         is_template = $7,
         variables = $8,
-        updated_at = CURRENT_TIMESTAMP`,
-      [
-        id,
-        prompt.name,
-        prompt.content,
-        prompt.description || null,
-        prompt.category || null,
-        prompt.tags || [],
-        prompt.isTemplate || false,
-        prompt.variables || []
-      ]
-    );
+        updated_at = CURRENT_TIMESTAMP
+      RETURNING id
+    `;
     
-    return id;
-  } catch (error) {
-    console.error('Error saving prompt to database:', error);
-    throw error;
+    const values = [
+      id,
+      prompt.name,
+      prompt.content,
+      prompt.description || '',
+      prompt.category || '',
+      prompt.tags || [],
+      prompt.isTemplate || false,
+      prompt.variables || []
+    ];
+    
+    const result = await client.query(query, values);
+    return result.rows[0].id;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 
 // Get all prompts from database
 export async function getAllPromptsFromDb(): Promise<Prompt[]> {
+  const config = getConfig();
+  
+  if (config.storage.type !== 'postgres') {
+    throw new Error('Database storage not configured');
+  }
+  
+  const pool = new Pool({
+    connectionString: config.storage.pgConnectionString,
+  });
+  
   const client = await pool.connect();
+  
   try {
-    const result = await client.query(`
-      SELECT 
-        id, 
-        name, 
-        content, 
-        description, 
-        category, 
-        tags, 
-        is_template as "isTemplate", 
-        variables
+    const query = `
+      SELECT id, name, content, description, category, tags, is_template AS "isTemplate", variables
       FROM prompts
       ORDER BY name
-    `);
+    `;
     
+    const result = await client.query(query);
     return result.rows;
-  } catch (error) {
-    console.error('Error retrieving prompts from database:', error);
-    throw error;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 
-// Get prompt by ID from database
+// Get a prompt by ID from database
 export async function getPromptFromDb(id: string): Promise<Prompt | null> {
+  const config = getConfig();
+  
+  if (config.storage.type !== 'postgres') {
+    throw new Error('Database storage not configured');
+  }
+  
+  const pool = new Pool({
+    connectionString: config.storage.pgConnectionString,
+  });
+  
   const client = await pool.connect();
+  
   try {
-    const result = await client.query(
-      `SELECT 
-        id, 
-        name, 
-        content, 
-        description, 
-        category, 
-        tags, 
-        is_template as "isTemplate", 
-        variables
+    const query = `
+      SELECT id, name, content, description, category, tags, is_template AS "isTemplate", variables
       FROM prompts
-      WHERE id = $1`,
-      [id]
-    );
+      WHERE id = $1
+    `;
     
+    const result = await client.query(query, [id]);
     return result.rows.length > 0 ? result.rows[0] : null;
-  } catch (error) {
-    console.error(`Error retrieving prompt ${id} from database:`, error);
-    throw error;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 
-// Delete prompt from database
+// Delete a prompt by ID from database
 export async function deletePromptFromDb(id: string): Promise<boolean> {
+  const config = getConfig();
+  
+  if (config.storage.type !== 'postgres') {
+    throw new Error('Database storage not configured');
+  }
+  
+  const pool = new Pool({
+    connectionString: config.storage.pgConnectionString,
+  });
+  
   const client = await pool.connect();
+  
   try {
-    const result = await client.query('DELETE FROM prompts WHERE id = $1', [id]);
-    return result.rowCount ? result.rowCount > 0 : false;
-  } catch (error) {
-    console.error(`Error deleting prompt ${id} from database:`, error);
-    throw error;
+    const query = 'DELETE FROM prompts WHERE id = $1 RETURNING id';
+    const result = await client.query(query, [id]);
+    return result.rowCount !== null && result.rowCount > 0;
   } finally {
     client.release();
+    await pool.end();
   }
 }
 
-// File system operations
-const PROMPTS_DIR = process.env.PROMPTS_DIR || '/home/sparrow/mcp/data/prompts/';
+// File-based storage functions
+
+// Get backup directory path
+function getBackupDir(config: ReturnType<typeof getConfig>): string {
+  // Default to 'backups' directory in current working directory
+  return config.storage.backupsDir || path.join(process.cwd(), 'backups');
+}
 
 // Save prompt to file
-export function savePromptToFile(id: string, prompt: Prompt): void {
+export function savePromptToFile(prompt: Prompt): string {
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  
   // Create directory if it doesn't exist
-  if (!fs.existsSync(PROMPTS_DIR)) {
-    fs.mkdirSync(PROMPTS_DIR, { recursive: true });
+  if (!fs.existsSync(promptsDir)) {
+    fs.mkdirSync(promptsDir, { recursive: true });
   }
   
-  const filePath = path.join(PROMPTS_DIR, `${id}.json`);
+  const id = prompt.id || uuidv4();
+  const promptWithId = { ...prompt, id };
   
-  // Save to file
-  fs.writeFileSync(filePath, JSON.stringify(prompt, null, 2), 'utf8');
+  fs.writeFileSync(
+    path.join(promptsDir, `${id}.json`),
+    JSON.stringify(promptWithId, null, 2),
+    'utf8'
+  );
+  
+  return id;
 }
 
-// Get all prompts from file system
+// Get all prompts from files
 export function getAllPromptsFromFiles(): Prompt[] {
-  if (!fs.existsSync(PROMPTS_DIR)) {
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  
+  if (!fs.existsSync(promptsDir)) {
+    fs.mkdirSync(promptsDir, { recursive: true });
     return [];
   }
   
-  const files = fs.readdirSync(PROMPTS_DIR);
+  const files = fs.readdirSync(promptsDir)
+    .filter(file => file.endsWith('.json'));
   
-  return files
-    .filter(file => file.endsWith('.json'))
-    .map(file => {
-      try {
-        const filePath = path.join(PROMPTS_DIR, file);
-        const content = fs.readFileSync(filePath, 'utf8');
-        return JSON.parse(content);
-      } catch (e) {
-        console.error(`Error parsing ${file}:`, e);
-        return null;
-      }
-    })
-    .filter(Boolean) as Prompt[];
+  return files.map(file => {
+    try {
+      const content = fs.readFileSync(path.join(promptsDir, file), 'utf8');
+      return JSON.parse(content) as Prompt;
+    } catch (error) {
+      console.error(`Error reading prompt file ${file}:`, error);
+      return null;
+    }
+  }).filter(Boolean) as Prompt[];
 }
 
-// Get prompt from file
+// Get a prompt by ID from file
 export function getPromptFromFile(id: string): Prompt | null {
-  const filePath = path.join(PROMPTS_DIR, `${id}.json`);
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  const filePath = path.join(promptsDir, `${id}.json`);
   
   if (!fs.existsSync(filePath)) {
     return null;
@@ -212,16 +274,18 @@ export function getPromptFromFile(id: string): Prompt | null {
   
   try {
     const content = fs.readFileSync(filePath, 'utf8');
-    return JSON.parse(content);
-  } catch (e) {
-    console.error(`Error reading prompt ${id}:`, e);
+    return JSON.parse(content) as Prompt;
+  } catch (error) {
+    console.error(`Error reading prompt file ${id}:`, error);
     return null;
   }
 }
 
-// Delete prompt file
+// Delete a prompt file
 export function deletePromptFile(id: string): boolean {
-  const filePath = path.join(PROMPTS_DIR, `${id}.json`);
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  const filePath = path.join(promptsDir, `${id}.json`);
   
   if (!fs.existsSync(filePath)) {
     return false;
@@ -230,116 +294,121 @@ export function deletePromptFile(id: string): boolean {
   try {
     fs.unlinkSync(filePath);
     return true;
-  } catch (e) {
-    console.error(`Error deleting prompt ${id}:`, e);
+  } catch (error) {
+    console.error(`Error deleting prompt file ${id}:`, error);
     return false;
   }
 }
 
-// Create backup directory
-const BACKUP_DIR = process.env.BACKUP_DIR || '/home/sparrow/mcp/backups/prompts/';
+// Backup and restore functions
 
 // Create a backup of all prompts
 export function createBackup(): string {
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  const backupsDir = getBackupDir(config);
+  
+  // Create backups directory if it doesn't exist
+  if (!fs.existsSync(backupsDir)) {
+    fs.mkdirSync(backupsDir, { recursive: true });
+  }
+  
+  // Get all prompts
+  let prompts: Prompt[] = [];
+  
+  if (config.storage.type === 'file') {
+    prompts = getAllPromptsFromFiles();
+  } else {
+    throw new Error('Backup only supported for file storage currently');
+  }
+  
+  if (prompts.length === 0) {
+    throw new Error('No prompts to backup');
+  }
+  
+  // Create backup file
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
-  const backupDir = path.join(BACKUP_DIR, timestamp);
+  const backupFileName = `backup-${timestamp}.json`;
+  const backupFilePath = path.join(backupsDir, backupFileName);
   
-  // Create backup directory
-  if (!fs.existsSync(BACKUP_DIR)) {
-    fs.mkdirSync(BACKUP_DIR, { recursive: true });
-  }
-  
-  // Create directory for this backup
-  fs.mkdirSync(backupDir, { recursive: true });
-  
-  // Copy each prompt file to backup directory
-  if (fs.existsSync(PROMPTS_DIR)) {
-    const files = fs.readdirSync(PROMPTS_DIR);
-    
-    for (const file of files) {
-      if (!file.endsWith('.json')) continue;
-      
-      const srcPath = path.join(PROMPTS_DIR, file);
-      const destPath = path.join(backupDir, file);
-      
-      fs.copyFileSync(srcPath, destPath);
-    }
-  }
-  
-  // Create a manifest file
   fs.writeFileSync(
-    path.join(backupDir, 'manifest.json'),
-    JSON.stringify({
+    backupFilePath,
+    JSON.stringify({ 
       timestamp,
-      count: fs.existsSync(PROMPTS_DIR) ? 
-        fs.readdirSync(PROMPTS_DIR).filter(f => f.endsWith('.json')).length : 0,
-      date: new Date().toISOString()
-    }, null, 2)
+      count: prompts.length,
+      prompts
+    }, null, 2),
+    'utf8'
   );
   
-  return backupDir;
+  return backupFilePath;
 }
 
-// List available backups
+// List all backups
 export function listBackups(): { timestamp: string, count: number }[] {
-  if (!fs.existsSync(BACKUP_DIR)) {
+  const config = getConfig();
+  const backupsDir = getBackupDir(config);
+  
+  if (!fs.existsSync(backupsDir)) {
     return [];
   }
   
-  const dirs = fs.readdirSync(BACKUP_DIR);
+  const files = fs.readdirSync(backupsDir)
+    .filter(file => file.startsWith('backup-') && file.endsWith('.json'));
   
-  return dirs
-    .map(dir => {
-      const backupDir = path.join(BACKUP_DIR, dir);
-      
-      // Skip if not a directory
-      if (!fs.statSync(backupDir).isDirectory()) return null;
-      
-      // Check for manifest file
-      const metadataPath = path.join(backupDir, 'manifest.json');
-      if (!fs.existsSync(metadataPath)) return null;
-      
-      try {
-        const metadata = JSON.parse(fs.readFileSync(metadataPath, 'utf8'));
-        return { 
-          timestamp: dir, 
-          count: metadata.count || -1 
-        };
-      } catch (e) {
-        console.error(`Error reading metadata from ${dir}:`, e);
-        return { 
-          timestamp: dir, 
-          count: -1 
-        };
-      }
-    })
-    .filter(Boolean) as { timestamp: string, count: number }[];
+  return files.map(file => {
+    try {
+      const content = fs.readFileSync(path.join(backupsDir, file), 'utf8');
+      const backup = JSON.parse(content);
+      return { 
+        timestamp: backup.timestamp,
+        count: backup.count
+      };
+    } catch (error) {
+      console.error(`Error reading backup file ${file}:`, error);
+      return null;
+    }
+  }).filter(Boolean) as { timestamp: string, count: number }[];
 }
 
-// Restore from a specific backup
+// Restore from a backup
 export function restoreFromBackup(timestamp: string): { success: boolean, count: number } {
-  const backupDir = path.join(BACKUP_DIR, timestamp);
+  const config = getConfig();
+  const promptsDir = config.storage.promptsDir;
+  const backupsDir = getBackupDir(config);
   
-  if (!fs.existsSync(backupDir)) {
-    throw new Error(`Backup ${timestamp} not found`);
+  // Find backup file
+  const files = fs.readdirSync(backupsDir)
+    .filter(file => file.includes(timestamp) && file.endsWith('.json'));
+  
+  if (files.length === 0) {
+    throw new Error(`No backup found with timestamp: ${timestamp}`);
   }
   
-  // Create prompts directory if it doesn't exist
-  if (!fs.existsSync(PROMPTS_DIR)) {
-    fs.mkdirSync(PROMPTS_DIR, { recursive: true });
+  // Read backup file
+  const backupFilePath = path.join(backupsDir, files[0]);
+  const backupContent = fs.readFileSync(backupFilePath, 'utf8');
+  const backup = JSON.parse(backupContent);
+  
+  if (!backup.prompts || !Array.isArray(backup.prompts)) {
+    throw new Error('Invalid backup file format');
   }
   
-  // Get all backup files
-  const files = fs.readdirSync(backupDir)
-    .filter(file => file.endsWith('.json') && file !== 'manifest.json');
+  // Clear existing prompts directory
+  const existingFiles = fs.readdirSync(promptsDir)
+    .filter(file => file.endsWith('.json'));
   
-  // Copy each file to prompts directory
-  for (const file of files) {
-    const srcPath = path.join(backupDir, file);
-    const destPath = path.join(PROMPTS_DIR, file);
-    
-    fs.copyFileSync(srcPath, destPath);
+  for (const file of existingFiles) {
+    fs.unlinkSync(path.join(promptsDir, file));
   }
   
-  return { success: true, count: files.length };
+  // Restore prompts
+  for (const prompt of backup.prompts) {
+    savePromptToFile(prompt);
+  }
+  
+  return { 
+    success: true,
+    count: backup.prompts.length
+  };
 }

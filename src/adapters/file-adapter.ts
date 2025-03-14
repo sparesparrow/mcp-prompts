@@ -1,147 +1,151 @@
-import fs from 'fs/promises';
+/**
+ * File Adapter
+ * Implements the StorageAdapter interface for file-based storage
+ */
+
+import fs from 'fs-extra';
 import path from 'path';
-import { Prompt, StorageAdapter, ListPromptsOptions } from '../core/types';
-import { validatePrompt } from '../core/utils';
+import { v4 as uuidv4 } from 'uuid';
+import { Prompt, StorageAdapter, ListPromptsOptions, TemplateVariable } from '../core/types.js';
+import { slugify, extractVariables } from '../core/utils.js';
 
 /**
- * Storage adapter implementation that uses the filesystem
+ * File-based storage adapter
  */
 export class FileAdapter implements StorageAdapter {
   private promptsDir: string;
   
   /**
-   * Create a new FileAdapter instance
-   * @param promptsDir Directory to store prompt files
+   * Create a new file adapter
+   * @param promptsDir Directory to store prompts
    */
   constructor(promptsDir: string) {
     this.promptsDir = promptsDir;
   }
   
   /**
-   * Ensure the prompts directory exists
+   * Connect to the file storage
    */
   async connect(): Promise<void> {
     try {
-      await fs.mkdir(this.promptsDir, { recursive: true });
-    } catch (error: any) {
-      throw new Error(`Failed to create prompts directory: ${error.message}`);
+      await fs.ensureDir(this.promptsDir);
+      console.log(`Connected to file storage at ${this.promptsDir}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to create prompts directory: ${errorMessage}`);
     }
   }
   
   /**
-   * No-op for file adapter
+   * Disconnect from the file storage
    */
   async disconnect(): Promise<void> {
-    // No resources to release for filesystem storage
+    // No-op for file adapter
   }
   
   /**
-   * Get a prompt by ID
-   * @param id Prompt ID
-   * @returns Promise resolving to the prompt
-   */
-  async getPrompt(id: string): Promise<Prompt> {
-    try {
-      const filePath = path.join(this.promptsDir, `${id}.json`);
-      const content = await fs.readFile(filePath, 'utf8');
-      const prompt = JSON.parse(content) as Prompt;
-      
-      if (!validatePrompt(prompt)) {
-        throw new Error(`Invalid prompt data for ID: ${id}`);
-      }
-      
-      return prompt;
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        throw new Error(`Prompt not found: ${id}`);
-      }
-      throw new Error(`Failed to get prompt: ${error.message}`);
-    }
-  }
-  
-  /**
-   * Save a prompt to the filesystem
+   * Save a prompt to the file storage
    * @param prompt Prompt to save
    */
   async savePrompt(prompt: Prompt): Promise<void> {
     try {
-      if (!validatePrompt(prompt)) {
-        throw new Error('Invalid prompt data');
-      }
-      
+      // Ensure the prompt has an ID
+    if (!prompt.id) {
+      prompt.id = uuidv4();
+    }
+    
+      // Create the file path
       const filePath = path.join(this.promptsDir, `${prompt.id}.json`);
-      await fs.writeFile(filePath, JSON.stringify(prompt, null, 2), 'utf8');
-    } catch (error: any) {
-      throw new Error(`Failed to save prompt: ${error.message}`);
+      
+      // Write the prompt to the file
+      await fs.writeJson(filePath, prompt, { spaces: 2 });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to save prompt: ${errorMessage}`);
     }
   }
-  
+
   /**
-   * List prompts with optional filtering
-   * @param options Filtering and pagination options
-   * @returns Promise resolving to an array of prompts
+   * Get a prompt from the file storage
+   * @param id Prompt ID
+   * @returns The prompt
+   */
+  async getPrompt(id: string): Promise<Prompt> {
+    try {
+      // Create the file path
+    const filePath = path.join(this.promptsDir, `${id}.json`);
+    
+      // Read the prompt from the file
+      return await fs.readJson(filePath);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to get prompt: ${errorMessage}`);
+    }
+  }
+
+  /**
+   * List prompts from the file storage
+   * @param options Options for filtering and sorting
+   * @returns Array of prompts
    */
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     try {
+      // Get all files in the prompts directory
       const files = await fs.readdir(this.promptsDir);
+      
+      // Filter for JSON files
       const jsonFiles = files.filter(file => file.endsWith('.json'));
       
-      const prompts: Prompt[] = [];
-      
-      for (const file of jsonFiles) {
-        try {
+      // Read all prompts
+      const prompts: Prompt[] = await Promise.all(
+        jsonFiles.map(async (file) => {
           const filePath = path.join(this.promptsDir, file);
-          const content = await fs.readFile(filePath, 'utf8');
-          const prompt = JSON.parse(content);
-          
-          if (validatePrompt(prompt)) {
-            prompts.push(prompt);
-          }
-        } catch (error: any) {
-          console.error(`Error reading prompt file ${file}: ${error.message}`);
-          // Continue with other files
-        }
+          return await fs.readJson(filePath);
+        })
+      );
+      
+      // Apply filtering and sorting if options are provided
+      if (options) {
+        return this.filterPrompts(prompts, options);
       }
       
-      return this.filterPrompts(prompts, options);
-    } catch (error: any) {
-      throw new Error(`Failed to list prompts: ${error.message}`);
+      return prompts;
+        } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to list prompts: ${errorMessage}`);
     }
   }
   
   /**
-   * Delete a prompt by ID
-   * @param id Prompt ID to delete
+   * Delete a prompt from the file storage
+   * @param id Prompt ID
    */
   async deletePrompt(id: string): Promise<void> {
     try {
+      // Create the file path
       const filePath = path.join(this.promptsDir, `${id}.json`);
-      await fs.unlink(filePath);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        throw new Error(`Prompt not found: ${id}`);
+      
+      // Check if the file exists
+      if (await fs.pathExists(filePath)) {
+        // Delete the file
+        await fs.remove(filePath);
+      } else {
+        throw new Error(`Prompt with ID ${id} not found`);
       }
-      throw new Error(`Failed to delete prompt: ${error.message}`);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      throw new Error(`Failed to delete prompt: ${errorMessage}`);
     }
   }
-  
+
   /**
-   * Filter prompts based on provided options
+   * Filter prompts based on the provided options
    * @param prompts Array of prompts to filter
-   * @param options Filtering and pagination options
+   * @param options Filtering options
    * @returns Filtered array of prompts
    */
-  private filterPrompts(prompts: Prompt[], options?: ListPromptsOptions): Prompt[] {
-    if (!options) return prompts;
-    
+  private filterPrompts(prompts: Prompt[], options: ListPromptsOptions): Prompt[] {
     let filtered = [...prompts];
-    
-    // Filter by tags (logical OR - prompt has at least one of the specified tags)
-    if (options.tags && options.tags.length > 0) {
-      filtered = filtered.filter(prompt => 
-        prompt.tags && options.tags?.some(tag => prompt.tags?.includes(tag))
-      );
-    }
     
     // Filter by template status
     if (options.isTemplate !== undefined) {
@@ -153,46 +157,147 @@ export class FileAdapter implements StorageAdapter {
       filtered = filtered.filter(prompt => prompt.category === options.category);
     }
     
-    // Filter by search term (in name, description or content)
-    if (options.search) {
-      const search = options.search.toLowerCase();
-      filtered = filtered.filter(prompt => 
-        prompt.name.toLowerCase().includes(search) ||
-        (prompt.description && prompt.description.toLowerCase().includes(search)) ||
-        prompt.content.toLowerCase().includes(search)
-      );
-    }
-    
-    // Sort results
-    if (options.sort) {
-      const sortField = options.sort as keyof Prompt;
-      const sortOrder = options.order === 'desc' ? -1 : 1;
-      
-      filtered.sort((a, b) => {
-        const aValue = a[sortField];
-        const bValue = b[sortField];
-        
-        if (aValue === undefined || bValue === undefined) {
-          return 0;
-        }
-        
-        if (typeof aValue === 'string' && typeof bValue === 'string') {
-          return sortOrder * aValue.localeCompare(bValue);
-        }
-        
-        if (aValue < bValue) return -1 * sortOrder;
-        if (aValue > bValue) return 1 * sortOrder;
-        return 0;
+    // Filter by tags
+    if (options.tags && options.tags.length > 0) {
+      filtered = filtered.filter(prompt => {
+        if (!prompt.tags) return false;
+        return options.tags!.every(tag => prompt.tags!.includes(tag));
       });
     }
     
+    // Filter by search term
+    if (options.search) {
+      const searchLower = options.search.toLowerCase();
+      filtered = filtered.filter(prompt => {
+        return (
+          prompt.name.toLowerCase().includes(searchLower) ||
+          (prompt.description && prompt.description.toLowerCase().includes(searchLower)) ||
+          prompt.content.toLowerCase().includes(searchLower)
+        );
+      });
+    }
+    
+    // Sort the results
+    if (options.sort) {
+      filtered = this.sortPrompts(filtered, options.sort, options.order);
+    }
+    
     // Apply pagination
-    if (options.limit !== undefined || options.offset !== undefined) {
+    if (options.offset !== undefined || options.limit !== undefined) {
       const offset = options.offset || 0;
-      const limit = options.limit !== undefined ? options.limit : filtered.length;
+      const limit = options.limit || filtered.length;
       filtered = filtered.slice(offset, offset + limit);
     }
     
     return filtered;
+  }
+
+  /**
+   * Sort prompts based on the provided field and order
+   * @param prompts Array of prompts to sort
+   * @param sort Field to sort by
+   * @param order Sort order (asc or desc)
+   * @returns Sorted array of prompts
+   */
+  private sortPrompts(prompts: Prompt[], sort?: string, order?: 'asc' | 'desc'): Prompt[] {
+    if (!sort) return prompts;
+    
+    const sortOrder = order === 'desc' ? -1 : 1;
+    
+    return [...prompts].sort((a, b) => {
+      const aValue = a[sort as keyof Prompt];
+      const bValue = b[sort as keyof Prompt];
+      
+      if (aValue === undefined && bValue === undefined) return 0;
+      if (aValue === undefined) return sortOrder;
+      if (bValue === undefined) return -sortOrder;
+      
+      if (typeof aValue === 'string' && typeof bValue === 'string') {
+        return aValue.localeCompare(bValue) * sortOrder;
+      }
+      
+      if (aValue !== undefined && bValue !== undefined) {
+        if (aValue < bValue) return -1 * sortOrder;
+        if (aValue > bValue) return 1 * sortOrder;
+      }
+      
+      return 0;
+    });
+  }
+
+  // Additional methods for the adapter
+  
+  /**
+   * Add a new prompt
+   * @param prompt Prompt to add
+   * @returns The added prompt with ID
+   */
+  async addPrompt(prompt: Prompt): Promise<Prompt> {
+    // Generate an ID if not provided
+    if (!prompt.id) {
+      prompt.id = uuidv4();
+    }
+    
+    // Set timestamps
+    const now = new Date().toISOString();
+    prompt.createdAt = now;
+    prompt.updatedAt = now;
+    
+    // Set version
+    prompt.version = 1;
+    
+    // Extract variables if this is a template
+    if (prompt.isTemplate) {
+      const extractedVars = extractVariables(prompt.content);
+      
+      // Create proper TemplateVariable objects
+      prompt.variables = extractedVars.map(name => ({
+        name,
+        description: '',
+        required: true
+      }));
+    }
+    
+    // Save the prompt
+    await this.savePrompt(prompt);
+    
+    return prompt;
+  }
+  
+  /**
+   * Update an existing prompt
+   * @param id Prompt ID
+   * @param updates Partial prompt with updates
+   * @returns The updated prompt
+   */
+  async updatePrompt(id: string, updates: Partial<Prompt>): Promise<Prompt> {
+    // Get the existing prompt
+    const existing = await this.getPrompt(id);
+    
+    // Create the updated prompt
+    const updated: Prompt = {
+      ...existing,
+      ...updates,
+      id, // Ensure ID doesn't change
+      updatedAt: new Date().toISOString(),
+      version: (existing.version || 0) + 1,
+    };
+    
+    // Extract variables if this is a template and content changed
+    if (updated.isTemplate && updates.content) {
+      const extractedVars = extractVariables(updated.content);
+      
+      // Create proper TemplateVariable objects
+      updated.variables = extractedVars.map(name => ({
+        name,
+        description: '',
+        required: true
+      }));
+    }
+    
+    // Save the updated prompt
+    await this.savePrompt(updated);
+    
+    return updated;
   }
 } 

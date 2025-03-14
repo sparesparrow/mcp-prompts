@@ -1,6 +1,6 @@
-# MCP Prompt Manager
+# MCP Prompts Server
 
-An MCP server for managing prompts and templates with project orchestration capabilities.
+An MCP server for managing prompts and templates with project orchestration capabilities. Part of the Model Context Protocol ecosystem.
 
 <a href="https://glama.ai/mcp/servers/i0z4f3pr82">
   <img width="380" height="200" src="https://glama.ai/mcp/servers/i0z4f3pr82/badge" alt="Prompts Server MCP server" />
@@ -18,13 +18,48 @@ An MCP server for managing prompts and templates with project orchestration capa
 - **Docker Support**: Easy deployment with Docker and Docker Compose
 - **Categories**: Organize prompts by category (e.g., 'development', 'project-orchestration')
 
+## Node.js Compatibility
+
+This package is designed to work with:
+
+- **Node.js v18+**: Fully supported and recommended
+- **Node.js v20+**: Fully supported and recommended for production
+- **Node.js v21+**: Fully supported with ESM import compliance
+- **Node.js v23+**: Full support with automatic fixing of ESM module imports
+
+> **Note**: This package includes automatic compatibility fixes for Node.js ESM modules. All import issues are automatically handled during the build process, making it compatible with all Node.js versions from 18 to 23+.
+
+## Quick Start with NPX
+
+The fastest way to use this package is with npx in a fresh container or environment:
+
+```bash
+# Run directly without installation using npx
+npx -y @modelcontextprotocol/mcp-prompts
+
+# To test with MCP Inspector
+npx @modelcontextprotocol/inspector npx -y @modelcontextprotocol/mcp-prompts
+```
+
+### Using Docker
+
+```bash
+# Run in a Docker container with the official image
+docker run -p 3003:3003 modelcontextprotocol/mcp-prompts:latest
+
+# Map a data volume for persistence
+docker run -p 3003:3003 -v $(pwd)/data:/app/data modelcontextprotocol/mcp-prompts:latest
+```
+
 ## Installation
 
 ### Prerequisites
 
 - Node.js 18 or later
+- npm 7 or later (or use the included Docker image)
 - PostgreSQL (optional for database storage)
 - Docker (optional for containerized deployment)
+- Claude Desktop or other MCP-compatible applications (for integration)
 
 ### Installation from NPM
 
@@ -38,9 +73,44 @@ npm install -g @sparesparrow/mcp-prompt-manager
 npx @sparesparrow/mcp-prompt-manager
 ```
 
+### Manual Installation
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/modelcontextprotocol/mcp-prompts.git
+   cd mcp-prompts
+   ```
+
+2. **Install dependencies**
+   ```bash
+   npm install
+   ```
+
+3. **Create environment file**
+   Create a `.env` file in the project root:
+   ```
+   # Storage configuration
+   STORAGE_TYPE=file
+   PROMPTS_DIR=./data/prompts
+   
+   # Server configuration
+   SERVER_NAME=mcp-prompts
+   SERVER_VERSION=1.0.0
+   LOG_LEVEL=info
+   ```
+
+4. **Build the project**
+   ```bash
+   npm run build
+   ```
+
 ### Claude Desktop Configuration
 
-Add the following to your Claude Desktop configuration file (usually located at `~/.config/Claude/config.json`):
+Add the following to your Claude Desktop configuration file:
+
+- **macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
+- **Linux**: `~/.config/Claude/claude_desktop_config.json`
+- **Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
 
 ```json
 {
@@ -56,245 +126,280 @@ Add the following to your Claude Desktop configuration file (usually located at 
 }
 ```
 
-### Manual Setup from Source
+For a local installation:
 
-If you prefer to build from source:
+```json
+{
+  "mcpServers": {
+    "mcp-prompt-manager": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-prompt-manager/build/index.js"]
+    }
+  }
+}
+```
 
-#### 1. Clone the repository
+### Docker Installation
+
+For a Docker-based installation:
+
+1. **Using the official Docker image**
+   ```bash
+   docker run -p 3003:3003 -v $(pwd)/data:/app/data sparesparrow/mcp-prompt-manager:latest
+   ```
+
+2. **Or build your own image**
+   ```bash
+   git clone https://github.com/sparesparrow/mcp-prompt-manager.git
+   cd mcp-prompt-manager
+   docker build -t mcp-prompt-manager:local .
+   docker run -p 3003:3003 -v $(pwd)/data:/app/data mcp-prompt-manager:local
+   ```
+
+3. **Configure Claude Desktop to use the Docker container**
+   
+   ```json
+   {
+     "mcpServers": {
+       "mcp-prompt-manager": {
+         "command": "docker",
+         "args": ["exec", "-i", "mcp-prompt-manager", "node", "index.js"]
+       }
+     }
+   }
+   ```
+
+### Automatic Installation
+
+For convenience, we provide a script that automates the installation process:
 
 ```bash
-git clone https://github.com/sparesparrow/mcp-prompt-manager.git
-cd mcp-prompt-manager
-```
+# Make the script executable
+chmod +x setup.sh
 
-#### 2. Install dependencies
-
-```bash
-npm install
-```
-
-#### 3. Configure environment variables
-
-Create a `.env` file in the root directory:
-
-```
-# Storage configuration
-# Possible values: file, postgres, memory
-STORAGE_TYPE=file
-
-# File storage configuration
-PROMPTS_DIR=./prompts
-
-# PostgreSQL storage configuration
-# Required when STORAGE_TYPE=postgres
-PG_CONNECTION_STRING=postgresql://localhost/mydb
-
-# Server configuration
-SERVER_NAME=mcp-prompt-manager
-SERVER_VERSION=1.1.0
-LOG_LEVEL=info
-```
-
-#### 4. Build and run the application
-
-```bash
-npm run build
-npm start
+# Run the installation script
+./setup.sh
 ```
 
 ## Usage
 
-### Starting the Server
+### Accessing Prompts
 
-```bash
-# If installed globally:
-mcp-prompt-manager
+#### Listing Available Prompts
 
-# If using npx:
-npx @sparesparrow/mcp-prompt-manager
+To see what prompts are available:
 
-# If running from source:
-npm start
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "list_prompts",
+  arguments: {}
+});
 ```
 
-### MCP Tools
+To filter by tags:
 
-The MCP Prompt Manager exposes the following tools:
-
-#### Prompt Management Tools
-
-##### `add_prompt`
-
-Add a new prompt.
-
-```json
-{
-  "prompt": {
-    "name": "Enhanced Code Review",
-    "content": "Please review this code and provide detailed feedback...",
-    "description": "A template for requesting advanced code reviews",
-    "isTemplate": true,
-    "tags": ["code", "review", "feedback"],
-    "category": "development"
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "list_prompts",
+  arguments: {
+    tags: ["development"]
   }
-}
+});
 ```
 
-##### `get_prompt`
+You can also filter by category, template status, or use search:
 
-Get a prompt by ID.
-
-```json
-{
-  "id": "enhanced-code-review"
-}
 ```
-
-##### `update_prompt`
-
-Update an existing prompt.
-
-```json
-{
-  "id": "enhanced-code-review",
-  "prompt": {
-    "name": "Enhanced Code Review",
-    "content": "Updated content...",
-    "tags": ["code", "review", "updated"]
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "list_prompts",
+  arguments: {
+    isTemplate: true,
+    category: "development",
+    search: "workflow"
   }
-}
+});
 ```
 
-##### `list_prompts`
+#### Getting a Specific Prompt
 
-List all prompts with optional filtering.
+To retrieve a specific prompt by ID:
 
-```json
-{
-  "tags": ["code", "review"],
-  "isTemplate": true,
-  "category": "development",
-  "search": "review",
-  "sort": "name",
-  "order": "asc"
-}
 ```
-
-##### `apply_template`
-
-Apply variables to a template prompt.
-
-```json
-{
-  "id": "enhanced-code-review",
-  "variables": {
-    "language": "TypeScript",
-    "focus": "performance optimization"
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "get_prompt",
+  arguments: {
+    id: "development-workflow"
   }
-}
+});
 ```
 
-##### `delete_prompt`
+#### Using a Template Prompt
 
-Delete a prompt by ID.
+To apply variables to a template prompt:
 
-```json
-{
-  "id": "enhanced-code-review"
-}
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "apply_template",
+  arguments: {
+    id: "development-system-prompt",
+    variables: {
+      "project_type": "web frontend",
+      "language": "JavaScript/React",
+      "project_name": "TaskManager",
+      "project_goal": "create a task management application with drag-and-drop functionality",
+      "technical_context": "Using React 18, TypeScript, and Material UI"
+    }
+  }
+});
 ```
 
-#### Database Tools
+### Managing Prompts
 
-##### `export_prompts_to_db`
+#### Adding a New Prompt
 
-Export all prompts from the file system to the PostgreSQL database.
+To add a new prompt:
 
-```json
-{}
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "add_prompt",
+  arguments: {
+    prompt: {
+      name: "Bug Report Template",
+      description: "Template for submitting bug reports",
+      content: "## Bug Report\n\n### Description\n{{description}}\n\n### Steps to Reproduce\n{{steps}}\n\n### Expected Behavior\n{{expected}}\n\n### Actual Behavior\n{{actual}}\n\n### Environment\n{{environment}}",
+      isTemplate: true,
+      tags: ["bug", "template", "documentation"],
+      category: "development"
+    }
+  }
+});
 ```
 
-##### `import_prompts_from_db`
+#### Updating an Existing Prompt
 
-Import all prompts from the PostgreSQL database to the file system.
+To update an existing prompt:
 
-```json
-{
-  "overwrite": true
-}
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "update_prompt",
+  arguments: {
+    id: "development-workflow",
+    prompt: {
+      content: "Updated workflow content here...",
+      tags: ["development", "workflow", "python", "updated"]
+    }
+  }
+});
 ```
 
-##### `sync_prompts`
+#### Deleting a Prompt
 
-Synchronize prompts between the file system and PostgreSQL database.
+To delete a prompt:
 
-```json
-{}
+```
+use_mcp_tool({
+  server_name: "mcp-prompts",
+  tool_name: "delete_prompt",
+  arguments: {
+    id: "outdated-prompt"
+  }
+});
 ```
 
-##### `create_backup`
+### Tips for Effective Prompt Management
 
-Create a backup of all prompts.
+1. **Use Consistent Naming**: Name prompts clearly and consistently for easy discovery
+2. **Tag Effectively**: Use tags to organize prompts by purpose, project, or context
+3. **Templatize Reusable Prompts**: Create templates for frequently used prompts with variables
+4. **Update Regularly**: Keep your prompts up-to-date as your needs change
+5. **Share with Team**: Share effective prompts with your team for consistent interactions
+6. **Use Categories**: Organize prompts into categories for better organization
+7. **Leverage Search**: Use the search functionality to find prompts quickly
 
-```json
-{}
-```
+## Roadmap
 
-##### `list_backups`
+### Completed (v1.5.0)
 
-List all available backups.
+- ✅ Implemented simplified architecture following SOLID principles
+- ✅ Created unified core types in a single file
+- ✅ Implemented focused storage adapters with file-based storage
+- ✅ Created streamlined prompt service
+- ✅ Simplified configuration management
+- ✅ Streamlined MCP server implementation with tools
+- ✅ Removed complex CLI interface in favor of focused MCP tools
+- ✅ Improved error handling with proper TypeScript types
+- ✅ Created Docker and Docker Compose configurations for easy deployment
+- ✅ Added comprehensive ESM module compatibility for Node.js 18-23+
+- ✅ Created robust build process with automatic import fixing
+- ✅ Added multi-stage Docker builds for smaller production images
+- ✅ Added health check endpoints and Docker health monitoring
+- ✅ Improved test scripts and automated publication workflow
 
-```json
-{}
-```
+### Current Release Focus
 
-##### `restore_backup`
+- Enhanced Docker support with official Docker Hub images
+- PostgreSQL storage adapter improvements
+- Automated testing infrastructure
+- Documentation updates with comprehensive examples
+- ESM compatibility across all Node.js versions
 
-Restore prompts from a backup.
+### Upcoming Improvements
 
-```json
-{
-  "timestamp": "2023-04-01T12-34-56-789Z"
-}
-```
+#### Phase 1: Testing and Quality Assurance
+- [ ] Add comprehensive Jest tests for all components
+- [ ] Add integration tests for the MCP tools
+- [ ] Set up test coverage reporting
+- [ ] Add load testing and performance benchmarks
 
-#### Project Orchestrator Tools
+#### Phase 2: Database and Storage Enhancements
+- [ ] Improve PostgreSQL storage adapter with migrations
+- [ ] Add MongoDB adapter
+- [ ] Implement Redis caching layer
+- [ ] Create backup/restore enhancements
 
-##### `init_project_orchestrator`
+#### Phase 3: Documentation and Examples
+- [ ] Add JSDoc comments to all public interfaces and classes
+- [ ] Create API documentation with TypeDoc
+- [ ] Add more examples in documentation
+- [ ] Create video tutorials and demos
 
-Initialize project orchestrator templates.
+#### Phase 4: CI/CD and DevOps
+- [ ] Set up GitHub Actions for continuous integration
+- [ ] Add automated testing on pull requests
+- [ ] Set up automatic versioning and releases
+- [ ] Implement semantic versioning automation
 
-```json
-{}
-```
+#### Phase 5: Enterprise Features
+- [ ] Add authentication and authorization
+- [ ] Implement multi-user support
+- [ ] Add advanced access control features
+- [ ] Implement audit logging
 
-##### `create_project`
+## Troubleshooting
 
-Create a new project using the project orchestrator.
+If you encounter issues:
 
-```json
-{
-  "project_name": "My New Project",
-  "project_idea": "A microservices-based e-commerce platform with user authentication, product catalog, and order processing capabilities.",
-  "output_directory": "/home/sparrow/projects/my-new-project"
-}
-```
+1. **Server not appearing in Claude**
+   - Check that the path in your configuration is correct and absolute
+   - Verify that the server builds successfully
+   - Check Claude's logs for any error messages
 
-##### `list_project_templates`
+2. **Cannot find prompts**
+   - Verify that the `prompts` directory exists
+   - Check storage configuration in the `.env` file
 
-List available project templates.
+3. **Import failures**
+   - Make sure you're using the correct format for the MCP tools
+   - Check that the data you're providing matches the expected schema
 
-```json
-{}
-```
-
-##### `list_component_templates`
-
-List available component templates.
-
-```json
-{}
-```
+For more help, check the logs or open an issue on the GitHub repository.
 
 ## Project Orchestration
 
@@ -409,24 +514,32 @@ All backups are stored in the `backups` directory with timestamped folders.
 
 ## Development
 
+For detailed development instructions, please refer to our [Development Guide](README-DEVELOPMENT.md).
+
+The MCP Prompt Manager follows a structured organization with clearly defined components:
+
+- `/src` - Core source code with services, adapters, and utilities
+- `/scripts` - Build and test scripts organized by purpose
+- `/docker` - Docker-related configuration files
+- `/tests` - Integration tests and SDK tests
+
 ### Testing
 
 ```bash
 # Run all tests
 npm test
+
+# Run integration tests
+npm run test:integration
+
+# Test build process
+npm run test:build
+
+# Test Docker build
+npm run test:docker
 ```
 
-### Linting and Formatting
-
-```bash
-# Lint the code
-npm run lint
-
-# Format the code
-npm run format
-```
-
-### Building
+### Build Process
 
 ```bash
 # Build the application
@@ -458,10 +571,10 @@ The project can be deployed using Docker:
 npm run docker:build
 
 # Build and start with Docker Compose
-npm run docker:up
+docker-compose -f docker/docker-compose.yml up
 
 # Stop the containers
-npm run docker:down
+docker-compose -f docker/docker-compose.yml down
 ```
 
 ## Contributing

@@ -1,40 +1,62 @@
-FROM node:18-alpine
+FROM node:20-alpine AS build
 
-# Set working directory
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
+# Set env to indicate Docker build
+ENV DOCKER_BUILD=true
 
-# Install dependencies but skip prepare scripts
-ENV npm_config_ignore_scripts=true
-RUN npm install
-ENV npm_config_ignore_scripts=false
-
-# Copy source code
+# Copy source files first
 COPY . .
+
+# Install dependencies without running the prepare script (which runs build)
+RUN npm ci --no-prepare
 
 # Build the application
 RUN npm run build
 
-# Create data directory
-RUN mkdir -p /data
+# Production image
+FROM node:20-alpine
 
-# Create non-root user
-RUN addgroup -S mcp && adduser -S mcp -G mcp && \
-    chown -R mcp:mcp /app /data
+WORKDIR /app
 
-# Switch to non-root user
-USER mcp
+# Set NODE_ENV and other environment variables
+ENV NODE_ENV=production
+ENV STORAGE_TYPE=file
+ENV PROMPTS_DIR=/app/data/prompts
+ENV BACKUPS_DIR=/app/data/backups
 
-# Environment variables
-ENV NODE_ENV=production \
-    STORAGE_TYPE=file \
-    PROMPTS_DIR=/data/prompts \
-    LOG_LEVEL=info
+# Copy only necessary files from the build stage
+COPY --from=build /app/build ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./
 
-# Volume for shared data
-VOLUME /data
+# Create a non-root user with a home directory
+RUN adduser -D -h /home/mcprompts mcprompts
 
-# Entry point
-CMD ["node", "/app/build/index.js"]
+# Create data directory with correct permissions
+RUN mkdir -p /app/data/prompts /app/data/backups && \
+    chown -R mcprompts:mcprompts /app/data
+
+# Set the user
+USER mcprompts
+
+# Create volume for data persistence
+VOLUME ["/app/data"]
+
+# Add image metadata
+LABEL org.opencontainers.image.authors="modelcontextprotocol"
+LABEL org.opencontainers.image.title="mcp-prompts"
+LABEL org.opencontainers.image.description="MCP server for managing prompts and templates"
+LABEL org.opencontainers.image.documentation="https://github.com/modelcontextprotocol/mcp-prompts"
+LABEL org.opencontainers.image.vendor="Model Context Protocol"
+LABEL org.opencontainers.image.licenses="MIT"
+
+# Expose the port
+EXPOSE 3003
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD wget -q --spider http://localhost:3003/health || exit 1
+
+# Run the application
+CMD ["node", "index.js"]
