@@ -15,10 +15,12 @@
     "baseUrl": ".",
     "paths": {
       "@modelcontextprotocol/sdk/*": ["node_modules/@modelcontextprotocol/sdk/dist/*"]
-    }
+    },
+    "isolatedModules": true
   },
   "include": [
-    "src/**/*.ts"
+    "src/**/*.ts",
+    "tests/**/*.ts"
   ],
   "exclude": ["node_modules"]
 }

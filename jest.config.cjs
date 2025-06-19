@@ -1,4 +1,4 @@
-export default {
+module.exports = {
   preset: 'ts-jest/presets/default-esm',
   testEnvironment: 'node',
   extensionsToTreatAsEsm: ['.ts'],
@@ -8,6 +8,7 @@ export default {
       'ts-jest',
       {
         useESM: true,
+        tsconfig: 'tsconfig.json',
       },
     ],
   },
@@ -22,5 +23,8 @@ export default {
   collectCoverageFrom: [
     'src/**/*.{ts,tsx}',
     '!src/**/*.d.ts',
+  ],
+  transformIgnorePatterns: [
+    '/node_modules/(?!(@modelcontextprotocol|uuid)/)'
   ],
 }; 

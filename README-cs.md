@@ -6,62 +6,64 @@
 
 ---
 
-## TODOs: Refaktoring, CI/CD a zvýšení kvality
+## TODOs: Další rozvoj a zlepšení
 
-Tento seznam obsahuje konkrétní úkoly pro další zlepšení repozitáře. Každý bod obsahuje detailní instrukce a akceptační kritéria.
+Tento seznam obsahuje aktuální úkoly a návrhy pro další rozvoj a zvýšení kvality projektu.
 
-### 4. Rozšíření a úklid testů
-- **Instrukce:**
-  - Přidejte/rozšiřte testy pro nové funkce (sekvence, workflow engine).
-  - Zajistěte, že všechny testy běží v CI (unit, integration, docker, E2E).
-  - Odstraňte nebo opravte neudržované testy.
-- **Akceptační kritéria:**
-  - Všechny hlavní funkce jsou pokryty testy.
-  - Testy jsou stabilní a procházejí v CI.
+### 1. Rozšíření a stabilizace funkcí
+- [ ] Stabilizovat a zdokumentovat MDC (Cursor Rules) adapter
+- [ ] Rozšířit podporu pro nové MCP klienty (LM Studio, LibreChat, Tasker, Android, atd.)
+- [ ] Přidat a rozšířit uživatelské návody (EN, CZ) pro všechny podporované klienty a integrace
+- [ ] Přidat příklady a scénáře pro pokročilé workflow a prompty
 
-### 5. Aktualizace závislostí a bezpečnost
-- **Instrukce:**
-  - Spusťte `npm outdated` a aktualizujte závislosti.
-  - Ověřte kompatibilitu MCP SDK a dalších klíčových balíčků.
-  - Ověřte bezpečnostní best practices v Dockerfile a docker-compose.
-- **Akceptační kritéria:**
-  - Všechny závislosti jsou aktuální a build/testy procházejí.
-  - Dockerfile a compose splňují bezpečnostní doporučení (viz security-considerations.mdc).
+### 2. Testování a CI/CD
+- [ ] Zajistit vysoké pokrytí testy (unit, integration, E2E)
+- [ ] Pravidelně spouštět CI pipeline (lint, testy, build, validace, audit)
+- [ ] Přidat testy pro MDC adapter a nové storage backendy
+- [ ] Automatizovat testy pro CLI a API
 
-### 6. Dokumentace a přehlednost
-- **Instrukce:**
-  - Udržujte README v kořeni a podsložkách stručné, s odkazy na detailní dokumentaci.
-  - Přidejte/aktualizujte README do všech důležitých složek (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`).
-  - Zvažte přesun dlouhých příkladů a FAQ do samostatných souborů.
-- **Akceptační kritéria:**
-  - README v kořeni i podsložkách je aktuální a přehledné.
-  - Dlouhé příklady/FAQ jsou v samostatných souborech.
+### 3. Dokumentace a přehlednost
+- [ ] Udržovat README a uživatelské návody stručné a aktuální
+- [ ] Přidat/aktualizovat README do všech důležitých složek (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
+- [ ] Přidat detailní příklady, FAQ a troubleshooting sekce
+- [ ] Přidat odkazy na oficiální MCP dokumentaci a komunitní zdroje
 
-### 7. Oprava build chyb a refaktoring importů
-- **Instrukce:**
-  - Opravte všechny importy na explicitní cesty s příponou `.js` dle požadavků ESM/TypeScript.
-  - Zkontrolujte a opravte všechny exporty/importy mezi soubory (`PromptService`, `createServer` apod.).
-  - Ověřte, že všechny třídy a funkce jsou správně pojmenované a exportované.
-- **Akceptační kritéria:**
-  - Build projde bez chyb.
-  - Všechny importy jsou explicitní a správné.
+### 4. Refaktoring a údržba
+- [ ] Pravidelně refaktorovat kód podle code-style pravidel
+- [ ] Odstraňovat mrtvý nebo neudržovaný kód
+- [ ] Zajistit konzistenci typů, exportů/importů a pojmenování
+- [ ] Zlepšit strukturu modulů a oddělení funkcí (adapters, prompts, handlers, ...)
 
-### 8. Aktualizace a sladění s MCP SDK
-- **Instrukce:**
-  - Zkontrolujte dokumentaci a typy aktuální verze MCP SDK.
-  - Upravte konstrukci serveru, použití `resource`, `tool` a dalších metod podle nové API.
-  - Ověřte, že všechny MCP integrace odpovídají aktuálnímu SDK.
-- **Akceptační kritéria:**
-  - Kód je kompatibilní s aktuální verzí MCP SDK.
-  - Všechny MCP funkce fungují dle očekávání.
+### 5. Bezpečnost a aktualizace
+- [ ] Pravidelně aktualizovat závislosti (`npm audit`, `npm update`)
+- [ ] Ověřit bezpečnostní best practices v Dockerfile, docker-compose a API
+- [ ] Přidat validaci vstupů a robustní error handling
 
-### 9. Oprava a rozšíření testů po refaktoringu
-- **Instrukce:**
-  - Po opravě build chyb upravte/rozšiřte testy tak, aby odpovídaly novému API a struktuře kódu.
-  - Ověřte, že testy pokrývají i chybové scénáře a edge cases.
-- **Akceptační kritéria:**
-  - Všechny testy projdou v CI.
-  - Testy pokrývají hlavní i chybové scénáře.
+### 6. Podpora nových funkcí a integrací
+- [ ] Přidat podporu pro nové typy promptů, tools a workflow
+- [ ] Zajistit kompatibilitu s novými verzemi MCP SDK a klientů
+- [ ] Přidat návody a příklady pro integraci s mobilními a desktopovými aplikacemi
+
+---
+
+## Úkoly a konkrétní TODOs
+
+Níže jsou konkrétní úkoly a návrhy pro přispěvatele. Pokud chcete pomoci, vyberte si neodškrtnutý bod nebo založte nové issue!
+
+- [ ] Implementovat pokročilou validaci promptů (např. kontrola duplicitních ID, povinných polí, použití proměnných)
+- [ ] Přidat integrační testy pro MDC (Cursor Rules) adapter
+- [ ] Vylepšit chybové hlášky a zpětnou vazbu v API odpovědích
+- [ ] Přidat screenshoty do uživatelských návodů (EN, CZ) pro hlavní klienty (Claude Desktop, Cursor IDE, LM Studio, LibreChat)
+- [ ] Automatizovat publikaci Docker image při vydání (CI/CD)
+- [ ] Přidat ukázkové Tasker profily a Android automatizační skripty do dokumentace
+- [ ] Rozšířit API dokumentaci v `docs/04-api-reference.md` (více příkladů endpointů, chybové scénáře)
+- [ ] Provést bezpečnostní revizi a vylepšit ochranu nových endpointů a integrací
+- [ ] Přidat pokročilé příklady promptů/workflow (vícekrokové, řetězení, atd.)
+- [ ] Přidat ukázky použití CLI a troubleshooting do uživatelského návodu
+- [ ] Přidat validaci proměnných z prostředí a srozumitelné chyby při startu
+- [ ] Přidat badge pro podporované MCP klienty (LM Studio, LibreChat, atd.) do README
+
+Neváhejte navrhnout další úkoly nebo založit issue na cokoli, co najdete!
 
 ---
 

@@ -140,4 +140,67 @@ docker run -d --name mcp-prompts \
   sparesparrow/mcp-prompts:latest
 ```
 
-See `docs/03-storage-adapters.md` for details. 
+See `docs/03-storage-adapters.md` for details.
+
+---
+
+## TODOs: Roadmap & Quality Improvements
+
+This list contains current tasks and suggestions for further development and quality improvement.
+
+### 1. Feature Expansion & Stabilization
+- [ ] Stabilize and document the MDC (Cursor Rules) adapter
+- [ ] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
+- [ ] Add and extend user guides (EN, CZ) for all supported clients and integrations
+- [ ] Add advanced workflow and prompt usage examples
+
+### 2. Testing & CI/CD
+- [ ] Ensure high test coverage (unit, integration, E2E)
+- [ ] Regularly run CI pipeline (lint, tests, build, validation, audit)
+- [ ] Add tests for MDC adapter and new storage backends
+- [ ] Automate CLI and API tests
+
+### 3. Documentation & Clarity
+- [ ] Keep README and user guides concise and up to date
+- [ ] Add/update README files in all key directories (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
+- [ ] Add detailed examples, FAQ, and troubleshooting sections
+- [ ] Add links to official MCP documentation and community resources
+
+### 4. Refactoring & Maintenance
+- [ ] Regularly refactor code to follow code-style guidelines
+- [ ] Remove dead or unmaintained code
+- [ ] Ensure consistency in types, exports/imports, and naming
+- [ ] Improve module structure and separation of concerns (adapters, prompts, handlers, ...)
+
+### 5. Security & Updates
+- [ ] Regularly update dependencies (`npm audit`, `npm update`)
+- [ ] Review security best practices in Dockerfile, docker-compose, and API
+- [ ] Add input validation and robust error handling
+
+### 6. Support for New Features & Integrations
+- [ ] Add support for new prompt types, tools, and workflows
+- [ ] Ensure compatibility with new MCP SDK and client versions
+- [ ] Add guides and examples for integration with mobile and desktop apps
+
+---
+
+## Tasks & Issues
+
+Below are concrete actionable tasks and TODOs for contributors. If you want to help, pick an unchecked item or open a new issue!
+
+- [ ] Implement advanced prompt validation (e.g. check for duplicate IDs, required fields, variable usage)
+- [ ] Add integration tests for MDC (Cursor Rules) adapter
+- [ ] Improve error messages and user feedback in API responses
+- [ ] Add screenshots to user guides (EN, CZ) for all major clients (Claude Desktop, Cursor IDE, LM Studio, LibreChat)
+- [ ] Automate Docker image publishing on release (CI/CD)
+- [ ] Add example Tasker profiles and Android automation scripts to the documentation
+- [ ] Expand API documentation in `docs/04-api-reference.md` (add more endpoint examples, error cases)
+- [ ] Review and improve security for new endpoints and integrations
+- [ ] Add more advanced prompt/workflow examples (multi-step, chaining, etc.)
+- [ ] Add CLI usage examples and troubleshooting section to the user guide
+- [ ] Add support for environment variable validation and helpful startup errors
+- [ ] Add badges for supported MCP clients (LM Studio, LibreChat, etc.) to README
+
+Feel free to suggest more tasks or open issues for anything you find!
+
+--- 
