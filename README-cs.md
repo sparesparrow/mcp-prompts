@@ -8,6 +8,56 @@
 
 ## TODOs: Další rozvoj a zlepšení
 
+Cílem je dosáhnout 100% spolehlivosti testů, neprůstřelného CI/CD a připravit repozitář na hlubší integraci v rámci celého MCP ekosystému.
+Finální Plán Vylepšení Repozitáře: Od Stabilizace k Produkční Připravenosti
+Cíl: Dosáhnout 100% zelené testovací sady, mít plně automatizované a stabilní CI/CD, vytvořit prvotřídní dokumentaci pro přispěvatele a zajistit plnou připravenost na integraci s dalšími MCP servery (mcp-router, Rust implementace).
+Fáze 1: Stabilizace a Zajištění Kvality (Okamžitá Priorita)
+Tato fáze se zaměřuje na odstranění poslední nestability v testech a zavedení mechanismů, které zabrání budoucím problémům.
+ * 1.1. Finální Oprava Testu should handle client errors
+   * Primární řešení: Upravte test tak, aby simuloval skutečnou chybu násilným ukončením TCP socketu na straně serveru. Toto je robustnější než čisté odpojení a má vysokou šanci, že korektně spustí onerror handler na straně klienta.
+     * V SseManager.ts přidejte metodu destroyClient(clientId), která zavolá client.res.socket?.destroy().
+     * V testu sse.test.ts použijte tuto novou metodu k vyvolání chyby.
+   * Záložní řešení (pokud by i zničení socketu bylo nespolehlivé): Použijte specializovanou mockovací knihovnu pro EventSource, jak je doporučováno v komunitě. To vám dá plnou kontrolu nad chováním a umožní deterministicky vyvolat chybu.
+     * Zvažte balíčky jako @dimak.dev/event-source-mock nebo eventsourcemock.
+     * V testu pak chybu vyvolejte přímo voláním sources[url].emitError(new Error('...')).
+ * 1.2. Ochrana proti Nestabilitě (Flakiness) v CI/CD
+   * Pojistka pro CI: Přidejte do CI workflow možnost přeskočit tento specifický test pomocí proměnné prostředí (např. SKIP_FLAKY_SSE_ERROR_TEST=true). To zajistí, že exotické běhové prostředí v CI nezablokuje celý build kvůli známému problému.
+   * Ukončení Jestu: Do skriptu npm run test:integration přidejte příznak --forceExit. Tím zajistíte, že Jest po dokončení testů spolehlivě ukončí proces a nezůstane viset, což je častý problém u testů s otevřenými SSE spojeními.[1]
+Fáze 2: Rozšíření Testovacího Pokrytí a Validace Protokolu
+Nyní, když je základ stabilní, rozšíříme testování o ověření shody s protokolem a end-to-end scénáře.
+ * 2.1. Zavedení Oficiálních MCP Compliance Testů
+   * Akce: Integrujte do CI pipeline mcp-protocol-validator jako samostatný krok. Tento nástroj ověří, že váš server striktně dodržuje specifikaci Model Context Protocol.
+   * Implementace: V GitHub Actions přidejte krok, který spustí validátor proti běžící instanci serveru.
+ * 2.2. Vytvoření End-to-End (E2E) Integračních Testů
+   * Cíl: Otestovat klíčovou vlastnost projektu – orchestraci v rámci ekosystému.[2]
+   * Akce:
+     * Vytvořte v repozitáři soubor docker-compose.e2e.yml. Tento soubor pomocí existujících obrazů spustí minimální, ale reálnou sestavu: mcp-prompts (aktuální server) a mcp-router jako gateway.[3]
+     * Vytvořte novou testovací sadu e2e.test.ts.
+     * Testovací scénář v e2e.test.ts nevolá mcp-prompts přímo, ale pošle požadavek na mcp-router, který ho následně přesměruje na mcp-prompts. Test ověří, že odpověď je správně doručena zpět.
+Fáze 3: Zlepšení Vývojářské Zkušenosti a Dokumentace
+Kvalitní projekt potřebuje kvalitní dokumentaci, která usnadní zapojení nových přispěvatelů.
+ * 3.1. Vytvoření Komplexního CONTRIBUTING.md
+   * Akce: Vytvořte nový soubor CONTRIBUTING.md s jasnou strukturou.
+   * Obsah: Musí obsahovat následující sekce:
+     * Local Development Setup: Jak rozjet projekt lokálně.
+     * Running Tests: Detailní příkazy pro spuštění všech typů testů:
+       * Unit testy: npm test
+       * Integrační testy (s databází): npm run test:integration
+       * End-to-end testy (s Dockerem): npm run test:e2e
+       * Compliance testy: Jak spustit mcp-protocol-validator.
+     * Pull Request Process: Jaký formát a styl se očekává od PR, včetně nutnosti aktualizovat dokumentaci při změně funkcí.
+ * 3.2. Sjednocení a Optimalizace CI/CD Workflow
+   * Akce: Upravte GitHub Actions workflow tak, aby spouštělo všechny testovací sady (unit, integrační, E2E, compliance) v rámci jednoho jobu nebo provázaných jobů. Tím zajistíte, že každý PR projde kompletní kontrolou kvality.
+   * Optimalizace: Označte pomalé integrační a E2E testy (např. tagem @slow v Jestu) a nakonfigurujte CI tak, aby se na PR spouštěly jen rychlé testy, zatímco kompletní sada (včetně @slow) běžela na nočních buildech nebo při mergi do hlavní větve.
+   * Vizuální Zpětná Vazba: Po úspěšném průchodu mcp-protocol-validator automaticky vygenerujte a aktualizujte badge „MCP Compliant“ v README.md.
+Fáze 4: Strategická Synchronizace Ekosystému
+Zajistíme, aby TypeScript verze zůstala v souladu s ostatními částmi ekosystému, zejména s výkonnostní variantou v Rustu.
+ * 4.1. Zajištění Parity s Rust Implementací
+   * Cíl: Předejít rozdílům v chování mezi TypeScript a Rust verzí (mcp-prompts-rs).[4]
+   * Akce:
+     * Vytvořte sdílenou sadu testovacích scénářů pro API. Ideální formát je Postman nebo Newman kolekce, kterou lze exportovat jako JSON a uložit v repozitáři.
+     * Rozšiřte CI workflow o krok, který spustí tuto sdílenou kolekci jak proti TypeScript serveru, tak (v budoucnu) proti Rust serveru. Tím se jakákoli regrese v API projeví okamžitě.
+     
 Tento seznam obsahuje aktuální úkoly a návrhy pro další rozvoj a zvýšení kvality projektu.
 
 ### 1. Rozšíření a stabilizace funkcí
