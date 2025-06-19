@@ -89,7 +89,7 @@ Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
 ## Documentation
 
-This README is intentionally concise. Full documentation lives in the `docs/` directory:
+This README is intentionally concise. Full documentation lives in the `docs/` directory, and each key directory (`scripts/`, `docker/scripts/`, `legacy/`, `examples/`) contains a README for navigation and usage details.
 
 | Path | What you will find there |
 | --- | --- |
@@ -190,7 +190,7 @@ This list contains current tasks and suggestions for further development and qua
 
 ### 3. Documentation & Clarity
 - [ ] Keep README and user guides concise and up to date
-- [ ] Add/update README files in all key directories (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
+- [x] Add/update README files in all key directories (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
 - [ ] Add detailed examples, FAQ, and troubleshooting sections
 - [ ] Add links to official MCP documentation and community resources
 
