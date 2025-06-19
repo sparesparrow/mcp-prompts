@@ -245,6 +245,14 @@ We are committed to a welcoming, inclusive, and safe community for all contribut
 
 Distributed under the MIT license. See `LICENSE` for more information.
 
+## Project Board & Roadmap
+
+We use a [GitHub Project board](https://github.com/sparesparrow/mcp-prompts/projects) to track issues, features, and roadmap items.
+- See what's planned, in progress, and completed.
+- Suggest new features or improvements by opening an issue or discussion.
+
+**Contributors:** Please check the board for tasks marked "help wanted" or "good first issue"!
+
 ---
 
 ## Using the MDC (Cursor Rules) Adapter
