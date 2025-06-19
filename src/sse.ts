@@ -574,19 +574,22 @@ export class SseManager extends EventEmitter {
   
   /**
    * Broadcast a message to all connected clients
-   * @param message The message to broadcast
-   * @returns Number of clients the message was sent to
    */
-  public async broadcast(message: any): Promise<number> {
-    let sentCount = 0;
-    
+  public broadcast(message: any): void {
+    const data = `data: ${JSON.stringify(message)}\n\n`;
     for (const client of this.clients.values()) {
-      if (await this.writeToClient(client, message)) {
-        sentCount++;
+      if (client.connected) {
+        try {
+          client.res.write(data);
+          if (typeof (client.res as any).flush === 'function') {
+            (client.res as any).flush();
+          }
+          console.log(`[SSE] broadcast: Sent to client ${client.id}:`, data);
+        } catch (err) {
+          console.warn(`[SSE] broadcast: Failed to send to client ${client.id}:`, err);
+        }
       }
     }
-    
-    return sentCount;
   }
   
   /**
@@ -599,6 +602,8 @@ export class SseManager extends EventEmitter {
     // Actual disconnect logic (add more as needed)
     client.connected = false;
     this.clients.delete(clientId);
+    console.log(`[SSE] removeClient: Removed client ${clientId}`);
+    console.log(`[SSE] removeClient: Current client IDs:`, Array.from(this.clients.keys()));
     return true;
   }
   
@@ -701,8 +706,102 @@ export class SseManager extends EventEmitter {
     }
   }
 
+  /**
+   * Add a new SSE client
+   */
+  public addClient(req: IncomingMessage, res: ServerResponse): SseClient {
+    const clientId = randomUUID();
+    const now = new Date();
+    const client: SseClient = {
+      id: clientId,
+      req,
+      res,
+      connected: true,
+      connectedAt: now,
+      lastActivity: now,
+      history: [],
+      metadata: {},
+      reconnectAttempts: 0,
+      maxReconnectAttempts: this._options.maxReconnectAttempts || 5,
+      reconnectDelay: this._options.reconnectDelay || 5000,
+      state: {
+        isReconnecting: false,
+        lastReconnectAttempt: null,
+        consecutiveFailures: 0,
+        lastMessageId: null,
+        isBackoff: false,
+        backoffUntil: null,
+        lastHeartbeat: now,
+        connectionQuality: 'good',
+        customHeaders: {},
+        features: {
+          supportsRetry: true,
+          supportsLastEventId: true,
+          supportsBinary: false,
+          supportsCompression: !!this._options.enableCompression,
+        },
+        metrics: {
+          messagesReceived: 0,
+          messagesSent: 0,
+          bytesReceived: 0,
+          bytesSent: 0,
+          lastLatency: 0,
+          avgLatency: 0,
+          errorCount: 0,
+        },
+      },
+      messageQueue: {
+        messages: [],
+        maxSize: this._options.messageQueueSize || 1000,
+        maxAttempts: this._options.messageRetryAttempts || 3,
+        retentionPeriod: this._options.messageRetentionPeriod || 3600000,
+        currentSize: 0,
+        compressionStats: {
+          totalCompressed: 0,
+          totalUncompressed: 0,
+          avgCompressionRatio: 1,
+          bytesSaved: 0,
+          compressionTimeTotal: 0,
+          compressionTimeAvg: 0,
+          byAlgorithm: {},
+        },
+      },
+    };
+    // Set required SSE headers
+    res.setHeader('Content-Type', 'text/event-stream');
+    res.setHeader('Cache-Control', 'no-cache');
+    res.setHeader('Connection', 'keep-alive');
+    // Initial comment and connected message
+    res.write(':\n\n');
+    res.write('data: "connected"\n\n');
+    if (typeof (res as any).flush === 'function') {
+      (res as any).flush();
+    }
+    console.log(`[SSE] addClient: Added client ${clientId}`);
+    this.clients.set(clientId, client);
+    console.log(`[SSE] addClient: Current client IDs:`, Array.from(this.clients.keys()));
+    // Cleanup on close/error
+    const cleanup = () => {
+      if (this.clients.has(clientId)) {
+        this.clients.delete(clientId);
+        if (this._options.logLevel === 'debug' || process.env.NODE_ENV === 'test') {
+          console.log(`[SSE] Client disconnected: ${clientId}`);
+        }
+      }
+    };
+    req.on('close', cleanup);
+    req.on('aborted', cleanup);
+    res.on('close', cleanup);
+    return client;
+  }
+
   public handleConnection(req: IncomingMessage, res: ServerResponse): void {
-    // Implementation here
+    console.log('[SSE] handleConnection: New connection');
+    const client = this.addClient(req, res);
+    if (this._options.logLevel === 'debug' || process.env.NODE_ENV === 'test') {
+      console.log(`[SSE] handleConnection: client ${client.id} registered. Total clients: ${this.clients.size}`);
+    }
+    console.log('[SSE] handleConnection: Connection setup complete');
   }
 
   public async sendHeartbeat(client: SseClient): Promise<void> {
