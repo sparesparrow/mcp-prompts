@@ -241,6 +241,33 @@ We are committed to a welcoming, inclusive, and safe community for all contribut
 
 ---
 
+## Sustainability
+
+MCP-Prompts is committed to long-term sustainability as both a technical project and a community resource. Our approach includes:
+
+- **Ongoing Maintenance:**
+  - Regular updates, bug fixes, and compatibility with new MCP standards and client versions.
+  - Maintenance costs are minimized through automation and community contributions.
+
+- **Community Engagement:**
+  - Open to contributors of all backgrounds, with clear onboarding, good first issues, and public discussions.
+  - Recognition for contributors and transparent decision-making.
+
+- **Funding and Support:**
+  - Free and open source for all users.
+  - We welcome sponsorships (e.g., GitHub Sponsors, OpenCollective), grants, and paid support contracts for organizations relying on MCP-Prompts.
+
+- **Infrastructure:**
+  - Designed for easy deployment, maintenance, and extension.
+  - Robust CI/CD, automated testing, and clear documentation reduce the maintenance burden.
+
+- **Pathways for Growth:**
+  - As the project grows, we will expand the maintainer team, explore partnerships, and consider optional paid services or consulting (while keeping the core open source).
+
+**We invite all users and organizations who benefit from MCP-Prompts to contribute code, documentation, funding, or feedback to help ensure its long-term sustainability.**
+
+---
+
 ## License
 
 Distributed under the MIT license. See `LICENSE` for more information.
