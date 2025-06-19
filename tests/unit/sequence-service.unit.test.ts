@@ -1,8 +1,8 @@
-import { SequenceServiceImpl } from '../../src/sequence-service';
-import { MemoryAdapter } from '../../src/adapters';
-import { PromptSequence } from '../../src/interfaces';
-import { MdcAdapter } from '../../src/adapters';
-import { Prompt } from '../../src/interfaces';
+import { SequenceServiceImpl } from '../../src/sequence-service.js';
+import { MemoryAdapter } from '../../src/adapters.js';
+import { PromptSequence } from '../../src/interfaces.js';
+import { MdcAdapter } from '../../src/adapters.js';
+import { Prompt } from '../../src/interfaces.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
@@ -129,6 +129,89 @@ describe('MdcAdapter', () => {
     await adapter.savePrompt(prompt);
     const prompts = await adapter.listPrompts();
     expect(prompts.length).toBeGreaterThan(0);
-    expect(prompts.some(p => p.name === 'List Prompt')).toBe(true);
+    expect(prompts.some((p: Prompt) => p.name === 'List Prompt')).toBe(true);
+  });
+});
+
+describe('MdcAdapter edge and error cases', () => {
+  const tempDir = path.join(__dirname, '../../.test-mdc-prompts-edge');
+  let adapter: MdcAdapter;
+
+  beforeEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+    adapter = new MdcAdapter(tempDir);
+  });
+
+  afterEach(async () => {
+    await fs.rm(tempDir, { recursive: true, force: true });
+  });
+
+  it('should throw if not connected', async () => {
+    await expect(adapter.savePrompt({ id: '', name: 'x', description: '', content: '', tags: [], isTemplate: false, variables: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not connected/);
+    await expect(adapter.getPrompt('id')).rejects.toThrow(/not connected/);
+    await expect(adapter.updatePrompt('id', { id: 'id', name: '', description: '', content: '', tags: [], isTemplate: false, variables: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not connected/);
+    await expect(adapter.deletePrompt('id')).rejects.toThrow(/not connected/);
+    await expect(adapter.listPrompts()).rejects.toThrow(/not connected/);
+    await expect(adapter.getAllPrompts()).rejects.toThrow(/not connected/);
+  });
+
+  it('should return null for getPrompt on missing file', async () => {
+    await adapter.connect();
+    const result = await adapter.getPrompt('does-not-exist');
+    expect(result).toBeNull();
+  });
+
+  it('should handle malformed MDC frontmatter gracefully', async () => {
+    await adapter.connect();
+    const badFile = path.join(tempDir, 'bad.mdc');
+    await fs.writeFile(badFile, '---\nthis is not yaml\n---\n\n# Title\n\nContent', 'utf8');
+    const result = await adapter.getPrompt('bad');
+    expect(result).not.toBeNull();
+    expect(result!.name).toBe('Title');
+  });
+
+  it('should filter prompts by tags, isTemplate, category, and search', async () => {
+    await adapter.connect();
+    const prompts = [
+      { id: '', name: 'A', description: '', content: 'foo', tags: ['glob:foo', 'cat:alpha'], isTemplate: false, variables: [], createdAt: '', updatedAt: '', category: 'alpha' },
+      { id: '', name: 'B', description: '', content: 'bar', tags: ['glob:bar'], isTemplate: true, variables: ['x'], createdAt: '', updatedAt: '', category: 'beta' },
+    ];
+    for (const p of prompts) await adapter.savePrompt(p);
+    const all = await adapter.listPrompts();
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    const byTag = await adapter.listPrompts({ tags: ['glob:foo'] });
+    expect(byTag.some(p => p.name === 'A')).toBe(true);
+    const byTemplate = await adapter.listPrompts({ isTemplate: true });
+    expect(byTemplate.every(p => p.isTemplate)).toBe(true);
+    const byCategory = await adapter.listPrompts({ category: 'alpha' });
+    expect(byCategory.every(p => p.category === 'alpha')).toBe(true);
+    const bySearch = await adapter.listPrompts({ search: 'bar' });
+    expect(bySearch.some(p => p.name === 'B')).toBe(true);
+  });
+
+  it('should extract variables from content', async () => {
+    await adapter.connect();
+    const prompt: Prompt = {
+      id: '',
+      name: 'Vars',
+      description: '',
+      content: 'Some text\n\n## Variables\n\n- `foo`\n- `bar`\n',
+      tags: [],
+      isTemplate: true,
+      variables: ['foo', 'bar'],
+      createdAt: '',
+      updatedAt: '',
+    };
+    const saved = await adapter.savePrompt(prompt);
+    const fetched = await adapter.getPrompt(saved.id);
+    expect(fetched!.variables).toContain('foo');
+    expect(fetched!.variables).toContain('bar');
+  });
+
+  it('should return null or throw for sequence methods', async () => {
+    await adapter.connect();
+    expect(await adapter.getSequence('any')).toBeNull();
+    await expect(adapter.saveSequence({ id: 'x', name: '', description: '', promptIds: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not supported/);
+    await expect(adapter.deleteSequence('x')).rejects.toThrow(/not supported/);
   });
 }); 

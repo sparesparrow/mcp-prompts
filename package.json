@@ -28,7 +28,7 @@
     "publish:minor": "./scripts/publish.sh minor",
     "publish:major": "./scripts/publish.sh major",
     "release:patch": "./scripts/release.sh --version patch --publish",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
   },
   "keywords": [
     "mcp",
@@ -51,9 +51,11 @@
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
+    "@types/estree": "^1.0.8",
     "@types/eventsource": "^1.1.15",
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
+    "@types/json-schema": "^7.0.15",
     "@types/pg": "^8.15.4",
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.18.1",
