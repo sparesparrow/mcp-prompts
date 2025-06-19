@@ -613,3 +613,124 @@ The Mermaid diagram server provides a simple HTTP endpoint to visualize prompt r
 - **HTTP Endpoint:** `POST /diagram` — Accepts `{ promptIds: [id1, id2, ...] }` and returns a Mermaid diagram string representing a linear flow of the prompts.
 
 --- 
+
+# TODO
+```
+1. Refactor and Enhance the Main README.md
+Task: Restructure the main README.md file to improve clarity and navigation for new contributors.
+
+Instructions:
+
+Add a Table of Contents at the top of the file to allow easy navigation to key sections (e.g., "What is this?", "Features", "Getting Started", "TODO", "Contributing").
+
+Add more shields.io badges to the top of the README. Include badges for 'license', 'last commit', 'open issues', and a link to the CONTRIBUTING.md.
+
+Create a new section titled "Project Philosophy" or "Core Concepts" that briefly explains the idea of the "Master Control Program" (MCP), the role of prompt engineering in this project, and how the different components (server, storage adapters, prompts) work together.
+
+Ensure all links within the README.md are valid and point to the correct files or external resources.
+
+Add a "Show your support" section with a link to your GitHub Sponsors page or other support channels.
+
+2. Implement the PostgresAdapter
+Task: The current PostgresAdapter in src/adapters.ts is a placeholder. Implement the full functionality for this adapter.
+
+Instructions:
+
+In src/adapters.ts, locate the PostgresAdapter class.
+
+Use the pg (node-postgres) library to connect to the PostgreSQL database. Connection details should be read from the central configuration (src/config.ts), which in turn reads from environment variables.
+
+Implement the get, set, and list methods to perform the corresponding SQL operations (SELECT, INSERT/UPDATE, SELECT *).
+
+Ensure the implementation correctly handles JSON data by serializing/deserializing it when storing/retrieving it from the database.
+
+The database schema is defined in docker/postgres/init/01-init.sql. Your implementation must be compatible with this schema.
+
+Add robust error handling for database connection errors and query failures.
+
+Create a new integration test file tests/integration/postgres-adapter.integration.test.ts to verify the functionality of the implemented adapter. The test should connect to the test database spun up by Docker and test all public methods of the adapter.
+
+3. Enhance Configuration Management
+Task: Improve the configuration management in src/config.ts to be more robust and developer-friendly.
+
+Instructions:
+
+Integrate the zod library to define a schema for all environment variables.
+
+The schema should validate that all required environment variables are present and have the correct type (e.g., PORT should be a number).
+
+At application startup, parse the environment variables using the Zod schema. If validation fails, log a clear error message indicating which variables are missing or invalid, and exit the process.
+
+Update the docker/.env.sample file to include comments explaining each variable.
+
+Update the documentation in docs/02-configuration.md to reflect these changes and list all available environment variables with their purpose and default values.
+
+4. Refactor and Consolidate GitHub Actions Workflows
+Task: Simplify and optimize the GitHub Actions workflows located in .github/workflows.
+
+Instructions:
+
+Combine docker-build.yml and docker-publish.yml into a single workflow file named docker-ci-cd.yml.
+
+This new workflow should trigger on pull_request to build the images (without pushing).
+
+It should trigger on release (type created) to build AND push the images to the container registry.
+
+Use workflow conditions (if: github.event_name == 'release') to control the push step.
+
+Analyze npm-publish.yml and npm-publish-github-packages.yml. If they perform similar steps, merge them into a single, more generic publish.yml workflow that takes secrets as inputs to decide the registry target.
+
+In all workflows that use Node.js, ensure you are using the actions/setup-node action's caching feature to speed up npm install.
+
+Review the triggers for all workflows. Ensure they are not running unnecessarily on every push to every branch. Scope them to main or specific paths where possible.
+
+5. Improve Test Coverage
+Task: Increase the unit and integration test coverage for the application.
+
+Instructions:
+
+sequence-service.ts: Write new unit tests in tests/unit/sequence-service.unit.test.ts that specifically cover the complex logic of handling sequences, including edge cases like empty sequences, sequences with failing steps, and correct variable interpolation.
+
+http-server.ts: Add more tests to src/__tests__/http-server.test.ts to cover all API endpoints. For each endpoint, test the success case (200 OK), error cases (404 Not Found, 400 Bad Request, 500 Internal Server Error), and input validation. Mock the service dependencies (PromptService, SequenceService).
+
+utils.ts: If any utility functions are not covered by existing tests, add a new unit test file for them.
+
+6. Automate API Documentation Generation
+Task: Replace the manual API documentation in docs/04-api-reference.md with an automated solution.
+
+Instructions:
+
+Add extensive TSDoc comments to all API route handlers in src/http-server.ts. Describe what each endpoint does, its parameters (path, query, body), and what it returns.
+
+Use a library like swagger-jsdoc and swagger-ui-express to generate an OpenAPI (Swagger) specification from the TSDoc comments.
+
+Add a new endpoint, /api-docs, to the Express server that serves the interactive Swagger UI.
+
+Remove the content from docs/04-api-reference.md and replace it with a link to the new /api-docs endpoint, explaining that the documentation is now generated automatically and served by the application itself.
+
+7. Create a Detailed CONTRIBUTING.md
+Task: Expand the existing CONTRIBUTING.md file into a comprehensive guide for developers.
+
+Instructions:
+
+Create a "Development Setup" section that explains how to use the Docker-based development environment. Provide step-by-step instructions: clone the repo, create a .env file from the sample, and run docker-compose up.
+
+Add a "Project Structure" section that gives a brief overview of the key directories (src, docs, prompts, docker) and files (http-server.ts, prompt-service.ts, adapters.ts).
+
+Add a "Coding Style" section that mentions the use of ESLint and Prettier and instructs contributors to run npm run lint before submitting code.
+
+Add a "Pull Request Process" section that outlines the steps for submitting a PR: fork the repo, create a feature branch, commit your changes, and open a PR against the main branch. Mention that PRs should reference an existing issue if applicable.
+
+8. Update Dependencies and Manage Security
+Task: Establish a process for regularly updating dependencies to keep the project secure and up-to-date.
+
+Instructions:
+
+Run npm audit to identify any existing vulnerabilities in the dependencies.
+
+Use npm update to update all packages to their latest minor and patch versions according to the package.json semver rules.
+
+For any vulnerabilities that remain, investigate them and create separate issues for packages that require a major version bump.
+
+Add a new GitHub workflow that runs npm audit weekly and creates an issue if any high or critical severity vulnerabilities are found.
+```

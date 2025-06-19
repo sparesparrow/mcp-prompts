@@ -67,23 +67,23 @@ describe('SseManager', () => {
   it('should establish SSE connection', done => {
     const es = new EventSource(`http://localhost:${port}/events`);
     eventSources.push(es);
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
     es.onopen = () => {
       expect(sseManager.getClientIds().length).toBe(1);
       es.close();
       clearTimeout(failTimeout);
       done();
     };
-    es.onerror = () => {
+    es.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE connection error');
+      done(new Error('SSE connection error'));
     };
   });
 
   it('should send and receive messages', done => {
     const es = new EventSource(`http://localhost:${port}/events`);
     eventSources.push(es);
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
     es.onmessage = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       expect(data).toEqual({ type: 'test', content: 'Hello World' });
@@ -91,9 +91,9 @@ describe('SseManager', () => {
       clearTimeout(failTimeout);
       done();
     };
-    es.onerror = () => {
+    es.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE message error');
+      done(new Error('SSE message error'));
     };
     setTimeout(() => {
       sseManager.broadcast({ type: 'test', content: 'Hello World' });
@@ -103,7 +103,7 @@ describe('SseManager', () => {
   it('should handle client disconnection', done => {
     const es = new EventSource(`http://localhost:${port}/events`);
     eventSources.push(es);
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
     es.onopen = () => {
       expect(sseManager.getClientIds().length).toBe(1);
       es.close();
@@ -113,9 +113,9 @@ describe('SseManager', () => {
         done();
       }, 100);
     };
-    es.onerror = () => {
+    es.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE disconnect error');
+      done(new Error('SSE disconnect error'));
     };
   });
 
@@ -125,7 +125,7 @@ describe('SseManager', () => {
     eventSources.push(es1, es2);
     let messageCount = 0;
     const expectedMessages = 2;
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
     const messageHandler = (event: MessageEvent) => {
       const data = JSON.parse(event.data);
       expect(data).toEqual({ type: 'test', content: 'Hello World' });
@@ -139,13 +139,13 @@ describe('SseManager', () => {
     };
     es1.onmessage = messageHandler;
     es2.onmessage = messageHandler;
-    es1.onerror = () => {
+    es1.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE multi-client error 1');
+      done(new Error('SSE multi-client error 1'));
     };
-    es2.onerror = () => {
+    es2.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE multi-client error 2');
+      done(new Error('SSE multi-client error 2'));
     };
     setTimeout(() => {
       sseManager.broadcast({ type: 'test', content: 'Hello World' });
@@ -155,8 +155,8 @@ describe('SseManager', () => {
   it('should handle client errors', done => {
     const es = new EventSource(`http://localhost:${port}/events`);
     eventSources.push(es);
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
-    es.onerror = () => {
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
+    es.onerror = (err) => {
       expect(sseManager.getClientIds().length).toBe(0);
       clearTimeout(failTimeout);
       done();
@@ -177,7 +177,7 @@ describe('SseManager', () => {
   it('should clean up stale connections', done => {
     const es = new EventSource(`http://localhost:${port}/events`);
     eventSources.push(es);
-    const failTimeout = setTimeout(() => done.fail('Timeout'), 10000);
+    const failTimeout = setTimeout(() => done(new Error('Timeout')), 10000);
     es.onopen = () => {
       expect(sseManager.getClientIds().length).toBe(1);
       // Simulate a stale connection by forcing cleanup
@@ -191,9 +191,9 @@ describe('SseManager', () => {
         done();
       }, 100);
     };
-    es.onerror = () => {
+    es.onerror = (err) => {
       clearTimeout(failTimeout);
-      done.fail('SSE stale connection error');
+      done(new Error('SSE stale connection error'));
     };
   });
 }); 

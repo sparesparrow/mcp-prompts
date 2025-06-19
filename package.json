@@ -4,7 +4,7 @@
   "description": "An MCP server for managing and providing prompts and prompt templates",
   "type": "module",
   "bin": {
-    "mcp-prompts": "dist/index.js"
+    "mcp-prompts": "dist/src/index.js"
   },
   "files": [
     "dist"
@@ -12,7 +12,7 @@
   "scripts": {
     "lint": "eslint 'src/**/*.ts' && prettier --check .",
     "validate:prompts": "ts-node src/scripts/validate-prompts.ts",
-    "build": "tsc && shx chmod +x dist/*.js dist/scripts/*.js",
+    "build": "tsc && shx chmod +x dist/src/*.js dist/src/scripts/*.js",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "clean": "rimraf dist",
