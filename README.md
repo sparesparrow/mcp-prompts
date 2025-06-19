@@ -70,7 +70,7 @@ curl http://localhost:3003/health
 | File storage adapter | ✅ | stable |
 | Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
-| MDC adapter (Cursor Rules) | 🛠️ | conceptual, not yet implemented |
+| MDC adapter (Cursor Rules) | ⚠️ | experimental, available in main branch |
 | HTTP server + SSE | ⚠️ | experimental |
 | ElasticSearch adapter | 🛠️ | v1.3 roadmap |
 | Orchestrator integration | 🛠️ | concept |
@@ -100,6 +100,13 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 
 ---
 
+## User Guides
+
+- [How to use MCP-Prompts with Claude Desktop and Cursor IDE (English)](./USER_GUIDE.md)
+- [Jak používat MCP-Prompts s Claude Desktop a Cursor IDE (česky)](./USER_GUIDE-cs.md)
+
+---
+
 ## Contributing
 
 We love contributions! Please read `CONTRIBUTING.md` for the workflow, coding style, and how to run the test suite.
@@ -108,4 +115,29 @@ We love contributions! Please read `CONTRIBUTING.md` for the workflow, coding st
 
 ## License
 
-Distributed under the MIT license. See `LICENSE` for more information. 
+Distributed under the MIT license. See `LICENSE` for more information.
+
+---
+
+## Using the MDC (Cursor Rules) Adapter
+
+To use the MDC adapter for storage (experimental):
+
+```
+STORAGE_TYPE=mdc
+MDC_RULES_DIR=./.cursor/rules
+```
+
+Or with Docker:
+
+```
+docker run -d --name mcp-prompts \
+  -p 3003:3003 \
+  -e HTTP_SERVER=true \
+  -e STORAGE_TYPE=mdc \
+  -e MDC_RULES_DIR=/.cursor/rules \
+  -v $(pwd)/.cursor/rules:/.cursor/rules \
+  sparesparrow/mcp-prompts:latest
+```
+
+See `docs/03-storage-adapters.md` for details. 
