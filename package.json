@@ -10,6 +10,7 @@
     "dist"
   ],
   "scripts": {
+    "test": "npm run test:unit && npm run test:integration",
     "lint": "eslint 'src/**/*.ts' && prettier --check .",
     "validate:prompts": "ts-node src/scripts/validate-prompts.ts",
     "build": "tsc && shx chmod +x dist/src/*.js dist/src/scripts/*.js",
