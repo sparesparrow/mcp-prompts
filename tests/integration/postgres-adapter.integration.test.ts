@@ -175,7 +175,7 @@ describe('PostgresAdapter Integration', () => {
     expect(savedPrompt).toBeDefined();
     
     // Act
-    const deleteResult = await adapter.deletePrompt(promptId);
+    await adapter.deletePrompt(promptId);
     
     // Assert - Try to retrieve the deleted prompt
     try {
@@ -186,8 +186,6 @@ describe('PostgresAdapter Integration', () => {
       // If an error is thrown, verify it's because the prompt wasn't found
       expect((error as Error).message).toContain('not found');
     }
-    
-    expect(deleteResult).toBe(true);
   });
   
   itOrSkip('should handle connection failures gracefully', async () => {

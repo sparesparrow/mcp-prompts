@@ -4,7 +4,7 @@
  */
 
 import type { StorageAdapter } from './interfaces.js';
-import { Prompt } from './interfaces.js';
+import { Prompt, ApplyTemplateResult } from './interfaces.js';
 import { CreatePromptArgs, UpdatePromptArgs, ListPromptsArgs, defaultPrompts } from './prompts.js';
 
 export class PromptService {
@@ -125,8 +125,8 @@ export class PromptService {
     return this.storage.updatePrompt(id, updated);
   }
 
-  async deletePrompt(id: string): Promise<boolean> {
-    return this.storage.deletePrompt(id);
+  async deletePrompt(id: string): Promise<void> {
+    await this.storage.deletePrompt(id);
   }
 
   async getPrompt(id: string): Promise<Prompt | null> {
@@ -150,7 +150,7 @@ export class PromptService {
     });
   }
 
-  async applyTemplate(id: string, variables: Record<string, string>): Promise<string> {
+  async applyTemplate(id: string, variables: Record<string, string>): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id);
     if (!prompt) {
       throw new Error(`Template prompt not found: ${id}`);
@@ -166,11 +166,14 @@ export class PromptService {
 
     // Check for any remaining template variables
     const remaining = content.match(/{{[^}]+}}/g);
-    if (remaining) {
-      throw new Error(`Missing template variables: ${remaining.join(', ')}`);
-    }
+    const missingVariables = remaining ? remaining.map(v => v.replace(/{{|}}/g, '').trim()) : undefined;
 
-    return content;
+    return {
+      content,
+      originalPrompt: prompt,
+      appliedVariables: variables,
+      missingVariables
+    };
   }
 
   /**
@@ -267,5 +270,10 @@ export class PromptService {
     }
     
     return result;
+  }
+
+  // Alias for interface compatibility
+  public async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    return this.createPrompt(data as any);
   }
 } 

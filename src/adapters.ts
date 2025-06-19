@@ -21,6 +21,7 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
+import { Client } from '@elastic/elasticsearch';
 
 /**
  * FileAdapter Implementation
@@ -105,19 +106,18 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<boolean> {
+  async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
       throw new Error("File storage not connected");
     }
     try {
       await fs.unlink(path.join(this.promptsDir, `${id}.json`));
-      return true;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        return false;
+        // no return value
       }
-      console.error(`Error deleting prompt ${id} from file:`, error);
-      throw error;
+        console.error(`Error deleting prompt ${id} from file:`, error);
+        throw error;
     }
   }
 
@@ -303,11 +303,11 @@ export class MemoryAdapter implements StorageAdapter {
     return prompt;
   }
 
-  async deletePrompt(id: string): Promise<boolean> {
+  async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
       throw new Error("Memory storage not connected");
     }
-    return this.prompts.delete(id);
+    this.prompts.delete(id);
   }
 
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
@@ -488,12 +488,11 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<boolean> {
+  async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
       throw new Error("PostgreSQL storage not connected");
     }
     const result = await this.pool.query('DELETE FROM prompts WHERE id = $1', [id]);
-    return result.rowCount > 0;
   }
 
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
@@ -653,17 +652,16 @@ export class MdcAdapter implements StorageAdapter {
     return updated;
   }
 
-  async deletePrompt(id: string): Promise<boolean> {
+  async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
       throw new Error("MDC storage not connected");
     }
     const filePath = this.getFilePath(id);
     try {
       await fs.unlink(filePath);
-      return true;
     } catch (error: any) {
       if (error.code === 'ENOENT') {
-        return false;
+        // no return value
       }
       throw error;
     }
@@ -791,25 +789,324 @@ export class MdcAdapter implements StorageAdapter {
   }
 }
 
+/**
+ * ElasticSearch Adapter Implementation
+ * Stores prompts in ElasticSearch with support for k-NN search
+ */
+export class ElasticSearchAdapter implements StorageAdapter {
+  private client: Client;
+  private index: string;
+  private connected: boolean = false;
+  private sequenceIndex: string;
+
+  constructor(config: {
+    node: string;
+    auth?: { username: string; password: string };
+    index?: string;
+    sequenceIndex?: string;
+  }) {
+    this.client = new Client({
+      node: config.node,
+      auth: config.auth,
+    });
+    this.index = config.index || 'prompts';
+    this.sequenceIndex = config.sequenceIndex || 'prompt-sequences';
+  }
+
+  async connect(): Promise<void> {
+    try {
+      // Check if indices exist, create if not
+      const promptsExists = await this.client.indices.exists({ index: this.index });
+      if (!promptsExists) {
+        await this.client.indices.create({
+          index: this.index,
+          mappings: {
+            properties: {
+              id: { type: 'keyword' },
+              name: { type: 'text' },
+              description: { type: 'text' },
+              content: { type: 'text' },
+              isTemplate: { type: 'boolean' },
+              variables: { type: 'keyword' },
+              tags: { type: 'keyword' },
+              category: { type: 'keyword' },
+              createdAt: { type: 'date' },
+              updatedAt: { type: 'date' },
+              version: { type: 'integer' },
+              metadata: { type: 'object' }
+            }
+          }
+        });
+      }
+
+      const sequencesExists = await this.client.indices.exists({ index: this.sequenceIndex });
+      if (!sequencesExists) {
+        await this.client.indices.create({
+          index: this.sequenceIndex,
+          mappings: {
+            properties: {
+              id: { type: 'keyword' },
+              name: { type: 'text' },
+              description: { type: 'text' },
+              promptIds: { type: 'keyword' },
+              createdAt: { type: 'date' },
+              updatedAt: { type: 'date' },
+              metadata: { type: 'object' }
+            }
+          }
+        });
+      }
+
+      this.connected = true;
+      console.error(`ElasticSearch storage connected: ${this.index}`);
+    } catch (error: any) {
+      console.error("Error connecting to ElasticSearch:", error);
+      throw new Error(`Failed to connect to ElasticSearch: ${error.message}`);
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    await this.client.close();
+    this.connected = false;
+    console.error("ElasticSearch storage disconnected");
+  }
+
+  async isConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
+  async savePrompt(prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      await this.client.index({
+        index: this.index,
+        id: prompt.id,
+        document: prompt,
+        refresh: true
+      });
+      return prompt;
+    } catch (error: any) {
+      console.error("Error saving prompt to ElasticSearch:", error);
+      throw error;
+    }
+  }
+
+  async getPrompt(id: string): Promise<Prompt | null> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      const response = await this.client.get({
+        index: this.index,
+        id: id
+      });
+      return response._source as Prompt;
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        return null;
+      }
+      console.error(`Error getting prompt ${id} from ElasticSearch:`, error);
+      throw error;
+    }
+  }
+
+  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      await this.client.update({
+        index: this.index,
+        id: id,
+        doc: prompt,
+        refresh: true
+      });
+      return prompt;
+    } catch (error: any) {
+      console.error(`Error updating prompt ${id} in ElasticSearch:`, error);
+      throw error;
+    }
+  }
+
+  async deletePrompt(id: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      const response = await this.client.delete({
+        index: this.index,
+        id: id,
+        refresh: true
+      });
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        // no return value
+      }
+      console.error(`Error deleting prompt ${id} from ElasticSearch:`, error);
+      throw error;
+    }
+  }
+
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      const query: any = {
+        bool: {
+          must: []
+        }
+      };
+
+      if (options?.isTemplate !== undefined) {
+        query.bool.must.push({ term: { isTemplate: options.isTemplate } });
+      }
+
+      if (options?.category) {
+        query.bool.must.push({ term: { category: options.category } });
+      }
+
+      if (options?.tags && options.tags.length > 0) {
+        query.bool.must.push({ terms: { tags: options.tags } });
+      }
+
+      if (options?.search) {
+        query.bool.must.push({
+          multi_match: {
+            query: options.search,
+            fields: ['name^2', 'description', 'content']
+          }
+        });
+      }
+
+      const response = await this.client.search({
+        index: this.index,
+        query,
+        sort: options?.sort ? [
+          { [options.sort]: { order: options.order || 'asc' } }
+        ] : undefined,
+        from: options?.offset || 0,
+        size: options?.limit || 10
+      });
+
+      return response.hits.hits.map(hit => hit._source as Prompt);
+    } catch (error: any) {
+      console.error("Error listing prompts from ElasticSearch:", error);
+      throw error;
+    }
+  }
+
+  async getAllPrompts(): Promise<Prompt[]> {
+    return this.listPrompts({ limit: 10000 });
+  }
+
+  async getSequence(id: string): Promise<PromptSequence | null> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      const response = await this.client.get({
+        index: this.sequenceIndex,
+        id: id
+      });
+      return response._source as PromptSequence;
+    } catch (error: any) {
+      if (error.statusCode === 404) {
+        return null;
+      }
+      console.error(`Error getting sequence ${id} from ElasticSearch:`, error);
+      throw error;
+    }
+  }
+
+  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      await this.client.index({
+        index: this.sequenceIndex,
+        id: sequence.id,
+        document: sequence,
+        refresh: true
+      });
+      return sequence;
+    } catch (error: any) {
+      console.error("Error saving sequence to ElasticSearch:", error);
+      throw error;
+    }
+  }
+
+  async deleteSequence(id: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("ElasticSearch storage not connected");
+    }
+
+    try {
+      await this.client.delete({
+        index: this.sequenceIndex,
+        id: id,
+        refresh: true
+      });
+    } catch (error: any) {
+      if (error.statusCode !== 404) {
+        console.error(`Error deleting sequence ${id} from ElasticSearch:`, error);
+        throw error;
+      }
+    }
+  }
+}
+
 export interface StorageConfig {
-  type: 'file' | 'memory' | 'postgres' | 'mdc';
+  type: 'file' | 'memory' | 'postgres' | 'mdc' | 'elasticsearch';
   promptsDir?: string;
   backupsDir?: string;
   postgres?: pg.PoolConfig;
   mdcRulesDir?: string;
+  elasticsearch?: {
+    node: string;
+    auth?: {
+      username: string;
+      password: string;
+    };
+    index?: string;
+    sequenceIndex?: string;
+  };
 }
 
 export function createStorageAdapter(config: StorageConfig): StorageAdapter {
   switch (config.type) {
     case 'file':
-      return new FileAdapter(config.promptsDir || './prompts');
+      if (!config.promptsDir) {
+        throw new Error('promptsDir is required for file storage');
+      }
+      return new FileAdapter(config.promptsDir);
     case 'memory':
       return new MemoryAdapter();
     case 'postgres':
-      if (!config.postgres) throw new Error('Missing postgres config');
+      if (!config.postgres) {
+        throw new Error('postgres config is required for postgres storage');
+      }
       return new PostgresAdapter(config.postgres);
     case 'mdc':
-      return new MdcAdapter(config.mdcRulesDir || './.cursor/rules');
+      if (!config.mdcRulesDir) {
+        throw new Error('mdcRulesDir is required for MDC storage');
+      }
+      return new MdcAdapter(config.mdcRulesDir);
+    case 'elasticsearch':
+      if (!config.elasticsearch) {
+        throw new Error('elasticsearch config is required for elasticsearch storage');
+      }
+      return new ElasticSearchAdapter(config.elasticsearch);
     default:
       throw new Error(`Unknown storage type: ${config.type}`);
   }

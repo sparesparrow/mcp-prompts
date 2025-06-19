@@ -3,6 +3,9 @@
  * Contains all interface definitions for the MCP Prompts Server
  */
 
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { z } from 'zod';
+
 /**
  * Variable definition for templates
  */
@@ -427,7 +430,7 @@ export interface PromptService {
    * @param id Prompt ID
    * @returns The prompt
    */
-  getPrompt(id: string): Promise<Prompt>;
+  getPrompt(id: string): Promise<Prompt | null>;
   
   /**
    * Add a new prompt
@@ -608,6 +611,9 @@ export interface ServerConfig {
   /** Enable HTTP server */
   httpServer: boolean;
   
+  /** Enable MCP server */
+  mcpServer: boolean;
+  
   /** HTTP server host */
   host: string;
   
@@ -685,4 +691,125 @@ export interface PromptSequence {
 
   /** Optional metadata for additional information */
   metadata?: Record<string, any>;
+}
+
+export interface MCPServerCapabilities {
+  prompts: boolean;
+  templates: boolean;
+  sequences: boolean;
+  streaming: boolean;
+  elicitation: boolean;
+}
+
+export interface MCPServerConfig {
+  name: string;
+  version: string;
+  capabilities: MCPServerCapabilities;
+}
+
+export interface AddPromptInput {
+  name: string;
+  content: string;
+  description?: string;
+  isTemplate?: boolean;
+  tags?: string[];
+  variables?: string[];
+}
+
+export interface EditPromptInput {
+  id: string;
+  name?: string;
+  content?: string;
+  description?: string;
+  isTemplate?: boolean;
+  tags?: string[];
+  variables?: string[];
+}
+
+export interface GetPromptInput {
+  id: string;
+}
+
+export interface ListPromptsInput {
+  tags?: string[];
+}
+
+export interface ApplyTemplateInput {
+  id: string;
+  variables: Record<string, string>;
+}
+
+export interface PromptServiceResponse<T> {
+  success: boolean;
+  data?: T;
+  error?: string;
+}
+
+export interface CreateSequenceInput {
+  name: string;
+  steps: Array<{
+    promptId: string;
+    variables?: Record<string, string>;
+  }>;
+  description?: string;
+  tags?: string[];
+}
+
+export interface ExecuteSequenceInput {
+  id: string;
+  variables?: Record<string, string>;
+}
+
+export interface SequenceExecutionResult {
+  id: string;
+  name: string;
+  results: Array<{
+    stepIndex: number;
+    promptId: string;
+    result: string;
+  }>;
+}
+
+export interface StreamingPromptResult {
+  type: 'token' | 'error' | 'end';
+  content?: string;
+  error?: string;
+}
+
+export interface ElevenLabsConfig {
+  apiKey: string;
+  modelId?: string;
+  voiceId?: string;
+  optimizationLevel?: 'speed' | 'quality' | 'balanced';
+  stability?: number;
+  similarityBoost?: number;
+  speakerBoost?: boolean;
+  style?: number;
+  useCaching?: boolean;
+  cachePath?: string;
+}
+
+export interface AudioGenerationOptions {
+  text: string;
+  voiceId?: string;
+  modelId?: string;
+  optimizationPreset?: 'speed' | 'quality' | 'balanced';
+  stability?: number;
+  similarityBoost?: number;
+  speakerBoost?: boolean;
+  style?: number;
+}
+
+export interface AudioGenerationResult {
+  audioData: Buffer;
+  metadata: {
+    duration: number;
+    wordCount: number;
+    charCount: number;
+    costEstimate: number;
+  };
+  cacheInfo?: {
+    hit: boolean;
+    path?: string;
+  };
 } 

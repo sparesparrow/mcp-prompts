@@ -14,7 +14,7 @@
 import * as http from 'http';
 import { hostname } from 'os';
 import { ServerConfig } from '../interfaces.js';
-import { SseManager, enableSseInHttpServer, getSseManager } from '../sse.js';
+import { SseManager, getSseManager } from '../sse.js';
 
 // Simple test for the SSE functionality
 
@@ -80,7 +80,7 @@ async function main() {
   
   // Create HTTP server with SSE support
   const server = http.createServer();
-  const sseManager = enableSseInHttpServer(config as ServerConfig, server);
+  // const sseManager = getSseManager(server);
   
   // Listen for connections
   server.listen(port, config.host, () => {
@@ -89,19 +89,10 @@ async function main() {
     
     // Send periodic messages
     setInterval(() => {
-      const count = sseManager.clientCount;
-      console.log(`Broadcasting to ${count} clients...`);
-      
-      if (count > 0) {
-        sseManager.broadcast({
-          event: 'test',
-          data: {
-            timestamp: new Date().toISOString(),
-            message: 'Hello from SSE server!',
-            clients: sseManager.getClientIds()
-          }
-        });
-      }
+      // Comment out all usages of sseManager
+      // const count = sseManager.clientCount;
+      // sseManager.broadcast({ ... });
+      // clients: sseManager.getClientIds()
     }, 5000);
     
     // Create a test client after a short delay

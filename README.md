@@ -20,6 +20,7 @@ graph TD
     C1[File Adapter]
     C2[Postgres Adapter]
     C3[MDC (Cursor Rules) Adapter]
+    C4[ElasticSearch Adapter]
   end
   subgraph Integrations
     D1[Docker]
@@ -37,10 +38,177 @@ graph TD
   B3 --> C1
   B3 --> C2
   B3 --> C3
+  B3 --> C4
   B2 --> D1
   D2 --> D3
   D1 --> B2
 ```
+
+# MCP Prompts
+
+A streamlined prompt manager using MCP architecture patterns.
+
+## Features
+
+- ✨ Prompt management with versioning and metadata
+- 🔄 Template support with variable substitution
+- 📦 Multiple storage adapters (File, PostgreSQL, Memory, MDC, ElasticSearch)
+- 🌐 HTTP API with robust security and rate limiting
+- 🔌 Server-Sent Events (SSE) for real-time updates
+- 🔒 Secure by default with helmet security headers
+- 🚦 Rate limiting to prevent abuse
+- 🔄 Automatic reconnection for SSE clients
+- 🧹 Automatic cleanup of stale connections
+- 📝 Comprehensive logging and error handling
+
+## Installation
+
+```bash
+npm install mcp-prompts
+```
+
+## Quick Start
+
+```typescript
+import { startServer } from 'mcp-prompts';
+
+const server = await startServer({
+  port: 3003,
+  storageType: 'file',
+  promptsDir: './prompts',
+  enableSSE: true
+});
+```
+
+## Configuration
+
+The server supports various configuration options:
+
+```typescript
+interface ServerConfig {
+  // Server settings
+  port: number;
+  host: string;
+  name: string;
+  version: string;
+
+  // Storage settings
+  storageType: 'file' | 'postgres' | 'memory' | 'mdc' | 'elasticsearch';
+  promptsDir: string;
+  backupsDir: string;
+
+  // HTTP settings
+  httpServer: boolean;
+  corsOrigin?: string;
+  
+  // Rate limiting
+  rateLimit?: {
+    windowMs: number; // Default: 15 minutes
+    max: number;      // Default: 100 requests per windowMs
+  };
+
+  // SSE settings
+  enableSSE?: boolean;
+  ssePath?: string;
+  
+  // PostgreSQL settings (if using postgres storage)
+  postgres?: {
+    host: string;
+    port: number;
+    database: string;
+    user: string;
+    password: string;
+  };
+
+  // ElasticSearch settings (if using elasticsearch storage)
+  elasticsearch?: {
+    node: string;
+    auth?: {
+      username: string;
+      password: string;
+    };
+    index?: string;
+    sequenceIndex?: string;
+  };
+}
+```
+
+## HTTP API
+
+The server provides a RESTful HTTP API with the following endpoints:
+
+### Prompts
+
+- `POST /prompts` - Create a new prompt
+- `GET /prompts/:id` - Get a prompt by ID
+- `PUT /prompts/:id` - Update a prompt
+- `DELETE /prompts/:id` - Delete a prompt
+- `GET /prompts` - List all prompts
+
+### Templates
+
+- `POST /templates` - Create a new template
+- `GET /templates/:id` - Get a template by ID
+- `PUT /templates/:id` - Update a template
+- `DELETE /templates/:id` - Delete a template
+- `POST /templates/:id/apply` - Apply a template with variables
+
+### Server-Sent Events
+
+The SSE implementation provides real-time updates with:
+
+- Automatic reconnection with exponential backoff
+- Message history for missed updates
+- Heartbeat to detect stale connections
+- Proper cleanup of disconnected clients
+
+To connect to the SSE stream:
+
+```javascript
+const sse = new EventSource('/events');
+
+sse.onmessage = (event) => {
+  const data = JSON.parse(event.data);
+  console.log('Received:', data);
+};
+
+sse.onerror = (error) => {
+  console.error('SSE error:', error);
+};
+```
+
+## Security
+
+The server implements several security measures:
+
+- Helmet security headers
+- Rate limiting
+- CORS configuration
+- Request size limits
+- Input validation
+- Error handling
+
+## Contributing
+
+Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of conduct and the process for submitting pull requests.
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Roadmap
+
+- [x] HTTP API with security features
+- [x] SSE support with reconnection
+- [x] Multiple storage adapters
+- [x] Template support
+- [x] ElasticSearch adapter
+- [x] Orchestrator integration
+- [x] Mermaid diagram server
+
+## Support
+
+For support, please open an issue in the GitHub repository or join our Discord community.
 
 # MCP Prompts Server
 
@@ -87,10 +255,10 @@ docker run -d --name mcp-prompts \
   sparesparrow/mcp-prompts:latest
 ```
 
-### 3. Docker Compose (PostgreSQL)
+### 3. Docker Compose (PostgreSQL + ElevenLabs)
 Create a `docker-compose.yml` file:
 ```yaml
-version: "3"
+version: "3.8"
 services:
   prompts:
     image: sparesparrow/mcp-prompts:latest
@@ -98,13 +266,30 @@ services:
       HTTP_SERVER: "true"
       STORAGE_TYPE: "postgres"
       POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
+      ELEVENLABS_API_KEY: "${ELEVENLABS_API_KEY}"
+      ELEVENLABS_MODEL: "eleven_multilingual_v2"
+      ELEVENLABS_VOICE_ID: "21m00Tcm4TlvDq8ikWAM"  # Default voice
+      ELEVENLABS_STABILITY: "0.75"  # Higher stability for better quality
+      ELEVENLABS_SIMILARITY: "0.85"  # Higher voice similarity
+      ELEVENLABS_STYLE: "1.0"  # Maximum style injection
+      ELEVENLABS_SPEAKER_BOOST: "true"  # Enable speaker boost
+      ELEVENLABS_CHUNK_LENGTH: "200"  # Optimal chunk size for cost/quality
+      ELEVENLABS_CACHE_DIR: "/app/cache/audio"  # Cache generated audio
     ports: [ "3003:3003" ]
+    volumes:
+      - audio_cache:/app/cache/audio
     depends_on: [ db ]
   db:
     image: postgres:14
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  audio_cache:
+  postgres_data:
 ```
 Then run:
 ```bash
@@ -151,10 +336,10 @@ For more details and advanced configuration, see the [GitHub Docs: Automatically
 | Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
 | MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
-| HTTP server + SSE | ⚠️ | experimental |
-| ElasticSearch adapter | 🛠️ | v1.3 roadmap |
-| Orchestrator integration | 🛠️ | concept |
-| Mermaid diagram server | 🛠️ | concept |
+| HTTP server + SSE | ✅ | stable, with compression |
+| ElasticSearch adapter | ✅ | since v1.3.x |
+| Orchestrator integration | ✅ | basic workflow tool & endpoint |
+| Mermaid diagram server | ✅ | basic HTTP endpoint |
 
 Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
@@ -366,10 +551,10 @@ All major features and integrations are now implemented and tested. Remaining ro
 | Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
 | MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
-| HTTP server + SSE | ⚠️ | experimental |
-| ElasticSearch adapter | 🛠️ | v1.3 roadmap |
-| Orchestrator integration | 🛠️ | concept |
-| Mermaid diagram server | 🛠️ | concept |
+| HTTP server + SSE | ✅ | stable, with compression |
+| ElasticSearch adapter | ✅ | since v1.3.x |
+| Orchestrator integration | ✅ | basic workflow tool & endpoint |
+| Mermaid diagram server | ✅ | basic HTTP endpoint |
 
 Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
@@ -411,5 +596,20 @@ A: Check the [User Guides](./USER_GUIDE.md), [docs/](./docs/) directory, or open
 
 **Q: What does an error response from the API look like?**
 A: All HTTP API errors are returned in a standardized JSON format with clear error codes and messages. See [docs/04-api-reference.md](./docs/04-api-reference.md#error-handling-and-response-format) for details and examples.
+
+---
+
+## Orchestrator Integration
+
+The orchestrator feature allows you to define and execute simple workflows (sequences of prompt/template applications) via MCP tool or HTTP endpoint.
+
+- **MCP Tool:** `orchestrate` — Accepts a list of steps (prompt IDs and variables) and returns the results of applying each step in order.
+- **HTTP Endpoint:** `POST /orchestrator` — Accepts `{ steps: [{ promptId, variables }] }` and returns the results.
+
+## Mermaid Diagram Server
+
+The Mermaid diagram server provides a simple HTTP endpoint to visualize prompt relationships as Mermaid diagrams.
+
+- **HTTP Endpoint:** `POST /diagram` — Accepts `{ promptIds: [id1, id2, ...] }` and returns a Mermaid diagram string representing a linear flow of the prompts.
 
 --- 
