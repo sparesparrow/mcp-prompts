@@ -109,6 +109,8 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 
 > **New:** See [examples/advanced-workflow-example.json](./examples/advanced-workflow-example.json) and the expanded [Templates Guide](./docs/05-templates-guide.md) for advanced prompt chaining and workflow usage.
 
+> **Validation:** Prompts are now validated for required fields, duplicate IDs, variable consistency, and content format. See [src/prompt-service.ts](./src/prompt-service.ts) for details.
+
 ---
 
 ## Official MCP Documentation & Community Resources
@@ -194,6 +196,7 @@ This list contains current tasks and suggestions for further development and qua
 - [x] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
 - [x] Add and extend user guides (EN, CZ) for all supported clients and integrations
 - [x] Add advanced workflow and prompt usage examples
+- [x] Implement advanced prompt validation (e.g. check for duplicate IDs, required fields, variable usage)
 
 ### 2. Testing & CI/CD
 - [x] Ensure high test coverage (unit, integration, E2E)
@@ -241,7 +244,6 @@ This list contains current tasks and suggestions for further development and qua
 
 Below are concrete actionable tasks and TODOs for contributors. If you want to help, pick an unchecked item or open a new issue!
 
-- [ ] Implement advanced prompt validation (e.g. check for duplicate IDs, required fields, variable usage)
 - [ ] Add integration tests for MDC (Cursor Rules) adapter
 - [ ] Improve error messages and user feedback in API responses
 - [ ] Add screenshots to user guides (EN, CZ) for all major clients (Claude Desktop, Cursor IDE, LM Studio, LibreChat)

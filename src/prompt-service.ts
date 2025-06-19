@@ -28,6 +28,75 @@ export class PromptService {
     }
   }
 
+  /**
+   * Validate a prompt for required fields, duplicate IDs, variable consistency, and content format
+   * Throws an error with details if validation fails
+   */
+  private async validatePrompt(prompt: Prompt, isUpdate = false): Promise<void> {
+    const errors: string[] = [];
+
+    // Required fields
+    if (!prompt.id || typeof prompt.id !== 'string' || !prompt.id.trim()) {
+      errors.push('Missing or invalid required field: id');
+    }
+    if (!prompt.name || typeof prompt.name !== 'string' || !prompt.name.trim()) {
+      errors.push('Missing or invalid required field: name');
+    }
+    if (!prompt.content || typeof prompt.content !== 'string' || !prompt.content.trim()) {
+      errors.push('Missing or invalid required field: content');
+    }
+    if (!prompt.createdAt || typeof prompt.createdAt !== 'string') {
+      errors.push('Missing required field: createdAt');
+    }
+    if (!prompt.updatedAt || typeof prompt.updatedAt !== 'string') {
+      errors.push('Missing required field: updatedAt');
+    }
+    if (typeof prompt.version !== 'number') {
+      errors.push('Missing or invalid required field: version');
+    }
+
+    // Duplicate ID check (on create)
+    if (!isUpdate) {
+      const allPrompts = await this.storage.listPrompts();
+      if (allPrompts.some(p => p.id === prompt.id)) {
+        errors.push(`Duplicate prompt ID: '${prompt.id}'`);
+      }
+    }
+
+    // Variable consistency (for templates)
+    if (prompt.isTemplate) {
+      const contentVars = Array.from(
+        new Set((prompt.content.match(/{{\s*([a-zA-Z0-9_]+)\s*}}/g) || []).map(v => v.replace(/{{\s*|\s*}}/g, '')))
+      );
+      const declaredVars = Array.isArray(prompt.variables)
+        ? prompt.variables.map(v => (typeof v === 'string' ? v : v.name))
+        : [];
+      // All referenced must be declared
+      const missing = contentVars.filter(v => !declaredVars.includes(v));
+      if (missing.length) {
+        errors.push(`Variables used in content but not declared: ${missing.join(', ')}`);
+      }
+      // All declared must be used
+      const unused = declaredVars.filter(v => !contentVars.includes(v));
+      if (unused.length) {
+        errors.push(`Variables declared but not used in content: ${unused.join(', ')}`);
+      }
+    }
+
+    // Content format: no empty/whitespace-only content
+    if (!prompt.content || !prompt.content.trim()) {
+      errors.push('Prompt content is empty or whitespace only');
+    }
+    // Sanitization: remove trailing spaces, normalize line endings
+    prompt.content = prompt.content.replace(/[ \t]+$/gm, '').replace(/\r\n?/g, '\n');
+
+    if (errors.length) {
+      const error = new Error('Prompt validation failed');
+      (error as any).details = errors;
+      throw error;
+    }
+  }
+
   async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
     const prompt: Prompt = {
       id: args.name.toLowerCase().replace(/\s+/g, '-'),
@@ -36,7 +105,7 @@ export class PromptService {
       updatedAt: new Date().toISOString(),
       version: 1
     };
-
+    await this.validatePrompt(prompt, false);
     return this.storage.savePrompt(prompt);
   }
 
@@ -45,7 +114,6 @@ export class PromptService {
     if (!existing) {
       throw new Error(`Prompt not found: ${id}`);
     }
-
     const updated: Prompt = {
       ...existing,
       ...args,
@@ -53,7 +121,7 @@ export class PromptService {
       updatedAt: new Date().toISOString(),
       version: (existing.version || 1) + 1
     };
-
+    await this.validatePrompt(updated, true);
     return this.storage.updatePrompt(id, updated);
   }
 

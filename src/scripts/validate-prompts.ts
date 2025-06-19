@@ -14,7 +14,8 @@ import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { cwd } from 'process';
-import Ajv from 'ajv';
+import { PromptService } from '../prompt-service.js';
+import { FileAdapter } from '../adapters.js';
 
 // resolve __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -69,33 +70,16 @@ const schema: Record<string, unknown> = {
 const ajv = new Ajv({ allErrors: true });
 const validate = ajv.compile(schema);
 
-async function validateFile(filePath: string): Promise<boolean> {
+async function validateFile(filePath: string, promptService: PromptService): Promise<boolean> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const json: unknown = JSON.parse(raw);
-
-    const ok = validate(json);
-    if (!ok) {
-      console.error(`✗ ${filePath} is invalid:`);
-      console.error(validate.errors);
-      return false;
-    }
-
-    // Extra: ensure variables referenced in content exist
-    if (typeof json === 'object' && json && 'content' in json) {
-      const matches = (json as any).content.match(/{{\s*([a-zA-Z0-9_]+)\s*}}/g) as string[] | null;
-      const tplVars: string[] = (matches ? Array.from(matches) : []).map(v => v.replace(/{{\s*|\s*}}/g, ''));
-      const declared: string[] = (json as any).variables || [];
-      const missing = tplVars.filter(v => !declared.includes(v));
-      if (missing.length) {
-        console.warn(`⚠️  ${filePath}: nedefinované variables ${missing.join(', ')}`);
-      }
-    }
-
+    // Use PromptService validation
+    await promptService["validatePrompt"](json as any, false);
     console.log(`✓ ${filePath}`);
     return true;
   } catch (err) {
-    console.error(`✗ Error parsing ${filePath}:`, err);
+    console.error(`✗ ${filePath} is invalid:`, err.details || err);
     return false;
   }
 }
@@ -123,7 +107,9 @@ async function main() {
     path.join(baseDir, 'fixed_prompts'),
     path.join(baseDir, 'data', 'prompts'),
   ];
-
+  // Use FileAdapter for validation context
+  const fileAdapter = new FileAdapter({ promptsDir: './prompts' });
+  const promptService = new PromptService(fileAdapter);
   let success = true;
   for (const dir of targetDirs) {
     const exists = await fs
@@ -131,10 +117,9 @@ async function main() {
       .then(() => true)
       .catch(() => false);
     if (!exists) continue;
-    const ok = await walk(dir, validateFile);
+    const ok = await walk(dir, (file) => validateFile(file, promptService));
     if (!ok) success = false;
   }
-
   if (!success) {
     console.error('Some prompt files are invalid');
     process.exit(1);
