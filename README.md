@@ -91,6 +91,8 @@ Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
 This README is intentionally concise. Full documentation lives in the `docs/` directory, and each key directory (`scripts/`, `docker/scripts/`, `legacy/`, `examples/`) contains a README for navigation and usage details.
 
+> **See also:** Links to official MCP documentation and community resources are provided below.
+
 | Path | What you will find there |
 | --- | --- |
 | `docs/00-overview.md` | Detailed project overview & motivation |
@@ -106,6 +108,16 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 > ℹ️ Legacy content from the previous long README has been preserved at `docs/LEGACY_README.md` until the migration is complete.
 
 > **New:** See [examples/advanced-workflow-example.json](./examples/advanced-workflow-example.json) and the expanded [Templates Guide](./docs/05-templates-guide.md) for advanced prompt chaining and workflow usage.
+
+---
+
+## Official MCP Documentation & Community Resources
+
+- [Model Context Protocol (MCP) – Official Docs](https://modelcontextprotocol.org/)
+- [MCP GitHub Organization](https://github.com/modelcontextprotocol)
+- [Cursor IDE – Model Context Protocol](https://docs.cursor.com/context/model-context-protocol)
+- [MCP Community Discussions](https://github.com/orgs/community/discussions)
+- [GitHub Actions Starter Workflows (for workflow inspiration)](https://github.com/actions/starter-workflows)
 
 ---
 
@@ -193,8 +205,8 @@ This list contains current tasks and suggestions for further development and qua
 ### 3. Documentation & Clarity
 - [ ] Keep README and user guides concise and up to date
 - [x] Add/update README files in all key directories (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
-- [ ] Add detailed examples, FAQ, and troubleshooting sections
-- [ ] Add links to official MCP documentation and community resources
+- [x] Add detailed examples, FAQ, and troubleshooting sections
+- [x] Add links to official MCP documentation and community resources
 
 ### 4. Refactoring & Maintenance
 - [x] Regularly refactor code to follow code-style guidelines
@@ -243,5 +255,27 @@ Below are concrete actionable tasks and TODOs for contributors. If you want to h
 - [ ] Add badges for supported MCP clients (LM Studio, LibreChat, etc.) to README
 
 Feel free to suggest more tasks or open issues for anything you find!
+
+---
+
+## FAQ & Troubleshooting
+
+**Q: The server starts but I can't access it at http://localhost:3003/health.**
+A: Make sure the server is running, the port is not blocked by a firewall, and you are using the correct address. If running in Docker, check port mappings and container status.
+
+**Q: Prompts are not showing up in my client (e.g., Cursor IDE, Claude Desktop, LM Studio).**
+A: Double-check the client configuration (server URL, port, and protocol). Ensure MCP-Prompts is running and accessible from the client machine. See the [User Guides](./USER_GUIDE.md) for step-by-step setup.
+
+**Q: How do I add or update environment variables?**
+A: You can set environment variables in your shell, `.env` file, or Docker Compose file. See [docs/02-configuration.md](./docs/02-configuration.md) for all supported variables and their defaults.
+
+**Q: How do I chain prompts or create multi-step workflows?**
+A: Use templates with variables and reference outputs between steps. See [examples/advanced-workflow-example.json](./examples/advanced-workflow-example.json) and the [Templates Guide](./docs/05-templates-guide.md) for details.
+
+**Q: I get ESM/TypeScript errors when running tests.**
+A: Use the provided npm scripts (e.g., `npm run test:unit`) and ensure all imports use explicit `.js` extensions. See the ESM/TypeScript/Jest notes in this README.
+
+**Q: Where can I find more help or report issues?**
+A: Check the [User Guides](./USER_GUIDE.md), [docs/](./docs/) directory, or open an issue on [GitHub](https://github.com/sparesparrow/mcp-prompts/issues).
 
 --- 
