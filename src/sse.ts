@@ -927,5 +927,8 @@ export function getSseManager(options?: SseManagerOptions): SseManager {
  *
  */
 export function resetSseManager() {
+  if (sseManagerInstance) {
+    sseManagerInstance.shutdown();
+  }
   sseManagerInstance = null;
 }

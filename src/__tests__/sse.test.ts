@@ -96,6 +96,8 @@ describe('SseManager', () => {
         }),
       );
     }
+    // Ensure all timers and resources are cleaned up
+    resetSseManager();
   });
 
   afterEach(async () => {
