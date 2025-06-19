@@ -1,5 +1,12 @@
 # Uživatelská příručka MCP-Prompts
 
+## Jak přispívat screenshoty
+Uvítáme příspěvky screenshotů pro vylepšení této příručky! Prosíme:
+- Ukládejte obrázky ve formátu PNG.
+- Pojmenovávejte soubory popisně (např. `lm-studio-server-config.png`).
+- Umístěte je do adresáře `images/` v kořeni projektu.
+- Odevzdejte pull request s vaším screenshotem a aktualizujte příslušný Markdown odkaz.
+
 ## Úvod
 MCP-Prompts je lehký, rozšiřitelný server pro správu promptů a šablon v ekosystému Model Context Protocol (MCP). Tato příručka vám pomůže nastavit, konfigurovat a používat MCP-Prompts s různými klienty, včetně LM Studio, LibreChat, Tasker, Android, Cursor IDE a Claude Desktop.
 
@@ -157,7 +164,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Vložit screenshot: Terminál se spuštěným MCP-Prompts]_  
+   - ![Terminál se spuštěným MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Ověřte běh serveru**
    - V prohlížeči nebo terminálu zadejte:
@@ -165,12 +172,12 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Vložit screenshot: Výstup health check]_  
+   - ![Výstup health check](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Nastavte Claude Desktop**
    - Otevřete Claude Desktop a přejděte do **Settings** → **Developer** → **Prompt Management**.
    - Přidejte nový server s adresou `http://localhost:3003` nebo adresou vašeho MCP-Prompts serveru.
-   - _[Vložit screenshot: Nastavení serveru v Claude Desktop]_  
+   - ![Nastavení serveru v Claude Desktop](images/claude-desktop-server-config.png) (Screenshot needed! Please contribute.)
 
 4. **Ověřte integraci**
    - Otevřete správce promptů v Claude Desktop a ověřte, že se načítají prompty z MCP-Prompts.

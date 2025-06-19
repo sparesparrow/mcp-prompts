@@ -1,5 +1,12 @@
 # MCP-Prompts User Guide
 
+## Contributing Screenshots
+We welcome contributions of screenshots to improve this guide! Please:
+- Save images in PNG format.
+- Name files descriptively (e.g., `lm-studio-server-config.png`).
+- Place them in the `images/` directory at the project root.
+- Submit a pull request with your screenshot and update the relevant Markdown image link.
+
 ## Introduction
 MCP-Prompts is a lightweight, extensible server for managing prompts and templates in the Model Context Protocol (MCP) ecosystem. This guide will help you set up, configure, and use MCP-Prompts with a variety of clients, including LM Studio, LibreChat, Tasker, Android, Cursor IDE, and Claude Desktop.
 
@@ -85,7 +92,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+   - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
    - In your browser or terminal, check:
@@ -93,7 +100,7 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Insert Screenshot: Health check output]_  
+   - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure LM Studio**
    - Open LM Studio and go to **Settings** → **Custom Servers**.
@@ -101,7 +108,7 @@ services:
      - **Name:** `MCP Prompts`
      - **URL:** `http://localhost:3003`
    - Click **Save**.
-   - _[Insert Screenshot: LM Studio server config screen]_  
+   - ![LM Studio server config screen](images/lm-studio-server-config.png) (Screenshot needed! Please contribute.)
 
 4. **Test Integration**
    - In LM Studio, open the prompt manager or resource browser.
@@ -143,7 +150,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+   - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
    - In your browser or terminal, check:
@@ -151,14 +158,14 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Insert Screenshot: Health check output]_  
+   - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure LibreChat**
    - Open LibreChat and go to **Settings** → **Backend Resources**.
    - Click **Add Resource** and enter:
      - **Resource URL:** `http://localhost:3003/prompts`
    - Click **Save**.
-   - _[Insert Screenshot: LibreChat resource config screen]_  
+   - ![LibreChat resource config screen](images/librechat-resource-config.png) (Screenshot needed! Please contribute.)
 
 4. **Test Integration**
    - In LibreChat, open the prompt/resource browser.
@@ -190,7 +197,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+   - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
    - In your browser or terminal, check:
@@ -198,7 +205,7 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Insert Screenshot: Health check output]_  
+   - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Tasker HTTP Request**
    - Open Tasker on your Android device.
@@ -208,7 +215,7 @@ services:
      - **URL:** `http://<your-server-ip>:3003/prompts`
      - (Replace `<your-server-ip>` with your computer/server's IP address on the same network.)
    - Optionally, add actions to process the response (e.g., display with a Popup, save to a file, or trigger another Tasker action).
-   - _[Insert Screenshot: Tasker HTTP Request configuration]_  
+   - ![Tasker HTTP Request configuration](images/tasker-http-request-config.png) (Screenshot needed! Please contribute.)
 
 4. **Test Integration**
    - Trigger the Tasker profile or task.
@@ -241,7 +248,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+   - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
    - In your browser or terminal, check:
@@ -249,7 +256,7 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Insert Screenshot: Health check output]_  
+   - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Cursor IDE**
    - Open Cursor IDE and go to **Settings** → **AI** → **Prompt Management**.
@@ -259,7 +266,7 @@ services:
      http://localhost:3003
      ```
    - Click **Save**.
-   - _[Insert Screenshot: Cursor IDE settings with MCP server URL]_  
+   - ![Cursor IDE settings with MCP server URL](images/cursor-ide-settings.png) (Screenshot needed! Please contribute.)
 
 4. **Test Integration**
    - In Cursor IDE, open the prompt/resource browser.
@@ -291,7 +298,7 @@ services:
      ```bash
      docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
      ```
-   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+   - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
    - In your browser or terminal, check:
@@ -299,7 +306,7 @@ services:
      curl http://localhost:3003/health
      # → { "status": "ok" }
      ```
-   - _[Insert Screenshot: Health check output]_  
+   - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Claude Desktop**
    - Open Claude Desktop and go to **Settings** → **Developer** → **Edit Config**.
@@ -316,7 +323,7 @@ services:
      }
      ```
    - Save the file and restart Claude Desktop.
-   - _[Insert Screenshot: Claude Desktop config file and settings]_  
+   - ![Claude Desktop config file and settings](images/claude-desktop-config.png) (Screenshot needed! Please contribute.)
 
 4. **Test Integration**
    - You should see a slider/tool icon in the chat input area. Click it to access MCP tools and prompts.
