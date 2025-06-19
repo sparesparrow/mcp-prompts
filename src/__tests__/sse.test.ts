@@ -194,7 +194,7 @@ describe('SseManager', () => {
           return;
         }
         try {
-          expect(data).toEqual({ content: 'Hello World', type: 'test' });
+          expect(JSON.parse(data)).toEqual({ content: 'Hello World', type: 'test' });
           resolved = true;
           clearTimeout(failTimeout);
           es.close();
@@ -307,7 +307,7 @@ describe('SseManager', () => {
           return;
         }
         try {
-          expect(data).toEqual({ content: 'Hello World', type: 'test' });
+          expect(JSON.parse(data)).toEqual({ content: 'Hello World', type: 'test' });
           if (esNum === 1) received1 = true;
           if (esNum === 2) received2 = true;
           checkDone();
