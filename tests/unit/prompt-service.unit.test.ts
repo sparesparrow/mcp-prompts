@@ -65,7 +65,7 @@ describe('PromptService', () => {
       variables: ['user'],
     });
     const applied = await service.applyTemplate(prompt.id, { user: 'Alice' });
-    expect(applied).toBe('Hello, Alice!');
+    expect(applied.content).toBe('Hello, Alice!');
   });
 
   it('should validate required fields', async () => {

@@ -834,6 +834,26 @@ export class SseManager extends EventEmitter {
     }
     return SseManager.instance;
   }
+
+  public shutdown(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    if (this.messageRetryInterval) {
+      clearInterval(this.messageRetryInterval);
+      this.messageRetryInterval = null;
+    }
+    if (this.connectionQualityInterval) {
+      clearInterval(this.connectionQualityInterval);
+      this.connectionQualityInterval = null;
+    }
+    // Odpojit všechny klienty
+    for (const client of this.clients.values()) {
+      this.disconnectClient(client.id);
+    }
+    this.clients.clear();
+  }
 }
 
 let sseManagerInstance: SseManager | null = null;
