@@ -5,14 +5,22 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'crypto';
 import express from 'express';
-import type { z } from 'zod';
+import { z } from 'zod';
 import { z as orchestratorZ } from 'zod';
 
-import { createStorageAdapter } from './adapters.js';
 import { loadConfig } from './config.js';
-import { initializeDefaultPrompts } from './data/defaults.js';
 import { startHttpServer } from './http-server.js';
-import type { PromptService } from './interfaces.js';
+import {
+  FileAdapter,
+  MdcAdapter,
+  MemoryAdapter,
+  PostgresAdapter,
+  type StorageAdapter,
+} from './adapters.js';
+import { PromptService } from './prompt-service.js';
+import { promptSchemas } from './schemas.js';
+import { SequenceServiceImpl } from './sequence-service.js';
+import { WorkflowServiceImpl } from './workflow-service.js';
 import {
   AddPromptInput,
   ApplyTemplateInput,
@@ -21,11 +29,7 @@ import {
   ListPromptsInput,
   Prompt,
   PromptSequence,
-  StorageAdapter,
 } from './interfaces.js';
-import { PromptService as PromptServiceImpl } from './prompt-service.js';
-import type { promptSchemas } from './schemas.js';
-import { SequenceServiceImpl } from './sequence-service.js';
 import { applyTemplate } from './utils.js';
 
 type UpdatePromptInput = z.infer<typeof promptSchemas.update>;
@@ -99,9 +103,12 @@ async function main() {
       sequenceIndex: config.ELASTICSEARCH_SEQUENCE_INDEX,
     };
   }
-  const storageAdapter = createStorageAdapter(storageConfig);
-  const promptService = new PromptServiceImpl(storageAdapter);
-  const sequenceService = new SequenceServiceImpl(storageAdapter);
+  const adapter: StorageAdapter = new MemoryAdapter();
+  await adapter.connect();
+
+  const promptService = new PromptService(adapter);
+  const sequenceService = new SequenceServiceImpl(adapter);
+  const workflowService = new WorkflowServiceImpl();
 
   // Start HTTP server if enabled
   if (config.HTTP_SERVER) {
@@ -114,7 +121,7 @@ async function main() {
         port: config.PORT,
         ssePath: config.SSE_PATH,
       },
-      { promptService, sequenceService },
+      { promptService, sequenceService, workflowService },
     );
   }
 

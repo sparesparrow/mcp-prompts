@@ -10,12 +10,56 @@ import { ServerConfig } from './interfaces.js';
 export const EnvSchema = z.object({
   BACKUPS_DIR: z.string().default('./data/backups'),
   CORS_ORIGIN: z.string().optional(),
+
+  ELASTICSEARCH_INDEX: z.string().optional(),
+
+  // ElasticSearch
+  ELASTICSEARCH_NODE: z.string().optional(),
+
+  ELASTICSEARCH_PASSWORD: z.string().optional(),
+
+  ELASTICSEARCH_SEQUENCE_INDEX: z.string().optional(),
+
+  ELASTICSEARCH_USERNAME: z.string().optional(),
+
+  // ElevenLabs
+  ELEVENLABS_API_KEY: z.string().optional(),
+
+  ELEVENLABS_CACHE_DIR: z.string().optional(),
+
+  ELEVENLABS_MODEL_ID: z.string().optional(),
+
+  ELEVENLABS_OPTIMIZATION_LEVEL: z.enum(['speed', 'quality', 'balanced']).optional(),
+
+  ELEVENLABS_SIMILARITY_BOOST: z.coerce.number().optional(),
+
+  ELEVENLABS_SPEAKER_BOOST: z.coerce.boolean().optional(),
+
+  ELEVENLABS_STABILITY: z.coerce.number().optional(),
+
+  ELEVENLABS_STYLE: z.coerce.number().optional(),
+
+  ELEVENLABS_USE_CACHING: z.coerce.boolean().optional(),
+
+  ELEVENLABS_VOICE_ID: z.string().optional(),
+
   ENABLE_SSE: z.coerce.boolean().optional(),
+
   HOST: z.string().default('localhost'),
+
   HTTP_SERVER: z.coerce.boolean().default(true),
+
   LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+
   MCP_SERVER: z.coerce.boolean().default(false),
+
   MDC_BACKUP_ENABLED: z.coerce.boolean().optional(),
+
+  MDC_BACKUP_INTERVAL: z.coerce.number().optional(),
+
+  // MDC
+  MDC_RULES_DIR: z.string().optional(),
+
   NAME: z.string().default('mcp-prompts'),
 
   PORT: z.coerce.number().default(3003),
@@ -25,77 +69,37 @@ export const EnvSchema = z.object({
   // Postgres
   POSTGRES_HOST: z.string().optional(),
 
-  // ElasticSearch
-ELASTICSEARCH_NODE: z.string().optional(),
-
-  
-POSTGRES_MAX_CONNECTIONS: z.coerce.number().optional(),
-
-  PROMPTS_DIR: z.string().default('./data/prompts'),
-
-  ELASTICSEARCH_INDEX: z.string().optional(),
-
-  STORAGE_TYPE: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']).default('file'),
+  POSTGRES_MAX_CONNECTIONS: z.coerce.number().optional(),
 
   POSTGRES_PASSWORD: z.string().optional(),
 
-  VERSION: z.string().default('1.0.0'),
-
-  ELASTICSEARCH_PASSWORD: z.string().optional(),
-
-  
-ELASTICSEARCH_SEQUENCE_INDEX: z.string().optional(),
-
-  // Sequences
-SEQUENCES_MAX_STEPS: z.coerce.number().optional(),
-
-  ELASTICSEARCH_USERNAME: z.string().optional(),
-
-  SEQUENCES_RETRY_ATTEMPTS: z.coerce.number().optional(),
-
-  // ElevenLabs
-ELEVENLABS_API_KEY: z.string().optional(),
-
-  
-SSE_PATH: z.string().optional(),
-
-  ELEVENLABS_CACHE_DIR: z.string().optional(),
-
-  STREAMING_CHUNK_SIZE: z.coerce.number().optional(),
-
-  ELEVENLABS_MODEL_ID: z.string().optional(),
-
-  
-ELEVENLABS_OPTIMIZATION_LEVEL: z.enum(['speed', 'quality', 'balanced']).optional(),
-
-  // Streaming
-STREAMING_ENABLED: z.coerce.boolean().optional(),
-
-  ELEVENLABS_SIMILARITY_BOOST: z.coerce.number().optional(),
-
-  STREAMING_MAX_TOKENS: z.coerce.number().optional(),
-
-  ELEVENLABS_SPEAKER_BOOST: z.coerce.boolean().optional(),
-
-  SEQUENCES_TIMEOUT: z.coerce.number().optional(),
-
-  ELEVENLABS_STABILITY: z.coerce.number().optional(),
-
   POSTGRES_PORT: z.coerce.number().optional(),
-
-  ELEVENLABS_STYLE: z.coerce.number().optional(),
 
   POSTGRES_SSL: z.coerce.boolean().optional(),
 
-  ELEVENLABS_USE_CACHING: z.coerce.boolean().optional(),
-
-  ELEVENLABS_VOICE_ID: z.string().optional(),
-
   POSTGRES_USER: z.string().optional(),
 
-  MDC_BACKUP_INTERVAL: z.coerce.number().optional(),
-  // MDC
-  MDC_RULES_DIR: z.string().optional(),
+  PROMPTS_DIR: z.string().default('./data/prompts'),
+
+  // Sequences
+  SEQUENCES_MAX_STEPS: z.coerce.number().optional(),
+
+  SEQUENCES_RETRY_ATTEMPTS: z.coerce.number().optional(),
+
+  SEQUENCES_TIMEOUT: z.coerce.number().optional(),
+
+  SSE_PATH: z.string().optional(),
+
+  STORAGE_TYPE: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']).default('file'),
+
+  STREAMING_CHUNK_SIZE: z.coerce.number().optional(),
+
+  // Streaming
+  STREAMING_ENABLED: z.coerce.boolean().optional(),
+
+  STREAMING_MAX_TOKENS: z.coerce.number().optional(),
+
+  VERSION: z.string().default('1.0.0'),
 });
 
 export type EnvVars = z.infer<typeof EnvSchema>;

@@ -805,3 +805,112 @@ The Mermaid diagram server provides a simple HTTP endpoint to visualize prompt r
 - **HTTP Endpoint:** `POST /diagram` — Accepts `{ promptIds: [id1, id2, ...] }` and returns a Mermaid diagram string representing a linear flow of the prompts.
 
 --- 
+
+## Workflow Engine: Visual Execution Flow
+
+```mermaid
+flowchart TD
+    Start([Start]) --> Step1["Prompt Step"]
+    Step1 --> Step2["Shell Step"]
+    Step2 --> Step3["HTTP Step"]
+    Step3 --> End([End])
+```
+
+For a full guide, see [docs/09-workflow-guide.md](./docs/09-workflow-guide.md).
+
+---
+
+# TODO: Workflow Engine Implementation Roadmap
+
+The following tasks outline the step-by-step implementation of the Workflow Engine MVP:
+
+1. **Schema & Validation**
+   - [x] Finalize and publish `workflow.schema.json` in `src/schemas.ts`.
+   - [x] Extend `validate-json.ts` to support workflow validation (`npm run validate:workflow <file>`).
+
+2. **Core Engine**
+   - [x] Implement `WorkflowService` for parsing, validating, and orchestrating workflows.
+   - [x] Implement `StepRunner` strategy pattern for step execution.
+   - [x] Implement `PromptRunner` for prompt steps.
+   - [x] Implement `ShellRunner` for shell steps (with sandboxing and timeouts).
+   - [x] Implement `HttpRunner` for HTTP steps.
+   - [x] Add shared in-memory context store for passing data between steps.
+
+3. **API Endpoints**
+   - [x] Add REST endpoint: `POST /api/v1/workflows/run` (ad-hoc execution).
+   - [x] Add REST endpoint: `POST /api/v1/workflows` (save workflow definition).
+   - [x] Add REST endpoint: `GET /api/v1/workflows/:id` (get workflow definition).
+   - [x] Add REST endpoint: `POST /api/v1/workflows/:id/run` (run saved workflow).
+
+4. **CLI Integration**
+   - [x] Add CLI command: `mcp-prompts workflow run <file>` (ad-hoc run).
+   - [x] Add CLI command: `mcp-prompts workflow save <file>` (save workflow).
+   - [x] Add CLI command: `mcp-prompts workflow run <id>` (run saved workflow).
+
+5. **Security & Performance**
+   - [x] Implement sandboxing for shell steps (e.g., Docker exec, no root).
+   - [x] Add per-step timeout (default 60s).
+   - [x] Add rate limiting for concurrent workflows per user.
+   - [x] Implement audit logging for workflow runs and results.
+
+6. **Documentation & Examples**
+   - [ ] Add user and developer guides for workflows.
+   - [ ] Add sample workflow YAML/JSON files.
+   - [ ] Add visual diagrams to docs and README.
+
+7. **Testing**
+   - [ ] Add integration tests for workflow execution and step types.
+
+8. **Future Extensions (Post-MVP)**
+   - [ ] Support parallel steps (`dependsOn`, `runAfter`).
+   - [ ] Add DAG/state machine visualization.
+   - [ ] Integrate with UI (Claude Desktop, web console).
+   - [ ] Support advanced conditions (`jq`, `JMESPath`).
+   - [ ] Enable distributed execution (worker pool, sharding).
+
+---
+
+## Security & Performance
+
+- **Sandboxing:** Shell steps are executed with a security warning if not sandboxed. For production, use Docker or a non-root environment.
+- **Timeouts:** Each workflow step has a default timeout of 60 seconds (configurable per step).
+- **Rate Limiting:** Each user is limited to 3 concurrent workflow runs by default. If the limit is exceeded, the API returns HTTP 429 (Too Many Requests).
+- **Audit Logging:** All workflow runs (start, end, error) are logged to `logs/workflow-audit.log` with timestamp, user, workflow ID, event type, and details.
+
+---
+
+## API Reference (Workflow Engine)
+
+- **POST /api/v1/workflows/:id/run**
+  - Runs a saved workflow by ID.
+  - Returns 429 if the user exceeds the concurrent workflow limit.
+  - Returns 404 if the workflow is not found.
+  - Returns 200 with results on success, 400 on workflow error.
+- **Audit Log:**
+  - All workflow executions are logged to `logs/workflow-audit.log` in JSONL format:
+    ```json
+    { "timestamp": "2024-06-10T12:34:56Z", "userId": "alice", "workflowId": "release", "eventType": "start", "details": { ... } }
+    ```
+
+---
+
+## CLI Usage: Workflow Engine
+
+You can run and manage workflows from the command line:
+
+```
+# Run a workflow from a JSON file (ad-hoc)
+npm run workflow:run:file -- <file.json>
+
+# Save a workflow from a JSON file
+npm run workflow:save:file -- <file.json>
+
+# Run a saved workflow by ID
+npm run workflow:run:id -- <workflow-id>
+```
+
+> **Note:** If you run multiple workflows in parallel (e.g., from different terminals or users), you may hit the per-user concurrency limit (default 3). If so, you'll receive a 429 error. All workflow runs are logged to `logs/workflow-audit.log` for auditing and troubleshooting.
+
+Set the `MCP_PROMPTS_API_URL` environment variable to override the API URL (default: http://localhost:3003).
+
+--- 

@@ -17,6 +17,8 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 
+import { workflowSchema } from '../schemas.js';
+
 // Get dirname equivalent in ESM
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -132,14 +134,47 @@ async function validateAndFixAllJsonFiles(directoryPath: string): Promise<void> 
 }
 
 /**
- * Main function
+ * Validates a workflow JSON file against the workflowSchema
+ * @param filePath Path to the workflow JSON file
+ * @returns True if valid, false otherwise
+ */
+async function validateWorkflowFile(filePath: string): Promise<boolean> {
+  console.log(`Validating workflow file: ${filePath}`);
+  try {
+    const content = await fs.promises.readFile(filePath, 'utf8');
+    const data = JSON.parse(content);
+    const result = workflowSchema.safeParse(data);
+    if (result.success) {
+      console.log(`✓ ${filePath} is a valid workflow definition`);
+      return true;
+    } else {
+      console.error(`✗ ${filePath} failed workflow schema validation:`);
+      console.error(result.error.format());
+      return false;
+    }
+  } catch (error: unknown) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    console.error(`✗ Error reading or parsing ${filePath}: ${errorMessage}`);
+    return false;
+  }
+}
+
+/**
+ * Main function (extended for workflow validation)
  */
 async function main(): Promise<void> {
-  // Get the directory path from command line arguments or use default
-  const directoryPath = process.argv[2] || path.resolve(__dirname, '../../prompts');
-
-  console.log(`Validating JSON files in ${directoryPath}`);
-  await validateAndFixAllJsonFiles(directoryPath);
+  const args = process.argv.slice(2);
+  if (args[0] === '--workflow' && args[1]) {
+    // Validate a workflow file
+    const filePath = args[1];
+    const success = await validateWorkflowFile(filePath);
+    process.exit(success ? 0 : 1);
+  } else {
+    // Default: validate all JSON files in a directory
+    const directoryPath = args[0] || path.resolve(__dirname, '../../prompts');
+    console.log(`Validating JSON files in ${directoryPath}`);
+    await validateAndFixAllJsonFiles(directoryPath);
+  }
 }
 
 // Run the main function

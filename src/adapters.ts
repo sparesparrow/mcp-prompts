@@ -3,7 +3,6 @@
  * Contains all storage adapters in a single file
  */
 
-import { Client } from '@elastic/elasticsearch';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import pg from 'pg';
@@ -20,6 +19,8 @@ import {
   ServerConfig,
   TemplateFormatOptions,
 } from './interfaces.js';
+
+export type { StorageAdapter };
 
 /**
  * FileAdapter Implementation
@@ -226,6 +227,14 @@ export class FileAdapter implements StorageAdapter {
 
   public async isConnected(): Promise<boolean> {
     return this.connected;
+  }
+
+  private generateId(name: string): string {
+    // Simple slug-like ID for MDC
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 }
 
@@ -879,304 +888,20 @@ export class MdcAdapter implements StorageAdapter {
   }
 
   private generateId(name: string): string {
-    const base = name
+    // Simple slug-like ID for MDC
+    return name
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
-      .replace(/(^-|-$)/g, '');
-    return base || uuidv4();
-  }
-}
-
-/**
- * ElasticSearch Adapter Implementation
- * Stores prompts in ElasticSearch with support for k-NN search
- */
-export class ElasticSearchAdapter implements StorageAdapter {
-  private client: Client;
-  private index: string;
-  private connected = false;
-  private sequenceIndex: string;
-
-  public constructor(config: {
-    node: string;
-    auth?: { username: string; password: string };
-    index?: string;
-    sequenceIndex?: string;
-  }) {
-    this.client = new Client({
-      auth: config.auth,
-      node: config.node,
-    });
-    this.index = config.index || 'prompts';
-    this.sequenceIndex = config.sequenceIndex || 'prompt-sequences';
-  }
-
-  public async connect(): Promise<void> {
-    try {
-      // Check if indices exist, create if not
-      const promptsExists = await this.client.indices.exists({ index: this.index });
-      if (!promptsExists) {
-        await this.client.indices.create({
-          index: this.index,
-          mappings: {
-            properties: {
-              category: { type: 'keyword' },
-              content: { type: 'text' },
-              createdAt: { type: 'date' },
-              description: { type: 'text' },
-              id: { type: 'keyword' },
-              isTemplate: { type: 'boolean' },
-              metadata: { type: 'object' },
-              name: { type: 'text' },
-              tags: { type: 'keyword' },
-              updatedAt: { type: 'date' },
-              variables: { type: 'keyword' },
-              version: { type: 'integer' },
-            },
-          },
-        });
-      }
-
-      const sequencesExists = await this.client.indices.exists({ index: this.sequenceIndex });
-      if (!sequencesExists) {
-        await this.client.indices.create({
-          index: this.sequenceIndex,
-          mappings: {
-            properties: {
-              createdAt: { type: 'date' },
-              description: { type: 'text' },
-              id: { type: 'keyword' },
-              metadata: { type: 'object' },
-              name: { type: 'text' },
-              promptIds: { type: 'keyword' },
-              updatedAt: { type: 'date' },
-            },
-          },
-        });
-      }
-
-      this.connected = true;
-      console.error(`ElasticSearch storage connected: ${this.index}`);
-    } catch (error: any) {
-      console.error('Error connecting to ElasticSearch:', error);
-      throw new Error(`Failed to connect to ElasticSearch: ${error.message}`);
-    }
-  }
-
-  public async disconnect(): Promise<void> {
-    await this.client.close();
-    this.connected = false;
-    console.error('ElasticSearch storage disconnected');
-  }
-
-  public async isConnected(): Promise<boolean> {
-    return this.connected;
-  }
-
-  public async savePrompt(prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      await this.client.index({
-        document: prompt,
-        id: prompt.id,
-        index: this.index,
-        refresh: true,
-      });
-      return prompt;
-    } catch (error: any) {
-      console.error('Error saving prompt to ElasticSearch:', error);
-      throw error;
-    }
-  }
-
-  public async getPrompt(id: string): Promise<Prompt | null> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      const response = await this.client.get({
-        id: id,
-        index: this.index,
-      });
-      return response._source as Prompt;
-    } catch (error: any) {
-      if (error.statusCode === 404) {
-        return null;
-      }
-      console.error(`Error getting prompt ${id} from ElasticSearch:`, error);
-      throw error;
-    }
-  }
-
-  public async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      await this.client.update({
-        doc: prompt,
-        id: id,
-        index: this.index,
-        refresh: true,
-      });
-      return prompt;
-    } catch (error: any) {
-      console.error(`Error updating prompt ${id} in ElasticSearch:`, error);
-      throw error;
-    }
-  }
-
-  public async deletePrompt(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      const response = await this.client.delete({
-        id: id,
-        index: this.index,
-        refresh: true,
-      });
-    } catch (error: any) {
-      if (error.statusCode === 404) {
-        // no return value
-      }
-      console.error(`Error deleting prompt ${id} from ElasticSearch:`, error);
-      throw error;
-    }
-  }
-
-  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      const query: any = {
-        bool: {
-          must: [],
-        },
-      };
-
-      if (options?.isTemplate !== undefined) {
-        query.bool.must.push({ term: { isTemplate: options.isTemplate } });
-      }
-
-      if (options?.category) {
-        query.bool.must.push({ term: { category: options.category } });
-      }
-
-      if (options?.tags && options.tags.length > 0) {
-        query.bool.must.push({ terms: { tags: options.tags } });
-      }
-
-      if (options?.search) {
-        query.bool.must.push({
-          multi_match: {
-            fields: ['name^2', 'description', 'content'],
-            query: options.search,
-          },
-        });
-      }
-
-      const response = await this.client.search({
-        from: options?.offset || 0,
-        index: this.index,
-        query,
-        size: options?.limit || 10,
-        sort: options?.sort ? [{ [options.sort]: { order: options.order || 'asc' } }] : undefined,
-      });
-
-      return response.hits.hits.map(hit => hit._source as Prompt);
-    } catch (error: any) {
-      console.error('Error listing prompts from ElasticSearch:', error);
-      throw error;
-    }
-  }
-
-  public async getAllPrompts(): Promise<Prompt[]> {
-    return this.listPrompts({ limit: 10000 });
-  }
-
-  public async getSequence(id: string): Promise<PromptSequence | null> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      const response = await this.client.get({
-        id: id,
-        index: this.sequenceIndex,
-      });
-      return response._source as PromptSequence;
-    } catch (error: any) {
-      if (error.statusCode === 404) {
-        return null;
-      }
-      console.error(`Error getting sequence ${id} from ElasticSearch:`, error);
-      throw error;
-    }
-  }
-
-  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      await this.client.index({
-        document: sequence,
-        id: sequence.id,
-        index: this.sequenceIndex,
-        refresh: true,
-      });
-      return sequence;
-    } catch (error: any) {
-      console.error('Error saving sequence to ElasticSearch:', error);
-      throw error;
-    }
-  }
-
-  public async deleteSequence(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error('ElasticSearch storage not connected');
-    }
-
-    try {
-      await this.client.delete({
-        id: id,
-        index: this.sequenceIndex,
-        refresh: true,
-      });
-    } catch (error: any) {
-      if (error.statusCode !== 404) {
-        console.error(`Error deleting sequence ${id} from ElasticSearch:`, error);
-        throw error;
-      }
-    }
+      .replace(/^-|-$/g, '');
   }
 }
 
 export interface StorageConfig {
-  type: 'file' | 'memory' | 'postgres' | 'mdc' | 'elasticsearch';
+  type: 'file' | 'memory' | 'postgres' | 'mdc';
   promptsDir?: string;
   backupsDir?: string;
   postgres?: pg.PoolConfig;
   mdcRulesDir?: string;
-  elasticsearch?: {
-    node: string;
-    auth?: {
-      username: string;
-      password: string;
-    };
-    index?: string;
-    sequenceIndex?: string;
-  };
 }
 
 /**
@@ -1187,27 +912,22 @@ export function createStorageAdapter(config: StorageConfig): StorageAdapter {
   switch (config.type) {
     case 'file':
       if (!config.promptsDir) {
-        throw new Error('promptsDir is required for file storage');
+        throw new Error('File storage requires promptsDir in config');
       }
       return new FileAdapter(config.promptsDir);
     case 'memory':
       return new MemoryAdapter();
     case 'postgres':
       if (!config.postgres) {
-        throw new Error('postgres config is required for postgres storage');
+        throw new Error('Postgres storage requires postgres in config');
       }
       return new PostgresAdapter(config.postgres);
     case 'mdc':
       if (!config.mdcRulesDir) {
-        throw new Error('mdcRulesDir is required for MDC storage');
+        throw new Error('MDC storage requires mdcRulesDir in config');
       }
       return new MdcAdapter(config.mdcRulesDir);
-    case 'elasticsearch':
-      if (!config.elasticsearch) {
-        throw new Error('elasticsearch config is required for elasticsearch storage');
-      }
-      return new ElasticSearchAdapter(config.elasticsearch);
     default:
-      throw new Error(`Unknown storage type: ${config.type}`);
+      throw new Error(`Unsupported storage type: ${config.type}`);
   }
 }

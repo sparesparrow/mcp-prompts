@@ -1,47 +1,41 @@
-import { jest } from '@jest/globals';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Server } from 'http';
+import type { DeepMockProxy } from 'jest-mock-extended';
+import { mock } from 'jest-mock-extended';
 import request from 'supertest';
 
 import { startHttpServer } from '../http-server.js';
+import type { Prompt } from '../interfaces.js';
 import type { PromptService } from '../prompt-service.js';
 import type { SequenceService } from '../sequence-service.js';
+import type { WorkflowService } from '../workflow-service.js';
 
 describe('HTTP Server', () => {
-  let server: any;
-  let promptService: jest.Mocked<PromptService>;
-  let sequenceService: jest.Mocked<SequenceService>;
+  let server: Server;
+  let promptService: DeepMockProxy<PromptService>;
+  let sequenceService: DeepMockProxy<SequenceService>;
+  let workflowService: DeepMockProxy<WorkflowService>;
 
   beforeEach(async () => {
-    // Mock services
-    promptService = {
-      createPrompt: jest.fn(),
-      deletePrompt: jest.fn().mockImplementation(() => Promise.resolve()),
-      getPrompt: jest.fn(),
-      updatePrompt: jest.fn(),
-    } as any;
-
-    sequenceService = {
-      getSequenceWithPrompts: jest.fn(),
-    } as any;
+    // Create mock services
+    promptService = mock<PromptService>();
+    sequenceService = mock<SequenceService>();
+    workflowService = mock<WorkflowService>();
 
     // Start server
     server = await startHttpServer(
       null,
       {
-        corsOrigin: '*',
-
-        enableSSE: true,
-        // Use random port
-        host: 'localhost',
         port: 0,
+        host: 'localhost',
+        enableSSE: true,
         ssePath: '/events',
       },
-      { promptService, sequenceService },
+      { promptService, sequenceService, workflowService },
     );
   });
 
-  afterEach(() => {
-    server.close();
+  afterEach(done => {
+    server.close(done);
   });
 
   describe('Security Headers', () => {
@@ -160,6 +154,16 @@ describe('HTTP Server', () => {
       expect(response.status).toBe(404);
       expect(response.body.error).toBe(true);
       expect(response.body.code).toBe('NOT_FOUND');
+    });
+  });
+
+  it('should return 404 for unknown routes', async () => {
+    const res = await request(server).get('/unknown-route');
+    expect(res.status).toBe(404);
+    expect(res.body).toEqual({
+      error: true,
+      message: 'Resource not found',
+      code: 'NOT_FOUND',
     });
   });
 });

@@ -13,6 +13,11 @@ Současný server MCP-Prompts ukládá a distribuuje jednotlivé prompty. Uživa
 * plnohodnotné API + CLI podporu
 * možnost paralelizace (v budoucnu)
 
+> **Why this matters:**
+> - Umožňuje automatizovat komplexní AI workflow.
+> - Sdílení a opakované použití workflow mezi týmy.
+> - Lepší auditovatelnost a správa promptů i workflow.
+
 ## 2 Základní koncepty
 
 | Pojem            | Popis                                                                                                               |
@@ -23,6 +28,8 @@ Současný server MCP-Prompts ukládá a distribuuje jednotlivé prompty. Uživa
 | **Output**       | Výstup kroku – ukládá se do shared context pod zadaným klíčem.                                                        |
 | **Condition**    | (volitelné) podmínka, zda krok vykonat (`expression` evaluovaná nad contextem).                                      |
 | **ErrorPolicy**  | Strategie při chybě (`continue`, `skip`, `abort`, `retry<n>`).                                                       |
+
+> **Tip:** Kontext (`context`) je sdílený objekt, do kterého každý krok ukládá svůj výstup. Další kroky mohou tento výstup použít jako vstup.
 
 ## 3 Formát definice (`workflow.yaml`)
 
@@ -65,37 +72,28 @@ steps:
 * `shell` – spuštění shell příkazu (běží v sandboxu serveru)
 * `http` – volání HTTP metody (GET/POST…)
 
+> **Příklad:**
+> - Prompt krok získá data z repozitáře.
+> - Další prompt krok data shrne.
+> - Shell krok výsledek uloží do souboru.
+
 ## 4 Architektura
 
-```
-              +---------------+
-              |  HTTP Client  |
-              +---------------+
-                     | REST
-         +-----------v-----------+
-         |  WorkflowController   |
-         +-----------+-----------+
-                     |
-          +----------v-----------+
-          |  WorkflowService     |
-          +----------+-----------+
-                     |
-      +--------------v--------------+
-      |  StepRunner (strategy)      |
-      +--------------+--------------+
-                     |
-           +---------v--------+
-           | PromptRunner     |
-           | ShellRunner      |
-           | HttpRunner       |
-           +-----------------+
+```mermaid
+flowchart TD
+    Client[HTTP Client or CLI] -->|REST/CLI| Controller[WorkflowController]
+    Controller --> Service[WorkflowService]
+    Service --> StepRunner
+    StepRunner --> PromptRunner
+    StepRunner --> ShellRunner
+    StepRunner --> HttpRunner
+    Service --> Context[Shared Context Store]
 ```
 
-* **WorkflowController** – REST endpoint `POST /api/v1/workflows/run` + CRUD.
-* **WorkflowService** – parsování definice, validace, orchestrace kroků.
-* **StepRunner** – strategický pattern, vždy konkrétní runner dle `type`.
-* Shared **Context Store** (in-memory Map) – uchovává `context` mezi kroky.
-* Časovače / Queue (future) – pro plánované nebo paralelní spouštění.
+- **WorkflowController:** REST endpointy pro spouštění a správu workflow.
+- **WorkflowService:** Parsování, validace a orchestrace kroků.
+- **StepRunner:** Strategický pattern pro různé typy kroků.
+- **Context Store:** Sdílený objekt pro předávání dat mezi kroky.
 
 ## 5 API rozhraní (MVP)
 
@@ -141,6 +139,56 @@ mcp-prompts workflow run saved-id            # spustit uložený
 1. Serializace velkých výstupů (uložit jen hash vs. celá data?)
 2. Mechanismus `secrets` pro shell & http kroky
 3. Distribuované běhy (sharding, worker pool)
+
+---
+
+# MVP Implementation Roadmap
+
+> **For up-to-date progress, see the TODO section in the main README.**
+
+1. **Schema & Validation**
+   - [ ] Finalizovat a publikovat `workflow.schema.json` v `src/schemas.ts`.
+   - [ ] Rozšířit `validate-json.ts` o validaci workflow (`npm run validate:workflow <file>`).
+
+2. **Core Engine**
+   - [ ] Implementovat `WorkflowService` pro parsování, validaci a orchestraci workflow.
+   - [ ] Implementovat strategii `StepRunner` pro různé typy kroků.
+   - [ ] Implementovat `PromptRunner` pro prompt kroky.
+   - [ ] Implementovat `ShellRunner` pro shell kroky (sandbox, timeout).
+   - [ ] Implementovat `HttpRunner` pro HTTP kroky.
+   - [ ] Přidat sdílený in-memory context store pro předávání dat mezi kroky.
+
+3. **API Endpoints**
+   - [ ] Přidat REST endpoint: `POST /api/v1/workflows/run` (ad-hoc spuštění).
+   - [ ] Přidat REST endpoint: `POST /api/v1/workflows` (uložení definice).
+   - [ ] Přidat REST endpoint: `GET /api/v1/workflows/:id` (získání definice).
+   - [ ] Přidat REST endpoint: `POST /api/v1/workflows/:id/run` (spuštění uloženého workflow).
+
+4. **CLI Integrace**
+   - [ ] Přidat CLI příkaz: `mcp-prompts workflow run <file>` (ad-hoc run).
+   - [ ] Přidat CLI příkaz: `mcp-prompts workflow save <file>` (uložení workflow).
+   - [ ] Přidat CLI příkaz: `mcp-prompts workflow run <id>` (spuštění uloženého workflow).
+
+5. **Bezpečnost & Výkon**
+   - [ ] Implementovat sandboxing pro shell kroky (např. Docker exec, bez root).
+   - [ ] Přidat timeout pro každý krok (default 60s).
+   - [ ] Přidat rate limiting pro paralelní workflow na uživatele.
+   - [ ] Implementovat audit logování běhů a výsledků.
+
+6. **Dokumentace & Příklady**
+   - [ ] Přidat uživatelské a vývojářské návody pro workflow.
+   - [ ] Přidat ukázkové workflow YAML/JSON soubory.
+   - [ ] Přidat vizuální diagramy do dokumentace a README.
+
+7. **Testování**
+   - [ ] Přidat integrační testy pro workflow engine a typy kroků.
+
+8. **Budoucí rozšíření (po MVP)**
+   - [ ] Podpora paralelních kroků (`dependsOn`, `runAfter`).
+   - [ ] Vizualizace DAG/stavového stroje.
+   - [ ] Integrace s UI (Claude Desktop, web konzole).
+   - [ ] Pokročilé podmínky (`jq`, `JMESPath`).
+   - [ ] Distribuované běhy (worker pool, sharding).
 
 ---
 

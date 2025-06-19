@@ -7,6 +7,15 @@ import type http from 'http';
 
 import type { PromptService } from './prompt-service.js';
 import type { SequenceService } from './sequence-service.js';
+import type { WorkflowService } from './workflow-service.js';
+import {
+  auditLogWorkflowEvent,
+  getWorkflowRateLimiter,
+  HttpRunner,
+  PromptRunner,
+  releaseWorkflowSlot,
+  ShellRunner,
+} from './workflow-service.js';
 
 export interface HttpServerConfig {
   port: number;
@@ -23,6 +32,7 @@ export interface HttpServerConfig {
 export interface ServerServices {
   promptService: PromptService;
   sequenceService: SequenceService;
+  workflowService: WorkflowService;
 }
 
 /**
@@ -216,6 +226,114 @@ export async function startHttpServer(
         res
           .status(500)
           .json({ error: true, message: err instanceof Error ? err.message : String(err) });
+      }
+    },
+  );
+
+  // In-memory workflow storage (TODO: replace with persistent storage)
+  const workflowStore: Map<string, any> = new Map();
+
+  const checkWorkflowRateLimit = getWorkflowRateLimiter();
+
+  /**
+   * POST /api/v1/workflows
+   * Save a workflow definition by ID
+   * Request body: { ...workflow }
+   * Response: { success, id, message }
+   */
+  app.post(
+    '/api/v1/workflows',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const workflow = req.body;
+        if (!services.workflowService.validateWorkflow(workflow)) {
+          res.status(400).json({ error: true, message: 'Invalid workflow definition.' });
+          return;
+        }
+        if (!workflow.id || typeof workflow.id !== 'string') {
+          res.status(400).json({ error: true, message: 'Workflow must have a string id.' });
+          return;
+        }
+        workflowStore.set(workflow.id, workflow);
+        res.status(201).json({ id: workflow.id, message: 'Workflow saved.', success: true });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/workflows/:id
+   * Retrieve a workflow definition by ID
+   * Response: { ...workflow } or 404
+   */
+  app.get(
+    '/api/v1/workflows/:id',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const workflow = workflowStore.get(req.params.id);
+        if (!workflow) {
+          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          return;
+        }
+        res.json(workflow);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * POST /api/v1/workflows/:id/run
+   * Run a saved workflow by ID
+   * Response: { success, message, outputs } or 404
+   */
+  app.post(
+    '/api/v1/workflows/:id/run',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const userId = (req.headers['x-user-id'] as string) || 'anonymous';
+      const workflowId = req.params.id;
+      if (!checkWorkflowRateLimit(userId)) {
+        res.status(429).json({
+          error: true,
+          message: 'Too many concurrent workflows. Please wait and try again.',
+        });
+        return;
+      }
+      let result;
+      try {
+        const workflow = workflowStore.get(workflowId);
+        if (!workflow) {
+          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          return;
+        }
+        // Audit: workflow start
+        auditLogWorkflowEvent({ details: { workflow }, eventType: 'start', userId, workflowId });
+        // Prepare step runners
+        const promptRunner = new PromptRunner(services.promptService);
+        const shellRunner = new ShellRunner();
+        const httpRunner = new HttpRunner();
+        const stepRunners = {
+          http: httpRunner,
+          prompt: promptRunner,
+          shell: shellRunner,
+        };
+        // Run the workflow
+        result = await (services.workflowService as any).runWorkflowSteps(workflow, stepRunners);
+        // Audit: workflow end
+        auditLogWorkflowEvent({ details: { result }, eventType: 'end', userId, workflowId });
+        res.status(result.success ? 200 : 400).json(result);
+      } catch (err) {
+        // Audit: workflow error
+        auditLogWorkflowEvent({
+          details: { error: err instanceof Error ? err.message : String(err) },
+          eventType: 'error',
+          userId,
+          workflowId,
+        });
+        next(err);
+      } finally {
+        releaseWorkflowSlot(userId);
       }
     },
   );
