@@ -1,8 +1,9 @@
 import fs from 'fs/promises';
 import path from 'path';
 import { fileURLToPath } from 'url';
+
 import { MdcAdapter } from '../../src/adapters.js';
-import { Prompt } from '../../src/interfaces.js';
+import type { Prompt } from '../../src/interfaces.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,27 +13,27 @@ describe('MdcAdapter Integration', () => {
   let adapter: MdcAdapter;
 
   beforeAll(async () => {
-    await fs.rm(testDir, { recursive: true, force: true });
+    await fs.rm(testDir, { force: true, recursive: true });
     await fs.mkdir(testDir, { recursive: true });
     adapter = new MdcAdapter(testDir);
     await adapter.connect();
   });
 
   afterAll(async () => {
-    await fs.rm(testDir, { recursive: true, force: true });
+    await fs.rm(testDir, { force: true, recursive: true });
   });
 
   it('should save and retrieve a prompt', async () => {
     const prompt: Prompt = {
-      id: 'test-mdc-1',
-      name: 'Test MDC Prompt',
-      description: 'Integration test prompt',
       content: 'Hello, {{name}}!',
-      isTemplate: true,
-      variables: ['name'],
-      tags: ['test', 'mdc'],
       createdAt: new Date().toISOString(),
+      description: 'Integration test prompt',
+      id: 'test-mdc-1',
+      isTemplate: true,
+      name: 'Test MDC Prompt',
+      tags: ['test', 'mdc'],
       updatedAt: new Date().toISOString(),
+      variables: ['name'],
       version: 1,
     };
     await adapter.savePrompt(prompt);
@@ -47,13 +48,13 @@ describe('MdcAdapter Integration', () => {
   it('should update a prompt', async () => {
     const now = new Date().toISOString();
     const updated = await adapter.updatePrompt('test-mdc-1', {
-      id: 'test-mdc-1',
-      name: 'Test MDC',
-      description: 'Updated desc',
       content: 'Test content',
       createdAt: now,
+      description: 'Updated desc',
+      id: 'test-mdc-1',
+      isTemplate: false,
+      name: 'Test MDC',
       updatedAt: now,
-      isTemplate: false
     });
     expect(updated).not.toBeNull();
     expect(updated?.description).toBe('Updated desc');
@@ -78,12 +79,12 @@ describe('MdcAdapter Integration', () => {
 
   it('should not allow duplicate IDs', async () => {
     const prompt: Prompt = {
-      id: 'dup-mdc',
-      name: 'Dup MDC',
-      description: 'Duplicate test',
       content: 'Test',
-      isTemplate: false,
       createdAt: new Date().toISOString(),
+      description: 'Duplicate test',
+      id: 'dup-mdc',
+      isTemplate: false,
+      name: 'Dup MDC',
       updatedAt: new Date().toISOString(),
       version: 1,
     };
@@ -94,14 +95,14 @@ describe('MdcAdapter Integration', () => {
 
   it('should handle template variable extraction', async () => {
     const prompt: Prompt = {
-      id: 'var-mdc',
-      name: 'Var MDC',
-      description: 'Variable extraction',
       content: 'Hi, {{user}} and {{other}}!',
-      isTemplate: true,
-      variables: ['user', 'other'],
       createdAt: new Date().toISOString(),
+      description: 'Variable extraction',
+      id: 'var-mdc',
+      isTemplate: true,
+      name: 'Var MDC',
       updatedAt: new Date().toISOString(),
+      variables: ['user', 'other'],
       version: 1,
     };
     await adapter.savePrompt(prompt);
@@ -109,4 +110,4 @@ describe('MdcAdapter Integration', () => {
     expect(loaded?.variables).toEqual(expect.arrayContaining(['user', 'other']));
     await adapter.deletePrompt('var-mdc');
   });
-}); 
+});

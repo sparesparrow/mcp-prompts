@@ -12,19 +12,19 @@ import { z } from 'zod';
 export interface TemplateVariable {
   /** The variable name in the template (without { }) */
   name: string;
-  
+
   /** Description of the variable */
   description?: string;
-  
+
   /** Default value for the variable */
   default?: string;
-  
+
   /** Whether the variable is required */
   required?: boolean;
-  
+
   /** Type of the variable */
   type?: 'string' | 'number' | 'boolean' | 'array' | 'object';
-  
+
   /** Possible values for the variable (for enum-like variables) */
   options?: string[];
 }
@@ -36,37 +36,37 @@ export interface TemplateVariable {
 export interface Prompt {
   /** Unique identifier for the prompt */
   id: string;
-  
+
   /** Human-readable name of the prompt */
   name: string;
-  
+
   /** Optional description of the prompt */
   description?: string;
-  
+
   /** The actual prompt content */
   content: string;
-  
+
   /** Whether this is a template prompt */
   isTemplate?: boolean;
-  
+
   /** For templates, the list of variables */
   variables?: string[] | TemplateVariable[];
-  
+
   /** Tags for categorization and filtering */
   tags?: string[];
-  
+
   /** Primary category for organization */
   category?: string;
-  
+
   /** Date when the prompt was created (ISO string) */
   createdAt: string;
-  
+
   /** Date when the prompt was last updated (ISO string) */
   updatedAt: string;
-  
+
   /** Version number, incremented on updates */
   version?: number;
-  
+
   /** Optional metadata for additional information */
   metadata?: Record<string, any>;
 }
@@ -77,15 +77,15 @@ export interface Prompt {
 export enum PromptFormat {
   /** Standard JSON format */
   JSON = 'json',
-  
+
   /** Cursor Rules MDC format */
   MDC = 'mdc',
-  
+
   /** PGAI format with embeddings support */
   PGAI = 'pgai',
-  
+
   /** Dynamic template with variable placeholders */
-  TEMPLATE = 'template'
+  TEMPLATE = 'template',
 }
 
 /**
@@ -100,7 +100,7 @@ export interface MdcFormatOptions {
 }
 
 /**
- * PGAI format options 
+ * PGAI format options
  */
 export interface PgaiFormatOptions {
   /** Generate embeddings for content */
@@ -110,11 +110,11 @@ export interface PgaiFormatOptions {
   vectorConfig?: {
     /** Vector dimension */
     dimension: number;
-    
+
     /** Vector distance metric */
     metric: 'cosine' | 'euclidean' | 'manhattan';
   };
-  
+
   /** Collection name in PGAI */
   collection?: string;
 }
@@ -125,10 +125,10 @@ export interface PgaiFormatOptions {
 export interface TemplateFormatOptions {
   /** Variable delimiter style */
   delimiterStyle?: 'curly' | 'double_curly' | 'dollar' | 'percent';
-  
+
   /** Provide default values for variables */
   defaultValues?: Record<string, string>;
-  
+
   /** Programming language for code variables */
   codeLanguage?: string;
 }
@@ -139,17 +139,17 @@ export interface TemplateFormatOptions {
 export interface PromptConversionOptions {
   /** MDC format specific options */
   mdc?: MdcFormatOptions;
-  
+
   /** PGAI format specific options */
   pgai?: PgaiFormatOptions;
-  
+
   /** Template format specific options */
   template?: TemplateFormatOptions;
 }
 
 /**
  * MutablePrompt interface
- * 
+ *
  * Extended prompt interface that can be converted between different formats:
  * - Standard JSON (internal format)
  * - Cursor Rules MDC format
@@ -159,64 +159,56 @@ export interface PromptConversionOptions {
 export interface MutablePrompt extends Prompt {
   /**
    * Convert the prompt to a different format
-   * 
    * @param format Target format to convert to
    * @param options Format-specific conversion options
    * @returns The prompt in the specified format
    */
   toFormat(format: PromptFormat, options?: PromptConversionOptions): string | Record<string, any>;
-  
+
   /**
    * Convert the prompt to MDC format
-   * 
    * @param options MDC-specific options
    * @returns The prompt as an MDC formatted string
    */
   toMdc(options?: MdcFormatOptions): string;
-  
+
   /**
    * Convert the prompt to PGAI format
-   * 
    * @param options PGAI-specific options
    * @returns The prompt in PGAI format
    */
   toPgai(options?: PgaiFormatOptions): Record<string, any>;
-  
+
   /**
    * Convert the prompt to a template with placeholders
-   * 
    * @param options Template-specific options
    * @returns The prompt as a template string
    */
   toTemplate(options?: TemplateFormatOptions): string;
-  
+
   /**
    * Apply variable substitution to a template prompt
-   * 
    * @param variables Key-value pairs for variable substitution
    * @param options Template processing options
    * @returns The content with variables substituted
    */
   applyVariables(variables: Record<string, string>, options?: TemplateFormatOptions): string;
-  
+
   /**
    * Extract variables from the prompt content
-   * 
    * @param options Format-specific options for extraction
    * @returns Array of variable names found in the content
    */
   extractVariables(options?: TemplateFormatOptions): string[];
-  
+
   /**
    * Clone the prompt
-   * 
    * @returns A new instance of MutablePrompt with the same properties
    */
   clone(): MutablePrompt;
-  
+
   /**
    * Create a new version of the prompt
-   * 
    * @param changes Partial changes to apply to the new version
    * @returns A new prompt with incremented version
    */
@@ -229,34 +221,34 @@ export interface MutablePrompt extends Prompt {
 export interface MutablePromptFactory {
   /**
    * Create a new MutablePrompt instance
-   * 
    * @param data Initial prompt data
    * @returns A new MutablePrompt instance
    */
   create(data: Partial<Prompt>): MutablePrompt;
-  
+
   /**
    * Convert from a string format to a MutablePrompt
-   * 
    * @param content String content in a specific format
    * @param format The format of the input content
    * @param options Conversion options
    * @returns A new MutablePrompt instance
    */
-  fromFormat(content: string, format: PromptFormat, options?: PromptConversionOptions): MutablePrompt;
-  
+  fromFormat(
+    content: string,
+    format: PromptFormat,
+    options?: PromptConversionOptions,
+  ): MutablePrompt;
+
   /**
    * Convert from MDC format to a MutablePrompt
-   * 
    * @param mdcContent MDC formatted string
    * @param options MDC-specific options
    * @returns A new MutablePrompt instance
    */
   fromMdc(mdcContent: string, options?: MdcFormatOptions): MutablePrompt;
-  
+
   /**
    * Convert from PGAI format to a MutablePrompt
-   * 
    * @param pgaiData PGAI formatted data
    * @param options PGAI-specific options
    * @returns A new MutablePrompt instance
@@ -270,68 +262,68 @@ export interface MutablePromptFactory {
 export interface ListPromptsOptions {
   /** Filter by template status */
   isTemplate?: boolean;
-  
+
   /** Filter by category */
   category?: string;
-  
+
   /** Filter by tags (prompts must include all specified tags) */
   tags?: string[];
-  
+
   /** Search term for name, description, and content */
   search?: string;
-  
+
   /** Field to sort by */
   sort?: string;
-  
+
   /** Sort order */
   order?: 'asc' | 'desc';
-  
+
   /** Pagination offset */
   offset?: number;
-  
+
   /** Maximum number of results to return */
   limit?: number;
 }
 
 /**
- * Base storage adapter interface 
+ * Base storage adapter interface
  */
 export interface StorageAdapter {
   /**
    * Connect to the storage
    */
   connect(): Promise<void>;
-  
+
   /**
    * Disconnect from the storage
    */
   disconnect(): Promise<void>;
-  
+
   /**
    * Check if connected to the storage
    */
   isConnected(): boolean | Promise<boolean>;
-  
+
   /**
    * Save a prompt to storage
    * @param prompt Prompt to save
    * @returns Prompt ID or the full prompt
    */
   savePrompt(prompt: Prompt): Promise<Prompt>;
-  
+
   /**
    * Get a prompt by ID
    * @param id Prompt ID
    * @returns Prompt
    */
   getPrompt(id: string): Promise<Prompt | null>;
-  
+
   /**
    * Get all prompts
    * @returns Array of prompts
    */
   getAllPrompts(): Promise<Prompt[]>;
-  
+
   /**
    * Update a prompt
    * @param id Prompt ID
@@ -339,38 +331,38 @@ export interface StorageAdapter {
    * @returns Updated prompt or void
    */
   updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
-  
+
   /**
    * List prompts with filtering options
    * @param options Filtering options
    * @returns Array of prompts matching options
    */
   listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  
+
   /**
    * Delete a prompt
    * @param id Prompt ID
    */
   deletePrompt(id: string): Promise<void>;
-  
+
   /**
    * Clear all prompts
    * Removes all prompts from storage
    */
   clearAll?(): Promise<void>;
-  
+
   /**
    * Backup the storage
    * @returns Backup ID
    */
   backup?(): Promise<string>;
-  
+
   /**
    * Restore from a backup
    * @param backupId Backup ID
    */
   restore?(backupId: string): Promise<void>;
-  
+
   /**
    * List available backups
    * @returns Array of backup IDs
@@ -410,13 +402,13 @@ export type TemplateVariables = Record<string, string>;
 export interface ApplyTemplateResult {
   /** The resulting content after applying variables */
   content: string;
-  
+
   /** The original prompt template */
   originalPrompt: Prompt;
-  
+
   /** The variables that were applied */
   appliedVariables: TemplateVariables;
-  
+
   /** Any variables that were missing from the input */
   missingVariables?: string[];
 }
@@ -431,14 +423,14 @@ export interface PromptService {
    * @returns The prompt
    */
   getPrompt(id: string): Promise<Prompt | null>;
-  
+
   /**
    * Add a new prompt
    * @param data Partial prompt data
    * @returns The created prompt
    */
   addPrompt(data: Partial<Prompt>): Promise<Prompt>;
-  
+
   /**
    * Update an existing prompt
    * @param id Prompt ID
@@ -446,20 +438,20 @@ export interface PromptService {
    * @returns The updated prompt
    */
   updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
-  
+
   /**
    * List prompts with optional filtering
    * @param options Filter options
    * @returns Filtered list of prompts
    */
   listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  
+
   /**
    * Delete a prompt
    * @param id Prompt ID
    */
   deletePrompt(id: string): Promise<void>;
-  
+
   /**
    * Apply a template
    * @param id Template ID
@@ -524,27 +516,27 @@ export interface Project {
    * Unique identifier for the project
    */
   id: string;
-  
+
   /**
    * Name of the project
    */
   name: string;
-  
+
   /**
    * Optional description of the project
    */
   description?: string;
-  
+
   /**
    * Optional tags for categorization
    */
   tags?: string[];
-  
+
   /**
    * Creation timestamp
    */
   createdAt?: string;
-  
+
   /**
    * Last update timestamp
    */
@@ -565,8 +557,12 @@ export interface ToolResponse {
  * MCP Tool Parameters
  */
 export type AddPromptParams = CreatePromptParams;
-export type GetPromptParams = { id: string };
-export type DeletePromptParams = { id: string };
+export interface GetPromptParams {
+  id: string;
+}
+export interface DeletePromptParams {
+  id: string;
+}
 
 /**
  * MCP Request Handler Extra
@@ -589,43 +585,43 @@ export interface McpRequestExtra {
 export interface ServerConfig {
   /** Server name */
   name: string;
-  
+
   /** Server version */
   version: string;
-  
+
   /** Storage type */
   storageType: 'file' | 'postgres' | 'memory' | 'mdc';
-  
+
   /** File storage directory */
   promptsDir: string;
-  
+
   /** Backups directory */
   backupsDir: string;
-  
+
   /** HTTP server port */
   port: number;
-  
+
   /** Log level */
   logLevel: 'debug' | 'info' | 'warn' | 'error';
-  
+
   /** Enable HTTP server */
   httpServer: boolean;
-  
+
   /** Enable MCP server */
   mcpServer: boolean;
-  
+
   /** HTTP server host */
   host: string;
-  
+
   /** Enable Server-Sent Events (SSE) */
   enableSSE?: boolean;
-  
+
   /** SSE endpoint path */
   ssePath?: string;
-  
+
   /** CORS origin setting */
   corsOrigin?: string;
-  
+
   /** PostgreSQL configuration */
   postgres?: {
     host: string;
@@ -644,26 +640,26 @@ export interface ServerConfig {
 export interface ErrorWithContext extends Error {
   /** Error code */
   code?: string;
-  
+
   /** HTTP status code */
   statusCode?: number;
-  
+
   /** Additional context object */
   context?: Record<string, any>;
-  
+
   /** Original error if this wraps another error */
   originalError?: Error;
 }
 
 export interface StorageConfig {
   type: 'file' | 'memory' | 'postgres';
-  promptsDir?: string;  // For file storage
-  backupsDir?: string;  // For file storage
-  pgHost?: string;      // For postgres storage
-  pgPort?: number;      // For postgres storage
-  pgUser?: string;      // For postgres storage
-  pgPassword?: string;  // For postgres storage
-  pgDatabase?: string;  // For postgres storage
+  promptsDir?: string; // For file storage
+  backupsDir?: string; // For file storage
+  pgHost?: string; // For postgres storage
+  pgPort?: number; // For postgres storage
+  pgUser?: string; // For postgres storage
+  pgPassword?: string; // For postgres storage
+  pgDatabase?: string; // For postgres storage
 }
 
 /**
@@ -812,4 +808,4 @@ export interface AudioGenerationResult {
     hit: boolean;
     path?: string;
   };
-} 
+}

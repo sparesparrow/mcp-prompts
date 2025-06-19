@@ -1,9 +1,9 @@
 /**
  * Docker Health Check Integration Test
- * 
+ *
  * This test verifies that the health check endpoint is working correctly
  * when the MCP-Prompts server is running in a Docker container.
- * 
+ *
  * Note: This test requires the Docker container to be running at localhost:3003.
  * If you're running this test outside of Docker, make sure the server is started
  * with HTTP_SERVER=true and PORT=3003.
@@ -14,20 +14,23 @@ describe('Docker Health Check Integration', () => {
 
   // Skip the test if we're not in the right environment
   const runTest = process.env.TEST_DOCKER_HEALTH === 'true';
-  
+
   // Helper function to fetch health status
+  /**
+   *
+   */
   async function fetchHealthStatus() {
     try {
       const response = await fetch(HEALTH_CHECK_URL);
       return {
+        data: await response.json(),
         status: response.status,
-        data: await response.json()
       };
     } catch (error: any) {
       console.error('Error fetching health status:', error);
       return {
+        data: { error: error.message || 'Unknown error' },
         status: 500,
-        data: { error: error.message || 'Unknown error' }
       };
     }
   }
@@ -39,7 +42,7 @@ describe('Docker Health Check Integration', () => {
     }
 
     const { status, data } = await fetchHealthStatus();
-    
+
     expect(status).toBe(200);
     expect(data).toHaveProperty('status');
     expect(data.status).toBe('ok');
@@ -52,7 +55,7 @@ describe('Docker Health Check Integration', () => {
     }
 
     const { status, data } = await fetchHealthStatus();
-    
+
     expect(status).toBe(200);
     expect(data).toHaveProperty('storage');
     expect(data.storage).toHaveProperty('connected');
@@ -66,9 +69,9 @@ describe('Docker Health Check Integration', () => {
     }
 
     const { status, data } = await fetchHealthStatus();
-    
+
     expect(status).toBe(200);
     expect(data).toHaveProperty('version');
     expect(data.version).toBeTruthy();
   });
-}); 
+});

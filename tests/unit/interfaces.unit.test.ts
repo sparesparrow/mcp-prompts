@@ -1,4 +1,4 @@
-import { Prompt, MutablePrompt, PromptFormat } from '../../src/interfaces.js';
+import { MutablePrompt, Prompt, PromptFormat } from '../../src/interfaces.js';
 
 describe('Interfaces', () => {
   describe('Prompt interface', () => {
@@ -23,4 +23,4 @@ describe('Interfaces', () => {
       expect(PromptFormat.TEMPLATE).toBe('template');
     });
   });
-}); 
+});

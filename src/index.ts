@@ -1,21 +1,32 @@
 #!/usr/bin/env node
 
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import { z } from 'zod';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
+import { randomUUID } from 'crypto';
+import express from 'express';
+import type { z } from 'zod';
+import { z as orchestratorZ } from 'zod';
+
 import { createStorageAdapter } from './adapters.js';
-import { startHttpServer } from './http-server.js';
 import { loadConfig } from './config.js';
 import { initializeDefaultPrompts } from './data/defaults.js';
-import { promptSchemas } from './schemas.js';
-import { applyTemplate } from './utils.js';
-import { Prompt, StorageAdapter, PromptService, AddPromptInput, EditPromptInput, GetPromptInput, ListPromptsInput, ApplyTemplateInput, PromptSequence } from './interfaces.js';
-import { randomUUID } from 'crypto';
-import { SequenceServiceImpl } from './sequence-service.js';
-import express from 'express';
-import { z as orchestratorZ } from 'zod';
+import { startHttpServer } from './http-server.js';
+import type { PromptService } from './interfaces.js';
+import {
+  AddPromptInput,
+  ApplyTemplateInput,
+  EditPromptInput,
+  GetPromptInput,
+  ListPromptsInput,
+  Prompt,
+  PromptSequence,
+  StorageAdapter,
+} from './interfaces.js';
 import { PromptService as PromptServiceImpl } from './prompt-service.js';
+import type { promptSchemas } from './schemas.js';
+import { SequenceServiceImpl } from './sequence-service.js';
+import { applyTemplate } from './utils.js';
 
 type UpdatePromptInput = z.infer<typeof promptSchemas.update>;
 
@@ -25,11 +36,19 @@ const orchestratorSchema = orchestratorZ.object({
     orchestratorZ.object({
       promptId: orchestratorZ.string(),
       variables: orchestratorZ.record(orchestratorZ.string(), orchestratorZ.any()).optional(),
-    })
+    }),
   ),
 });
 
-async function runOrchestratorWorkflow(steps: Array<{ promptId: string; variables?: Record<string, any> }>, promptService: PromptService) {
+/**
+ *
+ * @param steps
+ * @param promptService
+ */
+async function runOrchestratorWorkflow(
+  steps: Array<{ promptId: string; variables?: Record<string, any> }>,
+  promptService: PromptService,
+) {
   const results = [];
   for (const step of steps) {
     const prompt = await promptService.getPrompt(step.promptId);
@@ -39,9 +58,9 @@ async function runOrchestratorWorkflow(steps: Array<{ promptId: string; variable
     }
     if (prompt.isTemplate) {
       const applied = await promptService.applyTemplate(prompt.id, step.variables || {});
-      results.push({ id: prompt.id, content: applied.content });
+      results.push({ content: applied.content, id: prompt.id });
     } else {
-      results.push({ id: prompt.id, content: prompt.content });
+      results.push({ content: prompt.content, id: prompt.id });
     }
   }
   return results;
@@ -52,142 +71,201 @@ async function runOrchestratorWorkflow(steps: Array<{ promptId: string; variable
  */
 async function main() {
   const config = loadConfig();
-  const storageConfig = {
-    type: config.storageType,
-    promptsDir: config.promptsDir,
-    backupsDir: config.backupsDir,
-    postgres: config.postgres,
-    elasticsearch: config.elasticsearch
+  const storageConfig: any = {
+    backupsDir: config.BACKUPS_DIR,
+    postgres: {
+      database: config.POSTGRES_DATABASE,
+      host: config.POSTGRES_HOST,
+      maxConnections: config.POSTGRES_MAX_CONNECTIONS,
+      password: config.POSTGRES_PASSWORD,
+      port: config.POSTGRES_PORT,
+      ssl: config.POSTGRES_SSL,
+      user: config.POSTGRES_USER,
+    },
+    promptsDir: config.PROMPTS_DIR,
+    type: config.STORAGE_TYPE,
   };
+  if (config.ELASTICSEARCH_NODE) {
+    storageConfig.elasticsearch = {
+      auth:
+        config.ELASTICSEARCH_USERNAME && config.ELASTICSEARCH_PASSWORD
+          ? {
+              password: config.ELASTICSEARCH_PASSWORD,
+              username: config.ELASTICSEARCH_USERNAME,
+            }
+          : undefined,
+      index: config.ELASTICSEARCH_INDEX,
+      node: config.ELASTICSEARCH_NODE,
+      sequenceIndex: config.ELASTICSEARCH_SEQUENCE_INDEX,
+    };
+  }
   const storageAdapter = createStorageAdapter(storageConfig);
   const promptService = new PromptServiceImpl(storageAdapter);
   const sequenceService = new SequenceServiceImpl(storageAdapter);
 
   // Start HTTP server if enabled
-  if (config.httpServer) {
+  if (config.HTTP_SERVER) {
     await startHttpServer(
       null,
       {
-        port: config.port,
-        host: config.host,
-        corsOrigin: config.corsOrigin,
-        enableSSE: config.enableSSE,
-        ssePath: config.ssePath,
+        corsOrigin: config.CORS_ORIGIN,
+        enableSSE: config.ENABLE_SSE,
+        host: config.HOST,
+        port: config.PORT,
+        ssePath: config.SSE_PATH,
       },
-      { promptService, sequenceService }
+      { promptService, sequenceService },
     );
   }
 
   // Initialize MCP server if enabled
-  if (config.mcpServer) {
+  if (config.MCP_SERVER) {
     const server = new Server({
-      name: 'mcp-prompts',
-      version: config.version,
       capabilities: {
+        elicitation: true,
         prompts: true,
-        templates: true,
         sequences: true,
         streaming: true,
-        elicitation: true
+        templates: true,
       },
+      name: config.NAME || 'mcp-prompts',
       tools: [
         {
-          name: 'add_prompt',
-          handler: async (params: { name: string; content: string; description?: string; isTemplate?: boolean; tags?: string[]; variables?: string[] }) => {
+          handler: async (params: {
+            name: string;
+            content: string;
+            description?: string;
+            isTemplate?: boolean;
+            tags?: string[];
+            variables?: string[];
+          }) => {
             try {
               const prompt = await promptService.createPrompt({
                 ...params,
-                isTemplate: params.isTemplate ?? false
+                isTemplate: params.isTemplate ?? false,
               });
-              return { success: true, prompt };
+              return { prompt, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'add_prompt',
         },
         {
-          name: 'edit_prompt',
-          handler: async (params: { id: string; name?: string; content?: string; description?: string; isTemplate?: boolean; tags?: string[]; variables?: string[] }) => {
+          handler: async (params: {
+            id: string;
+            name?: string;
+            content?: string;
+            description?: string;
+            isTemplate?: boolean;
+            tags?: string[];
+            variables?: string[];
+          }) => {
             try {
               const prompt = await promptService.updatePrompt(params.id, {
-                name: params.name,
                 content: params.content,
                 description: params.description,
                 isTemplate: params.isTemplate ?? false,
+                name: params.name,
                 tags: params.tags,
-                variables: params.variables
+                variables: params.variables,
               });
-              return { success: true, prompt };
+              return { prompt, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'edit_prompt',
         },
         {
-          name: 'get_prompt',
           handler: async (params: { id: string }) => {
             try {
               const prompt = await promptService.getPrompt(params.id);
-              return { success: true, prompt };
+              return { prompt, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'get_prompt',
         },
         {
-          name: 'list_prompts',
           handler: async (params: { tags?: string[] }) => {
             try {
               const prompts = await promptService.listPrompts({ tag: params.tags?.[0] });
-              return { success: true, prompts };
+              return { prompts, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'list_prompts',
         },
         {
-          name: 'apply_template',
           handler: async (params: { id: string; variables: Record<string, any> }) => {
             try {
               const result = await promptService.applyTemplate(params.id, params.variables);
-              return { success: true, result };
+              return { result, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'apply_template',
         },
         {
-          name: 'create_sequence',
           handler: async (params: { name?: string; description?: string }) => {
             try {
               const sequence = await sequenceService.createSequence({
+                description: params.description,
                 name: params.name,
-                description: params.description
               });
-              return { success: true, sequence };
+              return { sequence, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
+          },
+          name: 'create_sequence',
         },
         {
-          name: 'orchestrate',
-          handler: async (params: { steps: Array<{ promptId: string; variables?: Record<string, any> }> }) => {
+          handler: async (params: {
+            steps: Array<{ promptId: string; variables?: Record<string, any> }>;
+          }) => {
             try {
               const results = await runOrchestratorWorkflow(params.steps, promptService);
-              return { success: true, results };
+              return { results, success: true };
             } catch (error) {
-              return { success: false, error: error instanceof Error ? error.message : String(error) };
+              return {
+                error: error instanceof Error ? error.message : String(error),
+                success: false,
+              };
             }
-          }
-        }
-      ]
+          },
+          name: 'orchestrate',
+        },
+      ],
+      version: config.VERSION || '1.0.0',
     });
 
     // Store transports for each session type
     const transports = {
+      sse: {} as Record<string, SSEServerTransport>,
       streamable: {} as Record<string, StreamableHTTPServerTransport>,
-      sse: {} as Record<string, SSEServerTransport>
     };
 
     // Set up Express app for handling both Streamable HTTP and SSE
@@ -196,7 +274,9 @@ async function main() {
 
     // Modern Streamable HTTP endpoint
     app.all('/mcp', async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: () => randomUUID() });
+      const transport = new StreamableHTTPServerTransport({
+        sessionIdGenerator: () => randomUUID(),
+      });
       await server.connect(transport);
     });
 
@@ -204,11 +284,11 @@ async function main() {
     app.get('/sse', async (req, res) => {
       const transport = new SSEServerTransport('/messages', res);
       transports.sse[transport.sessionId] = transport;
-      
+
       res.on('close', () => {
         delete transports.sse[transport.sessionId];
       });
-      
+
       await server.connect(transport);
     });
 
@@ -228,21 +308,23 @@ async function main() {
       try {
         const parsed = orchestratorSchema.parse(req.body);
         const results = await runOrchestratorWorkflow(parsed.steps, promptService);
-        res.json({ success: true, results });
+        res.json({ results, success: true });
       } catch (error: any) {
-        res.status(400).json({ success: false, error: error instanceof Error ? error.message : String(error) });
+        res
+          .status(400)
+          .json({ error: error instanceof Error ? error.message : String(error), success: false });
       }
     });
 
     // Start the server
-    app.listen(config.port, config.host, () => {
-      console.log(`MCP server listening on ${config.host}:${config.port}`);
+    app.listen(config.PORT, config.HOST, () => {
+      console.log(`MCP server listening on ${config.HOST}:${config.PORT}`);
     });
   }
 }
 
 // Execute the main function
-main().catch((error) => {
+main().catch(error => {
   console.error('Fatal error:', error);
   process.exit(1);
 });

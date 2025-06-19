@@ -10,13 +10,14 @@
  *   npm run validate:prompts [cesta_ke_kořenovému_adresáři]
  */
 
+import Ajv from 'ajv';
 import fs from 'fs/promises';
 import path from 'path';
-import { fileURLToPath } from 'url';
 import { cwd } from 'process';
-import { PromptService } from '../prompt-service.js';
+import { fileURLToPath } from 'url';
+
 import { FileAdapter } from '../adapters.js';
-import Ajv from 'ajv';
+import { PromptService } from '../prompt-service.js';
 
 // resolve __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -39,49 +40,53 @@ interface PromptTemplate {
 
 // JSON schema definition (minimal)
 const schema: Record<string, unknown> = {
-  type: 'object',
+  additionalProperties: true,
   properties: {
-    id: { type: 'string', minLength: 1 },
-    name: { type: 'string', minLength: 1 },
-    description: { type: 'string', minLength: 1 },
-    content: { type: 'string', minLength: 1 },
-    isTemplate: { type: 'boolean', nullable: true },
-    variables: {
-      type: 'array',
-      items: { type: 'string' },
-      nullable: true,
-      uniqueItems: true,
-    },
+    content: { minLength: 1, type: 'string' },
+    createdAt: { format: 'date-time', nullable: true, type: 'string' },
+    description: { minLength: 1, type: 'string' },
+    examples: { items: {}, nullable: true, type: 'array' },
+    id: { minLength: 1, type: 'string' },
+    isTemplate: { nullable: true, type: 'boolean' },
+    metadata: { additionalProperties: true, nullable: true, type: 'object' },
+    name: { minLength: 1, type: 'string' },
     tags: {
-      type: 'array',
       items: { type: 'string' },
       nullable: true,
+      type: 'array',
       uniqueItems: true,
     },
-    createdAt: { type: 'string', format: 'date-time', nullable: true },
-    updatedAt: { type: 'string', format: 'date-time', nullable: true },
-    version: { type: 'integer', minimum: 0, nullable: true },
-    metadata: { type: 'object', nullable: true, additionalProperties: true },
-    examples: { type: 'array', nullable: true, items: {} },
+    updatedAt: { format: 'date-time', nullable: true, type: 'string' },
+    variables: {
+      items: { type: 'string' },
+      nullable: true,
+      type: 'array',
+      uniqueItems: true,
+    },
+    version: { minimum: 0, nullable: true, type: 'integer' },
   },
   required: ['id', 'name', 'description', 'content'],
-  additionalProperties: true,
+  type: 'object',
 };
 
 const ajv = new Ajv({ allErrors: true });
 const validate = ajv.compile(schema);
 
+/**
+ *
+ * @param filePath
+ * @param promptService
+ */
 async function validateFile(filePath: string, promptService: PromptService): Promise<boolean> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const json: unknown = JSON.parse(raw);
     // Use PromptService validation
-    await promptService["validatePrompt"](json as any, false);
+    await promptService['validatePrompt'](json as any, false);
     console.log(`✓ ${filePath}`);
     return true;
   } catch (err) {
     if (typeof err === 'object' && err !== null && 'details' in err) {
-      // @ts-ignore
       console.error(`✗ ${filePath} is invalid:`, err.details || err);
     } else if (err instanceof Error) {
       console.error(`✗ ${filePath} is invalid:`, err.message);
@@ -92,6 +97,11 @@ async function validateFile(filePath: string, promptService: PromptService): Pro
   }
 }
 
+/**
+ *
+ * @param dir
+ * @param cb
+ */
 async function walk(dir: string, cb: (file: string) => Promise<boolean>): Promise<boolean> {
   let allOk = true;
   const entries = await fs.readdir(dir, { withFileTypes: true });
@@ -108,6 +118,9 @@ async function walk(dir: string, cb: (file: string) => Promise<boolean>): Promis
   return allOk;
 }
 
+/**
+ *
+ */
 async function main() {
   const baseDir = process.argv[2] || path.resolve(cwd());
   const targetDirs = [
@@ -125,7 +138,7 @@ async function main() {
       .then(() => true)
       .catch(() => false);
     if (!exists) continue;
-    const ok = await walk(dir, (file) => validateFile(file, promptService));
+    const ok = await walk(dir, file => validateFile(file, promptService));
     if (!ok) success = false;
   }
   if (!success) {
@@ -139,4 +152,4 @@ async function main() {
 main().catch(err => {
   console.error('Fatal error', err);
   process.exit(1);
-}); 
+});

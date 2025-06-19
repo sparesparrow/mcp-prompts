@@ -1,9 +1,10 @@
-import request from 'supertest';
-import { startHttpServer } from '../http-server.js';
-import { PromptService } from '../prompt-service.js';
-import { SequenceService } from '../sequence-service.js';
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { jest } from '@jest/globals';
+import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import request from 'supertest';
+
+import { startHttpServer } from '../http-server.js';
+import type { PromptService } from '../prompt-service.js';
+import type { SequenceService } from '../sequence-service.js';
 
 describe('HTTP Server', () => {
   let server: any;
@@ -14,9 +15,9 @@ describe('HTTP Server', () => {
     // Mock services
     promptService = {
       createPrompt: jest.fn(),
+      deletePrompt: jest.fn().mockImplementation(() => Promise.resolve()),
       getPrompt: jest.fn(),
       updatePrompt: jest.fn(),
-      deletePrompt: jest.fn().mockImplementation(() => Promise.resolve()),
     } as any;
 
     sequenceService = {
@@ -27,13 +28,15 @@ describe('HTTP Server', () => {
     server = await startHttpServer(
       null,
       {
-        port: 0, // Use random port
-        host: 'localhost',
         corsOrigin: '*',
+
         enableSSE: true,
+        // Use random port
+        host: 'localhost',
+        port: 0,
         ssePath: '/events',
       },
-      { promptService, sequenceService }
+      { promptService, sequenceService },
     );
   });
 
@@ -78,9 +81,9 @@ describe('HTTP Server', () => {
   describe('Prompt Endpoints', () => {
     it('should create a prompt', async () => {
       const prompt = {
-        name: 'Test Prompt',
         content: 'Hello, {{name}}!',
         isTemplate: true,
+        name: 'Test Prompt',
         variables: ['name'],
       };
 
@@ -92,9 +95,7 @@ describe('HTTP Server', () => {
         version: 1,
       });
 
-      const response = await request(server)
-        .post('/prompts')
-        .send(prompt);
+      const response = await request(server).post('/prompts').send(prompt);
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
@@ -107,9 +108,7 @@ describe('HTTP Server', () => {
     });
 
     it('should handle missing required fields', async () => {
-      const response = await request(server)
-        .post('/prompts')
-        .send({});
+      const response = await request(server).post('/prompts').send({});
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe(true);
@@ -118,18 +117,17 @@ describe('HTTP Server', () => {
 
     it('should get a prompt', async () => {
       const prompt = {
-        id: '123',
-        name: 'Test Prompt',
         content: 'Hello!',
         createdAt: new Date().toISOString(),
+        id: '123',
+        name: 'Test Prompt',
         updatedAt: new Date().toISOString(),
         version: 1,
       };
 
       promptService.getPrompt.mockResolvedValue(prompt);
 
-      const response = await request(server)
-        .get('/prompts/123');
+      const response = await request(server).get('/prompts/123');
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject(prompt);
@@ -138,8 +136,7 @@ describe('HTTP Server', () => {
     it('should handle not found prompt', async () => {
       promptService.getPrompt.mockResolvedValue(null);
 
-      const response = await request(server)
-        .get('/prompts/123');
+      const response = await request(server).get('/prompts/123');
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe(true);
@@ -150,8 +147,7 @@ describe('HTTP Server', () => {
     it('should handle internal server errors', async () => {
       promptService.getPrompt.mockRejectedValue(new Error('Database error'));
 
-      const response = await request(server)
-        .get('/prompts/123');
+      const response = await request(server).get('/prompts/123');
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe(true);
@@ -159,12 +155,11 @@ describe('HTTP Server', () => {
     });
 
     it('should handle 404 for unknown routes', async () => {
-      const response = await request(server)
-        .get('/unknown');
+      const response = await request(server).get('/unknown');
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe(true);
       expect(response.body.code).toBe('NOT_FOUND');
     });
   });
-}); 
+});

@@ -1,12 +1,14 @@
 import { jest } from '@jest/globals';
 jest.setTimeout(60000);
-import express from 'express';
-import { Server } from 'node:http';
-import { SseManager, getSseManager, resetSseManager } from '../sse.js';
+import type { Server } from 'node:http';
+
 import { EventSource } from 'eventsource';
+import express from 'express';
+
+import { getSseManager, resetSseManager, SseManager } from '../sse.js';
 import * as sseModule from '../sse.js';
 
-type SseOptions = {
+interface SseOptions {
   enableCompression?: boolean;
   compressionMinSize?: number;
   messageHistory?: number;
@@ -14,7 +16,7 @@ type SseOptions = {
   connectionTimeout?: number;
   maxRetries?: number;
   retryDelay?: number;
-};
+}
 
 describe('SseManager', () => {
   let app: express.Application;
@@ -23,6 +25,10 @@ describe('SseManager', () => {
   let port: number;
   let eventSources: EventSource[] = [];
 
+  /**
+   *
+   * @param es
+   */
   async function closeEventSource(es: EventSource): Promise<void> {
     return new Promise(resolve => {
       es.close();
@@ -33,12 +39,12 @@ describe('SseManager', () => {
   beforeAll(async () => {
     resetSseManager();
     const options: SseOptions = {
-      enableCompression: true,
       compressionMinSize: 1024,
-      messageHistory: 100,
-      heartbeatInterval: 30000,
       connectionTimeout: 60000,
+      enableCompression: true,
+      heartbeatInterval: 30000,
       maxRetries: 3,
+      messageHistory: 100,
       retryDelay: 1000,
     };
     sseManager = getSseManager(options);
@@ -49,7 +55,7 @@ describe('SseManager', () => {
     });
     await new Promise<void>(resolve => {
       server = app.listen(0, () => {
-        port = (server.address() as import('net').AddressInfo).port;
+        port = (server.address() as any).port;
         console.log('[SSE TEST] Server started on port', port);
         resolve();
       });
@@ -83,10 +89,12 @@ describe('SseManager', () => {
     }
     eventSources.length = 0;
     if (server) {
-      await new Promise<void>(resolve => server.close(() => {
-        console.log('[SSE TEST] Server closed');
-        resolve();
-      }));
+      await new Promise<void>(resolve =>
+        server.close(() => {
+          console.log('[SSE TEST] Server closed');
+          resolve();
+        }),
+      );
     }
   });
 
@@ -104,10 +112,18 @@ describe('SseManager', () => {
     console.log('[TEST] afterEach: cleanup complete');
   });
 
+  /**
+   *
+   * @param ms
+   */
   function delay(ms: number) {
     return new Promise(resolve => setTimeout(resolve, ms));
   }
 
+  /**
+   *
+   * @param port
+   */
   function getSseUrl(port: number | string | undefined): string {
     if (!port || isNaN(Number(port))) {
       throw new Error(`[SSE TEST] Port is not defined nebo není číslo: ${port}`);
@@ -169,16 +185,16 @@ describe('SseManager', () => {
         }
       }, 20000);
       failTimeout.unref?.();
-      es.onmessage = (event: MessageEvent) => {
+      es.onmessage = (event: Event) => {
         if (resolved) return;
-        console.log('[TEST] Received message:', event.data);
-        if (!receivedConnected && event.data === '"connected"') {
+        const data = (event as any).data;
+        console.log('[TEST] Received message:', data);
+        if (!receivedConnected && data === '"connected"') {
           receivedConnected = true;
           return;
         }
         try {
-          const data = JSON.parse(event.data);
-          expect(data).toEqual({ type: 'test', content: 'Hello World' });
+          expect(data).toEqual({ content: 'Hello World', type: 'test' });
           resolved = true;
           clearTimeout(failTimeout);
           es.close();
@@ -201,7 +217,7 @@ describe('SseManager', () => {
       setTimeout(() => {
         if (!resolved) {
           console.log('[TEST] Broadcasting test message');
-          sseManager.broadcast({ type: 'test', content: 'Hello World' });
+          sseManager.broadcast({ content: 'Hello World', type: 'test' });
         }
       }, 300);
     });
@@ -238,7 +254,7 @@ describe('SseManager', () => {
           }, 100);
         }
       };
-      es.onerror = (err) => {
+      es.onerror = err => {
         if (!resolved) {
           resolved = true;
           clearTimeout(failTimeout);
@@ -254,8 +270,10 @@ describe('SseManager', () => {
     const es1 = new EventSource(getSseUrl(port));
     const es2 = new EventSource(getSseUrl(port));
     eventSources.push(es1, es2);
-    let received1 = false, received2 = false;
-    let connected1 = false, connected2 = false;
+    let received1 = false,
+      received2 = false;
+    let connected1 = false,
+      connected2 = false;
     let resolved = false;
     await new Promise<void>((resolve, reject) => {
       const failTimeout = setTimeout(() => {
@@ -276,20 +294,20 @@ describe('SseManager', () => {
           resolve();
         }
       };
-      const messageHandler = (esNum: number) => (event: MessageEvent) => {
+      const messageHandler = (esNum: number) => (event: Event) => {
         if (resolved) return;
-        console.log(`[TEST] [multi] es${esNum} received:`, event.data);
-        if ((esNum === 1 && !connected1 && event.data === '"connected"')) {
+        const data = (event as any).data;
+        console.log(`[TEST] [multi] es${esNum} received:`, data);
+        if (esNum === 1 && !connected1 && data === '"connected"') {
           connected1 = true;
           return;
         }
-        if ((esNum === 2 && !connected2 && event.data === '"connected"')) {
+        if (esNum === 2 && !connected2 && data === '"connected"') {
           connected2 = true;
           return;
         }
         try {
-          const data = JSON.parse(event.data);
-          expect(data).toEqual({ type: 'test', content: 'Hello World' });
+          expect(data).toEqual({ content: 'Hello World', type: 'test' });
           if (esNum === 1) received1 = true;
           if (esNum === 2) received2 = true;
           checkDone();
@@ -324,7 +342,7 @@ describe('SseManager', () => {
       setTimeout(() => {
         if (!resolved) {
           console.log('[TEST] Broadcasting message to multiple clients');
-          sseManager.broadcast({ type: 'test', content: 'Hello World' });
+          sseManager.broadcast({ content: 'Hello World', type: 'test' });
         }
       }, 300);
     });
@@ -335,12 +353,6 @@ describe('SseManager', () => {
     await delay(100);
     const es = new EventSource(getSseUrl(port));
     eventSources.push(es);
-    let clientId: string | undefined;
-
-    // Získání ID klienta po připojení
-    sseManager.on('clientConnected', id => {
-      clientId = id;
-    });
 
     await new Promise<void>((resolve, reject) => {
       const failTimeout = setTimeout(() => {
@@ -349,8 +361,10 @@ describe('SseManager', () => {
       }, 5000);
 
       es.onopen = () => {
-        if (clientId) {
-          sseManager.destroyClient(clientId);
+        // Get the clientId directly from sseManager
+        const clientIds = sseManager.getClientIds();
+        if (clientIds.length > 0) {
+          sseManager.destroyClient(clientIds[0]);
         }
       };
 
@@ -399,7 +413,7 @@ describe('SseManager', () => {
           }, 100);
         }
       };
-      es.onerror = (err) => {
+      es.onerror = err => {
         if (!resolved) {
           resolved = true;
           clearTimeout(failTimeout);

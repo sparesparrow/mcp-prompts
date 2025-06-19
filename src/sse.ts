@@ -1,23 +1,23 @@
 /**
  * Server-Sent Events (SSE) implementation for MCP Prompts
- * 
+ *
  * This module provides functionality for creating SSE servers and clients
  * for the MCP Prompts project. It implements the MCP SSE transport layer
  * following best practices.
  */
 
-import {
-  ServerConfig,
-} from './interfaces.js';
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
-import type { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
-import { Express, Request, Response } from 'express';
-import type { IncomingMessage, Server as HttpServer, ServerResponse } from 'node:http';
-import EventEmitter from 'node:events';
-import { Transport } from '@modelcontextprotocol/sdk/cjs/shared/transport.js';
 import { randomUUID } from 'node:crypto';
-import { gzip, deflate, brotliCompress } from 'node:zlib';
+import EventEmitter from 'node:events';
+import type { IncomingMessage, Server as HttpServer, ServerResponse } from 'node:http';
 import { promisify } from 'node:util';
+import { brotliCompress, deflate, gzip } from 'node:zlib';
+
+import { Transport } from '@modelcontextprotocol/sdk/cjs/shared/transport.js';
+import type { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index.js';
+import type { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
+import { Express, Request, Response } from 'express';
+
+import { ServerConfig } from './interfaces.js';
 
 const gzipAsync = promisify(gzip);
 const deflateAsync = promisify(deflate);
@@ -26,7 +26,7 @@ const brotliCompressAsync = promisify(brotliCompress);
 // Message compression options
 interface CompressionOptions {
   enabled: boolean;
-  minSize: number;  // Minimum size in bytes before compression
+  minSize: number; // Minimum size in bytes before compression
   algorithm: 'gzip' | 'deflate' | 'brotli';
   level?: 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
   autoSelect?: boolean; // Automatically select best compression method
@@ -182,38 +182,60 @@ export class SseManager extends EventEmitter {
   private constructor(options: SseManagerOptions = {}) {
     super();
     this._options = {
-      heartbeatInterval: options.heartbeatInterval || 30000,
+      autoSelectCompression: options.autoSelectCompression || false,
+      cleanupInterval: options.cleanupInterval || 300000,
+
       clientTimeout: options.clientTimeout || 60000,
-      messageHistory: options.messageHistory || 50,
+
+      compressionAlgorithm: options.compressionAlgorithm || 'gzip',
+
+      compressionMinSize: options.compressionMinSize || 1024,
+
+      // 1 hour
+      connectionQualityInterval: options.connectionQualityInterval || 60000,
+
+      enableCompression: options.enableCompression || false,
+
+      heartbeatInterval: options.heartbeatInterval || 30000,
+
+      logLevel: options.logLevel || 'info',
+
+      maxConcurrentClients: options.maxConcurrentClients || 1000,
+
       maxReconnectAttempts: options.maxReconnectAttempts || 5,
-      reconnectDelay: options.reconnectDelay || 5000,
-      cleanupInterval: options.cleanupInterval || 300000, // 5 minutes
+
+      messageHistory: options.messageHistory || 50,
+      // 5 minutes
       messageQueueSize: options.messageQueueSize || 1000,
+      messageRetentionPeriod: options.messageRetentionPeriod || 3600000,
       messageRetryAttempts: options.messageRetryAttempts || 3,
       messageRetryInterval: options.messageRetryInterval || 10000,
-      messageRetentionPeriod: options.messageRetentionPeriod || 3600000, // 1 hour
-      connectionQualityInterval: options.connectionQualityInterval || 60000,
-      enableCompression: options.enableCompression || false,
-      maxConcurrentClients: options.maxConcurrentClients || 1000,
-      logLevel: options.logLevel || 'info',
-      compressionMinSize: options.compressionMinSize || 1024,
-      compressionAlgorithm: options.compressionAlgorithm || 'gzip',
-      autoSelectCompression: options.autoSelectCompression || false,
-      ...options
+      reconnectDelay: options.reconnectDelay || 5000,
+      ...options,
     };
 
     // Start the cleanup interval
-    this.cleanupInterval = setInterval(() => { void this._cleanupDisconnectedClients(); }, this._options.cleanupInterval);
+    this.cleanupInterval = setInterval(() => {
+      void this._cleanupDisconnectedClients();
+    }, this._options.cleanupInterval);
 
     // Start message retry interval
-    this.messageRetryInterval = setInterval(() => { void this._retryFailedMessages(); }, this._options.messageRetryInterval);
+    this.messageRetryInterval = setInterval(() => {
+      void this._retryFailedMessages();
+    }, this._options.messageRetryInterval);
 
     // Start connection quality monitoring
-    this.connectionQualityInterval = setInterval(() => { void this._monitorConnectionQuality(); }, this._options.connectionQualityInterval);
+    this.connectionQualityInterval = setInterval(() => {
+      void this._monitorConnectionQuality();
+    }, this._options.connectionQualityInterval);
 
     // Handle process termination
-    process.on('SIGTERM', () => { void this._handleShutdown(); });
-    process.on('SIGINT', () => { void this._handleShutdown(); });
+    process.on('SIGTERM', () => {
+      void this._handleShutdown();
+    });
+    process.on('SIGINT', () => {
+      void this._handleShutdown();
+    });
   }
 
   private async _handleShutdown() {
@@ -239,26 +261,31 @@ export class SseManager extends EventEmitter {
       if (!client.connected || client.state.isBackoff) continue;
 
       const now = new Date();
-      const messages = client.messageQueue.messages.filter(msg => 
-        msg.attempts < client.messageQueue.maxAttempts && 
-        (!client.state.lastMessageId || msg.id > client.state.lastMessageId)
+      const messages = client.messageQueue.messages.filter(
+        msg =>
+          msg.attempts < client.messageQueue.maxAttempts &&
+          (!client.state.lastMessageId || msg.id > client.state.lastMessageId),
       );
 
       for (const message of messages) {
         try {
           const success = await this.writeToClient(client, {
-            id: message.id,
+            data: message.data,
             event: message.event,
-            data: message.data
+            id: message.id,
           });
 
           if (success) {
             client.state.lastMessageId = message.id;
-            client.messageQueue.messages = client.messageQueue.messages.filter(m => m.id !== message.id);
+            client.messageQueue.messages = client.messageQueue.messages.filter(
+              m => m.id !== message.id,
+            );
           } else {
             message.attempts++;
             if (message.attempts >= client.messageQueue.maxAttempts) {
-              console.warn(`Message ${message.id} to client ${client.id} failed after ${message.attempts} attempts`);
+              console.warn(
+                `Message ${message.id} to client ${client.id} failed after ${message.attempts} attempts`,
+              );
             }
           }
         } catch (error) {
@@ -281,23 +308,26 @@ export class SseManager extends EventEmitter {
 
       // Update connection quality
       const oldQuality = client.state.connectionQuality;
-      client.state.connectionQuality = this._calculateConnectionQuality(client, timeSinceLastHeartbeat);
+      client.state.connectionQuality = this._calculateConnectionQuality(
+        client,
+        timeSinceLastHeartbeat,
+      );
 
       // Emit quality change event
       if (oldQuality !== client.state.connectionQuality) {
         this.emit('connectionQualityChange', {
           clientId: client.id,
-          oldQuality,
+          metrics: client.state.metrics,
           newQuality: client.state.connectionQuality,
-          metrics: client.state.metrics
+          oldQuality,
         });
       }
 
       // Handle poor connection quality
       if (client.state.connectionQuality === 'poor') {
         console.warn(`Poor connection quality for client ${client.id}:`, {
+          metrics: client.state.metrics,
           timeSinceLastHeartbeat,
-          metrics: client.state.metrics
         });
 
         // Try to recover the connection
@@ -314,7 +344,7 @@ export class SseManager extends EventEmitter {
       const isInactive = timeSinceLastActivity > this._options.clientTimeout!;
 
       // Check if client is in a failed state
-      const isFailedState = 
+      const isFailedState =
         client.state.consecutiveFailures >= client.maxReconnectAttempts ||
         (client.state.connectionQuality === 'poor' && !client.state.isReconnecting);
 
@@ -326,10 +356,10 @@ export class SseManager extends EventEmitter {
 
         console.info(`Cleaning up client ${clientId}:`, {
           connected: client.connected,
-          timeSinceLastActivity,
-          isInactive,
           isFailedState,
-          metrics: client.state.metrics
+          isInactive,
+          metrics: client.state.metrics,
+          timeSinceLastActivity,
         });
 
         // Perform cleanup
@@ -338,8 +368,8 @@ export class SseManager extends EventEmitter {
         // Emit cleanup event
         this.emit('clientCleanup', {
           clientId,
+          metrics: client.state.metrics,
           reason: isInactive ? 'inactive' : isFailedState ? 'failed' : 'disconnected',
-          metrics: client.state.metrics
         });
       }
     }
@@ -347,36 +377,38 @@ export class SseManager extends EventEmitter {
     // Log overall status
     if (this._options.logLevel === 'debug') {
       console.debug('SSE manager status:', {
-        totalClients: this.clients.size,
         activeClients: Array.from(this.clients.values()).filter(c => c.connected).length,
-        reconnectingClients: Array.from(this.clients.values()).filter(c => c.state.isReconnecting).length
+        reconnectingClients: Array.from(this.clients.values()).filter(c => c.state.isReconnecting)
+          .length,
+        totalClients: this.clients.size,
       });
     }
   }
 
   private _calculateConnectionQuality(
     client: SseClient,
-    timeSinceLastHeartbeat: number
+    timeSinceLastHeartbeat: number,
   ): 'good' | 'fair' | 'poor' {
     // Calculate quality based on multiple factors
     const factors = {
+      errorRate:
+        client.state.metrics.errorCount === 0 ? 1 : client.state.metrics.errorCount < 3 ? 0.5 : 0,
       heartbeatDelay: timeSinceLastHeartbeat > 45000 ? 0 : timeSinceLastHeartbeat > 30000 ? 0.5 : 1,
-      errorRate: client.state.metrics.errorCount === 0 ? 1 : 
-                 client.state.metrics.errorCount < 3 ? 0.5 : 0,
-      latency: client.state.metrics.avgLatency < 100 ? 1 :
-               client.state.metrics.avgLatency < 500 ? 0.5 : 0,
-      messageSuccess: client.state.metrics.messagesSent === 0 ? 1 :
-                     client.state.metrics.messagesSent / 
-                     (client.state.metrics.messagesSent + client.state.metrics.errorCount)
+      latency:
+        client.state.metrics.avgLatency < 100 ? 1 : client.state.metrics.avgLatency < 500 ? 0.5 : 0,
+      messageSuccess:
+        client.state.metrics.messagesSent === 0
+          ? 1
+          : client.state.metrics.messagesSent /
+            (client.state.metrics.messagesSent + client.state.metrics.errorCount),
     };
 
     // Calculate weighted average
-    const score = (
+    const score =
       factors.heartbeatDelay * 0.4 +
       factors.errorRate * 0.3 +
       factors.latency * 0.2 +
-      factors.messageSuccess * 0.1
-    );
+      factors.messageSuccess * 0.1;
 
     // Map score to quality level
     if (score >= 0.8) return 'good';
@@ -390,25 +422,25 @@ export class SseManager extends EventEmitter {
 
     // Log the error with context
     console.error(`Client ${client.id} error:`, {
-      error: error.message,
-      stack: error.stack,
-      consecutiveFailures: client.state.consecutiveFailures,
       connectionQuality: client.state.connectionQuality,
+      consecutiveFailures: client.state.consecutiveFailures,
+      error: error.message,
       lastMessageId: client.state.lastMessageId,
-      metrics: client.state.metrics
+      metrics: client.state.metrics,
+      stack: error.stack,
     });
 
     // Implement exponential backoff
     if (client.state.consecutiveFailures > 1) {
       const backoffTime = Math.min(
         1000 * Math.pow(2, client.state.consecutiveFailures - 1),
-        30000 // Max 30 seconds
+        30000, // Max 30 seconds
       );
       client.state.isBackoff = true;
       client.state.backoffUntil = new Date(Date.now() + backoffTime);
 
       console.warn(`Client ${client.id} entering backoff for ${backoffTime}ms`);
-      
+
       // Schedule reconnection attempt after backoff
       setTimeout(async () => {
         client.state.isBackoff = false;
@@ -438,10 +470,10 @@ export class SseManager extends EventEmitter {
     // Emit error event for monitoring
     this.emit('clientError', {
       clientId: client.id,
-      error: error.message,
-      consecutiveFailures: client.state.consecutiveFailures,
       connectionQuality: client.state.connectionQuality,
-      metrics: client.state.metrics
+      consecutiveFailures: client.state.consecutiveFailures,
+      error: error.message,
+      metrics: client.state.metrics,
     });
   }
 
@@ -454,7 +486,9 @@ export class SseManager extends EventEmitter {
     client.state.lastReconnectAttempt = new Date();
     client.reconnectAttempts++;
 
-    console.info(`Attempting to reconnect client ${client.id} (attempt ${client.reconnectAttempts}/${client.maxReconnectAttempts})`);
+    console.info(
+      `Attempting to reconnect client ${client.id} (attempt ${client.reconnectAttempts}/${client.maxReconnectAttempts})`,
+    );
 
     try {
       // Try to restore the connection
@@ -471,7 +505,7 @@ export class SseManager extends EventEmitter {
         // Emit reconnected event
         this.emit('clientReconnected', {
           clientId: client.id,
-          metrics: client.state.metrics
+          metrics: client.state.metrics,
         });
 
         return true;
@@ -492,19 +526,19 @@ export class SseManager extends EventEmitter {
     try {
       // Set up SSE headers
       client.res.writeHead(200, {
-      'Content-Type': 'text/event-stream',
-      'Cache-Control': 'no-cache',
-      'Connection': 'keep-alive',
-        ...client.state.customHeaders
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+        'Content-Type': 'text/event-stream',
+        ...client.state.customHeaders,
       });
 
       // Send initial reconnection message
       const success = await this.writeToClient(client, {
-        event: 'reconnect',
         data: {
+          lastMessageId: client.state.lastMessageId,
           timestamp: new Date().toISOString(),
-          lastMessageId: client.state.lastMessageId
-        }
+        },
+        event: 'reconnect',
       });
 
       if (success) {
@@ -512,10 +546,10 @@ export class SseManager extends EventEmitter {
         client.connected = true;
         client.lastActivity = new Date();
         client.state.lastHeartbeat = new Date();
-        
+
         // Start heartbeat
         await this.sendHeartbeat(client);
-        
+
         return true;
       }
     } catch (error) {
@@ -530,9 +564,8 @@ export class SseManager extends EventEmitter {
       return;
     }
 
-    const missedMessages = client.messageQueue.messages.filter(msg => 
-      msg.id > client.state.lastMessageId! &&
-      (!msg.expiresAt || msg.expiresAt > new Date())
+    const missedMessages = client.messageQueue.messages.filter(
+      msg => msg.id > client.state.lastMessageId! && (!msg.expiresAt || msg.expiresAt > new Date()),
     );
 
     console.log(`Replaying ${missedMessages.length} missed messages for client ${client.id}`);
@@ -540,9 +573,9 @@ export class SseManager extends EventEmitter {
     for (const message of missedMessages) {
       try {
         const success = await this.writeToClient(client, {
-          id: message.id,
+          data: message.data,
           event: message.event,
-          data: message.data
+          id: message.id,
         });
 
         if (success) {
@@ -556,7 +589,7 @@ export class SseManager extends EventEmitter {
       }
     }
   }
-  
+
   /**
    * Send a message to a specific client
    * @param clientId The client ID
@@ -568,12 +601,13 @@ export class SseManager extends EventEmitter {
     if (!client) {
       return false;
     }
-    
+
     return await this.writeToClient(client, message);
   }
-  
+
   /**
    * Broadcast a message to all connected clients
+   * @param message
    */
   public broadcast(message: any): void {
     const data = `data: ${JSON.stringify(message)}\n\n`;
@@ -591,7 +625,7 @@ export class SseManager extends EventEmitter {
       }
     }
   }
-  
+
   /**
    * Disconnect a client
    * @param clientId The client ID to disconnect
@@ -606,38 +640,42 @@ export class SseManager extends EventEmitter {
     console.log(`[SSE] removeClient: Current client IDs:`, Array.from(this.clients.keys()));
     return true;
   }
-  
+
   /**
    * Get active client count
    */
   public get clientCount(): number {
     return this.clients.size;
   }
-  
+
   /**
    * Get a list of connected client IDs
    */
   public getClientIds(): string[] {
     return Array.from(this.clients.keys());
   }
-  
+
   /**
    * Internal method to write to a client
+   * @param client
+   * @param message
    */
   public async writeToClient(client: SseClient, message: any): Promise<boolean> {
     if (!client.connected || client.state.isBackoff) {
       return false;
     }
-    
+
     try {
-      let data = typeof message.data === 'object' ? JSON.stringify(message.data) : String(message.data);
+      let data =
+        typeof message.data === 'object' ? JSON.stringify(message.data) : String(message.data);
       let compressed = false;
       let compressionStats = null;
 
       // Compress data if enabled and client supports it
       if (
         this._options.enableCompression &&
-        client.state.features && client.state.features.supportsCompression &&
+        client.state.features &&
+        client.state.features.supportsCompression &&
         this._options.compressionMinSize &&
         (data?.length ?? 0) > this._options.compressionMinSize
       ) {
@@ -676,10 +714,10 @@ export class SseManager extends EventEmitter {
             compressed = true;
             compressionStats = {
               algorithm,
-              originalSize,
               compressedSize,
               compressionRatio,
-              compressionTime
+              compressionTime,
+              originalSize,
             };
 
             // Update compression stats
@@ -692,11 +730,11 @@ export class SseManager extends EventEmitter {
 
       // Send message to client
       const success = await this.sendMessageToClient(client, {
-        id: message.id,
-        event: message.event,
-        data: data,
         compressed: compressed,
-        compressionStats: compressionStats
+        compressionStats: compressionStats,
+        data: data,
+        event: message.event,
+        id: message.id,
       });
 
       return success;
@@ -708,62 +746,64 @@ export class SseManager extends EventEmitter {
 
   /**
    * Add a new SSE client
+   * @param req
+   * @param res
    */
   public addClient(req: IncomingMessage, res: ServerResponse): SseClient {
     const clientId = randomUUID();
     const now = new Date();
     const client: SseClient = {
-      id: clientId,
-      req,
-      res,
       connected: true,
       connectedAt: now,
-      lastActivity: now,
       history: [],
-      metadata: {},
-      reconnectAttempts: 0,
+      id: clientId,
+      lastActivity: now,
       maxReconnectAttempts: this._options.maxReconnectAttempts || 5,
-      reconnectDelay: this._options.reconnectDelay || 5000,
-      state: {
-        isReconnecting: false,
-        lastReconnectAttempt: null,
-        consecutiveFailures: 0,
-        lastMessageId: null,
-        isBackoff: false,
-        backoffUntil: null,
-        lastHeartbeat: now,
-        connectionQuality: 'good',
-        customHeaders: {},
-        features: {
-          supportsRetry: true,
-          supportsLastEventId: true,
-          supportsBinary: false,
-          supportsCompression: !!this._options.enableCompression,
-        },
-        metrics: {
-          messagesReceived: 0,
-          messagesSent: 0,
-          bytesReceived: 0,
-          bytesSent: 0,
-          lastLatency: 0,
-          avgLatency: 0,
-          errorCount: 0,
-        },
-      },
       messageQueue: {
-        messages: [],
-        maxSize: this._options.messageQueueSize || 1000,
-        maxAttempts: this._options.messageRetryAttempts || 3,
-        retentionPeriod: this._options.messageRetentionPeriod || 3600000,
-        currentSize: 0,
         compressionStats: {
+          avgCompressionRatio: 1,
+          byAlgorithm: {},
+          bytesSaved: 0,
+          compressionTimeAvg: 0,
+          compressionTimeTotal: 0,
           totalCompressed: 0,
           totalUncompressed: 0,
-          avgCompressionRatio: 1,
-          bytesSaved: 0,
-          compressionTimeTotal: 0,
-          compressionTimeAvg: 0,
-          byAlgorithm: {},
+        },
+        currentSize: 0,
+        maxAttempts: this._options.messageRetryAttempts || 3,
+        maxSize: this._options.messageQueueSize || 1000,
+        messages: [],
+        retentionPeriod: this._options.messageRetentionPeriod || 3600000,
+      },
+      metadata: {},
+      reconnectAttempts: 0,
+      reconnectDelay: this._options.reconnectDelay || 5000,
+      req,
+      res,
+      state: {
+        backoffUntil: null,
+        connectionQuality: 'good',
+        consecutiveFailures: 0,
+        customHeaders: {},
+        features: {
+          supportsBinary: false,
+          supportsCompression: !!this._options.enableCompression,
+          supportsLastEventId: true,
+          supportsRetry: true,
+        },
+        isBackoff: false,
+        isReconnecting: false,
+        lastHeartbeat: now,
+        lastMessageId: null,
+        lastReconnectAttempt: null,
+        metrics: {
+          avgLatency: 0,
+          bytesReceived: 0,
+          bytesSent: 0,
+          errorCount: 0,
+          lastLatency: 0,
+          messagesReceived: 0,
+          messagesSent: 0,
         },
       },
     };
@@ -799,7 +839,9 @@ export class SseManager extends EventEmitter {
     console.log('[SSE] handleConnection: New connection');
     const client = this.addClient(req, res);
     if (this._options.logLevel === 'debug' || process.env.NODE_ENV === 'test') {
-      console.log(`[SSE] handleConnection: client ${client.id} registered. Total clients: ${this.clients.size}`);
+      console.log(
+        `[SSE] handleConnection: client ${client.id} registered. Total clients: ${this.clients.size}`,
+      );
     }
     console.log('[SSE] handleConnection: Connection setup complete');
   }
@@ -870,6 +912,10 @@ export class SseManager extends EventEmitter {
 
 let sseManagerInstance: SseManager | null = null;
 
+/**
+ *
+ * @param options
+ */
 export function getSseManager(options?: SseManagerOptions): SseManager {
   if (!sseManagerInstance) {
     sseManagerInstance = SseManager.getInstance(options);
@@ -877,6 +923,9 @@ export function getSseManager(options?: SseManagerOptions): SseManager {
   return sseManagerInstance;
 }
 
+/**
+ *
+ */
 export function resetSseManager() {
   sseManagerInstance = null;
 }

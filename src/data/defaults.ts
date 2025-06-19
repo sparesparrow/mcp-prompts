@@ -1,12 +1,10 @@
-import { Prompt, StorageAdapter } from '../interfaces.js';
+import type { Prompt, StorageAdapter } from '../interfaces.js';
 
 /**
  * A list of default prompts to be loaded into storage if the store is empty.
  */
 export const DEFAULT_PROMPTS: Omit<Prompt, 'id' | 'createdAt' | 'updatedAt' | 'version'>[] = [
   {
-    name: 'Development System Prompt',
-    description: 'A template for creating system prompts for development assistance',
     content: `You are a development assistant helping with {{project_type}} development using {{language}}.
 
 Role:
@@ -24,17 +22,20 @@ When providing code examples:
 
 Technical context:
 {{technical_context}}`,
+    description: 'A template for creating system prompts for development assistance',
     isTemplate: true,
-    variables: ['project_type', 'language', 'project_name', 'project_goal', 'technical_context'],
+    name: 'Development System Prompt',
     tags: ['development', 'system', 'template'],
+    variables: ['project_type', 'language', 'project_name', 'project_goal', 'technical_context'],
   },
   {
-    name: 'Task List Helper',
+    content:
+      'Please create a prioritized task list based on the following requirements:\n\n{{requirements}}',
     description: 'A basic prompt to help organize and prioritize tasks',
-    content: 'Please create a prioritized task list based on the following requirements:\n\n{{requirements}}',
     isTemplate: true,
-    variables: ['requirements'],
+    name: 'Task List Helper',
     tags: ['productivity', 'planning'],
+    variables: ['requirements'],
   },
 ];
 
@@ -55,7 +56,7 @@ export async function initializeDefaultPrompts(storageAdapter: StorageAdapter) {
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
           version: 1,
-        }
+        };
         await storageAdapter.savePrompt(newPrompt);
       }
       console.log(`Added ${DEFAULT_PROMPTS.length} default prompts.`);
@@ -65,4 +66,4 @@ export async function initializeDefaultPrompts(storageAdapter: StorageAdapter) {
   } catch (error) {
     console.error('Error initializing default prompts:', error);
   }
-} 
+}

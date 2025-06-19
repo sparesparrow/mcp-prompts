@@ -1,5 +1,6 @@
-import { Prompt, PromptSequence, StorageAdapter } from "./interfaces.js";
 import { v4 as uuidv4 } from 'uuid';
+
+import type { Prompt, PromptSequence, StorageAdapter } from './interfaces.js';
 
 export interface GetSequenceWithPromptsResult {
   sequence: PromptSequence;
@@ -34,52 +35,52 @@ export interface SequenceService {
 export class SequenceServiceImpl implements SequenceService {
   private storage: StorageAdapter;
 
-  constructor(storage: StorageAdapter) {
+  public constructor(storage: StorageAdapter) {
     this.storage = storage;
   }
 
-  async getSequenceWithPrompts(id: string): Promise<GetSequenceWithPromptsResult> {
+  public async getSequenceWithPrompts(id: string): Promise<GetSequenceWithPromptsResult> {
     const sequence = await this.storage.getSequence(id);
     if (!sequence) {
       throw new Error(`Sequence with id ${id} not found`);
     }
 
     const prompts = await Promise.all(
-      sequence.promptIds.map(promptId => this.storage.getPrompt(promptId))
+      sequence.promptIds.map(promptId => this.storage.getPrompt(promptId)),
     );
 
     const foundPrompts = prompts.filter((p): p is Prompt => p !== null);
-    
+
     if (foundPrompts.length !== sequence.promptIds.length) {
-        console.warn(`Some prompts for sequence ${id} were not found.`);
+      console.warn(`Some prompts for sequence ${id} were not found.`);
     }
 
     return {
-      sequence,
       prompts: foundPrompts,
+      sequence,
     };
   }
 
-  async createSequence(data: Partial<PromptSequence>): Promise<PromptSequence> {
+  public async createSequence(data: Partial<PromptSequence>): Promise<PromptSequence> {
     if (!data.name || !data.promptIds) {
-      throw new Error("Missing required fields: name and promptIds");
+      throw new Error('Missing required fields: name and promptIds');
     }
 
     const now = new Date().toISOString();
     const newSequence: PromptSequence = {
-      id: data.id || uuidv4(),
-      name: data.name,
-      description: data.description,
-      promptIds: data.promptIds,
       createdAt: now,
-      updatedAt: now,
+      description: data.description,
+      id: data.id || uuidv4(),
       metadata: data.metadata,
+      name: data.name,
+      promptIds: data.promptIds,
+      updatedAt: now,
     };
 
     return this.storage.saveSequence(newSequence);
   }
 
-  async deleteSequence(id: string): Promise<void> {
+  public async deleteSequence(id: string): Promise<void> {
     await this.storage.deleteSequence(id);
   }
-} 
+}

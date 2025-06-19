@@ -3,25 +3,23 @@
  * Contains all storage adapters in a single file
  */
 
-import { 
-  Prompt, 
-  StorageAdapter, 
-  ListPromptsOptions, 
-  ServerConfig, 
-  MutablePrompt,
-  MutablePromptFactory,
-  PromptFormat, 
-  PromptConversionOptions,
-  MdcFormatOptions,
-  PgaiFormatOptions,
-  TemplateFormatOptions,
-  PromptSequence
-} from './interfaces.js';
+import { Client } from '@elastic/elasticsearch';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
-import { Client } from '@elastic/elasticsearch';
+
+import type { ListPromptsOptions, Prompt, PromptSequence, StorageAdapter } from './interfaces.js';
+import {
+  MdcFormatOptions,
+  MutablePrompt,
+  MutablePromptFactory,
+  PgaiFormatOptions,
+  PromptConversionOptions,
+  PromptFormat,
+  ServerConfig,
+  TemplateFormatOptions,
+} from './interfaces.js';
 
 /**
  * FileAdapter Implementation
@@ -30,55 +28,55 @@ import { Client } from '@elastic/elasticsearch';
 export class FileAdapter implements StorageAdapter {
   private promptsDir: string;
   private sequencesDir: string;
-  private connected: boolean = false;
+  private connected = false;
   private prompts: Map<string, Prompt> = new Map();
 
-  constructor(promptsDir: string) {
+  public constructor(promptsDir: string) {
     this.promptsDir = promptsDir;
     this.sequencesDir = path.join(promptsDir, 'sequences');
   }
 
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     try {
       await fs.mkdir(this.promptsDir, { recursive: true });
       await fs.mkdir(this.sequencesDir, { recursive: true });
       this.connected = true;
       console.error(`File storage connected: ${this.promptsDir}`);
     } catch (error: any) {
-      console.error("Error connecting to file storage:", error);
+      console.error('Error connecting to file storage:', error);
       throw new Error(`Failed to connect to file storage: ${error.message}`);
     }
   }
 
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     this.connected = false;
-    console.error("File storage disconnected");
+    console.error('File storage disconnected');
   }
 
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
+  public async savePrompt(prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
       await fs.writeFile(
         path.join(this.promptsDir, `${prompt.id}.json`),
-        JSON.stringify(prompt, null, 2)
+        JSON.stringify(prompt, null, 2),
       );
       return prompt;
     } catch (error: any) {
-      console.error("Error saving prompt to file:", error);
+      console.error('Error saving prompt to file:', error);
       throw error;
     }
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
+  public async getPrompt(id: string): Promise<Prompt | null> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
-      const content = await fs.readFile(path.join(this.promptsDir, `${id}.json`), "utf-8");
+      const content = await fs.readFile(path.join(this.promptsDir, `${id}.json`), 'utf-8');
       return JSON.parse(content);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -89,16 +87,13 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+  public async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
-      await fs.writeFile(
-        path.join(this.promptsDir, `${id}.json`),
-        JSON.stringify(prompt, null, 2)
-      );
+      await fs.writeFile(path.join(this.promptsDir, `${id}.json`), JSON.stringify(prompt, null, 2));
       return prompt;
     } catch (error: any) {
       console.error(`Error updating prompt ${id} in file:`, error);
@@ -106,9 +101,9 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  public async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
     try {
       await fs.unlink(path.join(this.promptsDir, `${id}.json`));
@@ -116,18 +111,18 @@ export class FileAdapter implements StorageAdapter {
       if (error.code === 'ENOENT') {
         // no return value
       }
-        console.error(`Error deleting prompt ${id} from file:`, error);
-        throw error;
+      console.error(`Error deleting prompt ${id} from file:`, error);
+      throw error;
     }
   }
 
-  async getSequence(id: string): Promise<PromptSequence | null> {
+  public async getSequence(id: string): Promise<PromptSequence | null> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
-      const content = await fs.readFile(path.join(this.sequencesDir, `${id}.json`), "utf-8");
+      const content = await fs.readFile(path.join(this.sequencesDir, `${id}.json`), 'utf-8');
       return JSON.parse(content);
     } catch (error: any) {
       if (error.code === 'ENOENT') {
@@ -138,26 +133,26 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
       await fs.writeFile(
         path.join(this.sequencesDir, `${sequence.id}.json`),
-        JSON.stringify(sequence, null, 2)
+        JSON.stringify(sequence, null, 2),
       );
       return sequence;
     } catch (error: any) {
-      console.error("Error saving sequence to file:", error);
+      console.error('Error saving sequence to file:', error);
       throw error;
     }
   }
 
-  async deleteSequence(id: string): Promise<void> {
+  public async deleteSequence(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
@@ -170,29 +165,29 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
 
     try {
       const files = await fs.readdir(this.promptsDir);
       const prompts: Prompt[] = [];
-      
+
       for (const file of files) {
-        if (file.endsWith(".json")) {
+        if (file.endsWith('.json')) {
           try {
-            const content = await fs.readFile(path.join(this.promptsDir, file), "utf-8");
+            const content = await fs.readFile(path.join(this.promptsDir, file), 'utf-8');
             prompts.push(JSON.parse(content));
           } catch (error: any) {
             console.error(`Error reading prompt file ${file}:`, error);
           }
         }
       }
-      
+
       return this.filterPrompts(prompts, options);
     } catch (error: any) {
-      console.error("Error listing prompts from file:", error);
+      console.error('Error listing prompts from file:', error);
       throw error;
     }
   }
@@ -222,14 +217,14 @@ export class FileAdapter implements StorageAdapter {
     return filtered;
   }
 
-  async getAllPrompts(): Promise<Prompt[]> {
+  public async getAllPrompts(): Promise<Prompt[]> {
     if (!this.connected) {
-      throw new Error("File storage not connected");
+      throw new Error('File storage not connected');
     }
     return Array.from(this.prompts.values());
   }
 
-  async isConnected(): Promise<boolean> {
+  public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 }
@@ -241,78 +236,78 @@ export class FileAdapter implements StorageAdapter {
 export class MemoryAdapter implements StorageAdapter {
   private prompts: Map<string, Prompt> = new Map();
   private sequences: Map<string, PromptSequence> = new Map();
-  private connected: boolean = false;
+  private connected = false;
 
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     this.connected = true;
-    console.error("Memory storage connected");
+    console.error('Memory storage connected');
   }
 
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     this.prompts.clear();
     this.sequences.clear();
     this.connected = false;
-    console.error("Memory storage disconnected");
+    console.error('Memory storage disconnected');
   }
 
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
+  public async savePrompt(prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
 
     this.prompts.set(prompt.id, prompt);
     return prompt;
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
+  public async getPrompt(id: string): Promise<Prompt | null> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
 
     return this.prompts.get(id) || null;
   }
 
-  async getSequence(id: string): Promise<PromptSequence | null> {
+  public async getSequence(id: string): Promise<PromptSequence | null> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
     return this.sequences.get(id) || null;
   }
 
-  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
     this.sequences.set(sequence.id, sequence);
     return sequence;
   }
 
-  async deleteSequence(id: string): Promise<void> {
+  public async deleteSequence(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
     this.sequences.delete(id);
   }
 
-  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+  public async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
 
     this.prompts.set(id, prompt);
     return prompt;
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  public async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
     this.prompts.delete(id);
   }
 
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
 
     const prompts = Array.from(this.prompts.values());
@@ -344,13 +339,13 @@ export class MemoryAdapter implements StorageAdapter {
     return filtered;
   }
 
-  async isConnected(): Promise<boolean> {
+  public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
-  async getAllPrompts(): Promise<Prompt[]> {
+  public async getAllPrompts(): Promise<Prompt[]> {
     if (!this.connected) {
-      throw new Error("Memory storage not connected");
+      throw new Error('Memory storage not connected');
     }
     return Array.from(this.prompts.values());
   }
@@ -362,27 +357,27 @@ export class MemoryAdapter implements StorageAdapter {
  */
 export class PostgresAdapter implements StorageAdapter {
   private pool: pg.Pool;
-  private connected: boolean = false;
+  private connected = false;
 
-  constructor(config: pg.PoolConfig) {
+  public constructor(config: pg.PoolConfig) {
     this.pool = new pg.Pool(config);
   }
 
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     try {
       await this.pool.query('SELECT NOW()');
       this.connected = true;
-      console.error("PostgreSQL storage connected");
+      console.error('PostgreSQL storage connected');
     } catch (error: any) {
-      console.error("Error connecting to PostgreSQL:", error);
+      console.error('Error connecting to PostgreSQL:', error);
       throw new Error(`Failed to connect to PostgreSQL: ${error.message}`);
     }
   }
 
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     await this.pool.end();
     this.connected = false;
-    console.error("PostgreSQL storage disconnected");
+    console.error('PostgreSQL storage disconnected');
   }
 
   // Helper: Get or create tag IDs for a list of tag names
@@ -397,7 +392,10 @@ export class PostgresAdapter implements StorageAdapter {
           tagIds.push(res.rows[0].id);
         } else {
           // Insert new tag
-          const insert = await client.query('INSERT INTO mcp_prompts.tags (name) VALUES ($1) RETURNING id', [name]);
+          const insert = await client.query(
+            'INSERT INTO mcp_prompts.tags (name) VALUES ($1) RETURNING id',
+            [name],
+          );
           tagIds.push(insert.rows[0].id);
         }
       }
@@ -416,7 +414,10 @@ export class PostgresAdapter implements StorageAdapter {
       if (tagNames.length === 0) return;
       const tagIds = await this.getOrCreateTagIds(tagNames);
       for (const tagId of tagIds) {
-        await client.query('INSERT INTO mcp_prompts.prompt_tags (prompt_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [promptId, tagId]);
+        await client.query(
+          'INSERT INTO mcp_prompts.prompt_tags (prompt_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [promptId, tagId],
+        );
       }
     } finally {
       client.release();
@@ -424,13 +425,21 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   // Helper: Set template variables for a prompt (replace all)
-  private async setTemplateVariables(promptId: number, variables: string[] | undefined): Promise<void> {
+  private async setTemplateVariables(
+    promptId: number,
+    variables: string[] | undefined,
+  ): Promise<void> {
     const client = await this.pool.connect();
     try {
-      await client.query('DELETE FROM mcp_prompts.template_variables WHERE prompt_id = $1', [promptId]);
+      await client.query('DELETE FROM mcp_prompts.template_variables WHERE prompt_id = $1', [
+        promptId,
+      ]);
       if (!variables || variables.length === 0) return;
       for (const name of variables) {
-        await client.query('INSERT INTO mcp_prompts.template_variables (prompt_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING', [promptId, name]);
+        await client.query(
+          'INSERT INTO mcp_prompts.template_variables (prompt_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
+          [promptId, name],
+        );
       }
     } finally {
       client.release();
@@ -442,7 +451,8 @@ export class PostgresAdapter implements StorageAdapter {
     const res = await this.pool.query(
       `SELECT t.name FROM mcp_prompts.tags t
        JOIN mcp_prompts.prompt_tags pt ON t.id = pt.tag_id
-       WHERE pt.prompt_id = $1`, [promptId]
+       WHERE pt.prompt_id = $1`,
+      [promptId],
     );
     return res.rows.map(r => r.name);
   }
@@ -450,7 +460,8 @@ export class PostgresAdapter implements StorageAdapter {
   // Helper: Get template variables for a prompt
   private async getVariablesForPrompt(promptId: number): Promise<string[]> {
     const res = await this.pool.query(
-      `SELECT name FROM mcp_prompts.template_variables WHERE prompt_id = $1`, [promptId]
+      `SELECT name FROM mcp_prompts.template_variables WHERE prompt_id = $1`,
+      [promptId],
     );
     return res.rows.map(r => r.name);
   }
@@ -469,8 +480,8 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   // Save (insert or update) prompt
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async savePrompt(prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     const client = await this.pool.connect();
     try {
       // Check if prompt exists (by name)
@@ -486,14 +497,26 @@ export class PostgresAdapter implements StorageAdapter {
             metadata = $4,
             updated_at = CURRENT_TIMESTAMP
           WHERE id = $5 RETURNING *`,
-          [prompt.description, prompt.content, prompt.isTemplate || false, JSON.stringify(prompt.metadata || {}), promptId]
+          [
+            prompt.description,
+            prompt.content,
+            prompt.isTemplate || false,
+            JSON.stringify(prompt.metadata || {}),
+            promptId,
+          ],
         );
       } else {
         // Insert
         res = await client.query(
           `INSERT INTO mcp_prompts.prompts (name, description, content, is_template, metadata)
            VALUES ($1, $2, $3, $4, $5) RETURNING *`,
-          [prompt.name, prompt.description, prompt.content, prompt.isTemplate || false, JSON.stringify(prompt.metadata || {})]
+          [
+            prompt.name,
+            prompt.description,
+            prompt.content,
+            prompt.isTemplate || false,
+            JSON.stringify(prompt.metadata || {}),
+          ],
         );
         promptId = res.rows[0].id;
       }
@@ -504,7 +527,7 @@ export class PostgresAdapter implements StorageAdapter {
       // Return full prompt
       return await this.getPromptById(promptId);
     } catch (error) {
-      console.error("Error saving prompt to PostgreSQL:", error);
+      console.error('Error saving prompt to PostgreSQL:', error);
       throw error;
     } finally {
       client.release();
@@ -519,23 +542,23 @@ export class PostgresAdapter implements StorageAdapter {
     const tags = await this.getTagsForPrompt(id);
     const variables = await this.getVariablesForPrompt(id);
     return {
-      id: row.id.toString(),
-      name: row.name,
-      description: row.description,
       content: row.content,
-      isTemplate: row.is_template,
-      tags,
-      variables,
-      metadata: row.metadata,
       createdAt: row.created_at,
+      description: row.description,
+      id: row.id.toString(),
+      isTemplate: row.is_template,
+      metadata: row.metadata,
+      name: row.name,
+      tags,
       updatedAt: row.updated_at,
-      version: row.version || 1
+      variables,
+      version: row.version || 1,
     };
   }
 
   // Get prompt by name (public API)
-  async getPrompt(idOrName: string): Promise<Prompt | null> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async getPrompt(idOrName: string): Promise<Prompt | null> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     // Try by numeric ID first
     let idNum = parseInt(idOrName, 10);
     let prompt: Prompt | null = null;
@@ -557,11 +580,11 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   // Update prompt (by name or ID)
-  async updatePrompt(idOrName: string, prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async updatePrompt(idOrName: string, prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     let promptId = parseInt(idOrName, 10);
     if (isNaN(promptId)) {
-      promptId = await this.getPromptIdByName(idOrName) || 0;
+      promptId = (await this.getPromptIdByName(idOrName)) || 0;
     }
     if (!promptId) throw new Error(`Prompt not found: ${idOrName}`);
     // SavePrompt will update if exists
@@ -569,8 +592,8 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   // Delete prompt
-  async deletePrompt(idOrName: string): Promise<void> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async deletePrompt(idOrName: string): Promise<void> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     let promptId = parseInt(idOrName, 10);
     if (isNaN(promptId)) {
       const foundId = await this.getPromptIdByName(idOrName);
@@ -582,8 +605,8 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   // List prompts (optionally filter by isTemplate, tags, etc.)
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     let query = 'SELECT * FROM mcp_prompts.prompts_with_tags';
     const params: any[] = [];
     const conditions: string[] = [];
@@ -606,50 +629,52 @@ export class PostgresAdapter implements StorageAdapter {
     for (const row of res.rows) {
       const variables = await this.getVariablesForPrompt(row.id);
       prompts.push({
-        id: row.id.toString(),
-        name: row.name,
-        description: row.description,
         content: row.content,
-        isTemplate: row.is_template,
-        tags: row.tags,
-        variables,
-        metadata: row.metadata,
         createdAt: row.created_at,
+        description: row.description,
+        id: row.id.toString(),
+        isTemplate: row.is_template,
+        metadata: row.metadata,
+        name: row.name,
+        tags: row.tags,
         updatedAt: row.updated_at,
-        version: row.version || 1
+        variables,
+        version: row.version || 1,
       });
     }
     return prompts;
   }
 
-  async isConnected(): Promise<boolean> {
+  public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
   // Sequence methods (not implemented)
-  async getSequence(id: string): Promise<PromptSequence | null> {
-    return Promise.reject(new Error("Method not implemented."));
+  public async getSequence(id: string): Promise<PromptSequence | null> {
+    return Promise.reject(new Error('Method not implemented.'));
   }
-  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    return Promise.reject(new Error("Method not implemented."));
+  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    return Promise.reject(new Error('Method not implemented.'));
   }
-  async deleteSequence(id: string): Promise<void> {
-    return Promise.reject(new Error("Method not implemented."));
+  public async deleteSequence(id: string): Promise<void> {
+    return Promise.reject(new Error('Method not implemented.'));
   }
 
   // Test helper: clear all data (truncate tables)
-  async clearAll(): Promise<void> {
-    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+  public async clearAll(): Promise<void> {
+    if (!this.connected) throw new Error('PostgreSQL storage not connected');
     const client = await this.pool.connect();
     try {
-      await client.query('TRUNCATE mcp_prompts.prompt_tags, mcp_prompts.template_variables, mcp_prompts.tags, mcp_prompts.prompts RESTART IDENTITY CASCADE');
+      await client.query(
+        'TRUNCATE mcp_prompts.prompt_tags, mcp_prompts.template_variables, mcp_prompts.tags, mcp_prompts.prompts RESTART IDENTITY CASCADE',
+      );
     } finally {
       client.release();
     }
   }
 
   // Return all prompts (required by StorageAdapter interface)
-  async getAllPrompts(): Promise<Prompt[]> {
+  public async getAllPrompts(): Promise<Prompt[]> {
     return this.listPrompts();
   }
 }
@@ -662,22 +687,22 @@ export class MdcAdapter implements StorageAdapter {
   private rulesDir: string;
   private connected = false;
 
-  constructor(rulesDir: string) {
+  public constructor(rulesDir: string) {
     this.rulesDir = rulesDir;
   }
 
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     await fs.mkdir(this.rulesDir, { recursive: true });
     this.connected = true;
     console.error(`MDC storage connected: ${this.rulesDir}`);
   }
 
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     this.connected = false;
     console.error('MDC storage disconnected');
   }
 
-  async isConnected(): Promise<boolean> {
+  public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
@@ -685,7 +710,7 @@ export class MdcAdapter implements StorageAdapter {
     return path.join(this.rulesDir, `${id}.mdc`);
   }
 
-  async savePrompt(prompt: Prompt, overwrite = false): Promise<Prompt> {
+  public async savePrompt(prompt: Prompt, overwrite = false): Promise<Prompt> {
     if (!this.connected) throw new Error('MDC adapter not connected');
     const id = prompt.id || this.generateId(prompt.name);
     prompt.id = id;
@@ -698,7 +723,7 @@ export class MdcAdapter implements StorageAdapter {
     return prompt;
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
+  public async getPrompt(id: string): Promise<Prompt | null> {
     if (!this.connected) throw new Error('MDC adapter not connected');
     try {
       const mdcContent = await fs.readFile(this.getFilePath(id), 'utf8');
@@ -709,7 +734,7 @@ export class MdcAdapter implements StorageAdapter {
     }
   }
 
-  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+  public async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
     if (!this.connected) throw new Error('MDC adapter not connected');
     const existing = await this.getPrompt(id);
     if (!existing) throw new Error(`Prompt not found: ${id}`);
@@ -718,9 +743,9 @@ export class MdcAdapter implements StorageAdapter {
     return updated;
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  public async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("MDC storage not connected");
+      throw new Error('MDC storage not connected');
     }
     const filePath = this.getFilePath(id);
     try {
@@ -733,7 +758,7 @@ export class MdcAdapter implements StorageAdapter {
     }
   }
 
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     if (!this.connected) throw new Error('MDC adapter not connected');
     const files = await fs.readdir(this.rulesDir);
     const prompts: Prompt[] = [];
@@ -751,18 +776,18 @@ export class MdcAdapter implements StorageAdapter {
     return this.filterPrompts(prompts, options);
   }
 
-  async getAllPrompts(): Promise<Prompt[]> {
+  public async getAllPrompts(): Promise<Prompt[]> {
     return this.listPrompts();
   }
 
   // Sequence support: not implemented for MDC, return null/empty
-  async getSequence(_id: string): Promise<PromptSequence | null> {
+  public async getSequence(_id: string): Promise<PromptSequence | null> {
     return null;
   }
-  async saveSequence(_sequence: PromptSequence): Promise<PromptSequence> {
+  public async saveSequence(_sequence: PromptSequence): Promise<PromptSequence> {
     throw new Error('Sequences not supported in MDC adapter');
   }
-  async deleteSequence(_id: string): Promise<void> {
+  public async deleteSequence(_id: string): Promise<void> {
     throw new Error('Sequences not supported in MDC adapter');
   }
 
@@ -780,10 +805,11 @@ export class MdcAdapter implements StorageAdapter {
     }
     if (options.search) {
       const term = options.search.toLowerCase();
-      filtered = filtered.filter(p =>
-        p.name.toLowerCase().includes(term) ||
-        (p.description && p.description.toLowerCase().includes(term)) ||
-        p.content.toLowerCase().includes(term)
+      filtered = filtered.filter(
+        p =>
+          p.name.toLowerCase().includes(term) ||
+          (p.description && p.description.toLowerCase().includes(term)) ||
+          p.content.toLowerCase().includes(term),
       );
     }
     return filtered;
@@ -823,15 +849,15 @@ export class MdcAdapter implements StorageAdapter {
     const content = mdcContent.replace(/---\n[\s\S]*?\n---\n\n# .*\n\n/, '');
     const variables = this.extractVariablesFromContent(content);
     return {
-      id,
-      name,
-      description,
       content,
-      tags,
-      isTemplate: variables.length > 0,
-      variables,
       createdAt: new Date().toISOString(),
+      description,
+      id,
+      isTemplate: variables.length > 0,
+      name,
+      tags,
       updatedAt: new Date().toISOString(),
+      variables,
     };
   }
 
@@ -843,14 +869,20 @@ export class MdcAdapter implements StorageAdapter {
     const varSection = content.match(/## Variables\n\n([\s\S]*?)(\n\n|$)/);
     if (!varSection) return [];
     const varContent = varSection[1];
-    return varContent.split('\n').map(line => {
-      const match = line.match(/- `([^`]+)`/);
-      return match ? match[1] : null;
-    }).filter(Boolean) as string[];
+    return varContent
+      .split('\n')
+      .map(line => {
+        const match = line.match(/- `([^`]+)`/);
+        return match ? match[1] : null;
+      })
+      .filter(Boolean) as string[];
   }
 
   private generateId(name: string): string {
-    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    const base = name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/(^-|-$)/g, '');
     return base || uuidv4();
   }
 }
@@ -862,24 +894,24 @@ export class MdcAdapter implements StorageAdapter {
 export class ElasticSearchAdapter implements StorageAdapter {
   private client: Client;
   private index: string;
-  private connected: boolean = false;
+  private connected = false;
   private sequenceIndex: string;
 
-  constructor(config: {
+  public constructor(config: {
     node: string;
     auth?: { username: string; password: string };
     index?: string;
     sequenceIndex?: string;
   }) {
     this.client = new Client({
-      node: config.node,
       auth: config.auth,
+      node: config.node,
     });
     this.index = config.index || 'prompts';
     this.sequenceIndex = config.sequenceIndex || 'prompt-sequences';
   }
 
-  async connect(): Promise<void> {
+  public async connect(): Promise<void> {
     try {
       // Check if indices exist, create if not
       const promptsExists = await this.client.indices.exists({ index: this.index });
@@ -888,20 +920,20 @@ export class ElasticSearchAdapter implements StorageAdapter {
           index: this.index,
           mappings: {
             properties: {
-              id: { type: 'keyword' },
-              name: { type: 'text' },
-              description: { type: 'text' },
-              content: { type: 'text' },
-              isTemplate: { type: 'boolean' },
-              variables: { type: 'keyword' },
-              tags: { type: 'keyword' },
               category: { type: 'keyword' },
+              content: { type: 'text' },
               createdAt: { type: 'date' },
+              description: { type: 'text' },
+              id: { type: 'keyword' },
+              isTemplate: { type: 'boolean' },
+              metadata: { type: 'object' },
+              name: { type: 'text' },
+              tags: { type: 'keyword' },
               updatedAt: { type: 'date' },
+              variables: { type: 'keyword' },
               version: { type: 'integer' },
-              metadata: { type: 'object' }
-            }
-          }
+            },
+          },
         });
       }
 
@@ -911,64 +943,64 @@ export class ElasticSearchAdapter implements StorageAdapter {
           index: this.sequenceIndex,
           mappings: {
             properties: {
-              id: { type: 'keyword' },
-              name: { type: 'text' },
-              description: { type: 'text' },
-              promptIds: { type: 'keyword' },
               createdAt: { type: 'date' },
+              description: { type: 'text' },
+              id: { type: 'keyword' },
+              metadata: { type: 'object' },
+              name: { type: 'text' },
+              promptIds: { type: 'keyword' },
               updatedAt: { type: 'date' },
-              metadata: { type: 'object' }
-            }
-          }
+            },
+          },
         });
       }
 
       this.connected = true;
       console.error(`ElasticSearch storage connected: ${this.index}`);
     } catch (error: any) {
-      console.error("Error connecting to ElasticSearch:", error);
+      console.error('Error connecting to ElasticSearch:', error);
       throw new Error(`Failed to connect to ElasticSearch: ${error.message}`);
     }
   }
 
-  async disconnect(): Promise<void> {
+  public async disconnect(): Promise<void> {
     await this.client.close();
     this.connected = false;
-    console.error("ElasticSearch storage disconnected");
+    console.error('ElasticSearch storage disconnected');
   }
 
-  async isConnected(): Promise<boolean> {
+  public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
+  public async savePrompt(prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       await this.client.index({
-        index: this.index,
-        id: prompt.id,
         document: prompt,
-        refresh: true
+        id: prompt.id,
+        index: this.index,
+        refresh: true,
       });
       return prompt;
     } catch (error: any) {
-      console.error("Error saving prompt to ElasticSearch:", error);
+      console.error('Error saving prompt to ElasticSearch:', error);
       throw error;
     }
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
+  public async getPrompt(id: string): Promise<Prompt | null> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       const response = await this.client.get({
+        id: id,
         index: this.index,
-        id: id
       });
       return response._source as Prompt;
     } catch (error: any) {
@@ -980,17 +1012,17 @@ export class ElasticSearchAdapter implements StorageAdapter {
     }
   }
 
-  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+  public async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       await this.client.update({
-        index: this.index,
-        id: id,
         doc: prompt,
-        refresh: true
+        id: id,
+        index: this.index,
+        refresh: true,
       });
       return prompt;
     } catch (error: any) {
@@ -999,16 +1031,16 @@ export class ElasticSearchAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  public async deletePrompt(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       const response = await this.client.delete({
-        index: this.index,
         id: id,
-        refresh: true
+        index: this.index,
+        refresh: true,
       });
     } catch (error: any) {
       if (error.statusCode === 404) {
@@ -1019,16 +1051,16 @@ export class ElasticSearchAdapter implements StorageAdapter {
     }
   }
 
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+  public async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       const query: any = {
         bool: {
-          must: []
-        }
+          must: [],
+        },
       };
 
       if (options?.isTemplate !== undefined) {
@@ -1046,42 +1078,40 @@ export class ElasticSearchAdapter implements StorageAdapter {
       if (options?.search) {
         query.bool.must.push({
           multi_match: {
+            fields: ['name^2', 'description', 'content'],
             query: options.search,
-            fields: ['name^2', 'description', 'content']
-          }
+          },
         });
       }
 
       const response = await this.client.search({
+        from: options?.offset || 0,
         index: this.index,
         query,
-        sort: options?.sort ? [
-          { [options.sort]: { order: options.order || 'asc' } }
-        ] : undefined,
-        from: options?.offset || 0,
-        size: options?.limit || 10
+        size: options?.limit || 10,
+        sort: options?.sort ? [{ [options.sort]: { order: options.order || 'asc' } }] : undefined,
       });
 
       return response.hits.hits.map(hit => hit._source as Prompt);
     } catch (error: any) {
-      console.error("Error listing prompts from ElasticSearch:", error);
+      console.error('Error listing prompts from ElasticSearch:', error);
       throw error;
     }
   }
 
-  async getAllPrompts(): Promise<Prompt[]> {
+  public async getAllPrompts(): Promise<Prompt[]> {
     return this.listPrompts({ limit: 10000 });
   }
 
-  async getSequence(id: string): Promise<PromptSequence | null> {
+  public async getSequence(id: string): Promise<PromptSequence | null> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       const response = await this.client.get({
+        id: id,
         index: this.sequenceIndex,
-        id: id
       });
       return response._source as PromptSequence;
     } catch (error: any) {
@@ -1093,35 +1123,35 @@ export class ElasticSearchAdapter implements StorageAdapter {
     }
   }
 
-  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       await this.client.index({
-        index: this.sequenceIndex,
-        id: sequence.id,
         document: sequence,
-        refresh: true
+        id: sequence.id,
+        index: this.sequenceIndex,
+        refresh: true,
       });
       return sequence;
     } catch (error: any) {
-      console.error("Error saving sequence to ElasticSearch:", error);
+      console.error('Error saving sequence to ElasticSearch:', error);
       throw error;
     }
   }
 
-  async deleteSequence(id: string): Promise<void> {
+  public async deleteSequence(id: string): Promise<void> {
     if (!this.connected) {
-      throw new Error("ElasticSearch storage not connected");
+      throw new Error('ElasticSearch storage not connected');
     }
 
     try {
       await this.client.delete({
-        index: this.sequenceIndex,
         id: id,
-        refresh: true
+        index: this.sequenceIndex,
+        refresh: true,
       });
     } catch (error: any) {
       if (error.statusCode !== 404) {
@@ -1149,6 +1179,10 @@ export interface StorageConfig {
   };
 }
 
+/**
+ *
+ * @param config
+ */
 export function createStorageAdapter(config: StorageConfig): StorageAdapter {
   switch (config.type) {
     case 'file':
@@ -1176,4 +1210,4 @@ export function createStorageAdapter(config: StorageConfig): StorageAdapter {
     default:
       throw new Error(`Unknown storage type: ${config.type}`);
   }
-} 
+}

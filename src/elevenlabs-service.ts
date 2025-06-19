@@ -1,9 +1,10 @@
 import axios from 'axios';
+import { createHash } from 'crypto';
+import * as fs from 'fs';
 import { createReadStream, createWriteStream } from 'fs';
 import { join } from 'path';
-import { promisify } from 'util';
 import { pipeline } from 'stream';
-import { createHash } from 'crypto';
+import { promisify } from 'util';
 
 const streamPipeline = promisify(pipeline);
 
@@ -35,14 +36,14 @@ export class ElevenLabsService {
   private readonly maxRetries: number;
   private readonly retryDelay: number;
 
-  constructor(config: ElevenLabsConfig) {
+  public constructor(config: ElevenLabsConfig) {
     this.apiKey = config.apiKey;
     this.defaultVoiceId = config.voiceId || 'pNInz6obpgDQGcFmaJgB'; // Default to Adam
     this.model = config.model || 'eleven_monolingual_v1';
     this.optimizeCost = config.optimizeCost ?? true;
     this.voiceSettings = {
+      similarity_boost: config.similarityBoost ?? 0.75,
       stability: config.stability ?? 0.5,
-      similarity_boost: config.similarityBoost ?? 0.75
     };
     this.cacheDir = config.cacheDir || './cache/audio';
     this.maxRetries = config.maxRetries || 3;
@@ -53,19 +54,19 @@ export class ElevenLabsService {
     method: string,
     endpoint: string,
     data?: any,
-    headers?: Record<string, string>
+    headers?: Record<string, string>,
   ): Promise<T> {
     let retries = 0;
     while (retries < this.maxRetries) {
       try {
         const response = await axios({
-          method,
-          url: `${this.baseUrl}${endpoint}`,
           data,
           headers: {
             'xi-api-key': this.apiKey,
-            ...headers
-          }
+            ...headers,
+          },
+          method,
+          url: `${this.baseUrl}${endpoint}`,
         });
         return response.data;
       } catch (error: any) {
@@ -108,13 +109,13 @@ export class ElevenLabsService {
   private async optimizeText(text: string): Promise<string> {
     // Remove unnecessary whitespace and normalize text
     text = text.trim().replace(/\s+/g, ' ');
-    
+
     // Split long text into optimal chunks (max 5000 chars per request)
     if (text.length > 5000) {
       const chunks = text.match(/.{1,5000}(?=\s|$)/g) || [];
       return chunks[0] ?? '';
     }
-    
+
     return text;
   }
 
@@ -124,7 +125,7 @@ export class ElevenLabsService {
       voiceId?: string;
       outputPath?: string;
       useCache?: boolean;
-    } = {}
+    } = {},
   ): Promise<string> {
     const voiceId = options.voiceId || this.defaultVoiceId;
     const useCache = options.useCache ?? this.optimizeCost;
@@ -148,29 +149,29 @@ export class ElevenLabsService {
     // Prepare request
     const endpoint = `/text-to-speech/${voiceId}`;
     const data = {
-      text,
       model_id: this.model,
-      voice_settings: this.voiceSettings
+      text,
+      voice_settings: this.voiceSettings,
     };
 
     try {
       const response = await axios({
-        method: 'POST',
-        url: `${this.baseUrl}${endpoint}`,
         data,
         headers: {
-          'xi-api-key': this.apiKey,
+          Accept: 'audio/mpeg',
           'Content-Type': 'application/json',
-          'Accept': 'audio/mpeg'
+          'xi-api-key': this.apiKey,
         },
-        responseType: 'stream'
+        method: 'POST',
+        responseType: 'stream',
+        url: `${this.baseUrl}${endpoint}`,
       });
 
       // Determine output path
       const outputPath = options.outputPath || this.getCacheKey(text, voiceId);
-      
+
       // Ensure cache directory exists
-      await promisify(require('fs').mkdir)(this.cacheDir, { recursive: true });
+      await fs.promises.mkdir(this.cacheDir, { recursive: true });
 
       // Save the audio file
       await streamPipeline(response.data, createWriteStream(outputPath));

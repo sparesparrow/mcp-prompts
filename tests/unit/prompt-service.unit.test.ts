@@ -1,5 +1,5 @@
-import { PromptService } from '../../src/prompt-service.js';
 import { MemoryAdapter } from '../../src/adapters.js';
+import { PromptService } from '../../src/prompt-service.js';
 
 describe('PromptService', () => {
   let service: PromptService;
@@ -13,10 +13,10 @@ describe('PromptService', () => {
 
   it('should create and retrieve a prompt', async () => {
     const prompt = await service.createPrompt({
-      name: 'Unit Test Prompt',
-      description: 'A prompt for unit testing',
       content: 'Hello, {{name}}!',
+      description: 'A prompt for unit testing',
       isTemplate: true,
+      name: 'Unit Test Prompt',
       variables: ['name'],
     });
     const loaded = await service.getPrompt(prompt.id);
@@ -27,9 +27,9 @@ describe('PromptService', () => {
 
   it('should update a prompt', async () => {
     const prompt = await service.createPrompt({
-      name: 'Update Test',
       content: 'Test',
       isTemplate: false,
+      name: 'Update Test',
     });
     await service.updatePrompt(prompt.id, { description: 'Updated' });
     const updated = await service.getPrompt(prompt.id);
@@ -38,9 +38,9 @@ describe('PromptService', () => {
 
   it('should delete a prompt', async () => {
     const prompt = await service.createPrompt({
-      name: 'Delete Test',
       content: 'Test',
       isTemplate: false,
+      name: 'Delete Test',
     });
     await service.deletePrompt(prompt.id);
     const deleted = await service.getPrompt(prompt.id);
@@ -49,9 +49,9 @@ describe('PromptService', () => {
 
   it('should list prompts', async () => {
     const prompt = await service.createPrompt({
-      name: 'List Test',
       content: 'Test',
       isTemplate: false,
+      name: 'List Test',
     });
     const prompts = await service.listPrompts({});
     expect(prompts.some(p => p.id === prompt.id)).toBe(true);
@@ -59,9 +59,9 @@ describe('PromptService', () => {
 
   it('should apply a template with variables', async () => {
     const prompt = await service.createPrompt({
-      name: 'Template Test',
       content: 'Hello, {{user}}!',
       isTemplate: true,
+      name: 'Template Test',
       variables: ['user'],
     });
     const applied = await service.applyTemplate(prompt.id, { user: 'Alice' });
@@ -69,10 +69,12 @@ describe('PromptService', () => {
   });
 
   it('should validate required fields', async () => {
-    await expect(service.createPrompt({
-      name: '',
-      content: '',
-      isTemplate: false,
-    })).rejects.toThrow();
+    await expect(
+      service.createPrompt({
+        content: '',
+        isTemplate: false,
+        name: '',
+      }),
+    ).rejects.toThrow();
   });
-}); 
+});

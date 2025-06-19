@@ -1,8 +1,9 @@
 import request from 'supertest';
+
+import { MemoryAdapter } from '../../src/adapters.js';
 import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
-import { MemoryAdapter } from '../../src/adapters.js';
-import { SequenceService } from '../../src/sequence-service.js';
+import type { SequenceService } from '../../src/sequence-service.js';
 
 let server: any;
 let baseUrl: string;
@@ -18,7 +19,11 @@ beforeAll(async () => {
   await adapter.connect();
   const promptService = new PromptService(adapter);
   const sequenceService = new DummySequenceService() as unknown as SequenceService;
-  server = await startHttpServer(undefined, { host: '127.0.0.1', port: 0 }, { promptService, sequenceService });
+  server = await startHttpServer(
+    undefined,
+    { host: '127.0.0.1', port: 0 },
+    { promptService, sequenceService },
+  );
   const address = server.address();
   baseUrl = `http://127.0.0.1:${address.port}`;
 });
@@ -36,9 +41,9 @@ describe('HTTP Server Integration', () => {
 
   it('should create and retrieve a prompt', async () => {
     const prompt = {
-      name: 'HTTP Test',
       content: 'Hello, HTTP!',
       isTemplate: false,
+      name: 'HTTP Test',
     };
     const createRes = await request(baseUrl).post('/prompts').send(prompt);
     expect(createRes.status).toBe(201);
@@ -51,9 +56,9 @@ describe('HTTP Server Integration', () => {
 
   it('should update a prompt', async () => {
     const prompt = {
-      name: 'Update HTTP',
       content: 'Update me',
       isTemplate: false,
+      name: 'Update HTTP',
     };
     const createRes = await request(baseUrl).post('/prompts').send(prompt);
     const id = createRes.body.id;
@@ -64,9 +69,9 @@ describe('HTTP Server Integration', () => {
 
   it('should delete a prompt', async () => {
     const prompt = {
-      name: 'Delete HTTP',
       content: 'Delete me',
       isTemplate: false,
+      name: 'Delete HTTP',
     };
     const createRes = await request(baseUrl).post('/prompts').send(prompt);
     const id = createRes.body.id;
@@ -82,7 +87,7 @@ describe('HTTP Server Integration', () => {
   });
 
   it('should return 400 for invalid prompt creation', async () => {
-    const res = await request(baseUrl).post('/prompts').send({ name: '', content: '' });
+    const res = await request(baseUrl).post('/prompts').send({ content: '', name: '' });
     expect(res.status).toBe(400);
   });
-}); 
+});

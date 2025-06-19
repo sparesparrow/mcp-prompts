@@ -1,11 +1,12 @@
-import { SequenceServiceImpl } from '../../src/sequence-service.js';
-import { MemoryAdapter } from '../../src/adapters.js';
-import { PromptSequence } from '../../src/interfaces.js';
-import { MdcAdapter } from '../../src/adapters.js';
-import { Prompt } from '../../src/interfaces.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
+
+import { MemoryAdapter } from '../../src/adapters.js';
+import { MdcAdapter } from '../../src/adapters.js';
+import type { Prompt } from '../../src/interfaces.js';
+import { PromptSequence } from '../../src/interfaces.js';
+import { SequenceServiceImpl } from '../../src/sequence-service.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -22,8 +23,8 @@ describe('SequenceService', () => {
 
   it('should create and retrieve a sequence (happy path)', async () => {
     const seq = await service.createSequence({
-      name: 'Test Sequence',
       description: 'Demo',
+      name: 'Test Sequence',
       promptIds: ['p1', 'p2'],
     });
     expect(seq.id).toBeDefined();
@@ -47,27 +48,27 @@ describe('MdcAdapter', () => {
   let adapter: MdcAdapter;
 
   beforeAll(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { force: true, recursive: true });
     adapter = new MdcAdapter(tempDir);
     await adapter.connect();
   });
 
   afterAll(async () => {
     await adapter.disconnect();
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { force: true, recursive: true });
   });
 
   it('should save and get a prompt', async () => {
     const prompt: Prompt = {
-      id: '',
-      name: 'Test Prompt',
-      description: 'A test prompt',
       content: 'Hello, world!',
-      tags: ['glob:test'],
-      isTemplate: false,
-      variables: [],
       createdAt: new Date().toISOString(),
+      description: 'A test prompt',
+      id: '',
+      isTemplate: false,
+      name: 'Test Prompt',
+      tags: ['glob:test'],
       updatedAt: new Date().toISOString(),
+      variables: [],
     };
     const saved = await adapter.savePrompt(prompt);
     expect(saved.id).toBeTruthy();
@@ -79,15 +80,15 @@ describe('MdcAdapter', () => {
 
   it('should update a prompt', async () => {
     const prompt: Prompt = {
-      id: '',
-      name: 'Update Prompt',
-      description: 'To update',
       content: 'Initial',
-      tags: [],
-      isTemplate: false,
-      variables: [],
       createdAt: new Date().toISOString(),
+      description: 'To update',
+      id: '',
+      isTemplate: false,
+      name: 'Update Prompt',
+      tags: [],
       updatedAt: new Date().toISOString(),
+      variables: [],
     };
     const saved = await adapter.savePrompt(prompt);
     const updated = await adapter.updatePrompt(saved.id, { ...saved, content: 'Updated!' });
@@ -98,15 +99,15 @@ describe('MdcAdapter', () => {
 
   it('should delete a prompt', async () => {
     const prompt: Prompt = {
-      id: '',
-      name: 'Delete Prompt',
-      description: '',
       content: 'To delete',
-      tags: [],
-      isTemplate: false,
-      variables: [],
       createdAt: new Date().toISOString(),
+      description: '',
+      id: '',
+      isTemplate: false,
+      name: 'Delete Prompt',
+      tags: [],
       updatedAt: new Date().toISOString(),
+      variables: [],
     };
     const saved = await adapter.savePrompt(prompt);
     await adapter.deletePrompt(saved.id);
@@ -116,15 +117,15 @@ describe('MdcAdapter', () => {
 
   it('should list prompts', async () => {
     const prompt: Prompt = {
-      id: '',
-      name: 'List Prompt',
-      description: '',
       content: 'To list',
-      tags: ['glob:list'],
-      isTemplate: false,
-      variables: [],
       createdAt: new Date().toISOString(),
+      description: '',
+      id: '',
+      isTemplate: false,
+      name: 'List Prompt',
+      tags: ['glob:list'],
       updatedAt: new Date().toISOString(),
+      variables: [],
     };
     await adapter.savePrompt(prompt);
     const prompts = await adapter.listPrompts();
@@ -138,18 +139,42 @@ describe('MdcAdapter edge and error cases', () => {
   let adapter: MdcAdapter;
 
   beforeEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { force: true, recursive: true });
     adapter = new MdcAdapter(tempDir);
   });
 
   afterEach(async () => {
-    await fs.rm(tempDir, { recursive: true, force: true });
+    await fs.rm(tempDir, { force: true, recursive: true });
   });
 
   it('should throw if not connected', async () => {
-    await expect(adapter.savePrompt({ id: '', name: 'x', description: '', content: '', tags: [], isTemplate: false, variables: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not connected/);
+    await expect(
+      adapter.savePrompt({
+        content: '',
+        createdAt: '',
+        description: '',
+        id: '',
+        isTemplate: false,
+        name: 'x',
+        tags: [],
+        updatedAt: '',
+        variables: [],
+      }),
+    ).rejects.toThrow(/not connected/);
     await expect(adapter.getPrompt('id')).rejects.toThrow(/not connected/);
-    await expect(adapter.updatePrompt('id', { id: 'id', name: '', description: '', content: '', tags: [], isTemplate: false, variables: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not connected/);
+    await expect(
+      adapter.updatePrompt('id', {
+        content: '',
+        createdAt: '',
+        description: '',
+        id: 'id',
+        isTemplate: false,
+        name: '',
+        tags: [],
+        updatedAt: '',
+        variables: [],
+      }),
+    ).rejects.toThrow(/not connected/);
     await expect(adapter.deletePrompt('id')).rejects.toThrow(/not connected/);
     await expect(adapter.listPrompts()).rejects.toThrow(/not connected/);
     await expect(adapter.getAllPrompts()).rejects.toThrow(/not connected/);
@@ -173,8 +198,30 @@ describe('MdcAdapter edge and error cases', () => {
   it('should filter prompts by tags, isTemplate, category, and search', async () => {
     await adapter.connect();
     const prompts = [
-      { id: '', name: 'A', description: '', content: 'foo', tags: ['glob:foo', 'cat:alpha'], isTemplate: false, variables: [], createdAt: '', updatedAt: '', category: 'alpha' },
-      { id: '', name: 'B', description: '', content: 'bar', tags: ['glob:bar'], isTemplate: true, variables: ['x'], createdAt: '', updatedAt: '', category: 'beta' },
+      {
+        category: 'alpha',
+        content: 'foo',
+        createdAt: '',
+        description: '',
+        id: '',
+        isTemplate: false,
+        name: 'A',
+        tags: ['glob:foo', 'cat:alpha'],
+        updatedAt: '',
+        variables: [],
+      },
+      {
+        category: 'beta',
+        content: 'bar',
+        createdAt: '',
+        description: '',
+        id: '',
+        isTemplate: true,
+        name: 'B',
+        tags: ['glob:bar'],
+        updatedAt: '',
+        variables: ['x'],
+      },
     ];
     for (const p of prompts) await adapter.savePrompt(p);
     const all = await adapter.listPrompts();
@@ -192,15 +239,15 @@ describe('MdcAdapter edge and error cases', () => {
   it('should extract variables from content', async () => {
     await adapter.connect();
     const prompt: Prompt = {
-      id: '',
-      name: 'Vars',
-      description: '',
       content: 'Some text\n\n## Variables\n\n- `foo`\n- `bar`\n',
-      tags: [],
-      isTemplate: true,
-      variables: ['foo', 'bar'],
       createdAt: '',
+      description: '',
+      id: '',
+      isTemplate: true,
+      name: 'Vars',
+      tags: [],
       updatedAt: '',
+      variables: ['foo', 'bar'],
     };
     const saved = await adapter.savePrompt(prompt);
     const fetched = await adapter.getPrompt(saved.id);
@@ -211,7 +258,16 @@ describe('MdcAdapter edge and error cases', () => {
   it('should return null or throw for sequence methods', async () => {
     await adapter.connect();
     expect(await adapter.getSequence('any')).toBeNull();
-    await expect(adapter.saveSequence({ id: 'x', name: '', description: '', promptIds: [], createdAt: '', updatedAt: '' })).rejects.toThrow(/not supported/);
+    await expect(
+      adapter.saveSequence({
+        createdAt: '',
+        description: '',
+        id: 'x',
+        name: '',
+        promptIds: [],
+        updatedAt: '',
+      }),
+    ).rejects.toThrow(/not supported/);
     await expect(adapter.deleteSequence('x')).rejects.toThrow(/not supported/);
   });
-}); 
+});

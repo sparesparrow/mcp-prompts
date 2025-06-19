@@ -4,26 +4,25 @@
  */
 
 import type { StorageAdapter } from './interfaces.js';
-import { Prompt, ApplyTemplateResult } from './interfaces.js';
-import { CreatePromptArgs, UpdatePromptArgs, ListPromptsArgs, defaultPrompts } from './prompts.js';
+import type { ApplyTemplateResult, Prompt } from './interfaces.js';
+import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
+import { defaultPrompts } from './prompts.js';
 
 export class PromptService {
   private storage: StorageAdapter;
 
-  constructor(storage: StorageAdapter) {
+  public constructor(storage: StorageAdapter) {
     this.storage = storage;
   }
 
-  async initialize() {
+  public async initialize() {
     await this.storage.connect();
-    
+
     // Load default prompts if storage is empty
     const existingPrompts = await this.listPrompts({});
     if (existingPrompts.length === 0) {
       await Promise.all(
-        Object.values(defaultPrompts).map(prompt => 
-          this.createPrompt(prompt as CreatePromptArgs)
-        )
+        Object.values(defaultPrompts).map(prompt => this.createPrompt(prompt as CreatePromptArgs)),
       );
     }
   }
@@ -31,6 +30,8 @@ export class PromptService {
   /**
    * Validate a prompt for required fields, duplicate IDs, variable consistency, and content format
    * Throws an error with details if validation fails
+   * @param prompt
+   * @param isUpdate
    */
   private async validatePrompt(prompt: Prompt, isUpdate = false): Promise<void> {
     const errors: string[] = [];
@@ -66,7 +67,11 @@ export class PromptService {
     // Variable consistency (for templates)
     if (prompt.isTemplate) {
       const contentVars = Array.from(
-        new Set((prompt.content.match(/{{\s*([a-zA-Z0-9_]+)\s*}}/g) || []).map(v => v.replace(/{{\s*|\s*}}/g, '')))
+        new Set(
+          (prompt.content.match(/{{\s*([a-zA-Z0-9_]+)\s*}}/g) || []).map(v =>
+            v.replace(/{{\s*|\s*}}/g, ''),
+          ),
+        ),
       );
       const declaredVars = Array.isArray(prompt.variables)
         ? prompt.variables.map(v => (typeof v === 'string' ? v : v.name))
@@ -97,19 +102,19 @@ export class PromptService {
     }
   }
 
-  async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
+  public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
     const prompt: Prompt = {
       id: args.name.toLowerCase().replace(/\s+/g, '-'),
       ...args,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
-      version: 1
+      version: 1,
     };
     await this.validatePrompt(prompt, false);
     return this.storage.savePrompt(prompt);
   }
 
-  async updatePrompt(id: string, args: Partial<UpdatePromptArgs>): Promise<Prompt> {
+  public async updatePrompt(id: string, args: Partial<UpdatePromptArgs>): Promise<Prompt> {
     const existing = await this.storage.getPrompt(id);
     if (!existing) {
       throw new Error(`Prompt not found: ${id}`);
@@ -119,23 +124,23 @@ export class PromptService {
       ...args,
       id, // Preserve original ID
       updatedAt: new Date().toISOString(),
-      version: (existing.version || 1) + 1
+      version: (existing.version || 1) + 1,
     };
     await this.validatePrompt(updated, true);
     return this.storage.updatePrompt(id, updated);
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  public async deletePrompt(id: string): Promise<void> {
     await this.storage.deletePrompt(id);
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
+  public async getPrompt(id: string): Promise<Prompt | null> {
     return this.storage.getPrompt(id);
   }
 
-  async listPrompts(args: ListPromptsArgs): Promise<Prompt[]> {
+  public async listPrompts(args: ListPromptsArgs): Promise<Prompt[]> {
     const prompts = await this.storage.listPrompts();
-    
+
     return prompts.filter(prompt => {
       if (args.category && prompt.category !== args.category) {
         return false;
@@ -150,7 +155,10 @@ export class PromptService {
     });
   }
 
-  async applyTemplate(id: string, variables: Record<string, string>): Promise<ApplyTemplateResult> {
+  public async applyTemplate(
+    id: string,
+    variables: Record<string, string>,
+  ): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id);
     if (!prompt) {
       throw new Error(`Template prompt not found: ${id}`);
@@ -166,13 +174,15 @@ export class PromptService {
 
     // Check for any remaining template variables
     const remaining = content.match(/{{[^}]+}}/g);
-    const missingVariables = remaining ? remaining.map(v => v.replace(/{{|}}/g, '').trim()) : undefined;
+    const missingVariables = remaining
+      ? remaining.map(v => v.replace(/{{|}}/g, '').trim())
+      : undefined;
 
     return {
-      content,
-      originalPrompt: prompt,
       appliedVariables: variables,
-      missingVariables
+      content,
+      missingVariables,
+      originalPrompt: prompt,
     };
   }
 
@@ -182,7 +192,10 @@ export class PromptService {
    * @param variables Optional variables to apply for templates
    * @returns Formatted prompt for MCP protocol
    */
-  formatMcpPrompt(prompt: Prompt, variables?: Record<string, string>): {
+  public formatMcpPrompt(
+    prompt: Prompt,
+    variables?: Record<string, string>,
+  ): {
     description: string;
     messages: Array<{
       role: string;
@@ -197,18 +210,18 @@ export class PromptService {
     if (prompt.isTemplate && variables) {
       content = this.processTemplate(content, variables);
     }
-    
+
     return {
       description: prompt.description || '',
       messages: [
         {
-          role: 'system',
           content: {
+            text: content,
             type: 'text',
-            text: content
-          }
-        }
-      ]
+          },
+          role: 'system',
+        },
+      ],
     };
   }
 
@@ -217,7 +230,7 @@ export class PromptService {
    * @param prompts Array of prompts to format
    * @returns Formatted prompts list for MCP protocol
    */
-  formatMcpPromptsList(prompts: Prompt[]): {
+  public formatMcpPromptsList(prompts: Prompt[]): {
     prompts: Array<{
       name: string;
       description: string;
@@ -231,27 +244,28 @@ export class PromptService {
     return {
       prompts: prompts.map(prompt => {
         // For template prompts, extract variables information
-        const args = prompt.isTemplate && prompt.variables?.length
-          ? prompt.variables.map((variable: any) => {
-              // Handle both string variables and complex variable objects
-              if (typeof variable === 'string') {
-                return { name: variable };
-              } else {
-                return {
-                  name: variable.name,
-                  description: variable.description,
-                  required: variable.required
-                };
-              }
-            })
-          : undefined;
-          
+        const args =
+          prompt.isTemplate && prompt.variables?.length
+            ? prompt.variables.map((variable: any) => {
+                // Handle both string variables and complex variable objects
+                if (typeof variable === 'string') {
+                  return { name: variable };
+                } else {
+                  return {
+                    description: variable.description,
+                    name: variable.name,
+                    required: variable.required,
+                  };
+                }
+              })
+            : undefined;
+
         return {
-          name: prompt.id,
           description: prompt.description || '',
-          ...(args && { arguments: args })
+          name: prompt.id,
+          ...(args && { arguments: args }),
         };
-      })
+      }),
     };
   }
 
@@ -263,12 +277,12 @@ export class PromptService {
    */
   private processTemplate(template: string, variables: Record<string, string>): string {
     let result = template;
-    
+
     for (const [key, value] of Object.entries(variables)) {
       const regex = new RegExp(`{${key}}`, 'g');
       result = result.replace(regex, value);
     }
-    
+
     return result;
   }
 
@@ -276,4 +290,4 @@ export class PromptService {
   public async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
     return this.createPrompt(data as any);
   }
-} 
+}
