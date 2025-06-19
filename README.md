@@ -1,5 +1,47 @@
 ![MCP-Prompts Architecture Overview](images/architecture.png)
 
+> **Quick Reference:** The following Mermaid diagram provides a text-based architecture overview. GitHub now renders Mermaid diagrams natively in Markdown for easy navigation and accessibility.
+
+```mermaid
+graph TD
+  subgraph Clients
+    A1[LM Studio]
+    A2[LibreChat]
+    A3[Tasker (Android)]
+    A4[Cursor IDE]
+    A5[Claude Desktop]
+  end
+  subgraph MCP-Prompts Server
+    B1[Prompt Service]
+    B2[HTTP/SSE API]
+    B3[Adapter Factory]
+  end
+  subgraph Storage Adapters
+    C1[File Adapter]
+    C2[Postgres Adapter]
+    C3[MDC (Cursor Rules) Adapter]
+  end
+  subgraph Integrations
+    D1[Docker]
+    D2[GitHub Actions]
+    D3[Release Automation]
+  end
+
+  A1 --> B2
+  A2 --> B2
+  A3 --> B2
+  A4 --> B2
+  A5 --> B2
+  B2 --> B1
+  B1 --> B3
+  B3 --> C1
+  B3 --> C2
+  B3 --> C3
+  B2 --> D1
+  D2 --> D3
+  D1 --> B2
+```
+
 # MCP Prompts Server
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/sparesparrow/mcp-prompts/ci.yml?branch=main)](https://github.com/sparesparrow/mcp-prompts/actions)
