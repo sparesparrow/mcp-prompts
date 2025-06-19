@@ -1,3 +1,103 @@
+MCP Prompts Server
+Model Context Protocol (MCP) Prompts Server is a lightweight, stateless service for storing, retrieving, and templating prompts for large-language-model (LLM) workflows. It's designed to be a centralized hub for prompt management in a multi-tool or multi-agent environment.
+It can run stand-alone, inside Docker, or as part of a multi-server MCP stack and already powers AI clients like Claude Desktop.
+✨ Key Features
+ * Stateless by Design: The server itself is stateless, delegating state management to swappable storage backends. This makes it highly scalable and resilient.
+ * Extensible Storage: Choose from multiple storage backends at runtime via a simple environment variable.
+   * file: Simple JSON file storage, great for getting started.
+   * mdc: Markdown-Cursor-Rules, stores prompts directly in Markdown files.
+   * postgres: Robust PostgreSQL backend for production use.
+ * Powerful Templating: Uses a simple {{variable}} syntax for dynamic prompt generation.
+ * Real-time with SSE: Built-in Server-Sent Events (SSE) support for streaming responses, perfect for real-time applications.
+ * Full-text and Vector Search: Leverage PostgreSQL's advanced search capabilities when using the postgres backend.
+ * Tagging: Organize prompts with tags for easy filtering and retrieval.
+ * Docker-Ready: Official Docker images and Docker Compose files for easy deployment.
+ * CI/CD Friendly: Designed for easy integration into automated testing and deployment pipelines.
+🤔 Why MCP Prompts?
+In complex LLM workflows, managing prompts can become a major challenge. They might be scattered across different tools, hardcoded in applications, or difficult to update. This server solves that by providing a central, API-driven repository for all your prompts, offering:
+ * Centralization: A single source of truth for all prompts.
+ * Decoupling: Separate your prompt logic from your application code.
+ * Reusability: Easily reuse and share prompts across different projects and tools.
+ * Dynamic Content: Use templates to generate prompts on the fly.
+🏗️ How It Works
+The server has a simple, layered architecture:
+ * API Layer (Express.js): Exposes a RESTful API for CRUD operations on prompts. It also handles SSE connections for real-time updates.
+ * Service Layer: Contains the core business logic for prompt management and templating.
+ * Storage Layer: An abstract interface with concrete implementations for different storage backends (file, mdc, postgres).
+🚀 Quick Start
+Run from your terminal using npx:
+# One-liner using npx
+npx -y @sparesparrow/mcp-prompts
+
+Or use the official Docker image:
+docker run -p 3003:3003 -v ~/mcp/data:/app/data sparesparrow/mcp-prompts:latest
+
+Point your MCP-compatible client (like Claude Desktop) to http://localhost:3003 and type / to see the list of available prompts.
+🛠️ Installation
+| Method | Command |
+|---|---|
+| NPX (recommended) | npx -y @sparesparrow/mcp-prompts |
+| Global NPM | npm i -g @sparesparrow/mcp-prompts |
+| Docker | docker pull sparesparrow/mcp-prompts:latest |
+⚙️ Configuration (Environment Variables)
+| Variable | Purpose | Default |
+|---|---|---|
+| PORT | HTTP port for the server | 3003 |
+| LOG_LEVEL | Logging level: error, warn, info, debug | info |
+| Storage |  |  |
+| STORAGE_TYPE | Storage backend: file, postgres, mdc | file |
+| PROMPTS_DIR | Directory for file and mdc storage | ~/mcp/data/prompts |
+| PostgreSQL | (Only if STORAGE_TYPE=postgres) |  |
+| PG_HOST | PostgreSQL server host | localhost |
+| PG_PORT | PostgreSQL server port | 5432 |
+| PG_USER | PostgreSQL username | postgres |
+| PG_PASSWORD | PostgreSQL password | postgres |
+| PG_DATABASE | PostgreSQL database name | mcp |
+📡 API / Tooling
+The server exposes a set of tools that can be called via any MCP client or standard HTTP requests.
+Example use_mcp_tool call:
+use_mcp_tool({
+  server_name: "prompt-manager",
+  tool_name: "apply_template",
+  arguments: {
+    id: "dev-system-prompt",
+    variables: {
+      project_type: "web frontend",
+      language: "TypeScript/React"
+    }
+  }
+});
+
+Example curl call:
+curl -X POST http://localhost:3003/api/prompts/apply-template \
+  -H "Content-Type: application/json" \
+  -d '{
+        "id": "dev-system-prompt",
+        "variables": {
+          "project_type": "web frontend",
+          "language": "TypeScript/React"
+        }
+      }'
+
+Available Tools
+| Tool | Description | Endpoint | Method |
+|---|---|---|---|
+| list_prompts | Retrieves a list of all available prompts. | /api/prompts | GET |
+| get_prompt | Fetches a single prompt by its ID. | /api/prompts/:id | GET |
+| add_prompt | Adds a new prompt. | /api/prompts | POST |
+| update_prompt | Updates an existing prompt by ID. | /api/prompts/:id | PUT |
+| delete_prompt | Deletes a prompt by ID. | /api/prompts/:id | DELETE |
+| apply_template | Applies variables to a prompt template and returns the result. | /api/prompts/apply-template | POST |
+🐋 Docker Compose
+For more complex setups, use the provided Docker Compose files.
+# Base deployment using file storage
+docker compose -f docker/compose/docker-compose.base.yml up -d
+
+# Deployment with a PostgreSQL backend
+docker compose -f docker/compose/docker-compose.base.yml \
+               -f docker/compose/docker-
+
+
 ![MCP-Prompts Architecture Overview](images/architecture.png)
 
 > **Quick Reference:** The following Mermaid diagram provides a text-based architecture overview. GitHub now renders Mermaid diagrams natively in Markdown for easy navigation and accessibility.
