@@ -42,13 +42,17 @@ export async function startHttpServer(
     res.json({ status: 'ok' });
   });
 
-  app.get('/api/v1/sequence/:id', async (req, res) => {
+  app.get('/api/v1/sequence/:id', async (req, res, next) => {
     const { id } = req.params;
     try {
       const result = await services.sequenceService.getSequenceWithPrompts(id);
       res.json(result);
     } catch (error: any) {
-      res.status(404).json({ error: error.message });
+      // Use next() to pass error to global error handler
+      error.status = 404;
+      error.code = 'NOT_FOUND';
+      error.details = { id };
+      next(error);
     }
   });
 
@@ -56,6 +60,20 @@ export async function startHttpServer(
   if (config.enableSSE) {
     setupSSE(app, config.ssePath || '/events');
   }
+
+  // Global error handler middleware
+  app.use((err, req, res, next) => {
+    const status = err.status || 500;
+    const code = err.code || 'INTERNAL_ERROR';
+    const message = err.message || 'An unexpected error occurred.';
+    const details = err.details || undefined;
+    res.status(status).json({
+      error: true,
+      message,
+      code,
+      ...(details ? { details } : {})
+    });
+  });
 
   // Start the server
   await new Promise<void>((resolve, reject) => {

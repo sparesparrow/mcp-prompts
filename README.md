@@ -282,4 +282,7 @@ A: Use the provided npm scripts (e.g., `npm run test:unit`) and ensure all impor
 **Q: Where can I find more help or report issues?**
 A: Check the [User Guides](./USER_GUIDE.md), [docs/](./docs/) directory, or open an issue on [GitHub](https://github.com/sparesparrow/mcp-prompts/issues).
 
+**Q: What does an error response from the API look like?**
+A: All HTTP API errors are returned in a standardized JSON format with clear error codes and messages. See [docs/04-api-reference.md](./docs/04-api-reference.md#error-handling-and-response-format) for details and examples.
+
 --- 
