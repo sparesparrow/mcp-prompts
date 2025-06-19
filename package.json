@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.2.47",
+  "version": "1.2.48",
   "description": "An MCP server for managing and providing prompts and prompt templates",
   "type": "module",
   "bin": {
@@ -29,7 +29,10 @@
     "publish:minor": "./scripts/publish.sh minor",
     "publish:major": "./scripts/publish.sh major",
     "release:patch": "./scripts/release.sh --version patch --publish",
-    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage"
+    "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
+    "workflow:run:file": "ts-node src/scripts/workflow-cli.ts workflow run",
+    "workflow:save:file": "ts-node src/scripts/workflow-cli.ts workflow save",
+    "workflow:run:id": "ts-node src/scripts/workflow-cli.ts workflow run"
   },
   "keywords": [
     "mcp",
@@ -50,6 +53,7 @@
     "express": "^4.21.2",
     "express-rate-limit": "^7.1.5",
     "helmet": "^7.2.0",
+    "node-fetch": "^2.7.0",
     "pg": "^8.11.3",
     "uuid": "^11.1.0",
     "ws": "^8.18.2",
@@ -62,6 +66,7 @@
     "@types/express": "^5.0.3",
     "@types/jest": "^30.0.0",
     "@types/json-schema": "^7.0.15",
+    "@types/node-fetch": "^2.6.12",
     "@types/pg": "^8.15.4",
     "@types/supertest": "^6.0.3",
     "@types/ws": "^8.18.1",
@@ -75,6 +80,7 @@
     "eslint-plugin-sort-keys-fix": "^1.1.2",
     "husky": "^8.0.3",
     "jest": "^29.7.0",
+    "jest-mock-extended": "^4.0.0",
     "prettier": "^3.5.3",
     "rimraf": "^6.0.1",
     "shx": "^0.4.0",
