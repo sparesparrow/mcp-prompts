@@ -149,16 +149,17 @@ See `docs/03-storage-adapters.md` for details.
 This list contains current tasks and suggestions for further development and quality improvement.
 
 ### 1. Feature Expansion & Stabilization
-- [ ] Stabilize and document the MDC (Cursor Rules) adapter
+- [x] Stabilize and document the MDC (Cursor Rules) adapter
 - [ ] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
 - [ ] Add and extend user guides (EN, CZ) for all supported clients and integrations
 - [ ] Add advanced workflow and prompt usage examples
 
 ### 2. Testing & CI/CD
-- [ ] Ensure high test coverage (unit, integration, E2E)
-- [ ] Regularly run CI pipeline (lint, tests, build, validation, audit)
-- [ ] Add tests for MDC adapter and new storage backends
-- [ ] Automate CLI and API tests
+- [x] Ensure high test coverage (unit, integration, E2E)
+- [x] Regularly run CI pipeline (lint, tests, build, validation, audit)
+- [x] Add tests for MDC adapter and new storage backends
+- [x] Automate CLI and API tests
+- [x] ESM/TypeScript/Jest compatibility: All tests and coverage run with Node ESM modules using --experimental-vm-modules. See package.json scripts for details.
 
 ### 3. Documentation & Clarity
 - [ ] Keep README and user guides concise and up to date
@@ -167,20 +168,31 @@ This list contains current tasks and suggestions for further development and qua
 - [ ] Add links to official MCP documentation and community resources
 
 ### 4. Refactoring & Maintenance
-- [ ] Regularly refactor code to follow code-style guidelines
-- [ ] Remove dead or unmaintained code
-- [ ] Ensure consistency in types, exports/imports, and naming
-- [ ] Improve module structure and separation of concerns (adapters, prompts, handlers, ...)
+- [x] Regularly refactor code to follow code-style guidelines
+- [x] Remove dead or unmaintained code
+- [x] Ensure consistency in types, exports/imports, and naming
+- [x] Improve module structure and separation of concerns (adapters, prompts, handlers, ...)
 
 ### 5. Security & Updates
-- [ ] Regularly update dependencies (`npm audit`, `npm update`)
-- [ ] Review security best practices in Dockerfile, docker-compose, and API
-- [ ] Add input validation and robust error handling
+- [x] Regularly update dependencies (`npm audit`, `npm update`)
+- [x] Review security best practices in Dockerfile, docker-compose, and API
+- [x] Add input validation and robust error handling
 
 ### 6. Support for New Features & Integrations
 - [ ] Add support for new prompt types, tools, and workflows
 - [ ] Ensure compatibility with new MCP SDK and client versions
 - [ ] Add guides and examples for integration with mobile and desktop apps
+
+---
+
+## ESM, TypeScript, and Jest Setup (Developer Note)
+
+- The project uses ESM modules (`"type": "module"` in package.json) and TypeScript with Node.js.
+- Jest is configured to run with ESM support using the `--experimental-vm-modules` flag. See the `test:unit` and `test:coverage` scripts in package.json.
+- If you encounter `Cannot use import statement outside a module` or similar ESM errors, ensure you:
+  - Use explicit `.js` extensions in all relative imports in TypeScript files.
+  - Run tests with the provided scripts (not plain `jest`).
+  - See [Jest ESM Docs](https://jestjs.io/docs/ecmascript-modules) and [Node/TS/ESM troubleshooting](https://thedrlambda.medium.com/nodejs-typescript-and-the-infuriating-esm-errors-828b77e7ecd3).
 
 ---
 
