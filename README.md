@@ -91,6 +91,12 @@ These images are built and signed automatically by [GitHub Actions](.github/work
 
 > **Note:** If you need Docker Hub support, open an issue or PR. The workflow can be extended to push to Docker Hub as well.
 
+### Release Notes Automation
+
+Release notes for every GitHub release are now **automatically generated and categorized** using [release.yml](.github/release.yml). Categories include Features, Bugfixes, Dependencies, and Other Changes. You can customize these categories by editing `.github/release.yml`.
+
+For more details and advanced configuration, see the [GitHub Docs: Automatically generated release notes](https://docs.github.com/en/repositories/releasing-projects-on-github/automatically-generated-release-notes).
+
 ---
 
 ## Implemented vs Planned Features
@@ -100,7 +106,7 @@ These images are built and signed automatically by [GitHub Actions](.github/work
 | File storage adapter | ✅ | stable |
 | Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
-| MDC adapter (Cursor Rules) | ⚠️ | experimental, available in main branch |
+| MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
 | HTTP server + SSE | ⚠️ | experimental |
 | ElasticSearch adapter | 🛠️ | v1.3 roadmap |
 | Orchestrator integration | 🛠️ | concept |
@@ -180,6 +186,17 @@ We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for gu
 
 ---
 
+## Community Standards
+
+We are committed to a welcoming, inclusive, and safe community for all contributors.
+
+- Please read our [Contributing Guide](./CONTRIBUTING.md) before opening issues or pull requests.
+- All contributors and participants are expected to follow our [Code of Conduct](./CODE_OF_CONDUCT.md).
+- Security issues should be reported privately as described in our [Security Policy](./SECURITY.md).
+- We use [issue templates](./.github/ISSUE_TEMPLATE/) and a [pull request template](./.github/pull_request_template.md) to help you provide actionable, high-quality contributions.
+
+---
+
 ## License
 
 Distributed under the MIT license. See `LICENSE` for more information.
@@ -188,7 +205,7 @@ Distributed under the MIT license. See `LICENSE` for more information.
 
 ## Using the MDC (Cursor Rules) Adapter
 
-To use the MDC adapter for storage (experimental):
+To use the MDC adapter for storage:
 
 ```
 STORAGE_TYPE=mdc
@@ -235,7 +252,7 @@ All major features and integrations are now implemented and tested. Remaining ro
 | File storage adapter | ✅ | stable |
 | Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
-| MDC adapter (Cursor Rules) | ⚠️ | experimental, available in main branch |
+| MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
 | HTTP server + SSE | ⚠️ | experimental |
 | ElasticSearch adapter | 🛠️ | v1.3 roadmap |
 | Orchestrator integration | 🛠️ | concept |

@@ -5,17 +5,17 @@ changelog:
     authors:
       - dependabot
   categories:
-    - title: Breaking Changes 🛠
+    - title: 🚀 Features
       labels:
-        - Semver-Major
-        - breaking-change
-    - title: New Features 🎉
-      labels:
-        - Semver-Minor
         - enhancement
-    - title: Bug Fixes 🐛
+        - feature
+    - title: 🐛 Bugfixes
       labels:
         - bug
+        - fix
+    - title: 👒 Dependencies
+      labels:
+        - dependencies
     - title: Other Changes
       labels:
         - "*" 

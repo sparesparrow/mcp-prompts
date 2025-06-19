@@ -216,6 +216,7 @@ services:
      - (Replace `<your-server-ip>` with your computer/server's IP address on the same network.)
    - Optionally, add actions to process the response (e.g., display with a Popup, save to a file, or trigger another Tasker action).
    - ![Tasker HTTP Request configuration](images/tasker-http-request-config.png) (Screenshot needed! Please contribute.)
+   - **Downloadable Example:** [examples/tasker-fetch-prompts.xml](./examples/tasker-fetch-prompts.xml)
 
 4. **Test Integration**
    - Trigger the Tasker profile or task.
@@ -236,6 +237,18 @@ services:
 - [ ] Tasker HTTP Request action uses correct server IP and port
 - [ ] No firewall or network isolation between Android and server
 - [ ] Tasker profile/task triggers and displays prompt data
+
+### Android Automation Scripts
+
+You can also use a shell script (e.g., with Termux) to fetch prompts from MCP-Prompts:
+
+```sh
+bash examples/android-fetch-prompt.sh
+```
+
+See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a ready-to-use script.
+
+> Contributions of more advanced Tasker profiles or Android automation scripts are welcome! Submit a PR to the `examples/` directory.
 
 ### Cursor IDE: Step-by-Step Setup
 
@@ -323,7 +336,7 @@ services:
      }
      ```
    - Save the file and restart Claude Desktop.
-   - ![Claude Desktop config file and settings](images/claude-desktop-config.png) (Screenshot needed! Please contribute.)
+   - You should see a slider/tool icon in the chat input area. Click it to access MCP tools and prompts.
 
 4. **Test Integration**
    - You should see a slider/tool icon in the chat input area. Click it to access MCP tools and prompts.
