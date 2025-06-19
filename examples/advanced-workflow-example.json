@@ -1,0 +1,21 @@
+[
+  {
+    "id": "summarize",
+    "name": "Summarize Text",
+    "description": "Summarize the provided input text.",
+    "content": "Summarize the following text: {{input}}",
+    "isTemplate": true,
+    "variables": ["input"]
+  },
+  {
+    "id": "questions",
+    "name": "Generate Questions",
+    "description": "Generate 3 questions based on the summary.",
+    "content": "Based on this summary: {{summary}}, generate 3 questions.",
+    "isTemplate": true,
+    "variables": ["summary"]
+  }
+]
+// Usage:
+// 1. Apply 'summarize' with your input text.
+// 2. Take the output, use as 'summary' variable for 'questions'. 

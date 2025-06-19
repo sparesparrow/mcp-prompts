@@ -105,6 +105,8 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 
 > ℹ️ Legacy content from the previous long README has been preserved at `docs/LEGACY_README.md` until the migration is complete.
 
+> **New:** See [examples/advanced-workflow-example.json](./examples/advanced-workflow-example.json) and the expanded [Templates Guide](./docs/05-templates-guide.md) for advanced prompt chaining and workflow usage.
+
 ---
 
 ## User Guides
@@ -179,7 +181,7 @@ This list contains current tasks and suggestions for further development and qua
 - [x] Stabilize and document the MDC (Cursor Rules) adapter
 - [x] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
 - [x] Add and extend user guides (EN, CZ) for all supported clients and integrations
-- [ ] Add advanced workflow and prompt usage examples
+- [x] Add advanced workflow and prompt usage examples
 
 ### 2. Testing & CI/CD
 - [x] Ensure high test coverage (unit, integration, E2E)
