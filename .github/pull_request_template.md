@@ -1,4 +1,25 @@
-<!-- Provide a brief description of your changes -->
+# Pull Request
+
+Thank you for your contribution! Please fill out the following to help us review your PR.
+
+## Summary
+<!-- A clear and concise description of what this PR does. -->
+
+## Motivation / Context
+<!-- Why is this change needed? What problem does it solve? -->
+
+## Related Issues
+<!-- List any related issues or pull requests. Use "Closes #123" to auto-close issues. -->
+
+## Checklist
+- [ ] I have read the [Contributing Guide](../CONTRIBUTING.md)
+- [ ] I have added/updated tests as needed
+- [ ] I have updated documentation as needed
+- [ ] All tests pass locally
+- [ ] The PR is ready for review
+
+## Additional Notes
+<!-- Add any other context, screenshots, or information here. -->
 
 ## Description
 
@@ -6,9 +27,6 @@
 <!-- If modifying an existing server, provide details -->
 - Server: <!-- e.g., filesystem, github -->
 - Changes to: <!-- e.g., tools, resources, prompts -->
-
-## Motivation and Context
-<!-- Why is this change needed? What problem does it solve? -->
 
 ## How Has This Been Tested?
 <!-- Have you tested this with an LLM client? Which scenarios were tested? -->
