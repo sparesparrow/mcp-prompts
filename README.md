@@ -110,6 +110,7 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 > **New:** See [examples/advanced-workflow-example.json](./examples/advanced-workflow-example.json) and the expanded [Templates Guide](./docs/05-templates-guide.md) for advanced prompt chaining and workflow usage.
 
 > **Validation:** Prompts are now validated for required fields, duplicate IDs, variable consistency, and content format. See [src/prompt-service.ts](./src/prompt-service.ts) for details.
+> **Testing:** The MDC (Cursor Rules) adapter is now covered by integration tests. See [tests/integration/mdc-adapter.integration.test.ts](./tests/integration/mdc-adapter.integration.test.ts).
 
 ---
 
@@ -197,6 +198,7 @@ This list contains current tasks and suggestions for further development and qua
 - [x] Add and extend user guides (EN, CZ) for all supported clients and integrations
 - [x] Add advanced workflow and prompt usage examples
 - [x] Implement advanced prompt validation (e.g. check for duplicate IDs, required fields, variable usage)
+- [x] Add integration tests for MDC (Cursor Rules) adapter
 
 ### 2. Testing & CI/CD
 - [x] Ensure high test coverage (unit, integration, E2E)

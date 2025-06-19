@@ -628,10 +628,14 @@ export class MdcAdapter implements StorageAdapter {
     return path.join(this.rulesDir, `${id}.mdc`);
   }
 
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
+  async savePrompt(prompt: Prompt, overwrite = false): Promise<Prompt> {
     if (!this.connected) throw new Error('MDC adapter not connected');
     const id = prompt.id || this.generateId(prompt.name);
     prompt.id = id;
+    if (!overwrite) {
+      const existing = await this.getPrompt(id);
+      if (existing) throw new Error(`Prompt with id '${id}' already exists`);
+    }
     const mdcContent = this.promptToMdc(prompt);
     await fs.writeFile(this.getFilePath(id), mdcContent, 'utf8');
     return prompt;
@@ -653,7 +657,7 @@ export class MdcAdapter implements StorageAdapter {
     const existing = await this.getPrompt(id);
     if (!existing) throw new Error(`Prompt not found: ${id}`);
     const updated: Prompt = { ...existing, ...prompt, id, updatedAt: new Date().toISOString() };
-    await this.savePrompt(updated);
+    await this.savePrompt(updated, true);
     return updated;
   }
 
