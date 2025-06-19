@@ -1,3 +1,5 @@
+![MCP-Prompts Architecture Overview](images/architecture.png)
+
 # MCP Prompts Server
 
 [![Build Status](https://img.shields.io/github/actions/workflow/status/sparesparrow/mcp-prompts/ci.yml?branch=main)](https://github.com/sparesparrow/mcp-prompts/actions)
