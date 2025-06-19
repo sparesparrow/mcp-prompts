@@ -253,6 +253,40 @@ We use a [GitHub Project board](https://github.com/sparesparrow/mcp-prompts/proj
 
 **Contributors:** Please check the board for tasks marked "help wanted" or "good first issue"!
 
+## Project Board Workflow
+
+Our [GitHub Project board](https://github.com/sparesparrow/mcp-prompts/projects) is the central place for tracking issues, features, and roadmap items.
+
+### How it works
+
+- **Automations:**  
+  - Issues and PRs with key labels (e.g., `bug`, `enhancement`, `help wanted`) are automatically added to the board.
+  - New items are set to the `Todo` status.
+  - Cards move automatically when PRs are merged or issues are closed.
+
+- **Columns:**  
+  - **Backlog:** Ideas and tasks not yet started.
+  - **Todo:** Ready to be picked up.
+  - **In Progress:** Actively being worked on.
+  - **Review:** Awaiting code review or testing.
+  - **Done:** Completed and merged/closed.
+
+### Contributor Guidelines
+
+- **Pick up tasks:**  
+  - Look for cards in `Todo` or `Backlog` with the `help wanted` or `good first issue` label.
+  - Move the card to `In Progress` when you start work.
+  - Move to `Review` when you open a pull request.
+  - Move to `Done` when your work is merged or the issue is closed.
+
+- **Use labels:**  
+  - Apply relevant labels when opening issues or PRs to help with triage and automation.
+
+- **Task lists:**  
+  - For large features, use checklists in issues to break down work into smaller steps.
+
+For more details, see [GitHub Docs: Creating a project](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) and [Quickstart for Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/quickstart-for-projects).
+
 ---
 
 ## Using the MDC (Cursor Rules) Adapter
