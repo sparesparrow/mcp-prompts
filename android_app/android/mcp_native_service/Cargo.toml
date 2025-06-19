@@ -1,0 +1,16 @@
+[package]
+name = "mcp_native_service"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+binder = "0.6.0"
+# In a real project, we would also have a dependency on the mcp_core logic crate, e.g.:
+# mcp_core = { path = "../mcp_core" }
+
+[build-dependencies]
+# This would be used to generate the Rust code from AIDL if not using the AOSP build system
+# rsbinder-aidl = "0.6" 

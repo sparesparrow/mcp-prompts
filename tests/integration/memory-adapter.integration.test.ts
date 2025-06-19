@@ -8,6 +8,10 @@ describe('MemoryAdapter Integration', () => {
     await adapter.connect();
   });
 
+  afterEach(async () => {
+    await adapter.disconnect();
+  });
+
   it('should be defined', () => {
     expect(MemoryAdapter).toBeDefined();
   });
@@ -87,14 +91,6 @@ describe('MemoryAdapter Integration', () => {
   });
 
   it('should list all prompts', async () => {
-    // Clear existing prompts to ensure clean test
-    try {
-      // @ts-ignore - clearAll method might not be in the type definition but is implemented
-      await adapter.clearAll();
-    } catch (error) {
-      console.warn('Could not clear prompts, test may not be reliable');
-    }
-
     const now = new Date().toISOString();
     const testPrompts = [
       {
@@ -128,11 +124,11 @@ describe('MemoryAdapter Integration', () => {
     }
 
     const allPrompts = await adapter.listPrompts();
-    expect(allPrompts.length).toBeGreaterThanOrEqual(2);
+    expect(allPrompts.length).toBe(2);
 
     const filteredPrompts = await adapter.listPrompts({ tags: ['important'] });
-    expect(filteredPrompts.length).toBeGreaterThanOrEqual(1);
-    expect(filteredPrompts.some(p => p.id === 'list-test-2')).toBe(true);
+    expect(filteredPrompts.length).toBe(1);
+    expect(filteredPrompts[0].id).toBe('list-test-2');
   });
 
   it('should delete a prompt', async () => {

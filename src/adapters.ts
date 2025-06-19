@@ -249,14 +249,14 @@ export class MemoryAdapter implements StorageAdapter {
 
   public async connect(): Promise<void> {
     this.connected = true;
-    console.error('Memory storage connected');
+    console.log('Memory storage connected');
   }
 
   public async disconnect(): Promise<void> {
     this.prompts.clear();
     this.sequences.clear();
     this.connected = false;
-    console.error('Memory storage disconnected');
+    console.log('Memory storage disconnected');
   }
 
   public async savePrompt(prompt: Prompt): Promise<Prompt> {

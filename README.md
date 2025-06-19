@@ -192,8 +192,8 @@ docker compose -f docker/compose/docker-compose.base.yml up -d
 
 # Deployment with a PostgreSQL backend
 docker compose -f docker/compose/docker-compose.base.yml \
-               -f docker/compose/docker-
-
+               -f docker/compose/docker-compose.postgres.yml \
+               up -d
 
 ![MCP-Prompts Architecture Overview](images/architecture.png)
 
@@ -705,6 +705,50 @@ Our [GitHub Project board](https://github.com/sparesparrow/mcp-prompts/projects)
 
 For more details, see [GitHub Docs: Creating a project](https://docs.github.com/en/issues/planning-and-tracking-with-projects/creating-projects/creating-a-project) and [Quickstart for Projects](https://docs.github.com/en/issues/planning-and-tracking-with-projects/learning-about-projects/quickstart-for-projects).
 
+# ✅ Android Implementation
+
+A complete, two-phase implementation for deploying the MCP server environment on the Android platform has been scaffolded and is now located in the `android_app/` directory. This implementation provides a powerful, self-contained mobile workflow, evolving from a robust hybrid model to a fully native, high-performance solution. See `android_app/docs/android-deployment-strategy.md` for the full architectural analysis.
+
+## Phase 1: Hybrid API-Client (Localhost Server) MVP
+
+This phase focuses on delivering a functional and high-quality application quickly by bundling the existing Rust server with a native Android UI.
+
+- [x] **Build & Toolchain Setup**
+  - [x] Configure `rustup` with Android targets (`aarch64-linux-android`, `x86_64-linux-android`).
+  - [x] Integrate `cargo-ndk` for cross-compiling the `mcp-prompts-rs` binary for Android ABIs.
+- [x] **Application Packaging**
+  - [x] Bundle the cross-compiled `mcp-prompts-rs` executable into the Android app's `jniLibs` directory.
+- [x] **Native Android Shell**
+  - [x] Develop a native Android UI using Kotlin/Java.
+  - [x] Implement an HTTP client (e.g., OkHttp, Ktor) for communication with the local server.
+- [x] **Background Service Management**
+  - [x] Create an Android `Service` to manage the lifecycle of the bundled Rust binary.
+    - [x] Logic to copy the binary to an executable directory.
+    - [x] Logic to launch, monitor, and restart the server process.
+  - [x] Implement the service as a `Foreground Service` with a persistent notification to ensure reliability and prevent termination by the OS.
+- [x] **Security**
+  - [x] Implement API key management using the Android `Keystore` system to securely store credentials like `ANTHROPIC_API_KEY`.
+
+## Phase 2: Migration to Native Systems Integration (AIDL)
+
+This phase evolves the architecture to achieve maximum performance, battery efficiency, and deep system integration by replacing the HTTP-based communication with Android's native IPC mechanism.
+
+- [x] **Core Logic Refactoring**
+  - [x] Refactor the `mcp-prompts-rs` server from a standalone binary into a reusable Rust library crate, separating logic from the web server.
+- [x] **Native IPC Interface Definition**
+  - [x] Define a stable service contract using the Android Interface Definition Language (AIDL) in an `IMcpService.aidl` file.
+  - [x] Configure the build system (Gradle/`cargo`) to compile the AIDL file into a Rust interface crate.
+- [x] **Native Service Implementation**
+  - [x] Create a new Rust crate that implements the AIDL-generated service trait.
+  - [x] Compile the Rust service implementation into a native shared library (`.so` file).
+  - [x] Modify the Android `Service` to load the `.so` library and host the Binder-based service.
+- [x] **Client Migration**
+  - [x] Update the Android UI client to connect to the service using `bindService()`.
+  - [x] Replace the HTTP client implementation with a Binder client to communicate with the native Rust service via the AIDL interface.
+- [x] **Future Extensions**
+  - [x] Explore exposing the AIDL service to other trusted applications on the device, transforming it into a shared platform component.
+  - [x] Integrate capabilities from other MCP ecosystem projects (`mcp-router`, `mcp-project-orchestrator`) into the native service.
+
 ---
 
 ## Using the MDC (Cursor Rules) Adapter
@@ -817,80 +861,6 @@ flowchart TD
 ```
 
 For a full guide, see [docs/09-workflow-guide.md](./docs/09-workflow-guide.md).
-
----
-
-# TODO: Workflow Engine Implementation Roadmap
-
-The following tasks outline the step-by-step implementation of the Workflow Engine MVP:
-
-1. **Schema & Validation**
-   - [x] Finalize and publish `workflow.schema.json` in `src/schemas.ts`.
-   - [x] Extend `validate-json.ts` to support workflow validation (`npm run validate:workflow <file>`).
-
-2. **Core Engine**
-   - [x] Implement `WorkflowService` for parsing, validating, and orchestrating workflows.
-   - [x] Implement `StepRunner` strategy pattern for step execution.
-   - [x] Implement `PromptRunner` for prompt steps.
-   - [x] Implement `ShellRunner` for shell steps (with sandboxing and timeouts).
-   - [x] Implement `HttpRunner` for HTTP steps.
-   - [x] Add shared in-memory context store for passing data between steps.
-
-3. **API Endpoints**
-   - [x] Add REST endpoint: `POST /api/v1/workflows/run` (ad-hoc execution).
-   - [x] Add REST endpoint: `POST /api/v1/workflows` (save workflow definition).
-   - [x] Add REST endpoint: `GET /api/v1/workflows/:id` (get workflow definition).
-   - [x] Add REST endpoint: `POST /api/v1/workflows/:id/run` (run saved workflow).
-
-4. **CLI Integration**
-   - [x] Add CLI command: `mcp-prompts workflow run <file>` (ad-hoc run).
-   - [x] Add CLI command: `mcp-prompts workflow save <file>` (save workflow).
-   - [x] Add CLI command: `mcp-prompts workflow run <id>` (run saved workflow).
-
-5. **Security & Performance**
-   - [x] Implement sandboxing for shell steps (e.g., Docker exec, no root).
-   - [x] Add per-step timeout (default 60s).
-   - [x] Add rate limiting for concurrent workflows per user.
-   - [x] Implement audit logging for workflow runs and results.
-
-6. **Documentation & Examples**
-   - [ ] Add user and developer guides for workflows.
-   - [ ] Add sample workflow YAML/JSON files.
-   - [ ] Add visual diagrams to docs and README.
-
-7. **Testing**
-   - [ ] Add integration tests for workflow execution and step types.
-
-8. **Future Extensions (Post-MVP)**
-   - [ ] Support parallel steps (`dependsOn`, `runAfter`).
-   - [ ] Add DAG/state machine visualization.
-   - [ ] Integrate with UI (Claude Desktop, web console).
-   - [ ] Support advanced conditions (`jq`, `JMESPath`).
-   - [ ] Enable distributed execution (worker pool, sharding).
-
----
-
-## Security & Performance
-
-- **Sandboxing:** Shell steps are executed with a security warning if not sandboxed. For production, use Docker or a non-root environment.
-- **Timeouts:** Each workflow step has a default timeout of 60 seconds (configurable per step).
-- **Rate Limiting:** Each user is limited to 3 concurrent workflow runs by default. If the limit is exceeded, the API returns HTTP 429 (Too Many Requests).
-- **Audit Logging:** All workflow runs (start, end, error) are logged to `logs/workflow-audit.log` with timestamp, user, workflow ID, event type, and details.
-
----
-
-## API Reference (Workflow Engine)
-
-- **POST /api/v1/workflows/:id/run**
-  - Runs a saved workflow by ID.
-  - Returns 429 if the user exceeds the concurrent workflow limit.
-  - Returns 404 if the workflow is not found.
-  - Returns 200 with results on success, 400 on workflow error.
-- **Audit Log:**
-  - All workflow executions are logged to `logs/workflow-audit.log` in JSONL format:
-    ```json
-    { "timestamp": "2024-06-10T12:34:56Z", "userId": "alice", "workflowId": "release", "eventType": "start", "details": { ... } }
-    ```
 
 ---
 
