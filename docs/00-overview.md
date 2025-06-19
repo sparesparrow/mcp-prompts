@@ -1,15 +1,36 @@
-# Overview
+# MCP-Prompts – Quick Overview
 
-This document provides a high-level overview of MCP-Prompts, its goals and architecture.
+MCP-Prompts je **MCP server**, který ukládá a doručuje prompty, šablony a nyní i sekvence/workflow pro AI klienty.
 
-> **Note**: The full overview is still being migrated from the original README. For now refer to [`docs/LEGACY_README.md`](LEGACY_README.md) for exhaustive details.
+## Why use it?
 
-MCP-Prompts is an **MCP server** responsible for storing, versioning and delivering prompts and templates to AI clients. Core responsibilities:
+* 📚 Centralizované úložiště promptů a šablon
+* 🔄 Verzování + validace JSON schématem
+* 🧩 Více backendů – File / PostgreSQL / In-Memory (+ další)
+* 🔗 Integrace s ostatními MCP servery (filesystem, GitHub, memory…)
+* ⚡ Rychlé API + CLI (`npx mcp-prompts ...`)
 
-1. **Centralised storage** – avoid prompt duplication across projects.
-2. **Template application** – substitute variables server-side for consistent output.
-3. **Multi-adapter backend** – choose between file, PostgreSQL, MDC… and more.
-4. **Resource aware** – integrate with other MCP servers (memory, filesystem, GitHub…).
-5. **Dev ergonomics** – CLI, API, quick-start images, rich docs.
+### Architecture at a glance
 
-See the [Quick-Start](01-quickstart.md) to get running. 
+```mermaid
+graph TD;
+  subgraph Clients
+    CLI[CLI] 
+    API[HTTP API] 
+    Other[Other MCP Servers]
+  end
+  CLI --> SERVER(MCP-Prompts)
+  API --> SERVER
+  Other --> SERVER
+  subgraph Storage
+    File[File Adapter]
+    Postgres[PostgreSQL Adapter]
+    Memory[In-Memory Adapter]
+  end
+  SERVER --> File
+  SERVER --> Postgres
+  SERVER --> Memory
+  SERVER -->|"Resource links"| EXT[External MCP Servers]
+```
+
+*Podrobnou dokumentaci najdete v jednotlivých souborech v `docs/` – českou verzi přehledu viz **`docs/00-overview-cs.md`**.* 

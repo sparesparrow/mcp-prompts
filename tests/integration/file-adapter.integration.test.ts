@@ -6,6 +6,20 @@ import { fileURLToPath } from 'url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PROMPTS_DIR = path.join(__dirname, '../../test-prompts');
 
+function removeDirRecursive(dirPath: string) {
+  if (fs.existsSync(dirPath)) {
+    for (const entry of fs.readdirSync(dirPath)) {
+      const entryPath = path.join(dirPath, entry);
+      if (fs.statSync(entryPath).isDirectory()) {
+        removeDirRecursive(entryPath);
+      } else {
+        fs.unlinkSync(entryPath);
+      }
+    }
+    fs.rmdirSync(dirPath);
+  }
+}
+
 describe('FileAdapter Integration', () => {
   let adapter: FileAdapter;
   
@@ -19,23 +33,16 @@ describe('FileAdapter Integration', () => {
   beforeEach(() => {
     // Clean the test directory before each test
     if (fs.existsSync(TEST_PROMPTS_DIR)) {
-      const files = fs.readdirSync(TEST_PROMPTS_DIR);
-      for (const file of files) {
-        fs.unlinkSync(path.join(TEST_PROMPTS_DIR, file));
-      }
+      removeDirRecursive(TEST_PROMPTS_DIR);
     }
-    
+    fs.mkdirSync(TEST_PROMPTS_DIR, { recursive: true });
     adapter = new FileAdapter(TEST_PROMPTS_DIR);
   });
   
   afterAll(() => {
     // Clean up after all tests
     if (fs.existsSync(TEST_PROMPTS_DIR)) {
-      const files = fs.readdirSync(TEST_PROMPTS_DIR);
-      for (const file of files) {
-        fs.unlinkSync(path.join(TEST_PROMPTS_DIR, file));
-      }
-      fs.rmdirSync(TEST_PROMPTS_DIR);
+      removeDirRecursive(TEST_PROMPTS_DIR);
     }
   });
   

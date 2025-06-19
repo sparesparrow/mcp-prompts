@@ -51,11 +51,14 @@ describe('PostgresAdapter Integration', () => {
   
   itOrSkip('should save and retrieve a prompt', async () => {
     // Arrange
+    const now = new Date().toISOString();
     const prompt = {
       id: 'test-prompt',
       name: 'Test Prompt',
       description: 'This is a test prompt',
-      content: 'This is the prompt content'
+      content: 'This is the prompt content',
+      createdAt: now,
+      updatedAt: now
     };
     
     // Act
@@ -72,12 +75,15 @@ describe('PostgresAdapter Integration', () => {
   
   itOrSkip('should update an existing prompt', async () => {
     // Arrange
+    const now = new Date().toISOString();
     const promptId = `update-test-${Date.now()}`;
     const prompt = {
       id: promptId,
       name: 'Update Test',
       description: 'Original description',
-      content: 'Original content'
+      content: 'Original content',
+      createdAt: now,
+      updatedAt: now
     };
     
     await adapter.savePrompt(prompt);
@@ -86,7 +92,8 @@ describe('PostgresAdapter Integration', () => {
     const updated = {
       ...prompt,
       description: 'Updated description',
-      content: 'Updated content'
+      content: 'Updated content',
+      updatedAt: new Date().toISOString()
     };
     
     await adapter.savePrompt(updated);
@@ -100,27 +107,34 @@ describe('PostgresAdapter Integration', () => {
   
   itOrSkip('should list prompts with optional filters', async () => {
     // Arrange
+    const now = new Date().toISOString();
     const prompts = [
       {
         id: 'list-test-1',
         name: 'List Test 1',
         description: 'Test for listing 1',
         content: 'Content 1',
-        tags: ['test', 'list']
+        tags: ['test', 'list'],
+        createdAt: now,
+        updatedAt: now
       },
       {
         id: 'list-test-2',
         name: 'List Test 2',
         description: 'Test for listing 2',
         content: 'Content 2',
-        tags: ['test']
+        tags: ['test'],
+        createdAt: now,
+        updatedAt: now
       },
       {
         id: 'list-test-3',
         name: 'List Test 3',
         description: 'Another test',
         content: 'Content 3',
-        tags: ['test', 'other']
+        tags: ['test', 'other'],
+        createdAt: now,
+        updatedAt: now
       }
     ];
     
@@ -143,12 +157,15 @@ describe('PostgresAdapter Integration', () => {
   
   itOrSkip('should delete a prompt', async () => {
     // Arrange
+    const now = new Date().toISOString();
     const promptId = `delete-test-${Date.now()}`;
     const prompt = {
       id: promptId,
       name: 'Delete Test',
       description: 'Test for deleting',
-      content: 'Delete me'
+      content: 'Delete me',
+      createdAt: now,
+      updatedAt: now
     };
     
     await adapter.savePrompt(prompt);
@@ -202,11 +219,14 @@ describe('PostgresAdapter Integration', () => {
   
   itOrSkip('should handle bulk operations correctly', async () => {
     // A simple test to verify we can save and retrieve multiple prompts
+    const now = new Date().toISOString();
     const prompts = Array.from({ length: 10 }, (_, i) => ({
       id: `bulk-test-${i}`,
       name: `Bulk Test ${i}`,
       description: `Bulk test description ${i}`,
-      content: `Bulk test content ${i}`
+      content: `Bulk test content ${i}`,
+      createdAt: now,
+      updatedAt: now
     }));
     
     // Save all prompts

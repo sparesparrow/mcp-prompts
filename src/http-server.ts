@@ -2,6 +2,8 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import express from 'express';
 import cors from 'cors';
 import { setupSSE } from './sse.js';
+import { PromptService } from './prompt-service.js';
+import { SequenceService } from './sequence-service.js';
 
 export interface HttpServerConfig {
   port: number;
@@ -11,9 +13,15 @@ export interface HttpServerConfig {
   ssePath?: string;
 }
 
+export interface ServerServices {
+  promptService: PromptService;
+  sequenceService: SequenceService;
+}
+
 export async function startHttpServer(
-  server: Server,
-  config: HttpServerConfig
+  server: Server | null = null,
+  config: HttpServerConfig,
+  services: ServerServices
 ): Promise<void> {
   const app = express();
 
@@ -32,6 +40,16 @@ export async function startHttpServer(
   // Health check endpoint
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
+  });
+
+  app.get('/api/v1/sequence/:id', async (req, res) => {
+    const { id } = req.params;
+    try {
+      const result = await services.sequenceService.getSequenceWithPrompts(id);
+      res.json(result);
+    } catch (error: any) {
+      res.status(404).json({ error: error.message });
+    }
   });
 
   // Set up SSE if enabled

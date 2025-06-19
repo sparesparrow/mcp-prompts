@@ -25,6 +25,7 @@ describe('MemoryAdapter Integration', () => {
   });
 
   it('should save and retrieve a prompt', async () => {
+    const now = new Date().toISOString();
     const testPrompt = {
       id: 'test-prompt-1',
       name: 'Test Prompt 1',
@@ -36,7 +37,9 @@ describe('MemoryAdapter Integration', () => {
       metadata: {
         author: 'Test Author',
         version: '1.0.0'
-      }
+      },
+      createdAt: now,
+      updatedAt: now
     };
 
     await adapter.savePrompt(testPrompt);
@@ -50,6 +53,7 @@ describe('MemoryAdapter Integration', () => {
   });
 
   it('should update an existing prompt', async () => {
+    const now = new Date().toISOString();
     const testPrompt = {
       id: 'test-prompt-2',
       name: 'Test Prompt 2',
@@ -58,7 +62,9 @@ describe('MemoryAdapter Integration', () => {
       tags: ['test'],
       isTemplate: false,
       variables: [],
-      metadata: {}
+      metadata: {},
+      createdAt: now,
+      updatedAt: now
     };
 
     await adapter.savePrompt(testPrompt);
@@ -67,7 +73,8 @@ describe('MemoryAdapter Integration', () => {
       ...testPrompt,
       description: 'Updated description',
       content: 'Updated content',
-      tags: ['test', 'updated']
+      tags: ['test', 'updated'],
+      updatedAt: new Date().toISOString()
     };
 
     await adapter.savePrompt(updatedPrompt);
@@ -88,6 +95,7 @@ describe('MemoryAdapter Integration', () => {
       console.warn('Could not clear prompts, test may not be reliable');
     }
 
+    const now = new Date().toISOString();
     const testPrompts = [
       {
         id: 'list-test-1',
@@ -97,7 +105,9 @@ describe('MemoryAdapter Integration', () => {
         tags: ['test', 'list'],
         isTemplate: false,
         variables: [],
-        metadata: {}
+        metadata: {},
+        createdAt: now,
+        updatedAt: now
       },
       {
         id: 'list-test-2',
@@ -107,7 +117,9 @@ describe('MemoryAdapter Integration', () => {
         tags: ['test', 'list', 'important'],
         isTemplate: true,
         variables: ['var1', 'var2'],
-        metadata: {}
+        metadata: {},
+        createdAt: now,
+        updatedAt: now
       }
     ];
 
@@ -124,6 +136,7 @@ describe('MemoryAdapter Integration', () => {
   });
 
   it('should delete a prompt', async () => {
+    const now = new Date().toISOString();
     const testPrompt = {
       id: 'delete-test',
       name: 'Delete Test',
@@ -132,7 +145,9 @@ describe('MemoryAdapter Integration', () => {
       tags: ['test', 'delete'],
       isTemplate: false,
       variables: [],
-      metadata: {}
+      metadata: {},
+      createdAt: now,
+      updatedAt: now
     };
 
     await adapter.savePrompt(testPrompt);

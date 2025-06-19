@@ -1,0 +1,27 @@
+{
+  "id": "exclusive-multi-step-issue-triage",
+  "name": "Exclusive: Multi-Step Issue Triage ➜ Memory ➜ Sequence Proposal",
+  "description": "Workflow: Provede triage GitHub issues, uloží výsledky do Memory MCP serveru a navrhne sekvenci řešení.",
+  "content": "# Multi-Step Issue Triage ➜ Memory ➜ Sequence Proposal\n\n1. Načti otevřené issues z repozitáře {{repo_uri}}.\n2. Proveď triage: označ urgentní, duplicitní a návrhové issues.\n3. Výsledky ulož do Memory MCP serveru pod klíčem: `memory://issue-triage/{{repo_name}}`.\n4. Navrhni sekvenci řešení (workflow) pro nejdůležitější issues.\n\n## MCP odkazy\n- GitHub: {{repo_uri}}\n- Memory: @memory://issue-triage/{{repo_name}}\n- Sequence: @sequence://triage/{{repo_name}}\n\n## Postup\n- Nejprve načti issues z GitHubu.\n- Proveď kategorizaci a ulož výsledky do Memory.\n- Navrhni konkrétní kroky (sekvenci) pro řešení prioritních issues.\n\n{{additional_instructions}}",
+  "variables": [
+    "repo_uri",
+    "repo_name",
+    "additional_instructions"
+  ],
+  "tags": ["exclusive", "workflow", "issue-triage", "github", "memory", "sequence", "multi-server"],
+  "examples": [
+    {
+      "name": "Quick demo",
+      "variables": {
+        "repo_uri": "@github://sparesparrow/mcp-prompts",
+        "repo_name": "mcp-prompts",
+        "additional_instructions": "Zaměř se na issues označené jako 'bug' a 'security'."
+      }
+    }
+  ],
+  "metadata": {
+    "created_at": "2025-06-18T10:10:00Z",
+    "author": "MCP-Prompts Team",
+    "category": "exclusive-workflow"
+  }
+} 

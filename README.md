@@ -2,6 +2,7 @@
 
 [![build](https://img.shields.io/github/actions/workflow/status/sparesparrow/mcp-prompts/ci.yml?branch=main)](https://github.com/sparesparrow/mcp-prompts/actions)
 [![license](https://img.shields.io/github/license/sparesparrow/mcp-prompts.svg)](LICENSE)
+[![codecov](https://codecov.io/gh/sparesparrow/mcp-prompts/branch/main/graph/badge.svg)](https://codecov.io/gh/sparesparrow/mcp-prompts)
 
 A lightweight, extensible server for managing prompts and templates in the Model Context Protocol (MCP) ecosystem. **Store prompts once, version them, and retrieve them on demand.**
 
@@ -67,12 +68,13 @@ curl http://localhost:3003/health
 | Feature | Status | Notes |
 | --- | :---: | --- |
 | File storage adapter | ✅ | stable |
+| Memory storage adapter | ✅ | stable, for testing/dev |
 | PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
 | MDC adapter (Cursor Rules) | 🛠️ | conceptual, not yet implemented |
 | HTTP server + SSE | ⚠️ | experimental |
 | ElasticSearch adapter | 🛠️ | v1.3 roadmap |
 | Orchestrator integration | 🛠️ | concept |
-| Mermaid diagram server | ⚠️ | behind flag |
+| Mermaid diagram server | 🛠️ | concept |
 
 Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 

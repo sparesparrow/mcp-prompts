@@ -14,11 +14,13 @@ import {
   PromptConversionOptions,
   MdcFormatOptions,
   PgaiFormatOptions,
-  TemplateFormatOptions
+  TemplateFormatOptions,
+  PromptSequence
 } from './interfaces.js';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 import pg from 'pg';
+import { v4 as uuidv4 } from 'uuid';
 
 /**
  * FileAdapter Implementation
@@ -26,16 +28,19 @@ import pg from 'pg';
  */
 export class FileAdapter implements StorageAdapter {
   private promptsDir: string;
+  private sequencesDir: string;
   private connected: boolean = false;
   private prompts: Map<string, Prompt> = new Map();
 
   constructor(promptsDir: string) {
     this.promptsDir = promptsDir;
+    this.sequencesDir = path.join(promptsDir, 'sequences');
   }
 
   async connect(): Promise<void> {
     try {
       await fs.mkdir(this.promptsDir, { recursive: true });
+      await fs.mkdir(this.sequencesDir, { recursive: true });
       this.connected = true;
       console.error(`File storage connected: ${this.promptsDir}`);
     } catch (error: any) {
@@ -115,6 +120,55 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
+  async getSequence(id: string): Promise<PromptSequence | null> {
+    if (!this.connected) {
+      throw new Error("File storage not connected");
+    }
+
+    try {
+      const content = await fs.readFile(path.join(this.sequencesDir, `${id}.json`), "utf-8");
+      return JSON.parse(content);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
+        return null;
+      }
+      console.error(`Error getting sequence ${id} from file:`, error);
+      throw error;
+    }
+  }
+
+  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    if (!this.connected) {
+      throw new Error("File storage not connected");
+    }
+
+    try {
+      await fs.writeFile(
+        path.join(this.sequencesDir, `${sequence.id}.json`),
+        JSON.stringify(sequence, null, 2)
+      );
+      return sequence;
+    } catch (error: any) {
+      console.error("Error saving sequence to file:", error);
+      throw error;
+    }
+  }
+
+  async deleteSequence(id: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("File storage not connected");
+    }
+
+    try {
+      await fs.unlink(path.join(this.sequencesDir, `${id}.json`));
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        console.error(`Error deleting sequence ${id} from file:`, error);
+        throw error;
+      }
+    }
+  }
+
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
     if (!this.connected) {
       throw new Error("File storage not connected");
@@ -185,6 +239,7 @@ export class FileAdapter implements StorageAdapter {
  */
 export class MemoryAdapter implements StorageAdapter {
   private prompts: Map<string, Prompt> = new Map();
+  private sequences: Map<string, PromptSequence> = new Map();
   private connected: boolean = false;
 
   async connect(): Promise<void> {
@@ -194,6 +249,7 @@ export class MemoryAdapter implements StorageAdapter {
 
   async disconnect(): Promise<void> {
     this.prompts.clear();
+    this.sequences.clear();
     this.connected = false;
     console.error("Memory storage disconnected");
   }
@@ -213,6 +269,28 @@ export class MemoryAdapter implements StorageAdapter {
     }
 
     return this.prompts.get(id) || null;
+  }
+
+  async getSequence(id: string): Promise<PromptSequence | null> {
+    if (!this.connected) {
+      throw new Error("Memory storage not connected");
+    }
+    return this.sequences.get(id) || null;
+  }
+
+  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    if (!this.connected) {
+      throw new Error("Memory storage not connected");
+    }
+    this.sequences.set(sequence.id, sequence);
+    return sequence;
+  }
+
+  async deleteSequence(id: string): Promise<void> {
+    if (!this.connected) {
+      throw new Error("Memory storage not connected");
+    }
+    this.sequences.delete(id);
   }
 
   async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
@@ -505,31 +583,231 @@ export class PostgresAdapter implements StorageAdapter {
   async isConnected(): Promise<boolean> {
     return this.connected;
   }
+
+  async getSequence(id: string): Promise<PromptSequence | null> {
+    return Promise.reject(new Error("Method not implemented."));
+  }
+
+  async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    return Promise.reject(new Error("Method not implemented."));
+  }
+
+  async deleteSequence(id: string): Promise<void> {
+    return Promise.reject(new Error("Method not implemented."));
+  }
+}
+
+/**
+ * MdcAdapter Implementation (Cursor Rules)
+ * Stores prompts as .mdc files in a directory using Markdown frontmatter
+ */
+export class MdcAdapter implements StorageAdapter {
+  private rulesDir: string;
+  private connected = false;
+
+  constructor(rulesDir: string) {
+    this.rulesDir = rulesDir;
+  }
+
+  async connect(): Promise<void> {
+    await fs.mkdir(this.rulesDir, { recursive: true });
+    this.connected = true;
+    console.error(`MDC storage connected: ${this.rulesDir}`);
+  }
+
+  async disconnect(): Promise<void> {
+    this.connected = false;
+    console.error('MDC storage disconnected');
+  }
+
+  async isConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
+  private getFilePath(id: string): string {
+    return path.join(this.rulesDir, `${id}.mdc`);
+  }
+
+  async savePrompt(prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error('MDC adapter not connected');
+    const id = prompt.id || this.generateId(prompt.name);
+    prompt.id = id;
+    const mdcContent = this.promptToMdc(prompt);
+    await fs.writeFile(this.getFilePath(id), mdcContent, 'utf8');
+    return prompt;
+  }
+
+  async getPrompt(id: string): Promise<Prompt | null> {
+    if (!this.connected) throw new Error('MDC adapter not connected');
+    try {
+      const mdcContent = await fs.readFile(this.getFilePath(id), 'utf8');
+      return this.mdcToPrompt(id, mdcContent);
+    } catch (error: any) {
+      if (error.code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error('MDC adapter not connected');
+    const existing = await this.getPrompt(id);
+    if (!existing) throw new Error(`Prompt not found: ${id}`);
+    const updated: Prompt = { ...existing, ...prompt, id, updatedAt: new Date().toISOString() };
+    await this.savePrompt(updated);
+    return updated;
+  }
+
+  async deletePrompt(id: string): Promise<void> {
+    if (!this.connected) throw new Error('MDC adapter not connected');
+    try {
+      await fs.unlink(this.getFilePath(id));
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') throw error;
+    }
+  }
+
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    if (!this.connected) throw new Error('MDC adapter not connected');
+    const files = await fs.readdir(this.rulesDir);
+    const prompts: Prompt[] = [];
+    for (const file of files) {
+      if (file.endsWith('.mdc')) {
+        const id = path.basename(file, '.mdc');
+        try {
+          const prompt = await this.getPrompt(id);
+          if (prompt) prompts.push(prompt);
+        } catch (error) {
+          console.error(`Error reading prompt ${id}:`, error);
+        }
+      }
+    }
+    return this.filterPrompts(prompts, options);
+  }
+
+  async getAllPrompts(): Promise<Prompt[]> {
+    return this.listPrompts();
+  }
+
+  // Sequence support: not implemented for MDC, return null/empty
+  async getSequence(_id: string): Promise<PromptSequence | null> {
+    return null;
+  }
+  async saveSequence(_sequence: PromptSequence): Promise<PromptSequence> {
+    throw new Error('Sequences not supported in MDC adapter');
+  }
+  async deleteSequence(_id: string): Promise<void> {
+    throw new Error('Sequences not supported in MDC adapter');
+  }
+
+  private filterPrompts(prompts: Prompt[], options?: ListPromptsOptions): Prompt[] {
+    if (!options) return prompts;
+    let filtered = prompts;
+    if (options.isTemplate !== undefined) {
+      filtered = filtered.filter(p => p.isTemplate === options.isTemplate);
+    }
+    if (options.tags && options.tags.length > 0) {
+      filtered = filtered.filter(p => p.tags && options.tags!.every(tag => p.tags!.includes(tag)));
+    }
+    if (options.category) {
+      filtered = filtered.filter(p => p.category === options.category);
+    }
+    if (options.search) {
+      const term = options.search.toLowerCase();
+      filtered = filtered.filter(p =>
+        p.name.toLowerCase().includes(term) ||
+        (p.description && p.description.toLowerCase().includes(term)) ||
+        p.content.toLowerCase().includes(term)
+      );
+    }
+    return filtered;
+  }
+
+  private promptToMdc(prompt: Prompt): string {
+    let mdc = '---\n';
+    mdc += `description: ${prompt.description || ''}\n`;
+    if (prompt.tags && prompt.tags.length > 0) {
+      const globs = this.extractGlobsFromTags(prompt.tags);
+      if (globs.length > 0) {
+        mdc += `globs: ${JSON.stringify(globs)}\n`;
+      }
+    }
+    mdc += '---\n\n';
+    mdc += `# ${prompt.name}\n\n`;
+    mdc += prompt.content;
+    if (prompt.isTemplate && prompt.variables && prompt.variables.length > 0) {
+      mdc += '\n\n## Variables\n\n';
+      for (const variable of prompt.variables) {
+        mdc += `- \`${variable}\`\n`;
+      }
+    }
+    return mdc;
+  }
+
+  private mdcToPrompt(id: string, mdcContent: string): Prompt {
+    const frontmatterMatch = mdcContent.match(/---\n([\s\S]*?)\n---/);
+    const frontmatter = frontmatterMatch ? frontmatterMatch[1] : '';
+    const descriptionMatch = frontmatter.match(/description: (.*)/);
+    const description = descriptionMatch ? descriptionMatch[1].trim() : '';
+    const globsMatch = frontmatter.match(/globs: (\[.*\])/);
+    const globs = globsMatch ? JSON.parse(globsMatch[1]) : [];
+    const tags = globs.map((glob: string) => `glob:${glob}`);
+    const titleMatch = mdcContent.match(/# (.*)/);
+    const name = titleMatch ? titleMatch[1].trim() : id;
+    const content = mdcContent.replace(/---\n[\s\S]*?\n---\n\n# .*\n\n/, '');
+    const variables = this.extractVariablesFromContent(content);
+    return {
+      id,
+      name,
+      description,
+      content,
+      tags,
+      isTemplate: variables.length > 0,
+      variables,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  }
+
+  private extractGlobsFromTags(tags: string[]): string[] {
+    return tags.filter(tag => tag.startsWith('glob:')).map(tag => tag.replace('glob:', ''));
+  }
+
+  private extractVariablesFromContent(content: string): string[] {
+    const varSection = content.match(/## Variables\n\n([\s\S]*?)(\n\n|$)/);
+    if (!varSection) return [];
+    const varContent = varSection[1];
+    return varContent.split('\n').map(line => {
+      const match = line.match(/- `([^`]+)`/);
+      return match ? match[1] : null;
+    }).filter(Boolean) as string[];
+  }
+
+  private generateId(name: string): string {
+    const base = name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    return base || uuidv4();
+  }
 }
 
 export interface StorageConfig {
-  type: 'file' | 'memory' | 'postgres';
+  type: 'file' | 'memory' | 'postgres' | 'mdc';
   promptsDir?: string;
   backupsDir?: string;
   postgres?: pg.PoolConfig;
+  mdcRulesDir?: string;
 }
 
 export function createStorageAdapter(config: StorageConfig): StorageAdapter {
   switch (config.type) {
     case 'file':
-      if (!config.promptsDir) {
-        throw new Error('promptsDir is required for file storage');
-      }
-      return new FileAdapter(config.promptsDir);
-      
-    case 'postgres':
-      if (!config.postgres) {
-        throw new Error('postgres config is required for PostgreSQL storage');
-      }
-      return new PostgresAdapter(config.postgres);
-      
+      return new FileAdapter(config.promptsDir || './prompts');
     case 'memory':
-    default:
       return new MemoryAdapter();
+    case 'postgres':
+      if (!config.postgres) throw new Error('Missing postgres config');
+      return new PostgresAdapter(config.postgres);
+    case 'mdc':
+      return new MdcAdapter(config.mdcRulesDir || './.cursor/rules');
+    default:
+      throw new Error(`Unknown storage type: ${config.type}`);
   }
 } 

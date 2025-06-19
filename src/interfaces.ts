@@ -373,6 +373,26 @@ export interface StorageAdapter {
    * @returns Array of backup IDs
    */
   listBackups?(): Promise<string[]>;
+
+  /**
+   * Get a prompt sequence by ID
+   * @param id Sequence ID
+   * @returns PromptSequence
+   */
+  getSequence(id: string): Promise<PromptSequence | null>;
+
+  /**
+   * Save a prompt sequence to storage
+   * @param sequence PromptSequence to save
+   * @returns The saved PromptSequence
+   */
+  saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
+
+  /**
+   * Delete a prompt sequence
+   * @param id Sequence ID
+   */
+  deleteSequence(id: string): Promise<void>;
 }
 
 /**
@@ -638,4 +658,31 @@ export interface StorageConfig {
   pgUser?: string;      // For postgres storage
   pgPassword?: string;  // For postgres storage
   pgDatabase?: string;  // For postgres storage
+}
+
+/**
+ * PromptSequence interface
+ * Represents an ordered sequence of prompts
+ */
+export interface PromptSequence {
+  /** Unique identifier for the sequence */
+  id: string;
+
+  /** Human-readable name of the sequence */
+  name: string;
+
+  /** Optional description of the sequence */
+  description?: string;
+
+  /** Ordered list of prompt IDs in the sequence */
+  promptIds: string[];
+
+  /** Date when the sequence was created (ISO string) */
+  createdAt: string;
+
+  /** Date when the sequence was last updated (ISO string) */
+  updatedAt: string;
+
+  /** Optional metadata for additional information */
+  metadata?: Record<string, any>;
 } 

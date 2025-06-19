@@ -37,6 +37,7 @@ docker run -d --name mcp-prompts \
 ```
 
 * Prompts & backups are persisted to `./data` on your host.
+* **Note for Windows users**: In PowerShell, replace `$(pwd)` with `${PWD}`. In the classic Command Prompt, use `%CD%`.
 * Stop & remove: `docker rm -f mcp-prompts`.
 
 ---

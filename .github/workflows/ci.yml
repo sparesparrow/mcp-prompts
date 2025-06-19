@@ -1,13 +1,76 @@
-name: CI/CD Pipeline
+name: CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-  workflow_dispatch:
+    branches: [main]
 
 jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint (ESLint)
+        run: npm run lint
+
+      - name: Check formatting (Prettier)
+        run: npm run format:check
+
+      - name: Run unit & integration tests
+        run: npm test
+
+      - name: Validate prompts
+        run: npm run validate:prompts
+
+      - name: Build
+        run: npm run build --if-present
+
+      - name: Audit dependencies
+        run: npm audit --audit-level=moderate
+
+      - name: Run coverage
+        run: npm run test:coverage
+
+      - name: Upload coverage artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: coverage-report
+          path: coverage/
+
+      - name: Upload coverage to Codecov
+        if: env.CODECOV_TOKEN != null
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info
+          flags: unittests
+          name: codecov-umbrella
+
+      - name: Run E2E health check
+        run: |
+          # Start server in the background
+          node dist/scripts/start-server.js --port 3003 &
+          # Wait for the server to initialize
+          sleep 10
+          # Check the health endpoint
+          echo "Pinging health check endpoint..."
+          curl --fail http://localhost:3003/health
+          # Check the version command
+          echo "Checking CLI version..."
+          node dist/index.js --version
+
   test:
     name: Run Tests
     runs-on: ubuntu-latest
@@ -143,4 +206,3 @@ jobs:
           tags: |
             sparesparrow/mcp-prompts:latest
             sparesparrow/mcp-prompts:${{ steps.bump.outputs.VERSION_TYPE }}
-EOF 

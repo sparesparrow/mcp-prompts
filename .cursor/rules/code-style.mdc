@@ -1,12 +1,17 @@
 ---
+description: 
+globs: 
+alwaysApply: false
+---
+---
 description: Guidelines for consistent code style and formatting in the MCP-Prompts project
 globs:
   - "src/**/*.ts"
   - "src/**/*.js"
-  - "tests/**/*.ts"
-  - "tests/**/*.js"
----
-
+description: Guidelines for consistent code style and formatting in the MCP-Prompts project
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
 # Code Style and Formatting Guidelines
 
 This rule defines the coding standards and style guidelines for the MCP-Prompts project to ensure consistency, readability, and maintainability across the codebase.
@@ -57,7 +62,7 @@ This rule defines the coding standards and style guidelines for the MCP-Prompts 
 
 3. **Type vs Interface for API Contracts**: Use interfaces for public API contracts to allow extension.
 
-4. **Use Descriptive Types**: Avoid using `any` whenever possible. Use precise types or create custom types.
+4. **Use Descriptive Types**: Avoid using `any` whenever possible. Use precise types or create custom types. For cases where the type is truly unknown, prefer `unknown` over `any` to maintain type safety, forcing checks before use.
 
    ```typescript
    // Bad
@@ -68,6 +73,13 @@ This rule defines the coding standards and style guidelines for the MCP-Prompts 
    // Good
    function processData(data: PromptData): ProcessedResult {
      // ...
+   }
+
+   // Better than any when type is unknown
+   function handleUnknown(data: unknown) {
+     if (typeof data === 'string') {
+       // data is now treated as a string
+     }
    }
    ```
 
@@ -132,7 +144,9 @@ This rule defines the coding standards and style guidelines for the MCP-Prompts 
 
 3. **Maximum File Length**: Keep files under 300 lines. If a file grows larger, consider splitting it into multiple files.
 
-4. **Directory Structure**: Organize files by feature or component, not by type:
+4. **Alphabetical Sorting**: For better readability and to avoid merge conflicts, it's recommended to sort properties within interfaces, types, and objects alphabetically. This can be enforced with ESLint plugins.
+
+5. **Directory Structure**: Organize files by feature or component, not by type:
 
    ```
    ✅ Good:
@@ -324,6 +338,8 @@ This rule defines the coding standards and style guidelines for the MCP-Prompts 
 
 4. **Comment Style**: Use `//` for single-line comments and `/* */` for multi-line comments.
 
+5. **Enforce JSDoc**: To ensure all public APIs are documented, use the `eslint-plugin-jsdoc` plugin. It can be configured to require JSDoc comments for all exported functions, classes, and types.
+
 ### Error Handling
 
 1. **Custom Error Classes**: Use custom error classes that extend the base Error class.
@@ -514,35 +530,37 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:@typescript-eslint/recommended',
-    'prettier/@typescript-eslint',
-    'plugin:prettier/recommended',
+    'plugin:jsdoc/recommended',
+    'prettier',
+  ],
+  plugins: [
+    '@typescript-eslint',
+    'prettier',
+    'simple-import-sort',
+    'sort-keys-fix',
+    'jsdoc',
   ],
   rules: {
-    // Enforce named exports
+    'prettier/prettier': 'error',
+    'simple-import-sort/imports': 'error',
+    'simple-import-sort/exports': 'error',
+    'sort-keys-fix/sort-keys-fix': 'warn',
     'import/prefer-default-export': 'off',
-    
-    // Require explicit return types on functions and class methods
-    '@typescript-eslint/explicit-function-return-type': 'error',
-    
-    // Disallow unused variables
-    '@typescript-eslint/no-unused-vars': ['error', { 
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    '@typescript-eslint/no-unused-vars': ['warn', { 
       argsIgnorePattern: '^_',
       varsIgnorePattern: '^_',
     }],
-    
-    // Require consistent type definitions
     '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
-    
-    // Enforce consistent naming convention
     '@typescript-eslint/naming-convention': [
-      'error',
+      'warn',
       {
         selector: 'default',
         format: ['camelCase'],
       },
       {
         selector: 'variable',
-        format: ['camelCase', 'UPPER_CASE'],
+        format: ['camelCase', 'UPPER_CASE', 'PascalCase'],
       },
       {
         selector: 'parameter',
@@ -568,23 +586,12 @@ module.exports = {
         format: ['PascalCase'],
       },
     ],
-    
-    // Require explicit member accessibility modifiers
     '@typescript-eslint/explicit-member-accessibility': [
       'error',
       { accessibility: 'explicit' }
     ],
-    
-    // Disallow any type
-    '@typescript-eslint/no-explicit-any': 'error',
-    
-    // Enforce consistent line breaks
-    'object-curly-newline': ['error', {
-      ObjectExpression: { minProperties: 4, multiline: true },
-      ObjectPattern: { minProperties: 4, multiline: true },
-      ImportDeclaration: { minProperties: 4, multiline: true },
-      ExportDeclaration: { minProperties: 4, multiline: true },
-    }],
+    '@typescript-eslint/no-explicit-any': 'warn',
+    'object-curly-newline': 'off', // Let prettier handle this
   },
 };
 ```
@@ -607,7 +614,7 @@ module.exports = {
 
 ## VSCode Configuration
 
-For Visual Studio Code users, use the following settings:
+For Visual Studio Code users, use the following settings to integrate ESLint and Prettier for auto-formatting and fixing on save.
 
 ```json
 // .vscode/settings.json
@@ -615,7 +622,7 @@ For Visual Studio Code users, use the following settings:
   "editor.formatOnSave": true,
   "editor.defaultFormatter": "esbenp.prettier-vscode",
   "editor.codeActionsOnSave": {
-    "source.fixAll.eslint": true
+    "source.fixAll.eslint": "explicit"
   },
   "eslint.validate": [
     "javascript",
@@ -805,3 +812,4 @@ Use Husky and lint-staged to enforce code style and formatting on commits:
    ```
 
 These guidelines ensure a consistent, readable, and maintainable codebase for the MCP-Prompts project. All developers should follow these standards to maintain the quality of the code.
+

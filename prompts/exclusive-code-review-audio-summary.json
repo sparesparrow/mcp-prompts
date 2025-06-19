@@ -1,0 +1,29 @@
+{
+  "id": "exclusive-code-review-audio-summary",
+  "name": "Exclusive: Code Review ➜ Memory ➜ Audio Summary",
+  "description": "Workflow: Provede code review, uloží výsledek do Memory MCP serveru a vygeneruje audio shrnutí přes ElevenLabs.",
+  "content": "# Code Review ➜ Memory ➜ Audio Summary\n\n1. Proveď detailní code review pro {{repo_uri}} a zaměř se na oblast: {{review_focus}}.\n2. Výsledek ulož do Memory MCP serveru pod klíčem: `memory://code-review/{{repo_name}}/{{review_focus}}`.\n3. Vygeneruj audio shrnutí hlavních poznatků pomocí ElevenLabs MCP serveru.\n\n## MCP odkazy\n- Repo: {{repo_uri}}\n- Memory: @memory://code-review/{{repo_name}}/{{review_focus}}\n- Audio: @elevenlabs://audio/summary\n\n## Postup\n- Nejprve analyzuj kód a napiš textové shrnutí.\n- Ulož shrnutí do Memory.\n- Předej shrnutí ElevenLabs serveru pro převod na audio.\n\n{{additional_instructions}}",
+  "variables": [
+    "repo_uri",
+    "repo_name",
+    "review_focus",
+    "additional_instructions"
+  ],
+  "tags": ["exclusive", "workflow", "code-review", "memory", "audio", "elevenlabs", "multi-server"],
+  "examples": [
+    {
+      "name": "Quick demo",
+      "variables": {
+        "repo_uri": "@github://sparesparrow/mcp-prompts/src/index.ts",
+        "repo_name": "mcp-prompts",
+        "review_focus": "security",
+        "additional_instructions": "Zaměř se na bezpečnostní best practices a upozorni na možné zranitelnosti."
+      }
+    }
+  ],
+  "metadata": {
+    "created_at": "2025-06-18T10:00:00Z",
+    "author": "MCP-Prompts Team",
+    "category": "exclusive-workflow"
+  }
+} 
