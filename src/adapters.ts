@@ -105,18 +105,19 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  async deletePrompt(id: string): Promise<boolean> {
     if (!this.connected) {
       throw new Error("File storage not connected");
     }
-
     try {
       await fs.unlink(path.join(this.promptsDir, `${id}.json`));
+      return true;
     } catch (error: any) {
-      if (error.code !== 'ENOENT') {
-        console.error(`Error deleting prompt ${id} from file:`, error);
-        throw error;
+      if (error.code === 'ENOENT') {
+        return false;
       }
+      console.error(`Error deleting prompt ${id} from file:`, error);
+      throw error;
     }
   }
 
@@ -302,12 +303,11 @@ export class MemoryAdapter implements StorageAdapter {
     return prompt;
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  async deletePrompt(id: string): Promise<boolean> {
     if (!this.connected) {
       throw new Error("Memory storage not connected");
     }
-
-    this.prompts.delete(id);
+    return this.prompts.delete(id);
   }
 
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
@@ -488,20 +488,12 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  async deletePrompt(id: string): Promise<boolean> {
     if (!this.connected) {
       throw new Error("PostgreSQL storage not connected");
     }
-
-    const client = await this.pool.connect();
-    try {
-      await client.query('DELETE FROM prompts WHERE id = $1', [id]);
-    } catch (error) {
-      console.error(`Error deleting prompt ${id} from PostgreSQL:`, error);
-      throw error;
-    } finally {
-      client.release();
-    }
+    const result = await this.pool.query('DELETE FROM prompts WHERE id = $1', [id]);
+    return result.rowCount > 0;
   }
 
   async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
@@ -661,12 +653,19 @@ export class MdcAdapter implements StorageAdapter {
     return updated;
   }
 
-  async deletePrompt(id: string): Promise<void> {
-    if (!this.connected) throw new Error('MDC adapter not connected');
+  async deletePrompt(id: string): Promise<boolean> {
+    if (!this.connected) {
+      throw new Error("MDC storage not connected");
+    }
+    const filePath = this.getFilePath(id);
     try {
-      await fs.unlink(this.getFilePath(id));
+      await fs.unlink(filePath);
+      return true;
     } catch (error: any) {
-      if (error.code !== 'ENOENT') throw error;
+      if (error.code === 'ENOENT') {
+        return false;
+      }
+      throw error;
     }
   }
 

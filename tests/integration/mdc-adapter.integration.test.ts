@@ -45,7 +45,16 @@ describe('MdcAdapter Integration', () => {
   });
 
   it('should update a prompt', async () => {
-    const updated = await adapter.updatePrompt('test-mdc-1', { description: 'Updated desc' });
+    const now = new Date().toISOString();
+    const updated = await adapter.updatePrompt('test-mdc-1', {
+      id: 'test-mdc-1',
+      name: 'Test MDC',
+      description: 'Updated desc',
+      content: 'Test content',
+      createdAt: now,
+      updatedAt: now,
+      isTemplate: false
+    });
     expect(updated).not.toBeNull();
     expect(updated?.description).toBe('Updated desc');
   });

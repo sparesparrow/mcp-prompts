@@ -125,7 +125,7 @@ export class PromptService {
     return this.storage.updatePrompt(id, updated);
   }
 
-  async deletePrompt(id: string): Promise<void> {
+  async deletePrompt(id: string): Promise<boolean> {
     return this.storage.deletePrompt(id);
   }
 

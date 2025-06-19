@@ -16,6 +16,7 @@ import { fileURLToPath } from 'url';
 import { cwd } from 'process';
 import { PromptService } from '../prompt-service.js';
 import { FileAdapter } from '../adapters.js';
+import Ajv from 'ajv';
 
 // resolve __dirname for ESM
 const __filename = fileURLToPath(import.meta.url);
@@ -79,7 +80,14 @@ async function validateFile(filePath: string, promptService: PromptService): Pro
     console.log(`✓ ${filePath}`);
     return true;
   } catch (err) {
-    console.error(`✗ ${filePath} is invalid:`, err.details || err);
+    if (typeof err === 'object' && err !== null && 'details' in err) {
+      // @ts-ignore
+      console.error(`✗ ${filePath} is invalid:`, err.details || err);
+    } else if (err instanceof Error) {
+      console.error(`✗ ${filePath} is invalid:`, err.message);
+    } else {
+      console.error(`✗ ${filePath} is invalid:`, err);
+    }
     return false;
   }
 }
@@ -107,8 +115,8 @@ async function main() {
     path.join(baseDir, 'fixed_prompts'),
     path.join(baseDir, 'data', 'prompts'),
   ];
-  // Use FileAdapter for validation context
-  const fileAdapter = new FileAdapter({ promptsDir: './prompts' });
+  // Use FileAdapter with string path
+  const fileAdapter = new FileAdapter('./prompts');
   const promptService = new PromptService(fileAdapter);
   let success = true;
   for (const dir of targetDirs) {
