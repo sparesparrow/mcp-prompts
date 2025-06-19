@@ -1,30 +1,115 @@
-MCP Prompts Server
+# MCP Prompts Server
+
+[![License](https://img.shields.io/github/license/sparesparrow/mcp-prompts.svg)](LICENSE)
+[![Last Commit](https://img.shields.io/github/last-commit/sparesparrow/mcp-prompts.svg)](https://github.com/sparesparrow/mcp-prompts/commits/main)
+[![Open Issues](https://img.shields.io/github/issues/sparesparrow/mcp-prompts.svg)](https://github.com/sparesparrow/mcp-prompts/issues)
+[![Contributing](https://img.shields.io/badge/Contributing-Guidelines-blue)](CONTRIBUTING.md)
+
+---
+
+## Table of Contents
+- [Key Features](#key-features)
+- [Why MCP Prompts?](#why-mcp-prompts)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [API / Tooling](#api--tooling)
+- [Docker Compose](#docker-compose)
+- [Architecture Overview](#architecture-overview)
+- [Docker Images & Automated Publishing](#docker-images--automated-publishing)
+- [Documentation](#documentation)
+- [Supported Clients](#supported-clients)
+- [How to Contribute](#how-to-contribute)
+- [Community Standards](#community-standards)
+- [Sustainability](#sustainability)
+- [Project Board & Roadmap](#project-board--roadmap)
+- [CLI Usage & Troubleshooting](#cli-usage--troubleshooting)
+- [FAQ & Troubleshooting](#faq--troubleshooting)
+- [Project Philosophy](#project-philosophy)
+
+---
+
 Model Context Protocol (MCP) Prompts Server is a lightweight, stateless service for storing, retrieving, and templating prompts for large-language-model (LLM) workflows. It's designed to be a centralized hub for prompt management in a multi-tool or multi-agent environment.
 It can run stand-alone, inside Docker, or as part of a multi-server MCP stack and already powers AI clients like Claude Desktop.
-✨ Key Features
- * Stateless by Design: The server itself is stateless, delegating state management to swappable storage backends. This makes it highly scalable and resilient.
- * Extensible Storage: Choose from multiple storage backends at runtime via a simple environment variable.
-   * file: Simple JSON file storage, great for getting started.
-   * mdc: Markdown-Cursor-Rules, stores prompts directly in Markdown files.
-   * postgres: Robust PostgreSQL backend for production use.
- * Powerful Templating: Uses a simple {{variable}} syntax for dynamic prompt generation.
- * Real-time with SSE: Built-in Server-Sent Events (SSE) support for streaming responses, perfect for real-time applications.
- * Full-text and Vector Search: Leverage PostgreSQL's advanced search capabilities when using the postgres backend.
- * Tagging: Organize prompts with tags for easy filtering and retrieval.
- * Docker-Ready: Official Docker images and Docker Compose files for easy deployment.
- * CI/CD Friendly: Designed for easy integration into automated testing and deployment pipelines.
-🤔 Why MCP Prompts?
+
+---
+
+## ✨ Key Features
+
+- **Stateless by Design:** The server itself is stateless, delegating state management to swappable storage backends. This makes it highly scalable and resilient.
+- **Extensible Storage:** Choose from multiple storage backends at runtime via a simple environment variable.
+  - file: Simple JSON file storage, great for getting started.
+  - mdc: Markdown-Cursor-Rules, stores prompts directly in Markdown files.
+  - postgres: Robust PostgreSQL backend for production use.
+- **Powerful Templating:** Uses a simple `{{variable}}` syntax for dynamic prompt generation.
+- **Real-time with SSE:** Built-in Server-Sent Events (SSE) support for streaming responses, perfect for real-time applications.
+- **Full-text and Vector Search:** Leverage PostgreSQL's advanced search capabilities when using the postgres backend.
+- **Tagging:** Organize prompts with tags for easy filtering and retrieval.
+- **Docker-Ready:** Official Docker images and Docker Compose files for easy deployment.
+- **CI/CD Friendly:** Designed for easy integration into automated testing and deployment pipelines.
+
+---
+
+## 🤔 Why MCP Prompts?
+
 In complex LLM workflows, managing prompts can become a major challenge. They might be scattered across different tools, hardcoded in applications, or difficult to update. This server solves that by providing a central, API-driven repository for all your prompts, offering:
- * Centralization: A single source of truth for all prompts.
- * Decoupling: Separate your prompt logic from your application code.
- * Reusability: Easily reuse and share prompts across different projects and tools.
- * Dynamic Content: Use templates to generate prompts on the fly.
-🏗️ How It Works
-The server has a simple, layered architecture:
- * API Layer (Express.js): Exposes a RESTful API for CRUD operations on prompts. It also handles SSE connections for real-time updates.
- * Service Layer: Contains the core business logic for prompt management and templating.
- * Storage Layer: An abstract interface with concrete implementations for different storage backends (file, mdc, postgres).
-🚀 Quick Start
+
+- **Centralization:** A single source of truth for all prompts.
+- **Decoupling:** Separate your prompt logic from your application code.
+- **Reusability:** Easily reuse and share prompts across different projects and tools.
+- **Dynamic Content:** Use templates to generate prompts on the fly.
+
+---
+
+## 🏗️ Architecture Overview
+
+```mermaid
+graph TD
+  subgraph "Clients"
+    A1["LM Studio"]
+    A2["LibreChat"]
+    A3["Tasker (Android)"]
+    A4["Cursor IDE"]
+    A5["Claude Desktop"]
+  end
+  subgraph "MCP-Prompts Server"
+    B1["Prompt Service"]
+    B2["HTTP/SSE API"]
+    B3["Adapter Factory"]
+  end
+  subgraph "Storage Adapters"
+    C1["File Adapter"]
+    C2["Postgres Adapter"]
+    C3["MDC (Cursor Rules) Adapter"]
+    C4["ElasticSearch Adapter"]
+  end
+  subgraph "Integrations"
+    D1["Docker"]
+    D2["GitHub Actions"]
+    D3["Release Automation"]
+  end
+
+  A1 --> B2
+  A2 --> B2
+  A3 --> B2
+  A4 --> B2
+  A5 --> B2
+  B2 --> B1
+  B1 --> B3
+  B3 --> C1
+  B3 --> C2
+  B3 --> C3
+  B3 --> C4
+  B2 --> D1
+  D2 --> D3
+  D1 --> B2
+```
+
+---
+
+## 🚀 Quick Start
+
 Run from your terminal using npx:
 # One-liner using npx
 npx -y @sparesparrow/mcp-prompts
@@ -33,13 +118,19 @@ Or use the official Docker image:
 docker run -p 3003:3003 -v ~/mcp/data:/app/data sparesparrow/mcp-prompts:latest
 
 Point your MCP-compatible client (like Claude Desktop) to http://localhost:3003 and type / to see the list of available prompts.
-🛠️ Installation
+
+---
+
+## 🛠️ Installation
 | Method | Command |
 |---|---|
 | NPX (recommended) | npx -y @sparesparrow/mcp-prompts |
 | Global NPM | npm i -g @sparesparrow/mcp-prompts |
 | Docker | docker pull sparesparrow/mcp-prompts:latest |
-⚙️ Configuration (Environment Variables)
+
+---
+
+## ⚙️ Configuration (Environment Variables)
 | Variable | Purpose | Default |
 |---|---|---|
 | PORT | HTTP port for the server | 3003 |
@@ -53,7 +144,10 @@ Point your MCP-compatible client (like Claude Desktop) to http://localhost:3003 
 | PG_USER | PostgreSQL username | postgres |
 | PG_PASSWORD | PostgreSQL password | postgres |
 | PG_DATABASE | PostgreSQL database name | mcp |
-📡 API / Tooling
+
+---
+
+## 📡 API / Tooling
 The server exposes a set of tools that can be called via any MCP client or standard HTTP requests.
 Example use_mcp_tool call:
 use_mcp_tool({
@@ -88,7 +182,10 @@ Available Tools
 | update_prompt | Updates an existing prompt by ID. | /api/prompts/:id | PUT |
 | delete_prompt | Deletes a prompt by ID. | /api/prompts/:id | DELETE |
 | apply_template | Applies variables to a prompt template and returns the result. | /api/prompts/apply-template | POST |
-🐋 Docker Compose
+
+---
+
+## 🐋 Docker Compose
 For more complex setups, use the provided Docker Compose files.
 # Base deployment using file storage
 docker compose -f docker/compose/docker-compose.base.yml up -d
@@ -143,6 +240,8 @@ graph TD
   D2 --> D3
   D1 --> B2
 ```
+
+---
 
 # MCP Prompts
 
@@ -295,6 +394,13 @@ Please read our [Contributing Guide](CONTRIBUTING.md) for details on our code of
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## Show your support
+
+If you find MCP-Prompts useful, please consider supporting the project:
+
+- [GitHub Sponsors](https://github.com/sponsors/sparesparrow) – Help fund ongoing development and maintenance.
+- Star the repository and share it with your network!
 
 ## Roadmap
 
@@ -715,122 +821,40 @@ The Mermaid diagram server provides a simple HTTP endpoint to visualize prompt r
 --- 
 
 # TODO
-```
-1. Refactor and Enhance the Main README.md
-Task: Restructure the main README.md file to improve clarity and navigation for new contributors.
 
-Instructions:
+## Table of Contents
+- [What is this?](#mcp-prompts-server)
+- [Key Features](#key-features)
+- [How It Works](#how-it-works)
+- [Quick Start](#quick-start)
+- [Installation](#installation)
+- [Configuration](#configuration)
+- [API / Tooling](#api--tooling)
+- [Docker Compose](#docker-compose)
+- [Architecture Overview](#architecture-overview)
+- [Docker Images & Automated Publishing](#docker-images--automated-publishing)
+- [Documentation](#documentation)
+- [Supported Clients](#supported-clients)
+- [How to Contribute](#how-to-contribute)
+- [Community Standards](#community-standards)
+- [Sustainability](#sustainability)
+- [Project Board & Roadmap](#project-board--roadmap)
+- [Orchestrator Integration](#orchestrator-integration)
+- [Mermaid Diagram Server](#mermaid-diagram-server)
+- [TODO](#todo)
 
-Add a Table of Contents at the top of the file to allow easy navigation to key sections (e.g., "What is this?", "Features", "Getting Started", "TODO", "Contributing").
+## Project Philosophy
 
-Add more shields.io badges to the top of the README. Include badges for 'license', 'last commit', 'open issues', and a link to the CONTRIBUTING.md.
+The **Master Control Program (MCP)** philosophy is about centralizing and orchestrating the management of prompts for large language models (LLMs) and AI workflows. In complex AI systems, prompts are the core instructions that drive model behavior, but they are often scattered, duplicated, or hard to update across tools and teams.
 
-Create a new section titled "Project Philosophy" or "Core Concepts" that briefly explains the idea of the "Master Control Program" (MCP), the role of prompt engineering in this project, and how the different components (server, storage adapters, prompts) work together.
+MCP-Prompts solves this by providing:
+- **A central server** for storing, retrieving, and templating prompts.
+- **Extensible storage adapters** (File, PostgreSQL, MDC, etc.) so you can choose the best backend for your needs.
+- **Prompt engineering tools** that let you version, tag, and template prompts for dynamic, reusable workflows.
 
-Ensure all links within the README.md are valid and point to the correct files or external resources.
+All components work together so that prompts are:
+- Easy to manage and update in one place
+- Decoupled from application code
+- Shareable and reusable across projects and teams
 
-Add a "Show your support" section with a link to your GitHub Sponsors page or other support channels.
-
-2. Implement the PostgresAdapter
-Task: The current PostgresAdapter in src/adapters.ts is a placeholder. Implement the full functionality for this adapter.
-
-Instructions:
-
-In src/adapters.ts, locate the PostgresAdapter class.
-
-Use the pg (node-postgres) library to connect to the PostgreSQL database. Connection details should be read from the central configuration (src/config.ts), which in turn reads from environment variables.
-
-Implement the get, set, and list methods to perform the corresponding SQL operations (SELECT, INSERT/UPDATE, SELECT *).
-
-Ensure the implementation correctly handles JSON data by serializing/deserializing it when storing/retrieving it from the database.
-
-The database schema is defined in docker/postgres/init/01-init.sql. Your implementation must be compatible with this schema.
-
-Add robust error handling for database connection errors and query failures.
-
-Create a new integration test file tests/integration/postgres-adapter.integration.test.ts to verify the functionality of the implemented adapter. The test should connect to the test database spun up by Docker and test all public methods of the adapter.
-
-3. Enhance Configuration Management
-Task: Improve the configuration management in src/config.ts to be more robust and developer-friendly.
-
-Instructions:
-
-Integrate the zod library to define a schema for all environment variables.
-
-The schema should validate that all required environment variables are present and have the correct type (e.g., PORT should be a number).
-
-At application startup, parse the environment variables using the Zod schema. If validation fails, log a clear error message indicating which variables are missing or invalid, and exit the process.
-
-Update the docker/.env.sample file to include comments explaining each variable.
-
-Update the documentation in docs/02-configuration.md to reflect these changes and list all available environment variables with their purpose and default values.
-
-4. Refactor and Consolidate GitHub Actions Workflows
-Task: Simplify and optimize the GitHub Actions workflows located in .github/workflows.
-
-Instructions:
-
-Combine docker-build.yml and docker-publish.yml into a single workflow file named docker-ci-cd.yml.
-
-This new workflow should trigger on pull_request to build the images (without pushing).
-
-It should trigger on release (type created) to build AND push the images to the container registry.
-
-Use workflow conditions (if: github.event_name == 'release') to control the push step.
-
-Analyze npm-publish.yml and npm-publish-github-packages.yml. If they perform similar steps, merge them into a single, more generic publish.yml workflow that takes secrets as inputs to decide the registry target.
-
-In all workflows that use Node.js, ensure you are using the actions/setup-node action's caching feature to speed up npm install.
-
-Review the triggers for all workflows. Ensure they are not running unnecessarily on every push to every branch. Scope them to main or specific paths where possible.
-
-5. Improve Test Coverage
-Task: Increase the unit and integration test coverage for the application.
-
-Instructions:
-
-sequence-service.ts: Write new unit tests in tests/unit/sequence-service.unit.test.ts that specifically cover the complex logic of handling sequences, including edge cases like empty sequences, sequences with failing steps, and correct variable interpolation.
-
-http-server.ts: Add more tests to src/__tests__/http-server.test.ts to cover all API endpoints. For each endpoint, test the success case (200 OK), error cases (404 Not Found, 400 Bad Request, 500 Internal Server Error), and input validation. Mock the service dependencies (PromptService, SequenceService).
-
-utils.ts: If any utility functions are not covered by existing tests, add a new unit test file for them.
-
-6. Automate API Documentation Generation
-Task: Replace the manual API documentation in docs/04-api-reference.md with an automated solution.
-
-Instructions:
-
-Add extensive TSDoc comments to all API route handlers in src/http-server.ts. Describe what each endpoint does, its parameters (path, query, body), and what it returns.
-
-Use a library like swagger-jsdoc and swagger-ui-express to generate an OpenAPI (Swagger) specification from the TSDoc comments.
-
-Add a new endpoint, /api-docs, to the Express server that serves the interactive Swagger UI.
-
-Remove the content from docs/04-api-reference.md and replace it with a link to the new /api-docs endpoint, explaining that the documentation is now generated automatically and served by the application itself.
-
-7. Create a Detailed CONTRIBUTING.md
-Task: Expand the existing CONTRIBUTING.md file into a comprehensive guide for developers.
-
-Instructions:
-
-Create a "Development Setup" section that explains how to use the Docker-based development environment. Provide step-by-step instructions: clone the repo, create a .env file from the sample, and run docker-compose up.
-
-Add a "Project Structure" section that gives a brief overview of the key directories (src, docs, prompts, docker) and files (http-server.ts, prompt-service.ts, adapters.ts).
-
-Add a "Coding Style" section that mentions the use of ESLint and Prettier and instructs contributors to run npm run lint before submitting code.
-
-Add a "Pull Request Process" section that outlines the steps for submitting a PR: fork the repo, create a feature branch, commit your changes, and open a PR against the main branch. Mention that PRs should reference an existing issue if applicable.
-
-8. Update Dependencies and Manage Security
-Task: Establish a process for regularly updating dependencies to keep the project secure and up-to-date.
-
-Instructions:
-
-Run npm audit to identify any existing vulnerabilities in the dependencies.
-
-Use npm update to update all packages to their latest minor and patch versions according to the package.json semver rules.
-
-For any vulnerabilities that remain, investigate them and create separate issues for packages that require a major version bump.
-
-Add a new GitHub workflow that runs npm audit weekly and creates an issue if any high or critical severity vulnerabilities are found.
-```
+This approach enables rapid iteration, better collaboration, and more reliable LLM-powered applications.

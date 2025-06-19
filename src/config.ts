@@ -3,6 +3,91 @@ import { ServerConfig } from './interfaces.js';
 import { z } from 'zod';
 
 /**
+ * Loads and validates the server configuration from environment variables using Zod.
+ * Throws a clear error and exits if validation fails.
+ */
+
+/**
+ * Zod schema for all supported environment variables.
+ * Uses .coerce for numbers/booleans, provides defaults, and enforces required fields.
+ */
+export const EnvSchema = z.object({
+  NAME: z.string().default('mcp-prompts'),
+  VERSION: z.string().default('1.0.0'),
+  STORAGE_TYPE: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']).default('file'),
+  PROMPTS_DIR: z.string().default('./data/prompts'),
+  BACKUPS_DIR: z.string().default('./data/backups'),
+  PORT: z.coerce.number().default(3003),
+  LOG_LEVEL: z.enum(['debug', 'info', 'warn', 'error']).default('info'),
+  HTTP_SERVER: z.coerce.boolean().default(true),
+  MCP_SERVER: z.coerce.boolean().default(false),
+  HOST: z.string().default('localhost'),
+  ENABLE_SSE: z.coerce.boolean().optional(),
+  SSE_PATH: z.string().optional(),
+  CORS_ORIGIN: z.string().optional(),
+
+  // Streaming
+  STREAMING_ENABLED: z.coerce.boolean().optional(),
+  STREAMING_CHUNK_SIZE: z.coerce.number().optional(),
+  STREAMING_MAX_TOKENS: z.coerce.number().optional(),
+
+  // Sequences
+  SEQUENCES_MAX_STEPS: z.coerce.number().optional(),
+  SEQUENCES_TIMEOUT: z.coerce.number().optional(),
+  SEQUENCES_RETRY_ATTEMPTS: z.coerce.number().optional(),
+
+  // Postgres
+  POSTGRES_HOST: z.string().optional(),
+  POSTGRES_PORT: z.coerce.number().optional(),
+  POSTGRES_DATABASE: z.string().optional(),
+  POSTGRES_USER: z.string().optional(),
+  POSTGRES_PASSWORD: z.string().optional(),
+  POSTGRES_SSL: z.coerce.boolean().optional(),
+  POSTGRES_MAX_CONNECTIONS: z.coerce.number().optional(),
+
+  // MDC
+  MDC_RULES_DIR: z.string().optional(),
+  MDC_BACKUP_ENABLED: z.coerce.boolean().optional(),
+  MDC_BACKUP_INTERVAL: z.coerce.number().optional(),
+
+  // ElasticSearch
+  ELASTICSEARCH_NODE: z.string().optional(),
+  ELASTICSEARCH_USERNAME: z.string().optional(),
+  ELASTICSEARCH_PASSWORD: z.string().optional(),
+  ELASTICSEARCH_INDEX: z.string().optional(),
+  ELASTICSEARCH_SEQUENCE_INDEX: z.string().optional(),
+
+  // ElevenLabs
+  ELEVENLABS_API_KEY: z.string().optional(),
+  ELEVENLABS_MODEL_ID: z.string().optional(),
+  ELEVENLABS_VOICE_ID: z.string().optional(),
+  ELEVENLABS_OPTIMIZATION_LEVEL: z.enum(['speed', 'quality', 'balanced']).optional(),
+  ELEVENLABS_STABILITY: z.coerce.number().optional(),
+  ELEVENLABS_SIMILARITY_BOOST: z.coerce.number().optional(),
+  ELEVENLABS_SPEAKER_BOOST: z.coerce.boolean().optional(),
+  ELEVENLABS_STYLE: z.coerce.number().optional(),
+  ELEVENLABS_USE_CACHING: z.coerce.boolean().optional(),
+  ELEVENLABS_CACHE_DIR: z.string().optional(),
+});
+
+export type EnvVars = z.infer<typeof EnvSchema>;
+
+/**
+ * Parses and validates process.env using the EnvSchema.
+ * Throws a clear error and exits if validation fails.
+ */
+export function loadConfig(): EnvVars {
+  const result = EnvSchema.safeParse(process.env);
+  if (!result.success) {
+    // Format Zod errors for clarity
+    const errors = result.error.errors.map(e => `- ${e.path.join('.')}: ${e.message}`);
+    console.error('\n❌ Invalid or missing environment variables:\n' + errors.join('\n'));
+    process.exit(1);
+  }
+  return result.data;
+}
+
+/**
  * Loads the server configuration from environment variables and provides default values.
  */
 export const ConfigSchema = z.object({
