@@ -1,4 +1,366 @@
-# MCP-Prompts User Guide (Claude Desktop & Cursor IDE)
+# MCP-Prompts User Guide
+
+## Introduction
+MCP-Prompts is a lightweight, extensible server for managing prompts and templates in the Model Context Protocol (MCP) ecosystem. This guide will help you set up, configure, and use MCP-Prompts with a variety of clients, including LM Studio, LibreChat, Tasker, Android, Cursor IDE, and Claude Desktop.
+
+**Intended Audience:**
+- Developers, prompt engineers, and advanced users who want to manage and version prompts for LLM workflows.
+
+**Prerequisites:**
+- Node.js (for local setup)
+- Docker (for containerized setup)
+- Basic familiarity with command-line tools
+
+## Table of Contents
+1. [Getting Started](#getting-started)
+2. [Supported Clients Setup](#supported-clients-setup)
+   - [LM Studio](#lm-studio)
+   - [LibreChat](#librechat)
+   - [Tasker (Android)](#tasker-android)
+   - [Cursor IDE](#cursor-ide)
+   - [Claude Desktop](#claude-desktop)
+3. [Features and Functions](#features-and-functions)
+4. [Advanced Usage Examples](#advanced-usage-examples)
+5. [Troubleshooting & FAQ](#troubleshooting--faq)
+6. [Contact & Support](#contact--support)
+
+## Getting Started
+
+### Local Setup (npx)
+```bash
+npx -y @sparesparrow/mcp-prompts
+curl http://localhost:3003/health
+```
+
+### Docker Setup
+```bash
+docker run -d --name mcp-prompts \
+  -p 3003:3003 \
+  -e HTTP_SERVER=true \
+  -e STORAGE_TYPE=file \
+  -v $(pwd)/data:/app/data \
+  sparesparrow/mcp-prompts:latest
+```
+
+### Docker Compose (PostgreSQL)
+```yaml
+version: "3"
+services:
+  prompts:
+    image: sparesparrow/mcp-prompts:latest
+    environment:
+      HTTP_SERVER: "true"
+      STORAGE_TYPE: "postgres"
+      POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
+    ports: [ "3003:3003" ]
+    depends_on: [ db ]
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+```
+
+## Supported Clients Setup
+
+### LM Studio
+- Add MCP-Prompts as a custom server in LM Studio settings.
+- Example config:
+  ```json
+  {
+    "name": "MCP Prompts",
+    "url": "http://localhost:3003"
+  }
+  ```
+- See [LM Studio docs](https://lmstudio.ai/docs/) for more details.
+
+### LM Studio: Step-by-Step Setup
+
+1. **Start MCP-Prompts Server**
+   - Open a terminal and run:
+     ```bash
+     npx -y @sparesparrow/mcp-prompts
+     ```
+   - Or use Docker:
+     ```bash
+     docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
+     ```
+   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+
+2. **Verify Server is Running**
+   - In your browser or terminal, check:
+     ```bash
+     curl http://localhost:3003/health
+     # → { "status": "ok" }
+     ```
+   - _[Insert Screenshot: Health check output]_  
+
+3. **Configure LM Studio**
+   - Open LM Studio and go to **Settings** → **Custom Servers**.
+   - Click **Add Server** and enter:
+     - **Name:** `MCP Prompts`
+     - **URL:** `http://localhost:3003`
+   - Click **Save**.
+   - _[Insert Screenshot: LM Studio server config screen]_  
+
+4. **Test Integration**
+   - In LM Studio, open the prompt manager or resource browser.
+   - You should see prompts from MCP-Prompts available.
+
+#### Troubleshooting LM Studio Integration
+
+| Issue                        | Solution                                                                 |
+|------------------------------|--------------------------------------------------------------------------|
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
+| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and LM Studio.|
+| Prompts not showing up       | Check server logs for errors; verify correct URL in LM Studio settings.  |
+
+#### Quick Reference Checklist
+
+- [ ] MCP-Prompts server is running (`curl http://localhost:3003/health`)
+- [ ] LM Studio configured with correct server URL
+- [ ] No firewall or port conflicts
+- [ ] Prompts visible in LM Studio
+
+### LibreChat
+- Add MCP-Prompts as a backend resource.
+- Example config:
+  ```json
+  {
+    "resource": "http://localhost:3003/prompts"
+  }
+  ```
+- See [LibreChat docs](https://github.com/danny-avila/LibreChat) for more details.
+
+### LibreChat: Step-by-Step Setup
+
+1. **Start MCP-Prompts Server**
+   - Open a terminal and run:
+     ```bash
+     npx -y @sparesparrow/mcp-prompts
+     ```
+   - Or use Docker:
+     ```bash
+     docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
+     ```
+   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+
+2. **Verify Server is Running**
+   - In your browser or terminal, check:
+     ```bash
+     curl http://localhost:3003/health
+     # → { "status": "ok" }
+     ```
+   - _[Insert Screenshot: Health check output]_  
+
+3. **Configure LibreChat**
+   - Open LibreChat and go to **Settings** → **Backend Resources**.
+   - Click **Add Resource** and enter:
+     - **Resource URL:** `http://localhost:3003/prompts`
+   - Click **Save**.
+   - _[Insert Screenshot: LibreChat resource config screen]_  
+
+4. **Test Integration**
+   - In LibreChat, open the prompt/resource browser.
+   - You should see prompts from MCP-Prompts available.
+
+#### Troubleshooting LibreChat Integration
+
+| Issue                        | Solution                                                                 |
+|------------------------------|--------------------------------------------------------------------------|
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
+| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and LibreChat.|
+| Prompts not showing up       | Check server logs for errors; verify correct URL in LibreChat settings.  |
+
+#### Quick Reference Checklist
+
+- [ ] MCP-Prompts server is running (`curl http://localhost:3003/health`)
+- [ ] LibreChat configured with correct resource URL
+- [ ] No firewall or port conflicts
+- [ ] Prompts visible in LibreChat
+
+### Tasker (Android): Step-by-Step Setup
+
+1. **Start MCP-Prompts Server**
+   - Open a terminal and run:
+     ```bash
+     npx -y @sparesparrow/mcp-prompts
+     ```
+   - Or use Docker:
+     ```bash
+     docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
+     ```
+   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+
+2. **Verify Server is Running**
+   - In your browser or terminal, check:
+     ```bash
+     curl http://localhost:3003/health
+     # → { "status": "ok" }
+     ```
+   - _[Insert Screenshot: Health check output]_  
+
+3. **Configure Tasker HTTP Request**
+   - Open Tasker on your Android device.
+   - Create a new **Profile** (e.g., "Fetch MCP Prompt").
+   - Add a **Task** with an **HTTP Request** action:
+     - **Method:** GET
+     - **URL:** `http://<your-server-ip>:3003/prompts`
+     - (Replace `<your-server-ip>` with your computer/server's IP address on the same network.)
+   - Optionally, add actions to process the response (e.g., display with a Popup, save to a file, or trigger another Tasker action).
+   - _[Insert Screenshot: Tasker HTTP Request configuration]_  
+
+4. **Test Integration**
+   - Trigger the Tasker profile or task.
+   - You should see the prompt data retrieved from MCP-Prompts.
+
+#### Troubleshooting Tasker Integration
+
+| Issue                        | Solution                                                                 |
+|------------------------------|--------------------------------------------------------------------------|
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible from your Android device.   |
+| Network unreachable          | Make sure your Android device and server are on the same Wi-Fi network.  |
+| Prompts not showing up       | Check server logs for errors; verify correct URL and port in Tasker.     |
+| HTTP Request action missing  | Update Tasker to the latest version; see [Tasker User Guide](https://tasker.joaoapps.com/userguide/en/) for help. |
+
+#### Quick Reference Checklist
+
+- [ ] MCP-Prompts server is running and accessible from Android
+- [ ] Tasker HTTP Request action uses correct server IP and port
+- [ ] No firewall or network isolation between Android and server
+- [ ] Tasker profile/task triggers and displays prompt data
+
+### Cursor IDE: Step-by-Step Setup
+
+1. **Start MCP-Prompts Server**
+   - Open a terminal and run:
+     ```bash
+     npx -y @sparesparrow/mcp-prompts
+     ```
+   - Or use Docker:
+     ```bash
+     docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
+     ```
+   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+
+2. **Verify Server is Running**
+   - In your browser or terminal, check:
+     ```bash
+     curl http://localhost:3003/health
+     # → { "status": "ok" }
+     ```
+   - _[Insert Screenshot: Health check output]_  
+
+3. **Configure Cursor IDE**
+   - Open Cursor IDE and go to **Settings** → **AI** → **Prompt Management**.
+   - Find the field for **Custom MCP server URL** (or similar).
+   - Enter your server address:
+     ```
+     http://localhost:3003
+     ```
+   - Click **Save**.
+   - _[Insert Screenshot: Cursor IDE settings with MCP server URL]_  
+
+4. **Test Integration**
+   - In Cursor IDE, open the prompt/resource browser.
+   - You should see prompts from MCP-Prompts available.
+
+#### Troubleshooting Cursor IDE Integration
+
+| Issue                        | Solution                                                                 |
+|------------------------------|--------------------------------------------------------------------------|
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
+| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and Cursor IDE.|
+| Prompts not showing up       | Check server logs for errors; verify correct URL in Cursor IDE settings.  |
+
+#### Quick Reference Checklist
+
+- [ ] MCP-Prompts server is running (`curl http://localhost:3003/health`)
+- [ ] Cursor IDE configured with correct server URL
+- [ ] No firewall or port conflicts
+- [ ] Prompts visible in Cursor IDE
+
+### Claude Desktop: Step-by-Step Setup
+
+1. **Start MCP-Prompts Server**
+   - Open a terminal and run:
+     ```bash
+     npx -y @sparesparrow/mcp-prompts
+     ```
+   - Or use Docker:
+     ```bash
+     docker run -d --name mcp-prompts -p 3003:3003 sparesparrow/mcp-prompts:latest
+     ```
+   - _[Insert Screenshot: Terminal running MCP-Prompts]_  
+
+2. **Verify Server is Running**
+   - In your browser or terminal, check:
+     ```bash
+     curl http://localhost:3003/health
+     # → { "status": "ok" }
+     ```
+   - _[Insert Screenshot: Health check output]_  
+
+3. **Configure Claude Desktop**
+   - Open Claude Desktop and go to **Settings** → **Developer** → **Edit Config**.
+   - This opens (or creates) `claude_desktop_config.json`.
+   - Add or update the MCP server section, for example:
+     ```json
+     {
+       "mcpServers": {
+         "prompts": {
+           "command": "npx",
+           "args": ["-y", "@sparesparrow/mcp-prompts"]
+         }
+       }
+     }
+     ```
+   - Save the file and restart Claude Desktop.
+   - _[Insert Screenshot: Claude Desktop config file and settings]_  
+
+4. **Test Integration**
+   - You should see a slider/tool icon in the chat input area. Click it to access MCP tools and prompts.
+
+#### Troubleshooting Claude Desktop Integration
+
+| Issue                        | Solution                                                                 |
+|------------------------------|--------------------------------------------------------------------------|
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
+| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and Claude Desktop.|
+| Prompts/tools not showing up | Check server logs for errors; verify correct config in Claude Desktop.    |
+
+#### Quick Reference Checklist
+
+- [ ] MCP-Prompts server is running (`curl http://localhost:3003/health`)
+- [ ] Claude Desktop config file updated with correct MCP server command/args
+- [ ] No firewall or port conflicts
+- [ ] Prompts/tools visible in Claude Desktop
+
+## Features and Functions
+- Pluggable storage: file, Postgres, MDC (Cursor Rules)
+- Versioned prompt management
+- HTTP/SSE API endpoints
+- Prompt templates and variable substitution
+- Integration with multiple clients
+- JSON schema validation
+
+## Advanced Usage Examples
+- Creating and applying prompt templates
+- Using the MDC (Cursor Rules) adapter
+- Multi-step workflow examples
+- Exporting/importing prompts
+
+## Troubleshooting & FAQ
+- Common errors and solutions
+- How to check server health
+- How to reset storage
+- Where to find logs
+- How to report issues
+
+## Contact & Support
+- [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- [Official MCP Documentation](https://github.com/modelcontextprotocol)
+- Community resources and Discord (if available)
 
 ## 1. Setting up MCP-Prompts server for Claude Desktop
 

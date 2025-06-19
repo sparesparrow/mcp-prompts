@@ -1,8 +1,15 @@
 # MCP Prompts Server
 
-[![build](https://img.shields.io/github/actions/workflow/status/sparesparrow/mcp-prompts/ci.yml?branch=main)](https://github.com/sparesparrow/mcp-prompts/actions)
-[![license](https://img.shields.io/github/license/sparesparrow/mcp-prompts.svg)](LICENSE)
-[![codecov](https://codecov.io/gh/sparesparrow/mcp-prompts/branch/main/graph/badge.svg)](https://codecov.io/gh/sparesparrow/mcp-prompts)
+[![Build Status](https://img.shields.io/github/actions/workflow/status/sparesparrow/mcp-prompts/ci.yml?branch=main)](https://github.com/sparesparrow/mcp-prompts/actions)
+[![Coverage](https://codecov.io/gh/sparesparrow/mcp-prompts/branch/main/graph/badge.svg)](https://codecov.io/gh/sparesparrow/mcp-prompts)
+[![npm](https://img.shields.io/npm/v/@sparesparrow/mcp-prompts)](https://www.npmjs.com/package/@sparesparrow/mcp-prompts)
+[![License](https://img.shields.io/github/license/sparesparrow/mcp-prompts.svg)](LICENSE)
+![LM Studio](https://img.shields.io/badge/Client-LM%20Studio-blue?logo=appveyor)
+![LibreChat](https://img.shields.io/badge/Client-LibreChat-blue?logo=appveyor)
+![Tasker](https://img.shields.io/badge/Client-Tasker-blue?logo=appveyor)
+![Android](https://img.shields.io/badge/Client-Android-green?logo=android)
+![Cursor IDE](https://img.shields.io/badge/Client-Cursor%20IDE-blue?logo=visualstudiocode)
+![Claude Desktop](https://img.shields.io/badge/Client-Claude%20Desktop-blue?logo=anthropic)
 
 A lightweight, extensible server for managing prompts and templates in the Model Context Protocol (MCP) ecosystem. **Store prompts once, version them, and retrieve them on demand.**
 
@@ -102,14 +109,34 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 
 ## User Guides
 
-- [How to use MCP-Prompts with Claude Desktop and Cursor IDE (English)](./USER_GUIDE.md)
-- [Jak používat MCP-Prompts s Claude Desktop a Cursor IDE (česky)](./USER_GUIDE-cs.md)
+- [How to use MCP-Prompts with Claude Desktop, Cursor IDE, LM Studio, LibreChat, and Tasker (English)](./USER_GUIDE.md)
+- [Jak používat MCP-Prompts s Claude Desktop, Cursor IDE, LM Studio, LibreChat a Taskerem (česky)](./USER_GUIDE-cs.md)
+
+> **Note:** User guides are now fully expanded for all major clients, including step-by-step setup, troubleshooting, and quick reference checklists. See the guides above for details.
 
 ---
 
-## Contributing
+## Supported Clients
 
-We love contributions! Please read `CONTRIBUTING.md` for the workflow, coding style, and how to run the test suite.
+MCP-Prompts works with the following clients:
+
+- **LM Studio** – [Setup Guide](#)
+- **LibreChat** – [Setup Guide](#)
+- **Tasker (Android)** – [Setup Guide](#)
+- **Cursor IDE** – [Setup Guide](#)
+- **Claude Desktop** – [Setup Guide](#)
+
+See the [examples/](./examples/) directory for configuration snippets.
+
+---
+
+## How to Contribute
+
+We welcome contributions! Please see [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines, or open an issue if you have questions or suggestions.
+
+- Fork the repo and create a feature branch
+- Run `npm install` and `npm test` to ensure all tests pass
+- Submit a pull request with a clear description
 
 ---
 
@@ -150,8 +177,8 @@ This list contains current tasks and suggestions for further development and qua
 
 ### 1. Feature Expansion & Stabilization
 - [x] Stabilize and document the MDC (Cursor Rules) adapter
-- [ ] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
-- [ ] Add and extend user guides (EN, CZ) for all supported clients and integrations
+- [x] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
+- [x] Add and extend user guides (EN, CZ) for all supported clients and integrations
 - [ ] Add advanced workflow and prompt usage examples
 
 ### 2. Testing & CI/CD
