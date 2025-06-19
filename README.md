@@ -70,6 +70,29 @@ curl http://localhost:3003/health
 
 ---
 
+## Docker Images & Automated Publishing
+
+Docker images for MCP-Prompts are automatically built and published to the GitHub Container Registry (GHCR) on every push to `main` and on every version tag (e.g., `v1.2.3`).
+
+- **Registry:** `ghcr.io/sparesparrow/mcp-prompts`
+- **Tags:** `latest`, or a specific version (e.g., `v1.2.43`)
+
+### Pull the Latest Image
+```bash
+docker pull ghcr.io/sparesparrow/mcp-prompts:latest
+```
+
+### Pull a Specific Version
+```bash
+docker pull ghcr.io/sparesparrow/mcp-prompts:v1.2.43
+```
+
+These images are built and signed automatically by [GitHub Actions](.github/workflows/docker-publish.yml) on every release.
+
+> **Note:** If you need Docker Hub support, open an issue or PR. The workflow can be extended to push to Docker Hub as well.
+
+---
+
 ## Implemented vs Planned Features
 
 | Feature | Status | Notes |
