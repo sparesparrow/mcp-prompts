@@ -854,6 +854,18 @@ export class SseManager extends EventEmitter {
     }
     this.clients.clear();
   }
+
+  /**
+   * Násilně ukončí TCP spojení klienta podle ID (pro testování chyb na klientovi)
+   * @param clientId - ID klienta
+   */
+  public destroyClient(clientId: string): void {
+    const client = this.clients.get(clientId);
+    if (client?.res?.socket) {
+      client.res.socket.destroy();
+    }
+    this.disconnectClient(clientId);
+  }
 }
 
 let sseManagerInstance: SseManager | null = null;

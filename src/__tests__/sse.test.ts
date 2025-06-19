@@ -335,6 +335,12 @@ describe('SseManager', () => {
     await delay(100);
     const es = new EventSource(getSseUrl(port));
     eventSources.push(es);
+    let clientId: string | undefined;
+
+    // Získání ID klienta po připojení
+    sseManager.on('clientConnected', id => {
+      clientId = id;
+    });
 
     await new Promise<void>((resolve, reject) => {
       const failTimeout = setTimeout(() => {
@@ -342,19 +348,17 @@ describe('SseManager', () => {
         reject(new Error('Timeout waiting for client error'));
       }, 5000);
 
+      es.onopen = () => {
+        if (clientId) {
+          sseManager.destroyClient(clientId);
+        }
+      };
+
       es.onerror = () => {
         clearTimeout(failTimeout);
         es.close();
-        expect(true).toBe(true); // Očekáváme, že dojde k chybě
+        expect(true).toBe(true); // Očekáváme chybu
         resolve();
-      };
-
-      es.onopen = () => {
-        // Explicitně odpojíme klienta na serveru
-        const clientIds = sseManager.getClientIds();
-        if (clientIds.length > 0) {
-          sseManager.disconnectClient(clientIds[0]);
-        }
       };
     });
   });
