@@ -358,7 +358,7 @@ export class MemoryAdapter implements StorageAdapter {
 
 /**
  * PostgresAdapter Implementation
- * Stores prompts in a PostgreSQL database
+ * Stores prompts in a normalized PostgreSQL schema (see docker/postgres/init/01-init.sql)
  */
 export class PostgresAdapter implements StorageAdapter {
   private pool: pg.Pool;
@@ -385,34 +385,124 @@ export class PostgresAdapter implements StorageAdapter {
     console.error("PostgreSQL storage disconnected");
   }
 
-  async savePrompt(prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
-    }
-
+  // Helper: Get or create tag IDs for a list of tag names
+  private async getOrCreateTagIds(tagNames: string[]): Promise<number[]> {
     const client = await this.pool.connect();
     try {
-      await client.query(`
-        INSERT INTO prompts (
-          id, name, description, content, is_template, variables, tags,
-          category, metadata, created_at, updated_at, version
-        ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12)
-      `, [
-        prompt.id,
-        prompt.name,
-        prompt.description || null,
-        prompt.content,
-        prompt.isTemplate || false,
-        prompt.variables ? JSON.stringify(prompt.variables) : null,
-        prompt.tags || null,
-        prompt.category || null,
-        prompt.metadata ? JSON.stringify(prompt.metadata) : null,
-        prompt.createdAt,
-        prompt.updatedAt,
-        prompt.version
-      ]);
-      
-      return prompt;
+      const tagIds: number[] = [];
+      for (const name of tagNames) {
+        // Try to get existing tag
+        const res = await client.query('SELECT id FROM mcp_prompts.tags WHERE name = $1', [name]);
+        if (res.rows.length > 0) {
+          tagIds.push(res.rows[0].id);
+        } else {
+          // Insert new tag
+          const insert = await client.query('INSERT INTO mcp_prompts.tags (name) VALUES ($1) RETURNING id', [name]);
+          tagIds.push(insert.rows[0].id);
+        }
+      }
+      return tagIds;
+    } finally {
+      client.release();
+    }
+  }
+
+  // Helper: Set tags for a prompt (replace all)
+  private async setPromptTags(promptId: number, tagNames: string[]): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      // Remove old tags
+      await client.query('DELETE FROM mcp_prompts.prompt_tags WHERE prompt_id = $1', [promptId]);
+      if (tagNames.length === 0) return;
+      const tagIds = await this.getOrCreateTagIds(tagNames);
+      for (const tagId of tagIds) {
+        await client.query('INSERT INTO mcp_prompts.prompt_tags (prompt_id, tag_id) VALUES ($1, $2) ON CONFLICT DO NOTHING', [promptId, tagId]);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  // Helper: Set template variables for a prompt (replace all)
+  private async setTemplateVariables(promptId: number, variables: string[] | undefined): Promise<void> {
+    const client = await this.pool.connect();
+    try {
+      await client.query('DELETE FROM mcp_prompts.template_variables WHERE prompt_id = $1', [promptId]);
+      if (!variables || variables.length === 0) return;
+      for (const name of variables) {
+        await client.query('INSERT INTO mcp_prompts.template_variables (prompt_id, name) VALUES ($1, $2) ON CONFLICT DO NOTHING', [promptId, name]);
+      }
+    } finally {
+      client.release();
+    }
+  }
+
+  // Helper: Get tags for a prompt
+  private async getTagsForPrompt(promptId: number): Promise<string[]> {
+    const res = await this.pool.query(
+      `SELECT t.name FROM mcp_prompts.tags t
+       JOIN mcp_prompts.prompt_tags pt ON t.id = pt.tag_id
+       WHERE pt.prompt_id = $1`, [promptId]
+    );
+    return res.rows.map(r => r.name);
+  }
+
+  // Helper: Get template variables for a prompt
+  private async getVariablesForPrompt(promptId: number): Promise<string[]> {
+    const res = await this.pool.query(
+      `SELECT name FROM mcp_prompts.template_variables WHERE prompt_id = $1`, [promptId]
+    );
+    return res.rows.map(r => r.name);
+  }
+
+  // Helper: Get prompt by name (for unique constraint)
+  private async getPromptIdByName(name: string): Promise<number | null> {
+    const res = await this.pool.query('SELECT id FROM mcp_prompts.prompts WHERE name = $1', [name]);
+    return res.rows.length > 0 ? res.rows[0].id : null;
+  }
+
+  // Helper: Extract variable names from Prompt.variables (string[] | TemplateVariable[] | undefined)
+  private extractVariableNames(variables: string[] | { name: string }[] | undefined): string[] {
+    if (!variables) return [];
+    if (typeof variables[0] === 'string') return variables as string[];
+    return (variables as { name: string }[]).map(v => v.name);
+  }
+
+  // Save (insert or update) prompt
+  async savePrompt(prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    const client = await this.pool.connect();
+    try {
+      // Check if prompt exists (by name)
+      let promptId = await this.getPromptIdByName(prompt.name);
+      let res;
+      if (promptId !== null) {
+        // Update
+        res = await client.query(
+          `UPDATE mcp_prompts.prompts SET
+            description = $1,
+            content = $2,
+            is_template = $3,
+            metadata = $4,
+            updated_at = CURRENT_TIMESTAMP
+          WHERE id = $5 RETURNING *`,
+          [prompt.description, prompt.content, prompt.isTemplate || false, JSON.stringify(prompt.metadata || {}), promptId]
+        );
+      } else {
+        // Insert
+        res = await client.query(
+          `INSERT INTO mcp_prompts.prompts (name, description, content, is_template, metadata)
+           VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+          [prompt.name, prompt.description, prompt.content, prompt.isTemplate || false, JSON.stringify(prompt.metadata || {})]
+        );
+        promptId = res.rows[0].id;
+      }
+      if (promptId === null) throw new Error('Failed to get prompt ID after save');
+      // Set tags and variables
+      await this.setPromptTags(promptId, prompt.tags || []);
+      await this.setTemplateVariables(promptId, this.extractVariableNames(prompt.variables));
+      // Return full prompt
+      return await this.getPromptById(promptId);
     } catch (error) {
       console.error("Error saving prompt to PostgreSQL:", error);
       throw error;
@@ -421,170 +511,146 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
-  async getPrompt(id: string): Promise<Prompt | null> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
-    }
-
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query(`
-        SELECT * FROM prompts WHERE id = $1
-      `, [id]);
-
-      if (result.rows.length === 0) {
-        return null;
-      }
-
-      return this.rowToPrompt(result.rows[0]);
-    } catch (error) {
-      console.error(`Error getting prompt ${id} from PostgreSQL:`, error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async updatePrompt(id: string, prompt: Prompt): Promise<Prompt> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
-    }
-
-    const client = await this.pool.connect();
-    try {
-      await client.query(`
-        UPDATE prompts SET
-          name = $1,
-          description = $2,
-          content = $3,
-          is_template = $4,
-          variables = $5,
-          tags = $6,
-          category = $7,
-          updated_at = $8,
-          version = $9,
-          metadata = $10
-        WHERE id = $11
-      `, [
-        prompt.name,
-        prompt.description || null,
-        prompt.content,
-        prompt.isTemplate || false,
-        prompt.variables ? JSON.stringify(prompt.variables) : null,
-        prompt.tags || null,
-        prompt.category || null,
-        prompt.updatedAt,
-        prompt.version,
-        prompt.metadata ? JSON.stringify(prompt.metadata) : null,
-        id
-      ]);
-      
-      return prompt;
-    } catch (error) {
-      console.error(`Error updating prompt ${id} in PostgreSQL:`, error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  async deletePrompt(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
-    }
-    const result = await this.pool.query('DELETE FROM prompts WHERE id = $1', [id]);
-  }
-
-  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
-    }
-
-    const client = await this.pool.connect();
-    try {
-      let query = 'SELECT * FROM prompts';
-      const params: any[] = [];
-      const conditions: string[] = [];
-
-      if (options) {
-        if (options.isTemplate !== undefined) {
-          conditions.push('is_template = $' + (params.length + 1));
-          params.push(options.isTemplate);
-        }
-
-        if (options.category) {
-          conditions.push('category = $' + (params.length + 1));
-          params.push(options.category);
-        }
-
-        if (options.tags && options.tags.length > 0) {
-          conditions.push('tags @> $' + (params.length + 1));
-          params.push(options.tags);
-        }
-
-        if (conditions.length > 0) {
-          query += ' WHERE ' + conditions.join(' AND ');
-        }
-      }
-
-      const result = await client.query(query, params);
-      return result.rows.map(row => this.rowToPrompt(row));
-    } catch (error) {
-      console.error("Error listing prompts from PostgreSQL:", error);
-      throw error;
-    } finally {
-      client.release();
-    }
-  }
-
-  private rowToPrompt(row: any): Prompt {
+  // Get prompt by ID (internal helper)
+  private async getPromptById(id: number): Promise<Prompt> {
+    const res = await this.pool.query('SELECT * FROM mcp_prompts.prompts WHERE id = $1', [id]);
+    if (res.rows.length === 0) throw new Error(`Prompt with id ${id} not found`);
+    const row = res.rows[0];
+    const tags = await this.getTagsForPrompt(id);
+    const variables = await this.getVariablesForPrompt(id);
     return {
-      id: row.id,
+      id: row.id.toString(),
       name: row.name,
       description: row.description,
       content: row.content,
       isTemplate: row.is_template,
-      variables: row.variables ? JSON.parse(row.variables) : undefined,
-      tags: row.tags,
-      category: row.category,
-      metadata: row.metadata ? JSON.parse(row.metadata) : undefined,
+      tags,
+      variables,
+      metadata: row.metadata,
       createdAt: row.created_at,
       updatedAt: row.updated_at,
-      version: row.version
+      version: row.version || 1
     };
   }
 
-  async getAllPrompts(): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error("PostgreSQL storage not connected");
+  // Get prompt by name (public API)
+  async getPrompt(idOrName: string): Promise<Prompt | null> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    // Try by numeric ID first
+    let idNum = parseInt(idOrName, 10);
+    let prompt: Prompt | null = null;
+    if (!isNaN(idNum)) {
+      try {
+        prompt = await this.getPromptById(idNum);
+      } catch {
+        prompt = null;
+      }
     }
+    if (!prompt) {
+      // Try by name
+      const promptId = await this.getPromptIdByName(idOrName);
+      if (promptId) {
+        prompt = await this.getPromptById(promptId);
+      }
+    }
+    return prompt;
+  }
 
-    const client = await this.pool.connect();
-    try {
-      const result = await client.query('SELECT * FROM prompts');
-      return result.rows.map(row => this.rowToPrompt(row));
-    } catch (error) {
-      console.error("Error getting all prompts from PostgreSQL:", error);
-      throw error;
-    } finally {
-      client.release();
+  // Update prompt (by name or ID)
+  async updatePrompt(idOrName: string, prompt: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    let promptId = parseInt(idOrName, 10);
+    if (isNaN(promptId)) {
+      promptId = await this.getPromptIdByName(idOrName) || 0;
     }
+    if (!promptId) throw new Error(`Prompt not found: ${idOrName}`);
+    // SavePrompt will update if exists
+    return this.savePrompt({ ...prompt, id: promptId.toString() });
+  }
+
+  // Delete prompt
+  async deletePrompt(idOrName: string): Promise<void> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    let promptId = parseInt(idOrName, 10);
+    if (isNaN(promptId)) {
+      const foundId = await this.getPromptIdByName(idOrName);
+      if (!foundId) throw new Error(`Prompt not found: ${idOrName}`);
+      promptId = foundId;
+    }
+    if (!promptId) throw new Error(`Prompt not found: ${idOrName}`);
+    await this.pool.query('DELETE FROM mcp_prompts.prompts WHERE id = $1', [promptId]);
+  }
+
+  // List prompts (optionally filter by isTemplate, tags, etc.)
+  async listPrompts(options?: ListPromptsOptions): Promise<Prompt[]> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    let query = 'SELECT * FROM mcp_prompts.prompts_with_tags';
+    const params: any[] = [];
+    const conditions: string[] = [];
+    if (options) {
+      if (options.isTemplate !== undefined) {
+        conditions.push('is_template = $' + (params.length + 1));
+        params.push(options.isTemplate);
+      }
+      if (options.tags && options.tags.length > 0) {
+        conditions.push('tags @> $' + (params.length + 1));
+        params.push(JSON.stringify(options.tags));
+      }
+    }
+    if (conditions.length > 0) {
+      query += ' WHERE ' + conditions.join(' AND ');
+    }
+    const res = await this.pool.query(query, params);
+    // For each row, fetch variables
+    const prompts: Prompt[] = [];
+    for (const row of res.rows) {
+      const variables = await this.getVariablesForPrompt(row.id);
+      prompts.push({
+        id: row.id.toString(),
+        name: row.name,
+        description: row.description,
+        content: row.content,
+        isTemplate: row.is_template,
+        tags: row.tags,
+        variables,
+        metadata: row.metadata,
+        createdAt: row.created_at,
+        updatedAt: row.updated_at,
+        version: row.version || 1
+      });
+    }
+    return prompts;
   }
 
   async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
+  // Sequence methods (not implemented)
   async getSequence(id: string): Promise<PromptSequence | null> {
     return Promise.reject(new Error("Method not implemented."));
   }
-
   async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
     return Promise.reject(new Error("Method not implemented."));
   }
-
   async deleteSequence(id: string): Promise<void> {
     return Promise.reject(new Error("Method not implemented."));
+  }
+
+  // Test helper: clear all data (truncate tables)
+  async clearAll(): Promise<void> {
+    if (!this.connected) throw new Error("PostgreSQL storage not connected");
+    const client = await this.pool.connect();
+    try {
+      await client.query('TRUNCATE mcp_prompts.prompt_tags, mcp_prompts.template_variables, mcp_prompts.tags, mcp_prompts.prompts RESTART IDENTITY CASCADE');
+    } finally {
+      client.release();
+    }
+  }
+
+  // Return all prompts (required by StorageAdapter interface)
+  async getAllPrompts(): Promise<Prompt[]> {
+    return this.listPrompts();
   }
 }
 

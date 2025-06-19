@@ -242,4 +242,29 @@ describe('PostgresAdapter Integration', () => {
       expect(found?.name).toBe(prompt.name);
     }
   });
+  
+  itOrSkip('should save and retrieve a prompt with variables and metadata', async () => {
+    const now = new Date().toISOString();
+    const prompt = {
+      id: 'test-prompt',
+      name: 'Test Prompt',
+      description: 'This is a test prompt',
+      content: 'This is the prompt content',
+      variables: [
+        { name: 'var1', description: 'Variable 1', default: 'foo' },
+        { name: 'var2' }
+      ],
+      tags: ['integration', 'test'],
+      metadata: { foo: 'bar', count: 42 },
+      createdAt: now,
+      updatedAt: now
+    };
+    await adapter.savePrompt(prompt);
+    const retrieved = await adapter.getPrompt('Test Prompt');
+    expect(retrieved).toBeDefined();
+    expect(retrieved?.name).toBe(prompt.name);
+    expect(retrieved?.tags).toEqual(expect.arrayContaining(['integration', 'test']));
+    expect(retrieved?.variables).toEqual(expect.arrayContaining(['var1', 'var2']));
+    expect(retrieved?.metadata).toMatchObject({ foo: 'bar', count: 42 });
+  });
 }); 
