@@ -96,4 +96,69 @@
 - [Jak připojit Claude Desktop k MCP serveru (MESA blog)](https://www.getmesa.com/blog/how-to-connect-mcp-server-claude/)
 - [Plná dokumentace MCP-Prompts](docs/00-overview.md)
 - [Průvodce šablonami promptů](docs/05-templates-guide.md)
-- [Vývojářský průvodce](docs/07-developer-guide.md) 
+- [Vývojářský průvodce](docs/07-developer-guide.md)
+
+## Použití MCP-Prompts s Taskerem (Android), Anthropic API a Android integracemi (náhled)
+
+> **Poznámka:** Podrobné návody k těmto integracím budou brzy doplněny. Níže je náhled plánovaných funkcí a scénářů.
+
+### 1. Tasker (Android)
+- Automatizace odesílání promptů a zpracování odpovědí přes HTTP požadavky na MCP-Prompts server.
+- Spouštění promptů na základě událostí v Androidu (notifikace, poloha, akce aplikací).
+- Zpracování odpovědí pomocí Tasker akcí (notifikace, přečtení přes TTS, kopírování do schránky).
+
+### 2. Anthropic API klíč pro HTTP požadavky
+- Nastavení Taskeru nebo jiných HTTP klientů pro volání MCP-Prompts serveru s vaším Anthropic API klíčem pro LLM odpovědi.
+- Bezpečné uložení a použití API klíče v proměnných Taskeru.
+
+### 3. Text-to-Speech (TTS)
+- Použití Taskeru pro přečtení odpovědí promptů pomocí Android TTS.
+
+### 4. Integrace se schránkou
+- Automatické kopírování odpovědí promptů do schránky pro rychlé sdílení nebo vložení.
+
+### 5. Sdílení přes Android Share menu
+- Sdílení výsledků promptů přímo z MCP-Prompts do jiných aplikací přes Android share intent.
+
+### 6. Android digitální asistent
+- Integrace MCP-Prompts s Google Assistantem nebo jiným digitálním asistentem pro hlasové workflow.
+
+### 7. AIDL (Android Interface Definition Language)
+- Pokročilé: Zpřístupnění MCP-Prompts jako služby přes AIDL pro hlubokou integraci s Android aplikacemi.
+
+> **Sledujte novinky!** Plné návody, Tasker profily a ukázkové skripty budou brzy doplněny.
+
+## Použití MCP-Prompts s LM Studio a dalšími MCP klienty
+
+### 1. LM Studio
+- **Nastavení:**
+  - Ujistěte se, že MCP-Prompts server běží (viz Quickstart výše).
+  - V LM Studio přejděte do nastavení nebo sekce integrací.
+  - Najděte možnost přidat vlastní MCP server nebo poskytovatele promptů.
+  - Zadejte URL vašeho MCP-Prompts serveru (např. `http://localhost:3003`).
+  - Uložte a případně restartujte LM Studio.
+- **Použití:**
+  - Prompty a nástroje z MCP-Prompts se objeví v rozhraní LM Studio.
+  - Vyberte prompt, vyplňte proměnné a použijte nástroje dle potřeby.
+  - Výsledky se zobrazí v chatu nebo výstupní oblasti.
+
+### 2. LibreChat
+- **Nastavení:**
+  - Spusťte MCP-Prompts server.
+  - V LibreChat otevřete nastavení integrací nebo pluginů.
+  - Přidejte nové připojení k MCP serveru s adresou vašeho MCP-Prompts.
+  - Uložte a obnovte klienta.
+- **Použití:**
+  - Přistupujte k šablonám promptů a nástrojům z MCP-Prompts přímo v LibreChat.
+  - V GUI vyberte, vyplňte a odešlete prompt.
+
+### 3. Ostatní MCP klienti (obecné instrukce)
+- **Nastavení:**
+  - Spusťte MCP-Prompts server a ujistěte se, že je dostupný z klientského zařízení.
+  - Ve vašem MCP klientovi (např. rozšíření prohlížeče, desktopová/webová aplikace) najděte možnost přidat nebo nastavit MCP server.
+  - Zadejte URL MCP-Prompts serveru a uložte.
+- **Použití:**
+  - Prompty a nástroje budou dostupné v rozhraní klienta.
+  - Používejte je stejně jako v Claude Desktop nebo Cursor IDE: vyberte prompt, vyplňte proměnné, spusťte nástroje a sledujte výsledky.
+
+> **Tip:** Pro detailní informace ke konkrétnímu klientovi nahlédněte do jeho dokumentace. Většina moderních klientů podporuje MCP protokol a lze je připojit k libovolnému kompatibilnímu serveru jako MCP-Prompts. 

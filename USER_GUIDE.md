@@ -96,4 +96,69 @@
 - [How to connect Claude Desktop to an MCP server (MESA blog)](https://www.getmesa.com/blog/how-to-connect-mcp-server-claude/)
 - [MCP-Prompts full documentation](docs/00-overview.md)
 - [Prompt templates guide](docs/05-templates-guide.md)
-- [Developer guide](docs/07-developer-guide.md) 
+- [Developer guide](docs/07-developer-guide.md)
+
+## Using MCP-Prompts with Tasker (Android), Anthropic API, and Android Integrations (Preview)
+
+> **Note:** Detailed instructions for these integrations are coming soon. Below is a preview of planned features and use cases.
+
+### 1. Tasker (Android)
+- Automate prompt sending and response handling via HTTP requests to MCP-Prompts server.
+- Trigger prompts from Android events (e.g. notifications, location, app actions).
+- Use Tasker actions to process responses (e.g. show notification, speak via TTS, copy to clipboard).
+
+### 2. Anthropic API Key for HTTP Requests
+- Configure Tasker or other HTTP clients to call MCP-Prompts server with your Anthropic API key for LLM completions.
+- Securely store and use your API key in Tasker variables.
+
+### 3. Text-to-Speech (TTS)
+- Use Tasker to read out prompt responses using Android TTS engine.
+
+### 4. Clipboard Integration
+- Automatically copy prompt responses to clipboard for quick sharing or pasting.
+
+### 5. Android Share Menu
+- Share prompt results directly from MCP-Prompts to other apps via Android's share intent.
+
+### 6. Android Digital Assistant
+- Integrate MCP-Prompts with Google Assistant or other digital assistants for voice-driven workflows.
+
+### 7. AIDL (Android Interface Definition Language)
+- Advanced: Expose MCP-Prompts as a service accessible via AIDL for deep Android app integration.
+
+> **Stay tuned!** Full guides, Tasker profiles, and example scripts will be added here soon.
+
+## Using MCP-Prompts with LM Studio and Other MCP Clients
+
+### 1. LM Studio
+- **Setup:**
+  - Ensure MCP-Prompts server is running (see Quickstart above).
+  - In LM Studio, go to the settings or integrations section.
+  - Find the option to add a custom MCP server or prompt provider.
+  - Enter your MCP-Prompts server URL (e.g., `http://localhost:3003`).
+  - Save and reload LM Studio if needed.
+- **Usage:**
+  - Prompts and tools from MCP-Prompts will appear in the LM Studio interface.
+  - Select prompts, fill in variables, and use tools as needed.
+  - Results will be shown in the chat or output area.
+
+### 2. LibreChat
+- **Setup:**
+  - Start the MCP-Prompts server.
+  - In LibreChat, open the integrations or plugin settings.
+  - Add a new MCP server connection with the address of your MCP-Prompts instance.
+  - Save and refresh the client.
+- **Usage:**
+  - Access prompt templates and tools from the MCP-Prompts server within LibreChat.
+  - Use the GUI to select, fill, and submit prompts.
+
+### 3. Other MCP Clients (General Instructions)
+- **Setup:**
+  - Start MCP-Prompts server and ensure it is accessible from the client machine.
+  - In your MCP client (e.g., browser extension, desktop app, web app), look for an option to add or configure an MCP server.
+  - Enter the MCP-Prompts server URL and save.
+- **Usage:**
+  - Prompts and tools will be available in the client's interface.
+  - Use as you would in Claude Desktop or Cursor IDE: select prompts, fill variables, run tools, and view results.
+
+> **Tip:** For client-specific details, consult the documentation for your MCP client. Most modern clients support the MCP protocol and can connect to any compatible server like MCP-Prompts. 
