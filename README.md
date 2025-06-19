@@ -766,20 +766,6 @@ Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
 ---
 
-## Tasks & Issues
-
-The following are the main areas for future contributions:
-- Add support for new prompt types, tools, and workflows
-- Ensure compatibility with new MCP SDK and client versions
-- Add guides and examples for integration with mobile and desktop apps
-- Add more advanced prompt/workflow examples (multi-step, chaining, etc.)
-- Add support for environment variable validation and helpful startup errors
-- Review and improve security for new endpoints and integrations
-
-> For the full list of open issues and feature requests, see the [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues) page.
-
----
-
 ## FAQ & Troubleshooting
 
 **Q: The server starts but I can't access it at http://localhost:3003/health.**
@@ -819,42 +805,3 @@ The Mermaid diagram server provides a simple HTTP endpoint to visualize prompt r
 - **HTTP Endpoint:** `POST /diagram` — Accepts `{ promptIds: [id1, id2, ...] }` and returns a Mermaid diagram string representing a linear flow of the prompts.
 
 --- 
-
-# TODO
-
-## Table of Contents
-- [What is this?](#mcp-prompts-server)
-- [Key Features](#key-features)
-- [How It Works](#how-it-works)
-- [Quick Start](#quick-start)
-- [Installation](#installation)
-- [Configuration](#configuration)
-- [API / Tooling](#api--tooling)
-- [Docker Compose](#docker-compose)
-- [Architecture Overview](#architecture-overview)
-- [Docker Images & Automated Publishing](#docker-images--automated-publishing)
-- [Documentation](#documentation)
-- [Supported Clients](#supported-clients)
-- [How to Contribute](#how-to-contribute)
-- [Community Standards](#community-standards)
-- [Sustainability](#sustainability)
-- [Project Board & Roadmap](#project-board--roadmap)
-- [Orchestrator Integration](#orchestrator-integration)
-- [Mermaid Diagram Server](#mermaid-diagram-server)
-- [TODO](#todo)
-
-## Project Philosophy
-
-The **Master Control Program (MCP)** philosophy is about centralizing and orchestrating the management of prompts for large language models (LLMs) and AI workflows. In complex AI systems, prompts are the core instructions that drive model behavior, but they are often scattered, duplicated, or hard to update across tools and teams.
-
-MCP-Prompts solves this by providing:
-- **A central server** for storing, retrieving, and templating prompts.
-- **Extensible storage adapters** (File, PostgreSQL, MDC, etc.) so you can choose the best backend for your needs.
-- **Prompt engineering tools** that let you version, tag, and template prompts for dynamic, reusable workflows.
-
-All components work together so that prompts are:
-- Easy to manage and update in one place
-- Decoupled from application code
-- Shareable and reusable across projects and teams
-
-This approach enables rapid iteration, better collaboration, and more reliable LLM-powered applications.
