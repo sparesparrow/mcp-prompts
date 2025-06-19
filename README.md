@@ -211,77 +211,51 @@ See `docs/03-storage-adapters.md` for details.
 
 ---
 
-## TODOs: Roadmap & Quality Improvements
+## CLI Usage & Troubleshooting
 
-This list contains current tasks and suggestions for further development and quality improvement.
+You can run MCP-Prompts via npx, Docker, or as a Node.js package. For full CLI options, troubleshooting, and advanced usage, see the [User Guide](./USER_GUIDE.md).
 
-### 1. Feature Expansion & Stabilization
-- [x] Stabilize and document the MDC (Cursor Rules) adapter
-- [x] Expand support for new MCP clients (LM Studio, LibreChat, Tasker, Android, etc.)
-- [x] Add and extend user guides (EN, CZ) for all supported clients and integrations
-- [x] Add advanced workflow and prompt usage examples
-- [x] Implement advanced prompt validation (e.g. check for duplicate IDs, required fields, variable usage)
-- [x] Add integration tests for MDC (Cursor Rules) adapter
+Common commands:
+```bash
+npx -y @sparesparrow/mcp-prompts --help
+npm run test:unit
+npm run test:integration
+```
 
-### 2. Testing & CI/CD
-- [x] Ensure high test coverage (unit, integration, E2E)
-- [x] Regularly run CI pipeline (lint, tests, build, validation, audit)
-- [x] Add tests for MDC adapter and new storage backends
-- [x] Automate CLI and API tests
-- [x] ESM/TypeScript/Jest compatibility: All tests and coverage run with Node ESM modules using --experimental-vm-modules. See package.json scripts for details.
-
-### 3. Documentation & Clarity
-- [ ] Keep README and user guides concise and up to date
-- [x] Add/update README files in all key directories (`scripts/`, `legacy/`, `examples/`, `docker/scripts/`)
-- [x] Add detailed examples, FAQ, and troubleshooting sections
-- [x] Add links to official MCP documentation and community resources
-
-### 4. Refactoring & Maintenance
-- [x] Regularly refactor code to follow code-style guidelines
-- [x] Remove dead or unmaintained code
-- [x] Ensure consistency in types, exports/imports, and naming
-- [x] Improve module structure and separation of concerns (adapters, prompts, handlers, ...)
-
-### 5. Security & Updates
-- [x] Regularly update dependencies (`npm audit`, `npm update`)
-- [x] Review security best practices in Dockerfile, docker-compose, and API
-- [x] Add input validation and robust error handling
-
-### 6. Support for New Features & Integrations
-- [ ] Add support for new prompt types, tools, and workflows
-- [ ] Ensure compatibility with new MCP SDK and client versions
-- [ ] Add guides and examples for integration with mobile and desktop apps
+If you encounter issues, see the FAQ & Troubleshooting section below or open an issue on GitHub.
 
 ---
 
-## ESM, TypeScript, and Jest Setup (Developer Note)
+## Roadmap & Quality Improvements
 
-- The project uses ESM modules (`"type": "module"` in package.json) and TypeScript with Node.js.
-- Jest is configured to run with ESM support using the `--experimental-vm-modules` flag. See the `test:unit` and `test:coverage` scripts in package.json.
-- If you encounter `Cannot use import statement outside a module` or similar ESM errors, ensure you:
-  - Use explicit `.js` extensions in all relative imports in TypeScript files.
-  - Run tests with the provided scripts (not plain `jest`).
-  - See [Jest ESM Docs](https://jestjs.io/docs/ecmascript-modules) and [Node/TS/ESM troubleshooting](https://thedrlambda.medium.com/nodejs-typescript-and-the-infuriating-esm-errors-828b77e7ecd3).
+All major features and integrations are now implemented and tested. Remaining roadmap items are tracked as GitHub issues. Experimental features are marked as such in the table below.
+
+| Feature | Status | Notes |
+| --- | :---: | --- |
+| File storage adapter | ✅ | stable |
+| Memory storage adapter | ✅ | stable, for testing/dev |
+| PostgreSQL adapter (+ embeddings) | ✅ | since v1.2.x |
+| MDC adapter (Cursor Rules) | ⚠️ | experimental, available in main branch |
+| HTTP server + SSE | ⚠️ | experimental |
+| ElasticSearch adapter | 🛠️ | v1.3 roadmap |
+| Orchestrator integration | 🛠️ | concept |
+| Mermaid diagram server | 🛠️ | concept |
+
+Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
 
 ---
 
 ## Tasks & Issues
 
-Below are concrete actionable tasks and TODOs for contributors. If you want to help, pick an unchecked item or open a new issue!
+The following are the main areas for future contributions:
+- Add support for new prompt types, tools, and workflows
+- Ensure compatibility with new MCP SDK and client versions
+- Add guides and examples for integration with mobile and desktop apps
+- Add more advanced prompt/workflow examples (multi-step, chaining, etc.)
+- Add support for environment variable validation and helpful startup errors
+- Review and improve security for new endpoints and integrations
 
-- [ ] Add integration tests for MDC (Cursor Rules) adapter
-- [ ] Improve error messages and user feedback in API responses
-- [ ] Add screenshots to user guides (EN, CZ) for all major clients (Claude Desktop, Cursor IDE, LM Studio, LibreChat)
-- [ ] Automate Docker image publishing on release (CI/CD)
-- [ ] Add example Tasker profiles and Android automation scripts to the documentation
-- [ ] Expand API documentation in `docs/04-api-reference.md` (add more endpoint examples, error cases)
-- [ ] Review and improve security for new endpoints and integrations
-- [ ] Add more advanced prompt/workflow examples (multi-step, chaining, etc.)
-- [ ] Add CLI usage examples and troubleshooting section to the user guide
-- [ ] Add support for environment variable validation and helpful startup errors
-- [ ] Add badges for supported MCP clients (LM Studio, LibreChat, etc.) to README
-
-Feel free to suggest more tasks or open issues for anything you find!
+> For the full list of open issues and feature requests, see the [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues) page.
 
 ---
 
