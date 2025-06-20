@@ -28,8 +28,8 @@ echo "Running tests..."
 npm test
 
 # If tests pass, update the version
-echo "Updating version..."
-npm version $VERSION_INCREMENT
+# echo "Updating version..."
+# npm version $VERSION_INCREMENT
 
 # Get the new version
 NEW_VERSION=$(node -p "require('./package.json').version")
