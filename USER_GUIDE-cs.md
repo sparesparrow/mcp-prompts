@@ -1,3 +1,360 @@
+# Průvodce nasazením a použitím MCP-Prompts
+
+## Předpoklady
+- **Node.js** (doporučeno v18+), pro lokální/serverové nasazení
+- **Docker** (pro kontejnerové nasazení)
+- **Porty:** Výchozí HTTP port je `3003`
+- **API klíč (doporučeno pro produkci):** Nastavte pomocí proměnné prostředí `API_KEYS` (více klíčů oddělujte čárkou)
+- **Perzistentní úložiště:** Použijte Docker volume nebo mapujte adresář na hostiteli pro file storage, případně nastavte PostgreSQL
+
+---
+
+## 🚀 Rychlý přehled
+| Metoda         | Příkaz/konfigurace                                                                                 |
+|---------------|----------------------------------------------------------------------------------------------------|
+| Lokálně (npx) | `npx -y @sparesparrow/mcp-prompts`                                                                 |
+| Lokálně (Node)| `git clone ... && npm install && npm run build && node build/index.js`                             |
+| Docker        | `docker run -d -p 3003:3003 -e HTTP_SERVER=true -e STORAGE_TYPE=file -v $(pwd)/data:/app/data sparesparrow/mcp-prompts:latest` |
+| Docker Compose| Viz níže pro příklad (Postgres nebo file)                                                          |
+
+---
+
+## 🖥️ Lokální nasazení (npx/Node.js)
+```bash
+# Nejjednodušší: npx (není potřeba instalace)
+npx -y @sparesparrow/mcp-prompts
+
+# Nebo ručně
+# git clone https://github.com/sparesparrow/mcp-prompts.git
+# cd mcp-prompts
+# npm install && npm run build
+# node build/index.js
+```
+
+### Proměnné prostředí
+- `HTTP_SERVER=true` (zapne HTTP API)
+- `PORT=3003` (změna portu dle potřeby)
+- `STORAGE_TYPE=file|postgres` (volba úložiště)
+- `PROMPTS_DIR=./data/prompts` (pro file storage)
+- `POSTGRES_CONNECTION_STRING=...` (pro Postgres)
+- `API_KEYS=vas_klic1,vas_klic2` (více klíčů oddělujte čárkou)
+
+---
+
+## 🐳 Nasazení přes Docker
+```bash
+docker run -d --name mcp-prompts \
+  -p 3003:3003 \
+  -e HTTP_SERVER=true \
+  -e STORAGE_TYPE=file \
+  -v $(pwd)/data:/app/data \
+  sparesparrow/mcp-prompts:latest
+```
+- Pro perzistenci vždy mapujte adresář hostitele na `/app/data`.
+- Pro produkci nastavte `API_KEYS` a zkontrolujte CORS/limity požadavků.
+
+---
+
+## 🐳 Docker Compose příklad (PostgreSQL)
+```yaml
+version: "3"
+services:
+  prompts:
+    image: sparesparrow/mcp-prompts:latest
+    environment:
+      HTTP_SERVER: "true"
+      STORAGE_TYPE: "postgres"
+      POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
+      API_KEYS: "vas-produkcni-klic"
+    ports: [ "3003:3003" ]
+    depends_on: [ db ]
+    volumes:
+      - ./data:/app/data
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+```
+
+---
+
+## 🔑 API klíč a autentizace
+- Nastavte proměnnou `API_KEYS` (více klíčů oddělujte čárkou)
+- Všechny API požadavky (kromě `/health` a `/api-docs`) vyžadují hlavičku `x-api-key`
+- **Příklad (curl):**
+  ```bash
+  curl -H "x-api-key: vas_klic" http://localhost:3003/prompts
+  ```
+- **Příklad (LM Studio/LibreChat/ostatní klienti):**
+  - Většina klientů umožňuje nastavit vlastní hlavičky nebo API klíč v nastavení serveru/resource. Zadejte svůj klíč dle potřeby.
+  - Pokud ne, použijte proxy nebo požádejte vývojáře klienta o podporu.
+- **Tip:** Pokud dostanete chybu 401/403, zkontrolujte API klíč a správnost hlavičky.
+
+---
+
+## 🩺 Health check & řešení problémů
+- Ověření běhu serveru:
+  ```bash
+  curl http://localhost:3003/health
+  # { "status": "ok" }
+  ```
+- Logy jsou na stdout (Docker: `docker logs mcp-prompts`)
+
+### Časté problémy a řešení
+| Problém                 | Řešení                                                                  |
+|-------------------------|-------------------------------------------------------------------------|
+| Port je obsazen         | Změňte proměnnou `PORT` nebo zastavte kolidující službu                 |
+| Chyby úložiště          | Zkontrolujte volume mapping nebo připojení k Postgres                   |
+| Chyby autentizace       | Ověřte správnou hlavičku `x-api-key` a hodnotu                          |
+| Data nejsou perzistentní| Mapujte adresář hostitele na `/app/data` v Dockeru nebo použijte Postgres|
+| API dokumentace nefunguje| Ověřte, že server běží a navštivte `/api-docs`                         |
+| SSE nefunguje           | Nastavte `ENABLE_SSE=true` a ověřte endpoint `/events`                  |
+
+---
+
+## 🛡️ Produkční bezpečnostní checklist
+- [ ] Nastavte silné, unikátní `API_KEYS` (nikdy nepoužívejte výchozí nebo veřejné klíče)
+- [ ] Omezte povolené domény pomocí CORS
+- [ ] Zapněte a nastavte rate limiting (viz README pro proměnné)
+- [ ] Používejte HTTPS (přes reverse proxy nebo orchestraci)
+- [ ] Používejte perzistentní úložiště (volume nebo Postgres)
+- [ ] Pravidelně aktualizujte server a závislosti
+- [ ] Sledujte logy a health endpoint
+- [ ] Pravidelně zálohujte data adresář nebo Postgres
+
+---
+
+## ⬆️ Jak bezpečně upgradovat
+1. **Zálohujte data** (adresář data nebo Postgres DB)
+2. **Stáhněte nejnovější image nebo aktualizujte npm balíček**
+   - Docker: `docker pull sparesparrow/mcp-prompts:latest`
+   - npm: `npm install -g @sparesparrow/mcp-prompts`
+3. **Restartujte server/kontejner**
+4. **Ověřte health endpoint a logy pro chyby**
+5. **Otestujte API a integrace s klienty**
+
+---
+
+## Použití s klienty
+- **LM Studio, Cursor IDE, LibreChat, Tasker, Android:**
+  - Přidejte URL MCP-Prompts serveru do nastavení klienta
+  - Pokud je nastaven API klíč, nakonfigurujte klienta pro posílání `x-api-key`
+  - Podrobné instrukce pro klienty najdete dále v této příručce
+
+## API & Swagger/OpenAPI
+- Interaktivní API dokumentace: [http://localhost:3003/api-docs](http://localhost:3003/api-docs)
+- Prozkoumejte endpointy, schémata a vyzkoušejte požadavky v prohlížeči
+- Všechny endpointy (kromě `/health` a `/api-docs`) vyžadují API klíč pokud je nastaven
+
+## Server-Sent Events (SSE)
+- Zapněte pomocí `ENABLE_SSE=true` (volitelné)
+- Výchozí endpoint: `/events`
+- Viz docs/06-mcp-integration.md pro použití
+
+## Konfigurace úložiště
+- **File:** Výchozí, ukládá prompty/workflow do `/app/data` (mapujte na hostitele pro perzistenci)
+- **Postgres:** Nastavte `STORAGE_TYPE=postgres` a `POSTGRES_CONNECTION_STRING`
+- **MDC (Cursor Rules):** Viz pokročilou dokumentaci
+
+## Podpora & zdroje
+- [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- [Oficiální MCP dokumentace](https://github.com/modelcontextprotocol)
+- Plný uživatelský a API průvodce najdete níže
+
+---
+
+## 🌐 Pokročilé scénáře nasazení
+
+### Reverse proxy (HTTPS, směrování domény)
+- **Doporučeno pro produkci:** Použijte Nginx, Caddy nebo Traefik pro HTTPS a vlastní doménu.
+- **Příklad (Nginx):**
+  ```nginx
+  server {
+    listen 443 ssl;
+    server_name prompts.example.com;
+    ssl_certificate /etc/letsencrypt/live/prompts.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/prompts.example.com/privkey.pem;
+
+    location / {
+      proxy_pass http://localhost:3003;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+  }
+  ```
+- **Caddy (auto HTTPS):**
+  ```caddyfile
+  prompts.example.com {
+    reverse_proxy localhost:3003
+  }
+  ```
+- **Tip:** V produkci vždy omezte přímý přístup na port 3003 (firewall, security group).
+
+### Cloud/VPS nasazení
+- Otevřete pouze potřebné porty (např. 443 pro HTTPS, 3003 pro lokální testování).
+- Použijte Docker nebo systemd pro správu procesu.
+- Nastavujte proměnné prostředí bezpečně (nikdy neukládejte tajné údaje do repozitáře).
+
+### Multi-instanční / vysoká dostupnost
+- Pro škálování použijte Docker Compose nebo Kubernetes.
+- Sdílejte Postgres databázi pro prompty/workflow.
+- Umístěte load balancer (např. Nginx, Traefik) před více instancí MCP-Prompts.
+- Pro file storage použijte sdílený volume (NFS, cloud storage) nebo preferujte Postgres pro distribuovaná nasazení.
+
+---
+
+## 🤖 Integrace klientů: krok za krokem
+
+### LM Studio
+1. **Otevřete LM Studio → Settings → Custom Servers**
+2. **Přidejte server:**
+   - Name: `MCP Prompts`
+   - URL: `https://vase-domena.cz` nebo `http://localhost:3003`
+3. **API klíč:** Pokud je vyžadován, zadejte do pole pro custom header nebo API key (pokud je dostupné). Pokud ne, použijte reverse proxy nebo požádejte o podporu.
+4. **Test:** Otevřete správce promptů. Prompty by se měly zobrazit.
+5. **Řešení problémů:**
+   - 401/403: Zkontrolujte API klíč a URL serveru.
+   - Nenačítá se: Zkontrolujte síť, firewall a logy serveru.
+
+### Cursor IDE
+1. **Otevřete Cursor IDE → Settings → AI → Prompt Management**
+2. **Přidejte resource server:**
+   - URL: `https://vase-domena.cz/prompts` nebo `http://localhost:3003/prompts`
+3. **API klíč:** Zadejte do pole pro custom header pokud je podporováno.
+4. **Test:** Prompty by měly být viditelné v resource browseru.
+5. **Řešení problémů:**
+   - 401/403: Zkontrolujte API klíč.
+   - Nenačítá se: Zkontrolujte URL a stav serveru.
+
+### LibreChat
+1. **Otevřete LibreChat → Settings → Backend Resources**
+2. **Přidejte resource:**
+   - Resource URL: `https://vase-domena.cz/prompts` nebo `http://localhost:3003/prompts`
+3. **API klíč:** Zadejte v konfiguraci resource pokud je podporováno.
+4. **Test:** Prompty by se měly zobrazit v resource browseru.
+5. **Řešení problémů:**
+   - 401/403: Zkontrolujte API klíč.
+   - Nenačítá se: Zkontrolujte URL a stav serveru.
+
+### Tasker (Android)
+1. **Vytvořte HTTP Request akci:**
+   - Method: GET
+   - URL: `http://<server>:3003/prompts`
+   - Headers: `x-api-key: vas_klic` (přidejte custom header)
+2. **Test:** Spusťte task a ověřte načtení dat.
+3. **Řešení problémů:**
+   - Chyba připojení: Zkontrolujte síť a stav serveru.
+   - 401/403: Zkontrolujte hlavičku API klíče.
+
+---
+
+## 🖼️ Vizualizace & screenshoty
+- **[ZÁSTUPCE ARCHITEKTONICKÉHO DIAGRAMU]**
+  - (Přispěvatelé: přidejte diagram znázorňující klient(y) → reverse proxy → MCP-Prompts → úložiště)
+- **[ZÁSTUPCE SÍŤOVÉHO DIAGRAMU]**
+  - (Přispěvatelé: přidejte diagram znázorňující tok API klíče, HTTPS a SSE)
+- **[ZÁSTUPCE SCREENSHOTŮ]**
+  - LM Studio: obrazovka konfigurace serveru
+  - Cursor IDE: konfigurace resource serveru
+  - LibreChat: konfigurace backend resource
+  - Tasker: nastavení HTTP requestu
+
+---
+
+## 🛠️ Pokročilé použití & API příklady
+
+### Běžné API volání (curl)
+- **Výpis promptů:**
+  ```bash
+  curl -H "x-api-key: vas_klic" http://localhost:3003/prompts
+  ```
+- **Přidání promptu:**
+  ```bash
+  curl -X POST -H "x-api-key: vas_klic" -H "Content-Type: application/json" \
+    -d '{"id":"muj-prompt","name":"Test","content":"Řekni ahoj!"}' \
+    http://localhost:3003/prompts
+  ```
+- **Úprava promptu:**
+  ```bash
+  curl -X PUT -H "x-api-key: vas_klic" -H "Content-Type: application/json" \
+    -d '{"name":"Upravený název"}' \
+    http://localhost:3003/prompts/muj-prompt
+  ```
+- **Smazání promptu:**
+  ```bash
+  curl -X DELETE -H "x-api-key: vas_klic" http://localhost:3003/prompts/muj-prompt
+  ```
+- **Výpis workflow:**
+  ```bash
+  curl -H "x-api-key: vas_klic" http://localhost:3003/workflows
+  ```
+- **Spuštění workflow:**
+  ```bash
+  curl -X POST -H "x-api-key: vas_klic" http://localhost:3003/workflows/run/<workflowId>
+  ```
+
+### Použití HTTPie (alternativa k curl)
+```bash
+http GET :3003/prompts x-api-key:vas_klic
+http POST :3003/prompts x-api-key:vas_klic id=muj2 name=Test2 content='Ahoj!'
+```
+
+### Použití Postmanu
+- Nastavte URL a metodu dle výše uvedených příkladů.
+- Přidejte hlavičku `x-api-key` s vaším klíčem.
+- Pro POST/PUT nastavte tělo na raw JSON.
+
+---
+
+### Workflow & šablony
+- **Šablony** umožňují proměnné v obsahu promptu, např.:
+  ```json
+  {
+    "id": "code-review-assistant",
+    "name": "Code Review Assistant",
+    "content": "Zkontroluj: {{code}}",
+    "isTemplate": true,
+    "variables": ["code"]
+  }
+  ```
+- **Použití:**
+  - V klientovi vyberte šablonu, vyplňte proměnné a odešlete.
+  - Přes API: POST na `/prompts/apply-template` (viz API dokumentace).
+- **Workflow** řetězí více kroků (viz endpoint `/workflows` a API dokumentace).
+
+---
+
+### Server-Sent Events (SSE) příklad
+- **Zapnutí SSE:** Nastavte `ENABLE_SSE=true` a připojte se na `/events`.
+- **Ukázka JS klienta:**
+  ```js
+  const es = new EventSource('http://localhost:3003/events');
+  es.onmessage = e => console.log('SSE:', e.data);
+  es.onerror = err => es.close();
+  ```
+- **Využití:** Získávejte v reálném čase změny promptů a workflow.
+
+---
+
+## 🧩 Troubleshooting & FAQ (pokročilé)
+| Problém                        | Řešení/tip                                                                 |
+|--------------------------------|-----------------------------------------------------------------------------|
+| CORS chyba v prohlížeči        | Nastavte povolené domény přes CORS proměnné (viz README); v produkci používejte HTTPS |
+| Překročen rate limit (429)     | Zvyšte limity přes proměnné nebo zpomalte požadavky                        |
+| Potřeba migrace Postgres       | Exportujte prompty do souboru, importujte do nové DB; viz migrační utilita (pokud je k dispozici) |
+| Odepřen přístup k souboru      | Ujistěte se, že Docker volume/adresář je zapisovatelný uživatelem kontejneru|
+| Nejasné logy                   | Zvyšte úroveň logování (pokud je podporováno); sledujte stack trace a kódy chyb |
+| SSE nefunguje                  | Zkontrolujte síť/firewall, zapněte SSE, použijte správný endpoint           |
+| API klíč funguje v curl, ne v klientovi | Zkontrolujte překlepy v hlavičce, proxy klienta, nebo CORS         |
+| Workflow neběží                | Zkontrolujte definici workflow, logy a API dokumentaci pro povinná pole     |
+
+---
+
 # Uživatelská příručka MCP-Prompts
 
 ## Jak přispívat screenshoty
@@ -475,3 +832,59 @@ services:
   - Používejte je stejně jako v Claude Desktop nebo Cursor IDE: vyberte prompt, vyplňte proměnné, spusťte nástroje a sledujte výsledky.
 
 > **Tip:** Pro detailní informace ke konkrétnímu klientovi nahlédněte do jeho dokumentace. Většina moderních klientů podporuje MCP protokol a lze je připojit k libovolnému kompatibilnímu serveru jako MCP-Prompts. 
+
+---
+
+## 🤝 Přispěvatelé
+
+Uvítáme příspěvky do dokumentace i kódu MCP-Prompts!
+
+### Dokumentace
+- **Screenshoty:** Přidejte PNG do složky `images/` a aktualizujte odkazy v Markdownu.
+- **Diagramy:** Přidejte architektonické nebo síťové diagramy (SVG/PNG) do `images/` a odkažte je v příručce.
+- **Překlady:** Pomozte udržovat českou a anglickou příručku synchronizovanou, případně přidejte další jazyky.
+- **FAQ & příklady:** Rozšiřte FAQ nebo přidejte reálné příklady použití.
+- **Jak přispět:** Forkněte repozitář, proveďte změny a odešlete pull request (PR).
+
+### Kód
+- **Fork a větev:** Forkněte repozitář a vytvořte si feature větev.
+- **Styl kódu:** Dodržujte styl a linting pravidla (viz README a `.eslintrc.js`).
+- **Testy:** Přidejte nebo upravte testy pro nové funkce nebo opravy chyb.
+- **Pull requesty:** Odesílejte PR s jasným popisem a případně odkazem na související issue.
+
+### Dotazy & návrhy funkcí
+- **GitHub Issues:** [https://github.com/sparesparrow/mcp-prompts/issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- **Diskuze:** Použijte GitHub Discussions nebo založte issue pro dotazy, nápady či zpětnou vazbu.
+
+### Synchronizace příruček
+- Pokud upravíte anglickou příručku, aktualizujte i českou (a naopak), aby zůstaly sladěné.
+
+---
+
+## 🏷️ Verzování & aktualizace
+
+- **Zjištění aktuální verze:**
+  - CLI: `mcp-prompts --version` nebo `npx @sparesparrow/mcp-prompts --version`
+  - Docker: `docker run sparesparrow/mcp-prompts:latest --version`
+  - npm: `npm list @sparesparrow/mcp-prompts` nebo zkontrolujte `package.json`
+- **Upgrade:**
+  - Docker: `docker pull sparesparrow/mcp-prompts:latest`
+  - npm: `npm install -g @sparesparrow/mcp-prompts`
+- **Changelog & poznámky k vydání:**
+  - Viz [CHANGELOG.md](./CHANGELOG.md) v repozitáři nebo stránku GitHub Releases
+- **Verzování:**
+  - MCP-Prompts používá [semver](https://semver.org/lang/cz/). Změna major verze může znamenat nekompatibilní změny; minor/patch jsou zpětně kompatibilní.
+
+---
+
+## 🫂 Podpora & komunita
+
+- **GitHub Issues:** Pro hlášení chyb, návrhy funkcí a dotazy: [https://github.com/sparesparrow/mcp-prompts/issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- **Diskuze:** Pro nápady, pomoc a komunitní chat: záložka GitHub Discussions
+- **Discord/komunita:** (Pokud je k dispozici, vložte odkaz)
+- **Etiketa:** Buďte slušní, přikládejte detaily (logy, kroky, verzi), a před založením issue zkontrolujte existující
+- **Odezva:** Maintaineři se snaží odpovídat do několika dnů; komunita může být rychlejší
+
+---
+
+_Naposledy aktualizováno: [RRRR-MM-DD]_ 

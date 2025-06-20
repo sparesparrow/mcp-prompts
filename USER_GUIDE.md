@@ -1,3 +1,271 @@
+# MCP-Prompts Deployment & Usage Guide
+
+## Prerequisites
+- **Node.js** (v18+ recommended) for local/server installs
+- **Docker** (for containerized deployment)
+- **Ports:** Default HTTP port is `3003`
+- **API Key (recommended for production):** Set via `API_KEYS` environment variable (comma-separated for multiple keys)
+- **Persistent storage:** Use Docker volume or map a host directory for file storage, or configure PostgreSQL
+
+---
+
+## 🚀 Quick Start Table
+| Method         | Command/Config                                                                                 |
+|---------------|-----------------------------------------------------------------------------------------------|
+| Local (npx)   | `npx -y @sparesparrow/mcp-prompts`                                                            |
+| Local (Node)  | `git clone ... && npm install && npm run build && node build/index.js`                        |
+| Docker        | `docker run -d -p 3003:3003 -e HTTP_SERVER=true -e STORAGE_TYPE=file -v $(pwd)/data:/app/data sparesparrow/mcp-prompts:latest` |
+| Docker Compose| See below for example (Postgres or file)                                                       |
+
+---
+
+## 🖥️ Local Deployment (npx/Node.js)
+```bash
+# Easiest: npx (no install needed)
+npx -y @sparesparrow/mcp-prompts
+
+# Or clone and run manually
+# git clone https://github.com/sparesparrow/mcp-prompts.git
+# cd mcp-prompts
+# npm install && npm run build
+# node build/index.js
+```
+
+### Environment Variables
+- `HTTP_SERVER=true` (enable HTTP API)
+- `PORT=3003` (change port if needed)
+- `STORAGE_TYPE=file|postgres` (choose storage backend)
+- `PROMPTS_DIR=./data/prompts` (for file storage)
+- `POSTGRES_CONNECTION_STRING=...` (for Postgres)
+- `API_KEYS=yourkey1,yourkey2` (comma-separated API keys)
+
+---
+
+## 🐳 Docker Deployment
+```bash
+docker run -d --name mcp-prompts \
+  -p 3003:3003 \
+  -e HTTP_SERVER=true \
+  -e STORAGE_TYPE=file \
+  -v $(pwd)/data:/app/data \
+  sparesparrow/mcp-prompts:latest
+```
+- For persistent storage, always map a host directory to `/app/data`.
+- For production, set `API_KEYS` and review CORS/rate limiting settings.
+
+---
+
+## 🐳 Docker Compose Example (PostgreSQL)
+```yaml
+version: "3"
+services:
+  prompts:
+    image: sparesparrow/mcp-prompts:latest
+    environment:
+      HTTP_SERVER: "true"
+      STORAGE_TYPE: "postgres"
+      POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
+      API_KEYS: "your-production-key"
+    ports: [ "3003:3003" ]
+    depends_on: [ db ]
+    volumes:
+      - ./data:/app/data
+  db:
+    image: postgres:14
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    volumes:
+      - ./pgdata:/var/lib/postgresql/data
+```
+
+---
+
+## 🔑 API Key Authentication
+- Set `API_KEYS` env variable (comma-separated for multiple keys)
+- All API requests (except `/health` and `/api-docs`) require `x-api-key` header
+- **Example (curl):**
+  ```bash
+  curl -H "x-api-key: yourkey" http://localhost:3003/prompts
+  ```
+- **Example (LM Studio/LibreChat/other clients):**
+  - Most clients allow you to set custom headers or an API key in their server/resource settings. Enter your key as required.
+  - If not, use a proxy or request support from the client developer.
+- **Tip:** If you get a 401/403 error, check your API key and header spelling.
+
+---
+
+## 🩺 Health Check & Troubleshooting
+- Check server health:
+  ```bash
+  curl http://localhost:3003/health
+  # { "status": "ok" }
+  ```
+- Logs are printed to stdout (Docker: `docker logs mcp-prompts`)
+
+### Common Problems & Solutions
+| Problem                  | Solution                                                                 |
+|--------------------------|--------------------------------------------------------------------------|
+| Port already in use      | Change `PORT` env variable or stop conflicting service                    |
+| Storage errors           | Check volume mapping or Postgres connection string                        |
+| Auth errors (401/403)    | Ensure correct `x-api-key` header and value                              |
+| Data not persistent      | Map a host directory to `/app/data` in Docker or use Postgres            |
+| API docs not loading     | Ensure server is running and visit `/api-docs`                           |
+| SSE not working          | Set `ENABLE_SSE=true` and check `/events` endpoint                       |
+
+---
+
+## 🛡️ Production Security Checklist
+- [ ] Set strong, unique `API_KEYS` (never use default or public keys)
+- [ ] Restrict allowed origins with CORS settings
+- [ ] Enable and tune rate limiting (see README for env vars)
+- [ ] Use HTTPS (with reverse proxy or container orchestration)
+- [ ] Use persistent storage (volume or Postgres)
+- [ ] Regularly update server and dependencies
+- [ ] Monitor logs and health endpoint
+- [ ] Backup data directory or Postgres regularly
+
+---
+
+## ⬆️ How to Upgrade Safely
+1. **Backup your data** (data directory or Postgres DB)
+2. **Pull the latest image or update npm package**
+   - Docker: `docker pull sparesparrow/mcp-prompts:latest`
+   - npm: `npm install -g @sparesparrow/mcp-prompts`
+3. **Restart the server/container**
+4. **Check health endpoint and logs for errors**
+5. **Test API and client integrations**
+
+---
+
+## Using with Clients
+- **LM Studio, Cursor IDE, LibreChat, Tasker, Android:**
+  - Add MCP-Prompts server URL in client settings
+  - If API key is set, configure client to send `x-api-key`
+  - See client-specific instructions in this guide
+
+## API & Swagger/OpenAPI
+- Interactive API docs: [http://localhost:3003/api-docs](http://localhost:3003/api-docs)
+- Explore endpoints, schemas, and try requests in browser
+- All endpoints (except `/health` and `/api-docs`) require API key if set
+
+## Server-Sent Events (SSE)
+- Enable with `ENABLE_SSE=true` (optional)
+- Default endpoint: `/events`
+- See docs/06-mcp-integration.md for usage
+
+## Storage Configuration
+- **File:** Default, stores prompts/workflows in `/app/data` (map to host for persistence)
+- **Postgres:** Set `STORAGE_TYPE=postgres` and provide `POSTGRES_CONNECTION_STRING`
+- **MDC (Cursor Rules):** See advanced docs
+
+## Support & Resources
+- [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- [Official MCP Docs](https://github.com/modelcontextprotocol)
+- See full user and API guides below for advanced usage
+
+---
+
+## 🌐 Advanced Deployment Scenarios
+
+### Reverse Proxy (HTTPS, Domain Routing)
+- **Recommended for production:** Use Nginx, Caddy, or Traefik to provide HTTPS and custom domain.
+- **Example (Nginx):**
+  ```nginx
+  server {
+    listen 443 ssl;
+    server_name prompts.example.com;
+    ssl_certificate /etc/letsencrypt/live/prompts.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/prompts.example.com/privkey.pem;
+
+    location / {
+      proxy_pass http://localhost:3003;
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    }
+  }
+  ```
+- **Caddy (auto HTTPS):**
+  ```caddyfile
+  prompts.example.com {
+    reverse_proxy localhost:3003
+  }
+  ```
+- **Tip:** Always restrict direct access to port 3003 in production (firewall, security group).
+
+### Cloud/VPS Deployment
+- Open only necessary ports (e.g., 443 for HTTPS, 3003 for local testing).
+- Use Docker or systemd for process management.
+- Set environment variables securely (never commit secrets).
+
+### Multi-Instance/High Availability
+- Use Docker Compose or Kubernetes for scaling.
+- Use a shared Postgres database for prompt/workflow storage.
+- Place a load balancer (e.g., Nginx, Traefik) in front of multiple MCP-Prompts instances.
+- For file storage, use a shared volume (NFS, cloud storage) or prefer Postgres for distributed setups.
+
+---
+
+## 🤖 Client Integration: Step-by-Step
+
+### LM Studio
+1. **Open LM Studio → Settings → Custom Servers**
+2. **Add server:**
+   - Name: `MCP Prompts`
+   - URL: `https://your-domain.com` or `http://localhost:3003`
+3. **API Key:** If required, enter in the custom header or API key field (if available). If not, use a reverse proxy to inject the header or request support.
+4. **Test:** Open the prompt manager. Prompts should appear.
+5. **Troubleshooting:**
+   - 401/403: Check API key and server URL.
+   - Not loading: Check network, firewall, and server logs.
+
+### Cursor IDE
+1. **Open Cursor IDE → Settings → AI → Prompt Management**
+2. **Add resource server:**
+   - URL: `https://your-domain.com/prompts` or `http://localhost:3003/prompts`
+3. **API Key:** Enter in the custom header field if supported.
+4. **Test:** Prompts should be visible in the resource browser.
+5. **Troubleshooting:**
+   - 401/403: Check API key.
+   - Not loading: Check URL and server status.
+
+### LibreChat
+1. **Open LibreChat → Settings → Backend Resources**
+2. **Add resource:**
+   - Resource URL: `https://your-domain.com/prompts` or `http://localhost:3003/prompts`
+3. **API Key:** Enter in the resource config if supported.
+4. **Test:** Prompts should appear in the resource browser.
+5. **Troubleshooting:**
+   - 401/403: Check API key.
+   - Not loading: Check URL and server status.
+
+### Tasker (Android)
+1. **Create HTTP Request action:**
+   - Method: GET
+   - URL: `http://<server>:3003/prompts`
+   - Headers: `x-api-key: yourkey` (add custom header)
+2. **Test:** Run the task and check for prompt data.
+3. **Troubleshooting:**
+   - Connection error: Check network and server status.
+   - 401/403: Check API key header.
+
+---
+
+## 🖼️ Visual Aids & Screenshots
+- **[ARCHITECTURE DIAGRAM PLACEHOLDER]**
+  - (Contributors: add a diagram showing client(s) → reverse proxy → MCP-Prompts → storage)
+- **[NETWORK FLOW DIAGRAM PLACEHOLDER]**
+  - (Contributors: add a diagram showing API key flow, HTTPS, and SSE)
+- **[SCREENSHOT PLACEHOLDERS]**
+  - LM Studio: server config screen
+  - Cursor IDE: resource server config
+  - LibreChat: backend resource config
+  - Tasker: HTTP request setup
+
+---
+
 # MCP-Prompts User Guide
 
 ## Contributing Screenshots
@@ -543,4 +811,149 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
   - Prompts and tools will be available in the client's interface.
   - Use as you would in Claude Desktop or Cursor IDE: select prompts, fill variables, run tools, and view results.
 
-> **Tip:** For client-specific details, consult the documentation for your MCP client. Most modern clients support the MCP protocol and can connect to any compatible server like MCP-Prompts. 
+> **Tip:** For client-specific details, consult the documentation for your MCP client. Most modern clients support the MCP protocol and can connect to any compatible server like MCP-Prompts.
+
+---
+
+## 🛠️ Advanced Usage & API Examples
+
+### Common API Calls (with curl)
+- **List prompts:**
+  ```bash
+  curl -H "x-api-key: yourkey" http://localhost:3003/prompts
+  ```
+- **Add a prompt:**
+  ```bash
+  curl -X POST -H "x-api-key: yourkey" -H "Content-Type: application/json" \
+    -d '{"id":"my-prompt","name":"Test","content":"Say hello!"}' \
+    http://localhost:3003/prompts
+  ```
+- **Update a prompt:**
+  ```bash
+  curl -X PUT -H "x-api-key: yourkey" -H "Content-Type: application/json" \
+    -d '{"name":"Updated name"}' \
+    http://localhost:3003/prompts/my-prompt
+  ```
+- **Delete a prompt:**
+  ```bash
+  curl -X DELETE -H "x-api-key: yourkey" http://localhost:3003/prompts/my-prompt
+  ```
+- **List workflows:**
+  ```bash
+  curl -H "x-api-key: yourkey" http://localhost:3003/workflows
+  ```
+- **Run a workflow:**
+  ```bash
+  curl -X POST -H "x-api-key: yourkey" http://localhost:3003/workflows/run/<workflowId>
+  ```
+
+### Using HTTPie (alternative to curl)
+```bash
+http GET :3003/prompts x-api-key:yourkey
+http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
+```
+
+### Using Postman
+- Set the request URL and method as above.
+- Add `x-api-key` header with your key.
+- For POST/PUT, set body to raw JSON.
+
+---
+
+### Workflows & Templates
+- **Templates** allow variables in prompt content, e.g.:
+  ```json
+  {
+    "id": "code-review-assistant",
+    "name": "Code Review Assistant",
+    "content": "Please review: {{code}}",
+    "isTemplate": true,
+    "variables": ["code"]
+  }
+  ```
+- **To use:**
+  - In a client, select the template, fill in variables, and submit.
+  - Via API, POST to `/prompts/apply-template` (see API docs for details).
+- **Workflows** chain multiple steps (see `/workflows` endpoint and API docs).
+
+---
+
+### Server-Sent Events (SSE) Example
+- **Enable SSE:** Set `ENABLE_SSE=true` and connect to `/events`.
+- **Sample JS client:**
+  ```js
+  const es = new EventSource('http://localhost:3003/events');
+  es.onmessage = e => console.log('SSE:', e.data);
+  es.onerror = err => es.close();
+  ```
+- **Use case:** Get real-time updates when prompts or workflows change.
+
+---
+
+## 🧩 Troubleshooting & FAQ (Advanced)
+| Problem                        | Solution/Tip                                                                 |
+|--------------------------------|------------------------------------------------------------------------------|
+| CORS error in browser          | Set allowed origins via CORS env vars (see README); use HTTPS in production   |
+| Rate limit exceeded (429)      | Increase limits via env vars or slow down requests                           |
+| Postgres migration needed      | Export prompts to file, import to new DB; see migration utility (if available)|
+| File permission denied         | Ensure Docker volume/host dir is writable by container user                  |
+| Logs unclear                   | Increase log level (if supported); check for stack traces and error codes     |
+| SSE not receiving events       | Check network/firewall, ensure SSE enabled, use correct endpoint             |
+| API key works in curl, not client | Check for header typos, client proxying, or CORS issues                  |
+| Workflow not running           | Check workflow definition, logs, and API docs for required fields            |
+
+---
+
+## 🤝 Contributing
+
+We welcome contributions to MCP-Prompts documentation and code!
+
+### Documentation
+- **Screenshots:** Add PNGs to the `images/` directory and update Markdown links.
+- **Diagrams:** Add architecture or network diagrams (SVG/PNG) to `images/` and reference in the guide.
+- **Translations:** Help keep the Czech and English guides in sync, or add new languages.
+- **FAQ & Examples:** Expand the FAQ or add real-world usage examples.
+- **How to contribute:** Fork the repo, make your changes, and submit a pull request (PR).
+
+### Code
+- **Fork and branch:** Fork the repo and create a feature branch.
+- **Code style:** Follow the code style and linting rules (see README and `.eslintrc.js`).
+- **Tests:** Add or update tests for new features or bugfixes.
+- **Pull requests:** Submit PRs with a clear description and reference related issues if applicable.
+
+### Questions & Feature Requests
+- **GitHub Issues:** [https://github.com/sparesparrow/mcp-prompts/issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- **Discussions:** Use GitHub Discussions or open an issue for questions, ideas, or feedback.
+
+### Syncing Guides
+- If you update the English guide, please update the Czech guide (and vice versa) to keep them aligned.
+
+---
+
+## 🏷️ Versioning & Updates
+
+- **Check current version:**
+  - CLI: `mcp-prompts --version` or `npx @sparesparrow/mcp-prompts --version`
+  - Docker: `docker run sparesparrow/mcp-prompts:latest --version`
+  - npm: `npm list @sparesparrow/mcp-prompts` or check `package.json`
+- **Upgrade:**
+  - Docker: `docker pull sparesparrow/mcp-prompts:latest`
+  - npm: `npm install -g @sparesparrow/mcp-prompts`
+- **Release notes & changelog:**
+  - See [CHANGELOG.md](./CHANGELOG.md) in the repo or GitHub Releases page
+- **Versioning:**
+  - MCP-Prompts uses [semantic versioning](https://semver.org/). Major version changes may include breaking changes; minor/patch are backward compatible.
+
+---
+
+## 🫂 Support & Community
+
+- **GitHub Issues:** For bugs, feature requests, and questions: [https://github.com/sparesparrow/mcp-prompts/issues](https://github.com/sparesparrow/mcp-prompts/issues)
+- **Discussions:** For ideas, help, and community chat: GitHub Discussions tab
+- **Discord/Community:** (If available, link here)
+- **Etiquette:** Be respectful, provide details (logs, steps, version), and check existing issues before posting
+- **Response times:** Maintainers aim to respond within a few days; community help may be faster
+
+---
+
+_Last updated: [YYYY-MM-DD]_ 

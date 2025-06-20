@@ -21,7 +21,7 @@
     "start": "node dist/scripts/start-server.js",
     "dev": "ts-node --esm src/scripts/start-server.ts",
     "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testRegex=\"(/__tests__/.*|(\\.|/)(unit))\\.(test|spec)\\.tsx?$\"",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testRegex=\"(/__tests__/.*|(\\.|/)(integration))\\.(test|spec)\\.tsx?$\"",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testRegex=\"(/__tests__/.*|(\\.|/)(integration))\\.(test|spec)\\.tsx?$\" --forceExit",
     "test:build": "npm run build && node dist/index.js --version",
     "test:inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "docker": "bash docker/scripts/docker-compose-manager.sh",
