@@ -57,7 +57,7 @@ async function main() {
   const transports = [
     new StreamableHTTPServerTransport({
       port: config.PORT,
-      host: config.HOST,
+        host: config.HOST,
       server: mcpServer.server,
     }),
   ];

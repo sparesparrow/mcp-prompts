@@ -384,7 +384,7 @@ export class PostgresAdapter implements StorageAdapter {
   public async connect(): Promise<void> {
     this.pool = new pg.Pool(this.config);
     await this.pool.query('SELECT 1');
-    this.connected = true;
+      this.connected = true;
     console.log('Postgres storage connected');
   }
 
@@ -417,9 +417,9 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   private async setPromptTags(promptId: number, tagNames: string[]): Promise<void> {
-    const tagIds = await this.getOrCreateTagIds(tagNames);
+      const tagIds = await this.getOrCreateTagIds(tagNames);
     await this.pool.query('DELETE FROM prompt_tags WHERE prompt_id = $1', [promptId]);
-    for (const tagId of tagIds) {
+      for (const tagId of tagIds) {
       await this.pool.query('INSERT INTO prompt_tags (prompt_id, tag_id) VALUES ($1, $2)', [
         promptId,
         tagId,
@@ -435,7 +435,7 @@ export class PostgresAdapter implements StorageAdapter {
     if (variables) {
       for (const variable of variables) {
         await this.pool.query('INSERT INTO template_variables (prompt_id, name) VALUES ($1, $2)', [
-          promptId,
+        promptId,
           variable,
         ]);
       }
@@ -479,9 +479,9 @@ export class PostgresAdapter implements StorageAdapter {
         'INSERT INTO prompts (id, name, description, content, is_template, tags, variables, category, version, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
         [
           prompt.id,
-          prompt.name,
-          prompt.description,
-          prompt.content,
+            prompt.name,
+            prompt.description,
+            prompt.content,
           prompt.isTemplate,
           prompt.tags,
           variableNames,
@@ -577,8 +577,8 @@ export class PostgresAdapter implements StorageAdapter {
 
     if (options?.isTemplate !== undefined) {
       whereClauses.push(`p.is_template = $${paramIndex++}`);
-      params.push(options.isTemplate);
-    }
+        params.push(options.isTemplate);
+      }
 
     if (options?.category) {
       whereClauses.push(`p.category = $${paramIndex++}`);
