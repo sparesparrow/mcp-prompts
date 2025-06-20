@@ -360,6 +360,45 @@ export async function startHttpServer(
     },
   );
 
+  /**
+   * GET /api/v1/workflows
+   * List all workflows
+   * Response: [ { ...workflow }, ... ]
+   */
+  app.get(
+    '/api/v1/workflows',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const workflows = getAllWorkflows();
+        res.json(workflows);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * DELETE /api/v1/workflows/:id
+   * Delete a workflow by ID
+   * Response: { success, id, message }
+   */
+  app.delete(
+    '/api/v1/workflows/:id',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const file = path.join(WORKFLOW_DIR, `${req.params.id}.json`);
+        if (!fs.existsSync(file)) {
+          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          return;
+        }
+        fs.unlinkSync(file);
+        res.json({ id: req.params.id, message: 'Workflow deleted.', success: true });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
   // Set up SSE if enabled
   if (config.enableSSE) {
     // setupSSE(app, config.ssePath || '/events');
