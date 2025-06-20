@@ -188,6 +188,12 @@ In addition to the HTTP API, the server provides a command-line interface (CLI) 
 
 ### Workflow Commands
 
+- `mcp-prompts workflow run <file>`: Run a workflow from a file.
+- `mcp-prompts workflow save <file>`: Save a workflow to the database.
+- `mcp-prompts workflow run <id>`: Run a saved workflow by its ID.
+
+### Workflow Commands
+
 The `workflow` command group allows you to execute and manage complex, multi-step prompt sequences defined in a JSON file.
 
 | Command | Description | Example |
