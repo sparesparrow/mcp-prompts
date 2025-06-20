@@ -24,6 +24,7 @@ class DummySequenceService {
 }
 
 beforeAll(async () => {
+  process.env.API_KEYS = 'test-key';
   const adapter = new MemoryAdapter();
   await adapter.connect();
   const promptService = new PromptService(adapter);
@@ -55,11 +56,16 @@ describe('HTTP Server Integration', () => {
       isTemplate: false,
       name: 'HTTP Test',
     };
-    const createRes = await request(baseUrl).post('/prompts').send(prompt);
+    const createRes = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
     expect(createRes.status).toBe(201);
     expect(createRes.body.name).toBe('HTTP Test');
     const id = createRes.body.id;
-    const getRes = await request(baseUrl).get(`/prompts/${id}`);
+    const getRes = await request(baseUrl)
+      .get(`/prompts/${id}`)
+      .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(200);
     expect(getRes.body.name).toBe('HTTP Test');
   });
@@ -70,9 +76,15 @@ describe('HTTP Server Integration', () => {
       isTemplate: false,
       name: 'Update HTTP',
     };
-    const createRes = await request(baseUrl).post('/prompts').send(prompt);
+    const createRes = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
     const id = createRes.body.id;
-    const updateRes = await request(baseUrl).put(`/prompts/${id}`).send({ description: 'Updated' });
+    const updateRes = await request(baseUrl)
+      .put(`/prompts/${id}`)
+      .set('x-api-key', 'test-key')
+      .send({ description: 'Updated' });
     expect(updateRes.status).toBe(200);
     expect(updateRes.body.description).toBe('Updated');
   });
@@ -83,21 +95,33 @@ describe('HTTP Server Integration', () => {
       isTemplate: false,
       name: 'Delete HTTP',
     };
-    const createRes = await request(baseUrl).post('/prompts').send(prompt);
+    const createRes = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
     const id = createRes.body.id;
-    const deleteRes = await request(baseUrl).delete(`/prompts/${id}`);
+    const deleteRes = await request(baseUrl)
+      .delete(`/prompts/${id}`)
+      .set('x-api-key', 'test-key');
     expect(deleteRes.status).toBe(204);
-    const getRes = await request(baseUrl).get(`/prompts/${id}`);
+    const getRes = await request(baseUrl)
+      .get(`/prompts/${id}`)
+      .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(404);
   });
 
   it('should return 404 for unknown route', async () => {
-    const res = await request(baseUrl).get('/unknown');
+    const res = await request(baseUrl)
+      .get('/unknown')
+      .set('x-api-key', 'test-key');
     expect(res.status).toBe(404);
   });
 
   it('should return 400 for invalid prompt creation', async () => {
-    const res = await request(baseUrl).post('/prompts').send({ content: '', name: '' });
+    const res = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send({ content: '', name: '' });
     expect(res.status).toBe(400);
   });
 });
@@ -118,17 +142,26 @@ describe('Workflow Engine Integration', () => {
       variables: ['text'],
     };
     // Use the same promptService as the server
-    await request(baseUrl).post('/prompts').send(prompt);
+    await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
     promptId = prompt.id;
   });
 
   it('should save and run a sample workflow', async () => {
     // Save workflow
-    const saveRes = await request(baseUrl).post('/api/v1/workflows').send(sampleWorkflow);
+    const saveRes = await request(baseUrl)
+      .post('/api/v1/workflows')
+      .set('x-api-key', 'test-key')
+      .send(sampleWorkflow);
     expect(saveRes.status).toBe(201);
     expect(saveRes.body.id).toBe(workflowId);
     // Run workflow
-    const runRes = await request(baseUrl).post(`/api/v1/workflows/${workflowId}/run`).send();
+    const runRes = await request(baseUrl)
+      .post(`/api/v1/workflows/${workflowId}/run`)
+      .set('x-api-key', 'test-key')
+      .send();
     // Accept 200 or 400 (if http step fails due to network)
     expect([200, 400]).toContain(runRes.status);
     expect(runRes.body).toHaveProperty('message');
@@ -146,6 +179,7 @@ describe('Workflow Engine Integration', () => {
       request(baseUrl)
         .post(`/api/v1/workflows/${workflowId}/run`)
         .set('x-user-id', 'ratelimit-test')
+        .set('x-api-key', 'test-key')
         .send(),
     );
 
@@ -156,6 +190,7 @@ describe('Workflow Engine Integration', () => {
     const res429 = await request(baseUrl)
       .post(`/api/v1/workflows/${workflowId}/run`)
       .set('x-user-id', 'ratelimit-test')
+      .set('x-api-key', 'test-key')
       .send();
 
     // 4th request should be rejected with 429

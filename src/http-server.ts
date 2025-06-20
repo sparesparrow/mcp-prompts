@@ -69,53 +69,23 @@ const swaggerDefinition = {
     version: '1.0.0',
     description: 'API documentation for MCP-Prompts server',
   },
-  servers: [
-    { url: 'http://localhost:3003', description: 'Local server' },
-  ],
+  servers: [{ url: 'http://localhost:3003', description: 'Local server' }],
   components: {
     schemas: {
       Prompt: {
         type: 'object',
         properties: {
-          id: {
-            type: 'string',
-          },
-          name: {
-            type: 'string',
-          },
-          content: {
-            type: 'string',
-          },
-          isTemplate: {
-            type: 'boolean',
-          },
-          description: {
-            type: 'string',
-          },
-          variables: {
-            type: 'object',
-            additionalProperties: true,
-          },
-          tags: {
-            type: 'array',
-            items: {
-              type: 'string',
-            },
-          },
-          category: {
-            type: 'string',
-          },
-          createdAt: {
-            type: 'string',
-            format: 'date-time',
-          },
-          updatedAt: {
-            type: 'string',
-            format: 'date-time',
-          },
-          version: {
-            type: 'integer',
-          },
+          id: { type: 'string' },
+          name: { type: 'string' },
+          content: { type: 'string' },
+          isTemplate: { type: 'boolean' },
+          description: { type: 'string' },
+          variables: { type: 'object', additionalProperties: true },
+          tags: { type: 'array', items: { type: 'string' } },
+          category: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
+          version: { type: 'integer' },
         },
       },
     },
@@ -127,6 +97,27 @@ const swaggerOptions = {
   apis: ['src/http-server.ts'], // Use static path to avoid __filename ReferenceError
 };
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
+
+/**
+ * API key authentication middleware
+ * Reads valid API keys from process.env.API_KEYS (comma-separated)
+ * Skips /health and /api-docs endpoints
+ */
+function apiKeyAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const openPaths = ['/health', '/api-docs'];
+  if (openPaths.some(path => req.path.startsWith(path))) {
+    return next();
+  }
+  const apiKeys = (process.env.API_KEYS || '')
+    .split(',')
+    .map(k => k.trim())
+    .filter(Boolean);
+  const key = req.header('x-api-key');
+  if (!key || !apiKeys.includes(key)) {
+    return res.status(401).json({ error: 'Unauthorized: missing or invalid API key' });
+  }
+  next();
+}
 
 /**
  *
@@ -159,11 +150,8 @@ export async function startHttpServer(
       frameguard: true,
       hidePoweredBy: true,
       hsts: true,
-      ieNoOpen: true,
       noSniff: true,
-      permittedCrossDomainPolicies: true,
       referrerPolicy: { policy: 'same-origin' },
-      xssFilter: true,
     }),
   );
 
@@ -205,6 +193,9 @@ export async function startHttpServer(
   app.get('/health', (req, res) => {
     res.json({ status: 'ok' });
   });
+
+  // Add API key authentication middleware
+  app.use(apiKeyAuth);
 
   // CRUD endpoints for prompts
   /**

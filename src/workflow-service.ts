@@ -229,22 +229,21 @@ export class PromptRunner implements StepRunner {
 }
 
 /**
- * StepRunner for 'shell' steps (MVP: uses child_process.exec, TODO: sandboxing)
+ * StepRunner for 'shell' steps.
+ *
+ * - If SHELL_SANDBOX_IMAGE is set, runs the command inside a Docker container using that image.
+ *   Example: SHELL_SANDBOX_IMAGE=ubuntu
+ *   The command will be run as: docker run --rm <image> sh -c "<command>"
+ * - If not set, falls back to child_process.exec with a security warning (unsafe for production).
  */
 export class ShellRunner implements StepRunner {
   /**
    * Run a 'shell' step: execute the command with a timeout, capture output
-   * Warn if not running in a sandbox (TODO: Docker exec, no root)
+   * Uses Docker for sandboxing if SHELL_SANDBOX_IMAGE is set.
    * @param step
    * @param context
    */
   public async runStep(step: unknown, context: WorkflowContext): Promise<StepResult> {
-    // TODO: Implement sandboxing (e.g., Docker exec, no root)
-    if (!process.env.SHELL_SANDBOXED) {
-      console.warn(
-        '[SECURITY WARNING] ShellRunner is not sandboxed! This is unsafe for production.',
-      );
-    }
     // Basic type check for MVP
     if (
       typeof step !== 'object' ||
@@ -255,12 +254,27 @@ export class ShellRunner implements StepRunner {
       return { error: 'Invalid shell step structure', success: false };
     }
     const { command } = step as { command: string };
+    const sandboxImage = process.env.SHELL_SANDBOX_IMAGE;
     try {
-      const { stdout, stderr } = await execAsync(command, { timeout: 60000 }); // 60s timeout
-      if (stderr) {
-        return { error: stderr, success: false };
+      if (sandboxImage) {
+        // Run the command inside a Docker container
+        const dockerCmd = `docker run --rm ${sandboxImage} sh -c ${JSON.stringify(command)}`;
+        const { stdout, stderr } = await execAsync(dockerCmd, { timeout: 60000 });
+        if (stderr) {
+          return { error: stderr, success: false };
+        }
+        return { output: stdout, success: true };
+      } else {
+        // Fallback: warn and run unsandboxed
+        console.warn(
+          '[SECURITY WARNING] ShellRunner is not sandboxed! This is unsafe for production. Set SHELL_SANDBOX_IMAGE to enable Docker-based sandboxing.'
+        );
+        const { stdout, stderr } = await execAsync(command, { timeout: 60000 }); // 60s timeout
+        if (stderr) {
+          return { error: stderr, success: false };
+        }
+        return { output: stdout, success: true };
       }
-      return { output: stdout, success: true };
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : String(error);
       return { error: errorMessage, success: false };
@@ -293,9 +307,18 @@ export class HttpRunner implements StepRunner {
     ) {
       return { error: 'Invalid http step structure', success: false };
     }
-    const { method, url, body, headers, auth } = step as { method: string; url: string; body?: unknown; headers?: Record<string, string>; auth?: { username: string; password: string } };
+    const { method, url, body, headers, auth } = step as {
+      method: string;
+      url: string;
+      body?: unknown;
+      headers?: Record<string, string>;
+      auth?: { username: string; password: string };
+    };
     // Support headers, auth, advanced options
-    const fetchHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(headers || {}) };
+    const fetchHeaders: Record<string, string> = {
+      'Content-Type': 'application/json',
+      ...(headers || {}),
+    };
     let fetchOptions: any = { method, headers: fetchHeaders };
     if (body) fetchOptions.body = JSON.stringify(body);
     if (auth && auth.username && auth.password) {

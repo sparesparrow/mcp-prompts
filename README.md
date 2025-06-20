@@ -403,6 +403,15 @@ The server implements several security measures:
 - Request size limits
 - Input validation
 - Error handling
+- **Shell Step Sandboxing:**
+  - For workflow steps of type `shell`, you can enable Docker-based sandboxing by setting the `SHELL_SANDBOX_IMAGE` environment variable (e.g., `SHELL_SANDBOX_IMAGE=ubuntu`).
+  - When set, shell commands are executed inside a Docker container using the specified image, providing isolation and improved security.
+  - If not set, shell commands run directly on the host (unsafe for production; a warning will be logged).
+  - Example:
+    ```bash
+    SHELL_SANDBOX_IMAGE=ubuntu npx -y @sparesparrow/mcp-prompts
+    ```
+  - This is the recommended way to run shell steps securely in production environments.
 
 ## Contributing
 
@@ -965,5 +974,15 @@ Workflows are now stored as JSON files in `data/workflows/`. This replaces the p
 ### Error Handling
 - In production, ensure error responses do not leak stack traces or sensitive information.
 - Review error handling middleware and logging for information leakage.
+
+### Shell Step Sandboxing
+- For workflow steps of type `shell`, you can enable Docker-based sandboxing by setting the `SHELL_SANDBOX_IMAGE` environment variable (e.g., `SHELL_SANDBOX_IMAGE=ubuntu`).
+- When set, shell commands are executed inside a Docker container using the specified image, providing isolation and improved security.
+- If not set, shell commands run directly on the host (unsafe for production; a warning will be logged).
+- Example:
+  ```bash
+  SHELL_SANDBOX_IMAGE=ubuntu npx -y @sparesparrow/mcp-prompts
+  ```
+- This is the recommended way to run shell steps securely in production environments.
 
 --- 

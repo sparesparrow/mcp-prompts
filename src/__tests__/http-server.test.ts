@@ -16,6 +16,7 @@ describe('HTTP Server', () => {
   let workflowService: DeepMockProxy<WorkflowService>;
 
   beforeEach(async () => {
+    process.env.API_KEYS = 'test-key';
     // Create mock services
     promptService = mock<PromptService>();
     sequenceService = mock<SequenceService>();
@@ -89,7 +90,8 @@ describe('HTTP Server', () => {
         version: 1,
       });
 
-      const response = await request(server).post('/prompts').send(prompt);
+      const apiKey = 'test-key';
+      const response = await request(server).post('/prompts').set('x-api-key', apiKey).send(prompt);
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
@@ -102,7 +104,8 @@ describe('HTTP Server', () => {
     });
 
     it('should handle missing required fields', async () => {
-      const response = await request(server).post('/prompts').send({});
+      const apiKey = 'test-key';
+      const response = await request(server).post('/prompts').set('x-api-key', apiKey).send({});
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe(true);
@@ -121,7 +124,8 @@ describe('HTTP Server', () => {
 
       promptService.getPrompt.mockResolvedValue(prompt);
 
-      const response = await request(server).get('/prompts/123');
+      const apiKey = 'test-key';
+      const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject(prompt);
@@ -130,7 +134,8 @@ describe('HTTP Server', () => {
     it('should handle not found prompt', async () => {
       promptService.getPrompt.mockResolvedValue(null);
 
-      const response = await request(server).get('/prompts/123');
+      const apiKey = 'test-key';
+      const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe(true);
@@ -141,7 +146,8 @@ describe('HTTP Server', () => {
     it('should handle internal server errors', async () => {
       promptService.getPrompt.mockRejectedValue(new Error('Database error'));
 
-      const response = await request(server).get('/prompts/123');
+      const apiKey = 'test-key';
+      const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe(true);
@@ -149,7 +155,8 @@ describe('HTTP Server', () => {
     });
 
     it('should handle 404 for unknown routes', async () => {
-      const response = await request(server).get('/unknown');
+      const apiKey = 'test-key';
+      const response = await request(server).get('/unknown').set('x-api-key', apiKey);
 
       expect(response.status).toBe(404);
       expect(response.body.error).toBe(true);
@@ -158,7 +165,8 @@ describe('HTTP Server', () => {
   });
 
   it('should return 404 for unknown routes', async () => {
-    const res = await request(server).get('/unknown-route');
+    const apiKey = 'test-key';
+    const res = await request(server).get('/unknown-route').set('x-api-key', apiKey);
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
       code: 'NOT_FOUND',
