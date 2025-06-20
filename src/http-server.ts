@@ -124,7 +124,7 @@ const swaggerDefinition = {
 
 const swaggerOptions = {
   swaggerDefinition,
-  apis: [__filename], // Inline JSDoc below
+  apis: ['src/http-server.ts'], // Use static path to avoid __filename ReferenceError
 };
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 
