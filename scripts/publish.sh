@@ -45,11 +45,11 @@ fi
 
 # Publish to npm
 echo "Publishing to npm..."
-npm publish
+npm publish --tag latest --access public
 
-# Build Docker image
+# Build and push Docker image
 echo "Building Docker image..."
-docker build -t sparesparrow/mcp-prompts:$NEW_VERSION -t sparesparrow/mcp-prompts:latest .
+docker build -t "$DOCKER_IMAGE_NAME:latest" -t "$DOCKER_IMAGE_NAME:$NEW_VERSION" -f docker/Dockerfile.prod .
 
 # Push Docker image
 echo "Pushing Docker image..."
