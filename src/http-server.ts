@@ -72,6 +72,54 @@ const swaggerDefinition = {
   servers: [
     { url: 'http://localhost:3003', description: 'Local server' },
   ],
+  components: {
+    schemas: {
+      Prompt: {
+        type: 'object',
+        properties: {
+          id: {
+            type: 'string',
+          },
+          name: {
+            type: 'string',
+          },
+          content: {
+            type: 'string',
+          },
+          isTemplate: {
+            type: 'boolean',
+          },
+          description: {
+            type: 'string',
+          },
+          variables: {
+            type: 'object',
+            additionalProperties: true,
+          },
+          tags: {
+            type: 'array',
+            items: {
+              type: 'string',
+            },
+          },
+          category: {
+            type: 'string',
+          },
+          createdAt: {
+            type: 'string',
+            format: 'date-time',
+          },
+          updatedAt: {
+            type: 'string',
+            format: 'date-time',
+          },
+          version: {
+            type: 'integer',
+          },
+        },
+      },
+    },
+  },
 };
 
 const swaggerOptions = {
@@ -159,6 +207,25 @@ export async function startHttpServer(
   });
 
   // CRUD endpoints for prompts
+  /**
+   * @openapi
+   * /prompts:
+   *   post:
+   *     summary: Create a new prompt
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/Prompt'
+   *     responses:
+   *       201:
+   *         description: Prompt created
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Prompt'
+   */
   app.post(
     '/prompts',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -184,6 +251,27 @@ export async function startHttpServer(
     },
   );
 
+  /**
+   * @openapi
+   * /prompts/{id}:
+   *   get:
+   *     summary: Get a prompt by ID
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Prompt object
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Prompt'
+   *       404:
+   *         description: Prompt not found
+   */
   app.get(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -200,6 +288,33 @@ export async function startHttpServer(
     },
   );
 
+  /**
+   * @openapi
+   * /prompts/{id}:
+   *   put:
+   *     summary: Update a prompt by ID
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/Prompt'
+   *     responses:
+   *       200:
+   *         description: Updated prompt
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Prompt'
+   *       404:
+   *         description: Prompt not found
+   */
   app.put(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -216,6 +331,23 @@ export async function startHttpServer(
     },
   );
 
+  /**
+   * @openapi
+   * /prompts/{id}:
+   *   delete:
+   *     summary: Delete a prompt by ID
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *     responses:
+   *       200:
+   *         description: Prompt deleted
+   *       404:
+   *         description: Prompt not found
+   */
   app.delete(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
