@@ -570,10 +570,10 @@ For more details and advanced configuration, see the [GitHub Docs: Automatically
 | MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
 | HTTP server + SSE | ✅ | stable, with compression |
 | ElasticSearch adapter | ✅ | since v1.3.x |
-| Orchestrator integration | ✅ | basic workflow tool & endpoint |
-| Mermaid diagram server | ✅ | basic HTTP endpoint |
+| Orchestrator integration | ✅ | stable |
+| Mermaid diagram server | ✅ | stable |
 
-Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
+Legend: ✅ stable · ⚠️ experimental
 
 ---
 
@@ -589,7 +589,7 @@ This README is intentionally concise. Full documentation lives in the `docs/` di
 | `docs/01-quickstart.md` | The same quick-start plus advanced tips |
 | `docs/02-configuration.md` | All environment variables & CLI flags |
 | `docs/03-storage-adapters.md` | File, Postgres, MDC, and upcoming adapters |
-| `docs/04-api-reference.md` | Tool & HTTP API reference (WIP) |
+| `docs/04-api-reference.md` | Tool & HTTP API reference |
 | `docs/05-templates-guide.md` | Variables, apply, export, best practices |
 | `docs/06-mcp-integration.md` | Multi-server scenarios, router, SSE |
 | `docs/07-developer-guide.md` | Contributing, tests, release process |
@@ -829,10 +829,10 @@ All major features and integrations are now implemented and tested. Remaining ro
 | MDC adapter (Cursor Rules) | ✅ | stable, fully tested |
 | HTTP server + SSE | ✅ | stable, with compression |
 | ElasticSearch adapter | ✅ | since v1.3.x |
-| Orchestrator integration | ✅ | basic workflow tool & endpoint |
-| Mermaid diagram server | ✅ | basic HTTP endpoint |
+| Orchestrator integration | ✅ | stable |
+| Mermaid diagram server | ✅ | stable |
 
-Legend: ✅ stable · ⚠️ experimental · 🛠️ in progress
+Legend: ✅ stable · ⚠️ experimental
 
 ---
 
