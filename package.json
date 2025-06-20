@@ -1,7 +1,8 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "1.7.0",
-  "description": "An MCP server for managing and providing prompts and prompt templates",
+  "version": "1.7.1",
+  "description": "A standalone server for managing and serving prompts for the Model Context Protocol (MCP)",
+  "main": "dist/index.js",
   "type": "module",
   "bin": {
     "mcp-prompts": "dist/src/index.js"
