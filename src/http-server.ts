@@ -6,6 +6,8 @@ import express from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
 import type http from 'http';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJSDoc from 'swagger-jsdoc';
 
 import type { PromptService } from './prompt-service.js';
 import type { SequenceService } from './sequence-service.js';
@@ -59,6 +61,24 @@ function getAllWorkflows() {
     .filter(f => f.endsWith('.json'))
     .map(f => JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, f), 'utf8')));
 }
+
+const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'MCP-Prompts API',
+    version: '1.0.0',
+    description: 'API documentation for MCP-Prompts server',
+  },
+  servers: [
+    { url: 'http://localhost:3003', description: 'Local server' },
+  ],
+};
+
+const swaggerOptions = {
+  swaggerDefinition,
+  apis: [__filename], // Inline JSDoc below
+};
+const swaggerSpec = swaggerJSDoc(swaggerOptions);
 
 /**
  *
@@ -405,6 +425,9 @@ export async function startHttpServer(
   }
 
   // Add this after all other routes, before the error handler
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
+
+  // Global error handler middleware
   app.use((req: express.Request, res: express.Response) => {
     res.status(404).json({
       code: 'NOT_FOUND',
