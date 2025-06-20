@@ -6,6 +6,9 @@ import path from 'path';
 
 const API_URL = process.env.MCP_PROMPTS_API_URL || 'http://localhost:3003';
 
+/**
+ *
+ */
 async function main() {
   const args = process.argv.slice(2);
   if (args.length < 3 || args[0] !== 'workflow') {
@@ -66,6 +69,9 @@ async function main() {
   }
 }
 
+/**
+ *
+ */
 function printUsage() {
   console.log(`Usage:
   mcp-prompts workflow run <file.json>    # Run workflow from file
@@ -75,6 +81,11 @@ function printUsage() {
   `);
 }
 
+/**
+ *
+ * @param result
+ * @param status
+ */
 function printResult(result: any, status: number) {
   if (status >= 200 && status < 300) {
     console.log('Success:', JSON.stringify(result, null, 2));
@@ -83,4 +94,4 @@ function printResult(result: any, status: number) {
   }
 }
 
-main(); 
+main();

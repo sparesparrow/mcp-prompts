@@ -25,9 +25,9 @@ describe('HTTP Server', () => {
     server = await startHttpServer(
       null,
       {
-        port: 0,
-        host: 'localhost',
         enableSSE: true,
+        host: 'localhost',
+        port: 0,
         ssePath: '/events',
       },
       { promptService, sequenceService, workflowService },
@@ -161,9 +161,9 @@ describe('HTTP Server', () => {
     const res = await request(server).get('/unknown-route');
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
+      code: 'NOT_FOUND',
       error: true,
       message: 'Resource not found',
-      code: 'NOT_FOUND',
     });
   });
 });

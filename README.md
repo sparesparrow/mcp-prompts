@@ -40,7 +40,6 @@ It can run stand-alone, inside Docker, or as part of a multi-server MCP stack an
 - **Stateless by Design:** The server itself is stateless, delegating state management to swappable storage backends. This makes it highly scalable and resilient.
 - **Extensible Storage:** Choose from multiple storage backends at runtime via a simple environment variable.
   - file: Simple JSON file storage, great for getting started.
-  - mdc: Markdown-Cursor-Rules, stores prompts directly in Markdown files.
   - postgres: Robust PostgreSQL backend for production use.
 - **Powerful Templating:** Uses a simple `{{variable}}` syntax for dynamic prompt generation.
 - **Real-time with SSE:** Built-in Server-Sent Events (SSE) support for streaming responses, perfect for real-time applications.
@@ -81,8 +80,6 @@ graph TD
   subgraph "Storage Adapters"
     C1["File Adapter"]
     C2["Postgres Adapter"]
-    C3["MDC (Cursor Rules) Adapter"]
-    C4["ElasticSearch Adapter"]
   end
   subgraph "Integrations"
     D1["Docker"]
@@ -99,8 +96,6 @@ graph TD
   B1 --> B3
   B3 --> C1
   B3 --> C2
-  B3 --> C3
-  B3 --> C4
   B2 --> D1
   D2 --> D3
   D1 --> B2
@@ -185,6 +180,25 @@ Available Tools
 
 ---
 
+##  CLI Usage
+
+In addition to the HTTP API, the server provides a command-line interface (CLI) for managing prompts and workflows.
+
+**Syntax:** `npx @sparesparrow/mcp-prompts <command> [options]`
+
+### Workflow Commands
+
+The `workflow` command group allows you to execute and manage complex, multi-step prompt sequences defined in a JSON file.
+
+| Command | Description | Example |
+|---|---|---|
+| `workflow run <file_or_id>` | Executes a workflow from a local JSON file or by the ID of a saved workflow. | `mcp-prompts workflow run ./examples/sample-workflow.json` |
+| `workflow save <file>` | Saves a workflow definition to the server, making it runnable by ID. | `mcp-prompts workflow save ./examples/advanced-workflow-example.json` |
+
+A workflow file defines a series of steps, where each step can call an MCP tool, run a shell command, or perform other actions. This enables powerful automation directly from the command line. For more details, see the [Workflow Guide](docs/09-workflow-guide.md).
+
+---
+
 ## 🐋 Docker Compose
 For more complex setups, use the provided Docker Compose files.
 # Base deployment using file storage
@@ -216,8 +230,6 @@ graph TD
   subgraph Storage Adapters
     C1[File Adapter]
     C2[Postgres Adapter]
-    C3[MDC (Cursor Rules) Adapter]
-    C4[ElasticSearch Adapter]
   end
   subgraph Integrations
     D1[Docker]
@@ -234,8 +246,6 @@ graph TD
   B1 --> B3
   B3 --> C1
   B3 --> C2
-  B3 --> C3
-  B3 --> C4
   B2 --> D1
   D2 --> D3
   D1 --> B2

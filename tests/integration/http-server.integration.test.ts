@@ -111,10 +111,10 @@ describe('Workflow Engine Integration', () => {
     sampleWorkflow = JSON.parse(fs.readFileSync(SAMPLE_WORKFLOW_PATH, 'utf8'));
     // Create the required 'basic-template' prompt
     const prompt = {
-      name: 'Basic Template',
       content: 'Echo: {{text}}',
-      isTemplate: true,
       id: 'basic-template',
+      isTemplate: true,
+      name: 'Basic Template',
       variables: ['text'],
     };
     // Use the same promptService as the server
@@ -178,6 +178,10 @@ describe('Workflow Engine Integration', () => {
   });
 });
 
+/**
+ *
+ * @param ms
+ */
 function sleep(ms: number) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }

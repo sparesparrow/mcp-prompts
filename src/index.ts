@@ -1,15 +1,13 @@
 #!/usr/bin/env node
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import { Server, type ServerTool } from '@modelcontextprotocol/sdk/server/index.js';
 import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { randomUUID } from 'crypto';
 import express from 'express';
-import { z } from 'zod';
+import type { z } from 'zod';
 import { z as orchestratorZ } from 'zod';
 
-import { loadConfig } from './config.js';
-import { startHttpServer } from './http-server.js';
 import {
   FileAdapter,
   MdcAdapter,
@@ -17,10 +15,8 @@ import {
   PostgresAdapter,
   type StorageAdapter,
 } from './adapters.js';
-import { PromptService } from './prompt-service.js';
-import { promptSchemas } from './schemas.js';
-import { SequenceServiceImpl } from './sequence-service.js';
-import { WorkflowServiceImpl } from './workflow-service.js';
+import { loadConfig } from './config.js';
+import { startHttpServer } from './http-server.js';
 import {
   AddPromptInput,
   ApplyTemplateInput,
@@ -30,7 +26,11 @@ import {
   Prompt,
   PromptSequence,
 } from './interfaces.js';
+import { PromptService } from './prompt-service.js';
+import type { promptSchemas } from './schemas.js';
+import { SequenceServiceImpl } from './sequence-service.js';
 import { applyTemplate } from './utils.js';
+import { WorkflowServiceImpl } from './workflow-service.js';
 
 type UpdatePromptInput = z.infer<typeof promptSchemas.update>;
 
@@ -43,6 +43,32 @@ const orchestratorSchema = orchestratorZ.object({
     }),
   ),
 });
+
+/**
+ *
+ * @param config
+ */
+function createStorageAdapter(config: any): StorageAdapter {
+  switch (config.STORAGE_TYPE) {
+    case 'file':
+      return new FileAdapter(config.PROMPTS_DIR);
+    case 'postgres':
+      return new PostgresAdapter({
+        database: config.POSTGRES_DATABASE,
+        host: config.POSTGRES_HOST,
+        maxConnections: config.POSTGRES_MAX_CONNECTIONS,
+        password: config.POSTGRES_PASSWORD,
+        port: config.POSTGRES_PORT,
+        ssl: config.POSTGRES_SSL,
+        user: config.POSTGRES_USER,
+      });
+    case 'mdc':
+      return new MdcAdapter(config.PROMPTS_DIR);
+    case 'memory':
+    default:
+      return new MemoryAdapter();
+  }
+}
 
 /**
  *
@@ -71,39 +97,145 @@ async function runOrchestratorWorkflow(
 }
 
 /**
+ *
+ * @param handler
+ * @param name
+ */
+function createTool<T>(
+  handler: (params: T, services: { promptService: PromptService }) => Promise<any>,
+  name: string,
+): ServerTool<T> {
+  return {
+    handler: async (
+      params: T,
+      _server,
+      _call,
+      { context }: { context: { promptService: PromptService } },
+    ) => {
+      try {
+        const result = await handler(params, context);
+        return { success: true, ...result };
+      } catch (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+          success: false,
+        };
+      }
+    },
+    name,
+  };
+}
+
+/**
+ *
+ * @param config
+ * @param promptService
+ * @param sequenceService
+ * @param workflowService
+ */
+async function startMcpServer(
+  config: any,
+  promptService: PromptService,
+  sequenceService: SequenceServiceImpl,
+  workflowService: WorkflowServiceImpl,
+) {
+  const transports = [];
+  if (config.SSE_SERVER_TRANSPORT) {
+    transports.push(new SSEServerTransport({ port: config.SSE_PORT }));
+  }
+  if (config.HTTP_SERVER_TRANSPORT) {
+    transports.push(new StreamableHTTPServerTransport({ port: config.HTTP_PORT }));
+  }
+
+  const server = new Server({
+    capabilities: {
+      elicitation: true,
+      prompts: true,
+      sequences: true,
+      streaming: true,
+      templates: true,
+    },
+    context: { promptService, sequenceService, workflowService },
+    name: config.NAME || 'mcp-prompts',
+    tools: [
+      createTool(
+        (params: {
+          name: string;
+          content: string;
+          description?: string;
+          isTemplate?: boolean;
+          tags?: string[];
+          variables?: string[];
+        }) =>
+          promptService.createPrompt({
+            ...params,
+            isTemplate: params.isTemplate ?? false,
+          }),
+        'add_prompt',
+      ),
+      createTool(
+        (params: {
+          id: string;
+          name?: string;
+          content?: string;
+          description?: string;
+          isTemplate?: boolean;
+          tags?: string[];
+          variables?: string[];
+        }) =>
+          promptService.updatePrompt(params.id, {
+            content: params.content,
+            description: params.description,
+            isTemplate: params.isTemplate ?? false,
+            name: params.name,
+            tags: params.tags,
+            variables: params.variables,
+          }),
+        'edit_prompt',
+      ),
+      createTool((params: { id: string }) => promptService.getPrompt(params.id), 'get_prompt'),
+      createTool(
+        (params: { id: string }) => promptService.deletePrompt(params.id),
+        'delete_prompt',
+      ),
+      createTool(
+        (params: {
+          isTemplate?: boolean;
+          tags?: string[];
+          category?: string;
+          search?: string;
+          page?: number;
+          pageSize?: number;
+        }) => promptService.listPrompts(params),
+        'list_prompts',
+      ),
+      createTool(
+        (params: { id: string; variables: Record<string, any> }) =>
+          promptService.applyTemplate(params.id, params.variables),
+        'apply_template',
+      ),
+      createTool(
+        (params: { steps: Array<{ promptId: string; variables?: Record<string, any> }> }) =>
+          runOrchestratorWorkflow(params.steps, promptService),
+        'run_workflow',
+      ),
+    ],
+    transports,
+  });
+
+  await server.start();
+  console.log(`MCP server started. Name: ${server.name}`);
+  server.transports.forEach(transport => {
+    console.log(`  - Transport: ${transport.constructor.name} ready.`);
+  });
+}
+
+/**
  * Main function to initialize and run the MCP Prompts Server.
  */
 async function main() {
   const config = loadConfig();
-  const storageConfig: any = {
-    backupsDir: config.BACKUPS_DIR,
-    postgres: {
-      database: config.POSTGRES_DATABASE,
-      host: config.POSTGRES_HOST,
-      maxConnections: config.POSTGRES_MAX_CONNECTIONS,
-      password: config.POSTGRES_PASSWORD,
-      port: config.POSTGRES_PORT,
-      ssl: config.POSTGRES_SSL,
-      user: config.POSTGRES_USER,
-    },
-    promptsDir: config.PROMPTS_DIR,
-    type: config.STORAGE_TYPE,
-  };
-  if (config.ELASTICSEARCH_NODE) {
-    storageConfig.elasticsearch = {
-      auth:
-        config.ELASTICSEARCH_USERNAME && config.ELASTICSEARCH_PASSWORD
-          ? {
-              password: config.ELASTICSEARCH_PASSWORD,
-              username: config.ELASTICSEARCH_USERNAME,
-            }
-          : undefined,
-      index: config.ELASTICSEARCH_INDEX,
-      node: config.ELASTICSEARCH_NODE,
-      sequenceIndex: config.ELASTICSEARCH_SEQUENCE_INDEX,
-    };
-  }
-  const adapter: StorageAdapter = new MemoryAdapter();
+  const adapter = createStorageAdapter(config);
   await adapter.connect();
 
   const promptService = new PromptService(adapter);
@@ -127,206 +259,12 @@ async function main() {
 
   // Initialize MCP server if enabled
   if (config.MCP_SERVER) {
-    const server = new Server({
-      capabilities: {
-        elicitation: true,
-        prompts: true,
-        sequences: true,
-        streaming: true,
-        templates: true,
-      },
-      name: config.NAME || 'mcp-prompts',
-      tools: [
-        {
-          handler: async (params: {
-            name: string;
-            content: string;
-            description?: string;
-            isTemplate?: boolean;
-            tags?: string[];
-            variables?: string[];
-          }) => {
-            try {
-              const prompt = await promptService.createPrompt({
-                ...params,
-                isTemplate: params.isTemplate ?? false,
-              });
-              return { prompt, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'add_prompt',
-        },
-        {
-          handler: async (params: {
-            id: string;
-            name?: string;
-            content?: string;
-            description?: string;
-            isTemplate?: boolean;
-            tags?: string[];
-            variables?: string[];
-          }) => {
-            try {
-              const prompt = await promptService.updatePrompt(params.id, {
-                content: params.content,
-                description: params.description,
-                isTemplate: params.isTemplate ?? false,
-                name: params.name,
-                tags: params.tags,
-                variables: params.variables,
-              });
-              return { prompt, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'edit_prompt',
-        },
-        {
-          handler: async (params: { id: string }) => {
-            try {
-              const prompt = await promptService.getPrompt(params.id);
-              return { prompt, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'get_prompt',
-        },
-        {
-          handler: async (params: { tags?: string[] }) => {
-            try {
-              const prompts = await promptService.listPrompts({ tag: params.tags?.[0] });
-              return { prompts, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'list_prompts',
-        },
-        {
-          handler: async (params: { id: string; variables: Record<string, any> }) => {
-            try {
-              const result = await promptService.applyTemplate(params.id, params.variables);
-              return { result, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'apply_template',
-        },
-        {
-          handler: async (params: { name?: string; description?: string }) => {
-            try {
-              const sequence = await sequenceService.createSequence({
-                description: params.description,
-                name: params.name,
-              });
-              return { sequence, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'create_sequence',
-        },
-        {
-          handler: async (params: {
-            steps: Array<{ promptId: string; variables?: Record<string, any> }>;
-          }) => {
-            try {
-              const results = await runOrchestratorWorkflow(params.steps, promptService);
-              return { results, success: true };
-            } catch (error) {
-              return {
-                error: error instanceof Error ? error.message : String(error),
-                success: false,
-              };
-            }
-          },
-          name: 'orchestrate',
-        },
-      ],
-      version: config.VERSION || '1.0.0',
-    });
+    await startMcpServer(config, promptService, sequenceService, workflowService);
+  }
 
-    // Store transports for each session type
-    const transports = {
-      sse: {} as Record<string, SSEServerTransport>,
-      streamable: {} as Record<string, StreamableHTTPServerTransport>,
-    };
-
-    // Set up Express app for handling both Streamable HTTP and SSE
-    const app = express();
-    app.use(express.json());
-
-    // Modern Streamable HTTP endpoint
-    app.all('/mcp', async (req, res) => {
-      const transport = new StreamableHTTPServerTransport({
-        sessionIdGenerator: () => randomUUID(),
-      });
-      await server.connect(transport);
-    });
-
-    // Legacy SSE endpoint for older clients
-    app.get('/sse', async (req, res) => {
-      const transport = new SSEServerTransport('/messages', res);
-      transports.sse[transport.sessionId] = transport;
-
-      res.on('close', () => {
-        delete transports.sse[transport.sessionId];
-      });
-
-      await server.connect(transport);
-    });
-
-    // Legacy message endpoint for older clients
-    app.post('/messages', async (req, res) => {
-      const sessionId = req.query.sessionId as string;
-      const transport = transports.sse[sessionId];
-      if (transport) {
-        await transport.handlePostMessage(req, res, req.body);
-      } else {
-        res.status(400).send('No transport found for sessionId');
-      }
-    });
-
-    // Orchestrator endpoint
-    app.post('/orchestrator', async (req, res) => {
-      try {
-        const parsed = orchestratorSchema.parse(req.body);
-        const results = await runOrchestratorWorkflow(parsed.steps, promptService);
-        res.json({ results, success: true });
-      } catch (error: any) {
-        res
-          .status(400)
-          .json({ error: error instanceof Error ? error.message : String(error), success: false });
-      }
-    });
-
-    // Start the server
-    app.listen(config.PORT, config.HOST, () => {
-      console.log(`MCP server listening on ${config.HOST}:${config.PORT}`);
-    });
+  if (!config.HTTP_SERVER && !config.MCP_SERVER) {
+    console.error('No servers enabled. Please enable HTTP_SERVER or MCP_SERVER.');
+    process.exit(1);
   }
 }
 

@@ -163,28 +163,28 @@ export interface MutablePrompt extends Prompt {
    * @param options Format-specific conversion options
    * @returns The prompt in the specified format
    */
-  toFormat(format: PromptFormat, options?: PromptConversionOptions): string | Record<string, any>;
+  public toFormat(format: PromptFormat, options?: PromptConversionOptions): string | Record<string, any>;
 
   /**
    * Convert the prompt to MDC format
    * @param options MDC-specific options
    * @returns The prompt as an MDC formatted string
    */
-  toMdc(options?: MdcFormatOptions): string;
+  public toMdc(options?: MdcFormatOptions): string;
 
   /**
    * Convert the prompt to PGAI format
    * @param options PGAI-specific options
    * @returns The prompt in PGAI format
    */
-  toPgai(options?: PgaiFormatOptions): Record<string, any>;
+  public toPgai(options?: PgaiFormatOptions): Record<string, any>;
 
   /**
    * Convert the prompt to a template with placeholders
    * @param options Template-specific options
    * @returns The prompt as a template string
    */
-  toTemplate(options?: TemplateFormatOptions): string;
+  public toTemplate(options?: TemplateFormatOptions): string;
 
   /**
    * Apply variable substitution to a template prompt
@@ -192,27 +192,27 @@ export interface MutablePrompt extends Prompt {
    * @param options Template processing options
    * @returns The content with variables substituted
    */
-  applyVariables(variables: Record<string, string>, options?: TemplateFormatOptions): string;
+  public applyVariables(variables: Record<string, string>, options?: TemplateFormatOptions): string;
 
   /**
    * Extract variables from the prompt content
    * @param options Format-specific options for extraction
    * @returns Array of variable names found in the content
    */
-  extractVariables(options?: TemplateFormatOptions): string[];
+  public extractVariables(options?: TemplateFormatOptions): string[];
 
   /**
    * Clone the prompt
    * @returns A new instance of MutablePrompt with the same properties
    */
-  clone(): MutablePrompt;
+  public clone(): MutablePrompt;
 
   /**
    * Create a new version of the prompt
    * @param changes Partial changes to apply to the new version
    * @returns A new prompt with incremented version
    */
-  createVersion(changes: Partial<Prompt>): MutablePrompt;
+  public createVersion(changes: Partial<Prompt>): MutablePrompt;
 }
 
 /**
@@ -224,7 +224,7 @@ export interface MutablePromptFactory {
    * @param data Initial prompt data
    * @returns A new MutablePrompt instance
    */
-  create(data: Partial<Prompt>): MutablePrompt;
+  public create(data: Partial<Prompt>): MutablePrompt;
 
   /**
    * Convert from a string format to a MutablePrompt
@@ -233,7 +233,7 @@ export interface MutablePromptFactory {
    * @param options Conversion options
    * @returns A new MutablePrompt instance
    */
-  fromFormat(
+  public fromFormat(
     content: string,
     format: PromptFormat,
     options?: PromptConversionOptions,
@@ -245,7 +245,7 @@ export interface MutablePromptFactory {
    * @param options MDC-specific options
    * @returns A new MutablePrompt instance
    */
-  fromMdc(mdcContent: string, options?: MdcFormatOptions): MutablePrompt;
+  public fromMdc(mdcContent: string, options?: MdcFormatOptions): MutablePrompt;
 
   /**
    * Convert from PGAI format to a MutablePrompt
@@ -253,7 +253,7 @@ export interface MutablePromptFactory {
    * @param options PGAI-specific options
    * @returns A new MutablePrompt instance
    */
-  fromPgai(pgaiData: Record<string, any>, options?: PgaiFormatOptions): MutablePrompt;
+  public fromPgai(pgaiData: Record<string, any>, options?: PgaiFormatOptions): MutablePrompt;
 }
 
 /**
@@ -292,37 +292,37 @@ export interface StorageAdapter {
   /**
    * Connect to the storage
    */
-  connect(): Promise<void>;
+  public connect(): Promise<void>;
 
   /**
    * Disconnect from the storage
    */
-  disconnect(): Promise<void>;
+  public disconnect(): Promise<void>;
 
   /**
    * Check if connected to the storage
    */
-  isConnected(): boolean | Promise<boolean>;
+  public isConnected(): boolean | Promise<boolean>;
 
   /**
    * Save a prompt to storage
    * @param prompt Prompt to save
    * @returns Prompt ID or the full prompt
    */
-  savePrompt(prompt: Prompt): Promise<Prompt>;
+  public savePrompt(prompt: Prompt): Promise<Prompt>;
 
   /**
    * Get a prompt by ID
    * @param id Prompt ID
    * @returns Prompt
    */
-  getPrompt(id: string): Promise<Prompt | null>;
+  public getPrompt(id: string): Promise<Prompt | null>;
 
   /**
    * Get all prompts
    * @returns Array of prompts
    */
-  getAllPrompts(): Promise<Prompt[]>;
+  public getAllPrompts(): Promise<Prompt[]>;
 
   /**
    * Update a prompt
@@ -330,64 +330,64 @@ export interface StorageAdapter {
    * @param data Updated prompt data
    * @returns Updated prompt or void
    */
-  updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
+  public updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
 
   /**
    * List prompts with filtering options
    * @param options Filtering options
    * @returns Array of prompts matching options
    */
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  public listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
 
   /**
    * Delete a prompt
    * @param id Prompt ID
    */
-  deletePrompt(id: string): Promise<void>;
+  public deletePrompt(id: string): Promise<void>;
 
   /**
    * Clear all prompts
    * Removes all prompts from storage
    */
-  clearAll?(): Promise<void>;
+  public clearAll?(): Promise<void>;
 
   /**
    * Backup the storage
    * @returns Backup ID
    */
-  backup?(): Promise<string>;
+  public backup?(): Promise<string>;
 
   /**
    * Restore from a backup
    * @param backupId Backup ID
    */
-  restore?(backupId: string): Promise<void>;
+  public restore?(backupId: string): Promise<void>;
 
   /**
    * List available backups
    * @returns Array of backup IDs
    */
-  listBackups?(): Promise<string[]>;
+  public listBackups?(): Promise<string[]>;
 
   /**
    * Get a prompt sequence by ID
    * @param id Sequence ID
    * @returns PromptSequence
    */
-  getSequence(id: string): Promise<PromptSequence | null>;
+  public getSequence(id: string): Promise<PromptSequence | null>;
 
   /**
    * Save a prompt sequence to storage
    * @param sequence PromptSequence to save
    * @returns The saved PromptSequence
    */
-  saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
+  public saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
 
   /**
    * Delete a prompt sequence
    * @param id Sequence ID
    */
-  deleteSequence(id: string): Promise<void>;
+  public deleteSequence(id: string): Promise<void>;
 }
 
 /**
@@ -422,14 +422,14 @@ export interface PromptService {
    * @param id Prompt ID
    * @returns The prompt
    */
-  getPrompt(id: string): Promise<Prompt | null>;
+  public getPrompt(id: string): Promise<Prompt | null>;
 
   /**
    * Add a new prompt
    * @param data Partial prompt data
    * @returns The created prompt
    */
-  addPrompt(data: Partial<Prompt>): Promise<Prompt>;
+  public addPrompt(data: Partial<Prompt>): Promise<Prompt>;
 
   /**
    * Update an existing prompt
@@ -437,20 +437,20 @@ export interface PromptService {
    * @param data Updated prompt data
    * @returns The updated prompt
    */
-  updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
+  public updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
 
   /**
    * List prompts with optional filtering
    * @param options Filter options
    * @returns Filtered list of prompts
    */
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  public listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
 
   /**
    * Delete a prompt
    * @param id Prompt ID
    */
-  deletePrompt(id: string): Promise<void>;
+  public deletePrompt(id: string): Promise<void>;
 
   /**
    * Apply a template
@@ -458,7 +458,7 @@ export interface PromptService {
    * @param variables Variables to apply
    * @returns The applied template result
    */
-  applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+  public applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
 }
 
 /**
