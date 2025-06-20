@@ -124,6 +124,81 @@ describe('HTTP Server Integration', () => {
       .send({ content: '', name: '' });
     expect(res.status).toBe(400);
   });
+
+  it('should return 400 for missing required fields', async () => {
+    const cases = [{}, { name: 'No Content' }, { content: 'No Name' }, { name: '', content: '' }];
+    for (const body of cases) {
+      const res = await request(baseUrl)
+        .post('/prompts')
+        .set('x-api-key', 'test-key')
+        .send(body);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('should return 400 for invalid field types', async () => {
+    const cases = [
+      { name: 'Bad Version', content: 'test', version: 'not-a-number' },
+      { name: 'Bad createdAt', content: 'test', createdAt: 123 },
+      { name: 'Bad updatedAt', content: 'test', updatedAt: false },
+    ];
+    for (const body of cases) {
+      const res = await request(baseUrl)
+        .post('/prompts')
+        .set('x-api-key', 'test-key')
+        .send(body);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('should return 400 for whitespace-only content', async () => {
+    const res = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send({ name: 'Whitespace', content: '   ' });
+    expect(res.status).toBe(400);
+  });
+
+  it('should return 400 for duplicate prompt ID', async () => {
+    const prompt = { name: 'Dup', content: 'test' };
+    // Create once
+    const res1 = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
+    expect(res1.status).toBe(201);
+    // Try to create again with same name (ID is derived from name)
+    const res2 = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
+    expect(res2.status).toBe(400);
+  });
+
+  it('should return 400 for template variable mismatches', async () => {
+    // Variable used but not declared
+    let res = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send({
+        name: 'VarMismatch1',
+        content: 'Hello {{foo}}',
+        isTemplate: true,
+        variables: [],
+      });
+    expect(res.status).toBe(400);
+    // Variable declared but not used
+    res = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send({
+        name: 'VarMismatch2',
+        content: 'Hello',
+        isTemplate: true,
+        variables: ['foo'],
+      });
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('Workflow Engine Integration', () => {

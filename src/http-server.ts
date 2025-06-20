@@ -20,6 +20,7 @@ import {
   releaseWorkflowSlot,
   ShellRunner,
 } from './workflow-service.js';
+import { promptSchemas } from './prompts.js';
 
 export interface HttpServerConfig {
   port: number;
@@ -221,11 +222,13 @@ export async function startHttpServer(
     '/prompts',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        const { name, content, isTemplate, description, variables, tags, category } = req.body;
-        if (!name || !content) {
-          res.status(400).json({ error: true, message: 'Name and content are required.' });
+        // Zod validation
+        const parseResult = promptSchemas.create.safeParse(req.body);
+        if (!parseResult.success) {
+          res.status(400).json({ error: true, message: 'Invalid prompt data', details: parseResult.error.errors });
           return;
         }
+        const { name, content, isTemplate, description, variables, tags, category, createdAt, updatedAt, version } = parseResult.data;
         const prompt = await services.promptService.createPrompt({
           category,
           content,
@@ -234,10 +237,17 @@ export async function startHttpServer(
           name,
           tags,
           variables,
+          createdAt,
+          updatedAt,
+          version,
         });
         res.status(201).json(prompt);
-      } catch (err) {
-        next(err);
+      } catch (err: any) {
+        if (err && typeof err === 'object' && 'details' in err) {
+          res.status(400).json({ error: true, message: err.message, details: err.details });
+        } else {
+          next(err);
+        }
       }
     },
   );
@@ -316,8 +326,12 @@ export async function startHttpServer(
           return;
         }
         res.json(updated);
-      } catch (err) {
-        next(err);
+      } catch (err: any) {
+        if (err && typeof err === 'object' && 'details' in err) {
+          res.status(400).json({ error: true, message: err.message, details: err.details });
+        } else {
+          next(err);
+        }
       }
     },
   );

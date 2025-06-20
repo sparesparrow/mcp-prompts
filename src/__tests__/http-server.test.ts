@@ -109,7 +109,9 @@ describe('HTTP Server', () => {
 
       expect(response.status).toBe(400);
       expect(response.body.error).toBe(true);
-      expect(response.body.message).toContain('required');
+      expect(response.body.message).toBe('Invalid prompt data');
+      expect(Array.isArray(response.body.details)).toBe(true);
+      expect(response.body.details.length).toBeGreaterThan(0);
     });
 
     it('should get a prompt', async () => {

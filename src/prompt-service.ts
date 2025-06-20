@@ -46,14 +46,22 @@ export class PromptService {
     if (!prompt.content || typeof prompt.content !== 'string' || !prompt.content.trim()) {
       errors.push('Missing or invalid required field: content');
     }
-    if (!prompt.createdAt || typeof prompt.createdAt !== 'string') {
-      errors.push('Missing required field: createdAt');
+    if (
+      !prompt.createdAt ||
+      typeof prompt.createdAt !== 'string' ||
+      isNaN(Date.parse(prompt.createdAt))
+    ) {
+      errors.push('Missing or invalid required field: createdAt (must be ISO date string)');
     }
-    if (!prompt.updatedAt || typeof prompt.updatedAt !== 'string') {
-      errors.push('Missing required field: updatedAt');
+    if (
+      !prompt.updatedAt ||
+      typeof prompt.updatedAt !== 'string' ||
+      isNaN(Date.parse(prompt.updatedAt))
+    ) {
+      errors.push('Missing or invalid required field: updatedAt (must be ISO date string)');
     }
-    if (typeof prompt.version !== 'number') {
-      errors.push('Missing or invalid required field: version');
+    if (typeof prompt.version !== 'number' || !Number.isFinite(prompt.version)) {
+      errors.push('Missing or invalid required field: version (must be a number)');
     }
 
     // Duplicate ID check (on create)
@@ -106,9 +114,9 @@ export class PromptService {
     const prompt: Prompt = {
       id: args.name.toLowerCase().replace(/\s+/g, '-'),
       ...args,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      version: 1,
+      createdAt: args.createdAt ?? new Date().toISOString(),
+      updatedAt: args.updatedAt ?? new Date().toISOString(),
+      version: args.version ?? 1,
     };
     await this.validatePrompt(prompt, false);
     return this.storage.savePrompt(prompt);

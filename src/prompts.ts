@@ -10,6 +10,9 @@ const createPromptArgsSchema = z.object({
   name: z.string().describe('Name of the prompt'),
   tags: z.array(z.string()).optional().describe('Tags to categorize the prompt'),
   variables: z.array(z.string()).optional().describe('Variables that can be used in the template'),
+  createdAt: z.string().optional().describe('Date when the prompt was created (ISO string)'),
+  updatedAt: z.string().optional().describe('Date when the prompt was last updated (ISO string)'),
+  version: z.number().optional().describe('Version number, incremented on updates'),
 });
 
 const updatePromptArgsSchema = createPromptArgsSchema.partial().extend({
