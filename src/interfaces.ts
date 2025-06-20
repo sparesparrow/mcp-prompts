@@ -3,8 +3,11 @@
  * Contains all interface definitions for the MCP Prompts Server
  */
 
-import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { z } from 'zod';
+
+import { McpConfigSchema } from './config.js';
+
+export type McpConfig = z.infer<typeof McpConfigSchema>;
 
 /**
  * Variable definition for templates
@@ -147,113 +150,29 @@ export interface PromptConversionOptions {
   template?: TemplateFormatOptions;
 }
 
-/**
- * MutablePrompt interface
- *
- * Extended prompt interface that can be converted between different formats:
- * - Standard JSON (internal format)
- * - Cursor Rules MDC format
- * - PGAI format with embeddings
- * - Template with variables for dynamic substitution
- */
-export interface MutablePrompt extends Prompt {
-  /**
-   * Convert the prompt to a different format
-   * @param format Target format to convert to
-   * @param options Format-specific conversion options
-   * @returns The prompt in the specified format
-   */
-  public toFormat(format: PromptFormat, options?: PromptConversionOptions): string | Record<string, any>;
-
-  /**
-   * Convert the prompt to MDC format
-   * @param options MDC-specific options
-   * @returns The prompt as an MDC formatted string
-   */
-  public toMdc(options?: MdcFormatOptions): string;
-
-  /**
-   * Convert the prompt to PGAI format
-   * @param options PGAI-specific options
-   * @returns The prompt in PGAI format
-   */
-  public toPgai(options?: PgaiFormatOptions): Record<string, any>;
-
-  /**
-   * Convert the prompt to a template with placeholders
-   * @param options Template-specific options
-   * @returns The prompt as a template string
-   */
-  public toTemplate(options?: TemplateFormatOptions): string;
-
-  /**
-   * Apply variable substitution to a template prompt
-   * @param variables Key-value pairs for variable substitution
-   * @param options Template processing options
-   * @returns The content with variables substituted
-   */
-  public applyVariables(variables: Record<string, string>, options?: TemplateFormatOptions): string;
-
-  /**
-   * Extract variables from the prompt content
-   * @param options Format-specific options for extraction
-   * @returns Array of variable names found in the content
-   */
-  public extractVariables(options?: TemplateFormatOptions): string[];
-
-  /**
-   * Clone the prompt
-   * @returns A new instance of MutablePrompt with the same properties
-   */
-  public clone(): MutablePrompt;
-
-  /**
-   * Create a new version of the prompt
-   * @param changes Partial changes to apply to the new version
-   * @returns A new prompt with incremented version
-   */
-  public createVersion(changes: Partial<Prompt>): MutablePrompt;
+export interface PromptConversion {
+  toFormat(format: PromptFormat, options?: PromptConversionOptions): string | Record<string, any>;
+  toMdc(options?: MdcFormatOptions): string;
+  toPgai(options?: PgaiFormatOptions): Record<string, any>;
+  toTemplate(options?: TemplateFormatOptions): string;
+  applyVariables(variables: Record<string, string>, options?: TemplateFormatOptions): string;
+  extractVariables(options?: TemplateFormatOptions): string[];
 }
 
-/**
- * Factory for creating MutablePrompt instances
- */
-export interface MutablePromptFactory {
-  /**
-   * Create a new MutablePrompt instance
-   * @param data Initial prompt data
-   * @returns A new MutablePrompt instance
-   */
-  public create(data: Partial<Prompt>): MutablePrompt;
+export interface MutablePrompt extends Prompt, PromptConversion {
+  clone(): MutablePrompt;
+  createVersion(changes: Partial<Prompt>): MutablePrompt;
+}
 
-  /**
-   * Convert from a string format to a MutablePrompt
-   * @param content String content in a specific format
-   * @param format The format of the input content
-   * @param options Conversion options
-   * @returns A new MutablePrompt instance
-   */
-  public fromFormat(
-    content: string,
+export interface PromptFactory {
+  create(data: Partial<Prompt>): MutablePrompt;
+  fromFormat(
     format: PromptFormat,
+    content: string | Record<string, any>,
     options?: PromptConversionOptions,
   ): MutablePrompt;
-
-  /**
-   * Convert from MDC format to a MutablePrompt
-   * @param mdcContent MDC formatted string
-   * @param options MDC-specific options
-   * @returns A new MutablePrompt instance
-   */
-  public fromMdc(mdcContent: string, options?: MdcFormatOptions): MutablePrompt;
-
-  /**
-   * Convert from PGAI format to a MutablePrompt
-   * @param pgaiData PGAI formatted data
-   * @param options PGAI-specific options
-   * @returns A new MutablePrompt instance
-   */
-  public fromPgai(pgaiData: Record<string, any>, options?: PgaiFormatOptions): MutablePrompt;
+  fromMdc(mdcContent: string, options?: MdcFormatOptions): MutablePrompt;
+  fromPgai(pgaiData: Record<string, any>, options?: PgaiFormatOptions): MutablePrompt;
 }
 
 /**
@@ -289,181 +208,42 @@ export interface ListPromptsOptions {
  * Base storage adapter interface
  */
 export interface StorageAdapter {
-  /**
-   * Connect to the storage
-   */
-  public connect(): Promise<void>;
-
-  /**
-   * Disconnect from the storage
-   */
-  public disconnect(): Promise<void>;
-
-  /**
-   * Check if connected to the storage
-   */
-  public isConnected(): boolean | Promise<boolean>;
-
-  /**
-   * Save a prompt to storage
-   * @param prompt Prompt to save
-   * @returns Prompt ID or the full prompt
-   */
-  public savePrompt(prompt: Prompt): Promise<Prompt>;
-
-  /**
-   * Get a prompt by ID
-   * @param id Prompt ID
-   * @returns Prompt
-   */
-  public getPrompt(id: string): Promise<Prompt | null>;
-
-  /**
-   * Get all prompts
-   * @returns Array of prompts
-   */
-  public getAllPrompts(): Promise<Prompt[]>;
-
-  /**
-   * Update a prompt
-   * @param id Prompt ID
-   * @param data Updated prompt data
-   * @returns Updated prompt or void
-   */
-  public updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
-
-  /**
-   * List prompts with filtering options
-   * @param options Filtering options
-   * @returns Array of prompts matching options
-   */
-  public listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-
-  /**
-   * Delete a prompt
-   * @param id Prompt ID
-   */
-  public deletePrompt(id: string): Promise<void>;
-
-  /**
-   * Clear all prompts
-   * Removes all prompts from storage
-   */
-  public clearAll?(): Promise<void>;
-
-  /**
-   * Backup the storage
-   * @returns Backup ID
-   */
-  public backup?(): Promise<string>;
-
-  /**
-   * Restore from a backup
-   * @param backupId Backup ID
-   */
-  public restore?(backupId: string): Promise<void>;
-
-  /**
-   * List available backups
-   * @returns Array of backup IDs
-   */
-  public listBackups?(): Promise<string[]>;
-
-  /**
-   * Get a prompt sequence by ID
-   * @param id Sequence ID
-   * @returns PromptSequence
-   */
-  public getSequence(id: string): Promise<PromptSequence | null>;
-
-  /**
-   * Save a prompt sequence to storage
-   * @param sequence PromptSequence to save
-   * @returns The saved PromptSequence
-   */
-  public saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
-
-  /**
-   * Delete a prompt sequence
-   * @param id Sequence ID
-   */
-  public deleteSequence(id: string): Promise<void>;
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  isConnected(): boolean | Promise<boolean>;
+  savePrompt(prompt: Prompt): Promise<Prompt>;
+  getPrompt(id: string): Promise<Prompt | null>;
+  getAllPrompts(): Promise<Prompt[]>;
+  updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  deletePrompt(id: string): Promise<void>;
+  clearAll?(): Promise<void>;
+  backup?(): Promise<string>;
+  restore?(backupId: string): Promise<void>;
+  listBackups?(): Promise<string[]>;
+  getSequence(id: string): Promise<PromptSequence | null>;
+  saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
+  deleteSequence(id: string): Promise<void>;
 }
 
-/**
- * Template variables map
- * Maps variable names to their values
- */
 export type TemplateVariables = Record<string, string>;
 
-/**
- * Result of applying a template
- */
 export interface ApplyTemplateResult {
-  /** The resulting content after applying variables */
   content: string;
-
-  /** The original prompt template */
   originalPrompt: Prompt;
-
-  /** The variables that were applied */
   appliedVariables: TemplateVariables;
-
-  /** Any variables that were missing from the input */
   missingVariables?: string[];
 }
 
-/**
- * Prompt service interface
- */
 export interface PromptService {
-  /**
-   * Get a prompt by ID
-   * @param id Prompt ID
-   * @returns The prompt
-   */
-  public getPrompt(id: string): Promise<Prompt | null>;
-
-  /**
-   * Add a new prompt
-   * @param data Partial prompt data
-   * @returns The created prompt
-   */
-  public addPrompt(data: Partial<Prompt>): Promise<Prompt>;
-
-  /**
-   * Update an existing prompt
-   * @param id Prompt ID
-   * @param data Updated prompt data
-   * @returns The updated prompt
-   */
-  public updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
-
-  /**
-   * List prompts with optional filtering
-   * @param options Filter options
-   * @returns Filtered list of prompts
-   */
-  public listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-
-  /**
-   * Delete a prompt
-   * @param id Prompt ID
-   */
-  public deletePrompt(id: string): Promise<void>;
-
-  /**
-   * Apply a template
-   * @param id Template ID
-   * @param variables Variables to apply
-   * @returns The applied template result
-   */
-  public applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+  getPrompt(id: string): Promise<Prompt | null>;
+  addPrompt(data: Partial<Prompt>): Promise<Prompt>;
+  updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
+  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
+  deletePrompt(id: string): Promise<void>;
+  applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
 }
 
-/**
- * Interface for creating a new prompt
- */
 export interface CreatePromptParams {
   id?: string;
   name: string;
@@ -475,9 +255,6 @@ export interface CreatePromptParams {
   metadata?: Record<string, any>;
 }
 
-/**
- * Interface for updating a prompt
- */
 export interface UpdatePromptParams {
   id: string;
   name?: string;
@@ -489,9 +266,6 @@ export interface UpdatePromptParams {
   metadata?: Record<string, any>;
 }
 
-/**
- * Interface for listing prompts with filters
- */
 export interface ListPromptsParams {
   tags?: string[];
   isTemplate?: boolean;
@@ -500,52 +274,20 @@ export interface ListPromptsParams {
   offset?: number;
 }
 
-/**
- * Interface for applying template variables
- */
 export interface ApplyTemplateParams {
   id: string;
   variables: Record<string, string>;
 }
 
-/**
- * Project interface
- */
 export interface Project {
-  /**
-   * Unique identifier for the project
-   */
   id: string;
-
-  /**
-   * Name of the project
-   */
   name: string;
-
-  /**
-   * Optional description of the project
-   */
   description?: string;
-
-  /**
-   * Optional tags for categorization
-   */
   tags?: string[];
-
-  /**
-   * Creation timestamp
-   */
   createdAt?: string;
-
-  /**
-   * Last update timestamp
-   */
   updatedAt?: string;
 }
 
-/**
- * Response for tool operations
- */
 export interface ToolResponse {
   content: Array<{
     type: string;
@@ -553,9 +295,6 @@ export interface ToolResponse {
   }>;
 }
 
-/**
- * MCP Tool Parameters
- */
 export type AddPromptParams = CreatePromptParams;
 export interface GetPromptParams {
   id: string;
@@ -564,9 +303,6 @@ export interface DeletePromptParams {
   id: string;
 }
 
-/**
- * MCP Request Handler Extra
- */
 export interface McpRequestExtra {
   arguments: any;
   request: {
@@ -579,50 +315,20 @@ export interface McpRequestExtra {
   };
 }
 
-/**
- * Server configuration interface
- */
 export interface ServerConfig {
-  /** Server name */
   name: string;
-
-  /** Server version */
   version: string;
-
-  /** Storage type */
-  storageType: 'file' | 'postgres' | 'memory' | 'mdc';
-
-  /** File storage directory */
+  storageType: 'file' | 'postgres' | 'memory';
   promptsDir: string;
-
-  /** Backups directory */
   backupsDir: string;
-
-  /** HTTP server port */
   port: number;
-
-  /** Log level */
   logLevel: 'debug' | 'info' | 'warn' | 'error';
-
-  /** Enable HTTP server */
   httpServer: boolean;
-
-  /** Enable MCP server */
   mcpServer: boolean;
-
-  /** HTTP server host */
   host: string;
-
-  /** Enable Server-Sent Events (SSE) */
   enableSSE?: boolean;
-
-  /** SSE endpoint path */
   ssePath?: string;
-
-  /** CORS origin setting */
   corsOrigin?: string;
-
-  /** PostgreSQL configuration */
   postgres?: {
     host: string;
     port: number;
@@ -634,58 +340,31 @@ export interface ServerConfig {
   };
 }
 
-/**
- * Error interface with additional context
- */
 export interface ErrorWithContext extends Error {
-  /** Error code */
   code?: string;
-
-  /** HTTP status code */
   statusCode?: number;
-
-  /** Additional context object */
   context?: Record<string, any>;
-
-  /** Original error if this wraps another error */
   originalError?: Error;
 }
 
 export interface StorageConfig {
   type: 'file' | 'memory' | 'postgres';
-  promptsDir?: string; // For file storage
-  backupsDir?: string; // For file storage
-  pgHost?: string; // For postgres storage
-  pgPort?: number; // For postgres storage
-  pgUser?: string; // For postgres storage
-  pgPassword?: string; // For postgres storage
-  pgDatabase?: string; // For postgres storage
+  promptsDir?: string;
+  backupsDir?: string;
+  pgHost?: string;
+  pgPort?: number;
+  pgUser?: string;
+  pgPassword?: string;
+  pgDatabase?: string;
 }
 
-/**
- * PromptSequence interface
- * Represents an ordered sequence of prompts
- */
 export interface PromptSequence {
-  /** Unique identifier for the sequence */
   id: string;
-
-  /** Human-readable name of the sequence */
   name: string;
-
-  /** Optional description of the sequence */
   description?: string;
-
-  /** Ordered list of prompt IDs in the sequence */
   promptIds: string[];
-
-  /** Date when the sequence was created (ISO string) */
   createdAt: string;
-
-  /** Date when the sequence was last updated (ISO string) */
   updatedAt: string;
-
-  /** Optional metadata for additional information */
   metadata?: Record<string, any>;
 }
 

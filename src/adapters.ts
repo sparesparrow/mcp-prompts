@@ -8,19 +8,15 @@ import * as path from 'path';
 import pg from 'pg';
 import { v4 as uuidv4 } from 'uuid';
 import { glob } from 'glob';
-import { paramCase } from 'param-case';
+import paramCase from 'param-case';
 import { pino } from 'pino';
 
-import type { ListPromptsOptions, Prompt, PromptSequence, StorageAdapter } from './interfaces.js';
-import {
-  MdcFormatOptions,
-  MutablePrompt,
-  MutablePromptFactory,
-  PgaiFormatOptions,
-  PromptConversionOptions,
-  PromptFormat,
-  ServerConfig,
-  TemplateFormatOptions,
+import type {
+  ListPromptsOptions,
+  McpConfig,
+  Prompt,
+  PromptSequence,
+  StorageAdapter,
 } from './interfaces.js';
 
 export type { StorageAdapter };

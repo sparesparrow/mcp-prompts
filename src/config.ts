@@ -104,6 +104,20 @@ export const EnvSchema = z.object({
 
 export type EnvVars = z.infer<typeof EnvSchema>;
 
+export const McpConfigSchema = EnvSchema.extend({
+  storage: z.object({
+    type: z.enum(['file', 'postgres', 'memory']),
+    promptsDir: z.string(),
+    host: z.string().optional(),
+    port: z.number().optional(),
+    user: z.string().optional(),
+    password: z.string().optional(),
+    database: z.string().optional(),
+    maxConnections: z.number().optional(),
+    ssl: z.boolean().optional(),
+  }),
+});
+
 /**
  * Loads and validates the server configuration from environment variables using Zod.
  * Throws a clear error and exits if validation fails.
