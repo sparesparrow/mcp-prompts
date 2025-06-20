@@ -27,6 +27,7 @@
 - [CLI Usage & Troubleshooting](#cli-usage--troubleshooting)
 - [FAQ & Troubleshooting](#faq--troubleshooting)
 - [Project Philosophy](#project-philosophy)
+- [Security Best Practices](#security-best-practices)
 
 ---
 
@@ -938,5 +939,31 @@ HTTP workflow steps now support custom headers and basic authentication. Example
 ### Persistent Workflow Storage
 
 Workflows are now stored as JSON files in `data/workflows/`. This replaces the previous in-memory storage. You can back up or edit workflows by managing these files directly.
+
+---
+
+## Security Best Practices
+
+### CORS Configuration
+- By default, the server allows all origins (`*`) for CORS. **This is insecure for production.**
+- Set the `corsOrigin` config or `CORS_ORIGIN` environment variable to your trusted frontend domain(s) in production.
+- Example (in `.env` or config):
+  ```
+  CORS_ORIGIN=https://your-frontend.example.com
+  ```
+- Allowing `*` means any website can make requests to your API as the user.
+
+### Rate Limiting
+- Global rate limiting is enabled (default: 100 requests per 15 minutes per IP).
+- You can configure this via the `rateLimit` config or environment variables.
+- For sensitive endpoints (e.g., workflow execution), consider adding stricter, per-user or per-endpoint limits.
+
+### Security Headers
+- The server uses `helmet` to set strong HTTP security headers (CSP, HSTS, frameguard, etc.).
+- You can customize these in `src/http-server.ts` if needed.
+
+### Error Handling
+- In production, ensure error responses do not leak stack traces or sensitive information.
+- Review error handling middleware and logging for information leakage.
 
 --- 
