@@ -12,6 +12,8 @@ fi
 
 VERSION_INCREMENT=$1
 
+DOCKER_IMAGE_NAME="sparesparrow/mcp-prompts"
+
 # Make sure we're in the project root
 cd "$(dirname "$0")/.."
 
