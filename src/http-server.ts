@@ -1,3 +1,5 @@
+import fs from 'fs';
+import path from 'path';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import cors from 'cors';
 import express from 'express';
@@ -33,6 +35,29 @@ export interface ServerServices {
   promptService: PromptService;
   sequenceService: SequenceService;
   workflowService: WorkflowService;
+}
+
+const WORKFLOW_DIR = path.resolve(process.cwd(), 'data', 'workflows');
+function ensureWorkflowDir() {
+  if (!fs.existsSync(WORKFLOW_DIR)) fs.mkdirSync(WORKFLOW_DIR, { recursive: true });
+}
+function saveWorkflowToFile(workflow: any) {
+  ensureWorkflowDir();
+  fs.writeFileSync(
+    path.join(WORKFLOW_DIR, `${workflow.id}.json`),
+    JSON.stringify(workflow, null, 2),
+  );
+}
+function loadWorkflowFromFile(id: string) {
+  const file = path.join(WORKFLOW_DIR, `${id}.json`);
+  if (!fs.existsSync(file)) return null;
+  return JSON.parse(fs.readFileSync(file, 'utf8'));
+}
+function getAllWorkflows() {
+  ensureWorkflowDir();
+  return fs.readdirSync(WORKFLOW_DIR)
+    .filter(f => f.endsWith('.json'))
+    .map(f => JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, f), 'utf8')));
 }
 
 /**
@@ -230,9 +255,6 @@ export async function startHttpServer(
     },
   );
 
-  // In-memory workflow storage (TODO: replace with persistent storage)
-  const workflowStore: Map<string, any> = new Map();
-
   const checkWorkflowRateLimit = getWorkflowRateLimiter();
 
   /**
@@ -254,7 +276,7 @@ export async function startHttpServer(
           res.status(400).json({ error: true, message: 'Workflow must have a string id.' });
           return;
         }
-        workflowStore.set(workflow.id, workflow);
+        saveWorkflowToFile(workflow);
         res.status(201).json({ id: workflow.id, message: 'Workflow saved.', success: true });
       } catch (err) {
         next(err);
@@ -271,7 +293,7 @@ export async function startHttpServer(
     '/api/v1/workflows/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        const workflow = workflowStore.get(req.params.id);
+        const workflow = loadWorkflowFromFile(req.params.id);
         if (!workflow) {
           res.status(404).json({ error: true, message: 'Workflow not found.' });
           return;
@@ -302,7 +324,7 @@ export async function startHttpServer(
       }
       let result;
       try {
-        const workflow = workflowStore.get(workflowId);
+        const workflow = loadWorkflowFromFile(workflowId);
         if (!workflow) {
           res.status(404).json({ error: true, message: 'Workflow not found.' });
           return;

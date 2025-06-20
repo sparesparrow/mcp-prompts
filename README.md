@@ -899,4 +899,44 @@ npm run workflow:run:id -- <workflow-id>
 
 Set the `MCP_PROMPTS_API_URL` environment variable to override the API URL (default: http://localhost:3003).
 
+---
+
+## Workflow Engine Improvements
+
+### Configurable Concurrency Limit
+
+You can now control the maximum number of concurrent workflows per user with the environment variable:
+
+```
+WORKFLOW_MAX_CONCURRENT=5
+```
+(Default is 3)
+
+### HTTP Step: Headers and Basic Auth
+
+HTTP workflow steps now support custom headers and basic authentication. Example step:
+
+```json
+{
+  "id": "http1",
+  "type": "http",
+  "method": "POST",
+  "url": "https://api.example.com/endpoint",
+  "headers": {
+    "Authorization": "Bearer ...",
+    "X-Custom": "value"
+  },
+  "auth": {
+    "username": "user",
+    "password": "pass"
+  },
+  "body": { "foo": "bar" },
+  "output": "result"
+}
+```
+
+### Persistent Workflow Storage
+
+Workflows are now stored as JSON files in `data/workflows/`. This replaces the previous in-memory storage. You can back up or edit workflows by managing these files directly.
+
 --- 

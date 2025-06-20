@@ -293,14 +293,17 @@ export class HttpRunner implements StepRunner {
     ) {
       return { error: 'Invalid http step structure', success: false };
     }
-    const { method, url, body } = step as { method: string; url: string; body?: unknown };
-    // TODO: Support headers, auth, advanced options
+    const { method, url, body, headers, auth } = step as { method: string; url: string; body?: unknown; headers?: Record<string, string>; auth?: { username: string; password: string } };
+    // Support headers, auth, advanced options
+    const fetchHeaders: Record<string, string> = { 'Content-Type': 'application/json', ...(headers || {}) };
+    let fetchOptions: any = { method, headers: fetchHeaders };
+    if (body) fetchOptions.body = JSON.stringify(body);
+    if (auth && auth.username && auth.password) {
+      const encoded = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');
+      fetchOptions.headers['Authorization'] = `Basic ${encoded}`;
+    }
     try {
-      const response = await fetch(url, {
-        body: body ? JSON.stringify(body) : undefined,
-        headers: { 'Content-Type': 'application/json' },
-        method,
-      });
+      const response = await fetch(url, fetchOptions);
       const text = await response.text();
       if (!response.ok) {
         return { error: `HTTP ${response.status}: ${text}`, success: false };
@@ -315,7 +318,7 @@ export class HttpRunner implements StepRunner {
 
 // --- Rate Limiter ---
 const workflowConcurrency: Record<string, number> = {};
-const MAX_CONCURRENT_WORKFLOWS = 3; // TODO: make configurable
+const MAX_CONCURRENT_WORKFLOWS = Number(process.env.WORKFLOW_MAX_CONCURRENT) || 3;
 
 /**
  * Returns a function to check and update workflow concurrency for a user.
