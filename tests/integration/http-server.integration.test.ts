@@ -375,7 +375,7 @@ describe.skip('Bulk Prompt Operations', () => {
   });
 });
 
-describe.skip('Workflow Engine Integration', () => {
+describe('Workflow Engine Integration', () => {
   let sampleWorkflow: any;
   beforeAll(() => {
     sampleWorkflow = JSON.parse(fs.readFileSync(SAMPLE_WORKFLOW_PATH, 'utf8'));
@@ -392,7 +392,7 @@ describe.skip('Workflow Engine Integration', () => {
     });
   });
 
-  it('should save and run a sample workflow', async () => {
+  it.skip('should save and run a sample workflow', async () => {
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
@@ -415,7 +415,7 @@ describe.skip('Workflow Engine Integration', () => {
     expect(runRes.body.state.outputs.capital).toMatch(/Paris/);
   });
 
-  it('should enforce workflow rate limiting', async () => {
+  it.skip('should enforce workflow rate limiting', async () => {
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
