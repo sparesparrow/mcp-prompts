@@ -54,9 +54,9 @@ export class FileAdapter implements StorageAdapter {
           try {
             const content = await fsp.readFile(filePath, 'utf-8');
             const prompt = JSON.parse(content);
-            validatePrompt(prompt, 'full', true);
+            promptSchemas.full.parse(prompt);
           } catch (error: unknown) {
-            if (error instanceof ValidationError) {
+            if (error instanceof z.ZodError) {
               console.warn(`Validation failed for ${file}: ${error.message}`);
             } else {
               console.error(`Error reading or parsing ${file}:`, error);
@@ -91,7 +91,8 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
-    const id = this.generateId(promptData.name);
+    const parsedData = promptSchemas.create.parse(promptData);
+    const id = this.generateId(parsedData.name);
 
     const versions = await this.listPromptVersions(id);
     const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
@@ -99,12 +100,12 @@ export class FileAdapter implements StorageAdapter {
     const promptWithDefaults: Prompt = {
       id,
       version: newVersion,
-      ...promptSchemas.create.parse(promptData),
+      ...parsedData,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
 
-    validatePrompt(promptWithDefaults, 'full', true);
+    promptSchemas.full.parse(promptWithDefaults);
 
     const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
@@ -136,9 +137,12 @@ export class FileAdapter implements StorageAdapter {
     try {
       const content = await fsp.readFile(this.getPromptFileName(id, versionToFetch), 'utf-8');
       const prompt: Prompt = JSON.parse(content);
-      validatePrompt(prompt, 'full', true);
-      return prompt;
+      return promptSchemas.full.parse(prompt);
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        console.warn(`Validation failed for prompt ${id} v${versionToFetch}: ${error.message}`);
+        return null;
+      }
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
@@ -175,7 +179,7 @@ export class FileAdapter implements StorageAdapter {
       updatedAt: new Date().toISOString(),
     };
 
-    validatePrompt(updatedPrompt, 'full', true);
+    promptSchemas.full.parse(updatedPrompt);
 
     const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
@@ -217,7 +221,10 @@ export class FileAdapter implements StorageAdapter {
     }
   }
 
-  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
+  public async listPrompts(
+    options?: ListPromptsOptions,
+    allVersions = false,
+  ): Promise<{ prompts: Prompt[]; total: number }> {
     if (!this.connected) throw new Error('File storage not connected');
     const allFiles = await fsp.readdir(this.promptsDir);
     const promptFiles = allFiles.filter(f => f.endsWith('.json'));
@@ -226,9 +233,16 @@ export class FileAdapter implements StorageAdapter {
     for (const file of promptFiles) {
       try {
         const content = await fsp.readFile(path.join(this.promptsDir, file), 'utf-8');
-        prompts.push(JSON.parse(content));
-      } catch {
-        // ignore malformed files
+        const data = JSON.parse(content);
+        const prompt = promptSchemas.full.parse(data);
+        prompts.push(prompt);
+      } catch (error) {
+        // Log warnings for malformed or invalid files, then ignore
+        if (error instanceof z.ZodError) {
+          console.warn(`Skipping invalid prompt file ${file}: ${error.message}`);
+        } else if (error instanceof Error) {
+          console.warn(`Skipping malformed JSON file ${file}: ${error.message}`);
+        }
       }
     }
 
@@ -239,17 +253,37 @@ export class FileAdapter implements StorageAdapter {
     }
 
     if (allVersions) {
-      return filtered;
+      return { prompts: filtered, total: filtered.length };
     }
 
-    const latestPrompts = new Map<string, Prompt>();
-    for (const prompt of filtered) {
-      const existing = latestPrompts.get(prompt.id);
-      if (!existing || prompt.version > existing.version) {
-        latestPrompts.set(prompt.id, prompt);
+    const latestVersionsMap = new Map<string, Prompt>();
+    for (const p of filtered) {
+      const existing = latestVersionsMap.get(p.id);
+      if (!existing || p.version > existing.version) {
+        latestVersionsMap.set(p.id, p);
       }
     }
-    return Array.from(latestPrompts.values());
+    filtered = Array.from(latestVersionsMap.values());
+
+    // Apply sorting
+    if (options?.sort) {
+      filtered.sort((a, b) => {
+        const aVal = a[options.sort!];
+        const bVal = b[options.sort!];
+        if (aVal < bVal) return options.order === 'desc' ? 1 : -1;
+        if (aVal > bVal) return options.order === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+
+    const total = filtered.length;
+
+    // Apply pagination
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? 20;
+    const paginated = filtered.slice(offset, offset + limit);
+
+    return { prompts: paginated, total };
   }
 
   public async getSequence(id: string): Promise<PromptSequence | null> {
@@ -729,7 +763,7 @@ export class PostgresAdapter implements StorageAdapter {
     };
 
     // Validate the final, merged object against the full schema
-    validatePrompt(updatedPromptData, 'full', true);
+    promptSchemas.full.parse(updatedPromptData);
 
     const finalPath = this.getPromptFileName(id, version);
     const tempPath = `${finalPath}.tmp`;

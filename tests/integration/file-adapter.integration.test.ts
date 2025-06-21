@@ -3,9 +3,10 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import fsp from 'node:fs/promises';
 import os from 'node:os';
+import { z } from 'zod';
 
 import { FileAdapter } from '../../src/adapters.js';
-import { Prompt } from '../../src/interfaces';
+import { Prompt } from '../../src/interfaces.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PROMPTS_DIR = path.join(__dirname, '../../test-prompts');
@@ -118,10 +119,10 @@ describe('FileAdapter Integration', () => {
       promptsData.map(p => adapter.savePrompt(p)),
     );
 
-    const all = await adapter.listPrompts({}, true);
-    expect(all.length).toBeGreaterThanOrEqual(2);
-    expect(all.some(p => p.id === savedPrompts[0].id)).toBe(true);
-    expect(all.some(p => p.id === savedPrompts[1].id)).toBe(true);
+    const result = await adapter.listPrompts({}, true);
+    expect(result.prompts.length).toBeGreaterThanOrEqual(2);
+    expect(result.prompts.some(p => p.id === savedPrompts[0].id)).toBe(true);
+    expect(result.prompts.some(p => p.id === savedPrompts[1].id)).toBe(true);
   });
 
   it('should delete all versions of a prompt', async () => {
@@ -139,5 +140,39 @@ describe('FileAdapter Integration', () => {
     // Verify no versions are left
     const versions = await adapter.listPromptVersions(savedPrompt1.id);
     expect(versions).toEqual([]);
+  });
+
+  describe('Schema Validation', () => {
+    it('should throw a ZodError when saving a prompt with invalid data', async () => {
+      const invalidPromptData: any = {
+        // name is missing, which is required by the schema
+        content: 'This prompt is invalid',
+      };
+      await expect(adapter.savePrompt(invalidPromptData)).rejects.toThrow(z.ZodError);
+    });
+
+    it('should skip malformed JSON files when listing prompts', async () => {
+      // Manually create a malformed file
+      const malformedFilePath = path.join(testDir, 'malformed.json');
+      await fsp.writeFile(malformedFilePath, '{ "name": "malformed", "content": "test"'); // Missing closing brace
+
+      const prompts = await adapter.listPrompts();
+      expect(prompts.prompts.find(p => p.name === 'malformed')).toBeUndefined();
+    });
+
+    it('should skip files that fail schema validation when listing prompts', async () => {
+      // Manually create a file with valid JSON but invalid schema
+      const invalidSchemaPrompt = {
+        id: 'invalid-schema-prompt',
+        name: 'Invalid Schema',
+        content: 'test',
+        version: 'not-a-number', // version should be a number
+      };
+      const invalidSchemaFilePath = path.join(testDir, 'invalid-schema-prompt.json');
+      await fsp.writeFile(invalidSchemaFilePath, JSON.stringify(invalidSchemaPrompt));
+
+      const prompts = await adapter.listPrompts();
+      expect(prompts.prompts.find(p => p.id === 'invalid-schema-prompt')).toBeUndefined();
+    });
   });
 });
