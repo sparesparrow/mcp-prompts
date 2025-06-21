@@ -2,7 +2,7 @@ import type { Prompt } from '../../src/interfaces.js';
 import { promptSchemas, workflowSchema } from '../../src/schemas.js';
 import { validatePrompt, ValidationError } from '../../src/validation.js';
 
-describe.skip('Validation', () => {
+describe('Validation', () => {
   it('should pass for a valid full prompt object', () => {
     const validPrompt: Prompt = {
       id: '1',
@@ -83,7 +83,7 @@ describe.skip('Validation', () => {
   });
 });
 
-describe.skip('Schema Validation', () => {
+describe('Schema Validation', () => {
   describe('promptSchemas', () => {
     it('should trim the name field', () => {
       const result = promptSchemas.create.parse({
