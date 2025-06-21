@@ -2,14 +2,15 @@ name: Version Consistency Check
 
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
-  release:
-    types: [published]
+    branches: [main]
+  workflow_dispatch:
+
+if: false
 
 jobs:
-  github:
+  check-version:
     if: false # Temporarily disable this check
     name: Check GitHub server version consistency
     runs-on: ubuntu-latest

@@ -512,23 +512,29 @@ export class MemoryAdapter implements StorageAdapter {
   }
 
   public async updatePrompt(id: string, version: number, promptData: Partial<Prompt>): Promise<Prompt> {
-    const versionMap = this.prompts.get(id);
-    if (!versionMap || !versionMap.has(version)) {
-      throw new Error(`Prompt with id ${id} and version ${version} not found`);
+    if (!this.connected) {
+      throw new Error('Memory storage not connected');
     }
 
-    const existingPrompt = versionMap.get(version)!;
+    const existingPrompt = await this.getPrompt(id, version);
+    if (!existingPrompt) {
+      throw new Error(`Prompt with id ${id} and version ${version} not found`);
+    }
     
-    const newVersion = existingPrompt.version + 1;
+    const newVersion = (await this.listPromptVersions(id)).length > 0 ? Math.max(...(await this.listPromptVersions(id))) + 1 : 1;
 
     const updatedPrompt: Prompt = {
       ...existingPrompt,
       ...promptData,
+      id, // Ensure id is not changed
       version: newVersion,
       updatedAt: new Date().toISOString(),
     };
     
-    versionMap.set(newVersion, updatedPrompt);
+    promptSchemas.full.parse(updatedPrompt);
+    
+    const versionMap = this.prompts.get(id);
+    versionMap?.set(newVersion, updatedPrompt);
     return updatedPrompt;
   }
 
