@@ -65,7 +65,7 @@ async function main() {
         promptService,
         sequenceService,
         workflowService,
-        storageAdapter,
+        storageAdapters: [storageAdapter],
         elevenLabsService,
       },
     );

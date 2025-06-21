@@ -34,10 +34,10 @@ export class FileAdapter implements StorageAdapter {
   private workflowStatesDir: string;
   private connected = false;
 
-  public constructor(promptsDir: string) {
-    this.promptsDir = promptsDir;
-    this.sequencesDir = path.join(promptsDir, 'sequences');
-    this.workflowStatesDir = path.join(promptsDir, 'workflow-states');
+  public constructor(options: { promptsDir: string }) {
+    this.promptsDir = options.promptsDir;
+    this.sequencesDir = path.join(options.promptsDir, 'sequences');
+    this.workflowStatesDir = path.join(options.promptsDir, 'workflow-states');
   }
 
   public async connect(): Promise<void> {

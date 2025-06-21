@@ -49,7 +49,7 @@ describe('Storage Adapters', () => {
     });
 
     it('should be instantiable with a path', () => {
-      const adapter = new FileAdapter('./test-prompts');
+      const adapter = new FileAdapter({ promptsDir: './test-prompts' });
       expect(adapter).toBeDefined();
       expect(adapter.constructor.name).toBe('FileAdapter');
     });

@@ -24,6 +24,7 @@ import {
   ShellRunner,
 } from './workflow-service.js';
 import { promptSchemas } from './prompts.js';
+import { StorageAdapter } from './interfaces.js';
 
 export interface HttpServerConfig {
   port: number;
@@ -41,6 +42,7 @@ export interface ServerServices {
   promptService: PromptService;
   sequenceService: SequenceService;
   workflowService: WorkflowService;
+  storageAdapters: StorageAdapter[];
 }
 
 const WORKFLOW_DIR = path.resolve(process.cwd(), 'data', 'workflows');
@@ -256,26 +258,25 @@ export async function startHttpServer(
   // Health check endpoint
   app.get('/health', async (req, res) => {
     try {
-      const storage = services.promptService.getStorage();
-      const healthy = await storage.healthCheck?.();
-      let poolMetrics = undefined;
-      // Expose pool metrics if PostgresAdapter
-      if (typeof storage.getPoolMetrics === 'function') {
-        poolMetrics = storage.getPoolMetrics();
-      }
-      if (!healthy) {
-        res.status(503).json({
+      const healthChecks = services.storageAdapters.map(adapter => adapter.healthCheck());
+      const results = await Promise.all(healthChecks);
+      const allHealthy = results.every(healthy => healthy);
+
+      if (!allHealthy) {
+        return res.status(503).json({
           status: 'error',
           storage: 'unhealthy',
-          pool: poolMetrics,
+          details: services.storageAdapters.map((adapter, i) => ({
+            adapter: adapter.constructor.name,
+            healthy: results[i],
+          })),
         });
-        return;
       }
+
       res.json({
         status: 'ok',
         version: process.env.npm_package_version || 'dev',
         storage: 'healthy',
-        pool: poolMetrics,
       });
     } catch (err) {
       res.status(503).json({
