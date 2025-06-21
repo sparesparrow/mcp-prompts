@@ -14,6 +14,7 @@ import type { Request, Response, NextFunction } from 'express';
 import type { PromptService } from './prompt-service.js';
 import type { SequenceService } from './sequence-service.js';
 import type { WorkflowService } from './workflow-service.js';
+import { AppError, HttpErrorCode } from './errors.js';
 import {
   auditLogWorkflowEvent,
   getWorkflowRateLimiter,
@@ -217,16 +218,18 @@ export async function startHttpServer(
   );
 
   // Add rate limiting
-  const limiter = rateLimit({
-    legacyHeaders: false,
-    // 15 minutes
-    max: config.rateLimit?.max || 100,
-    // Limit each IP to 100 requests per windowMs
-    standardHeaders: true,
+  if (process.env.ENABLE_RATE_LIMIT !== 'false') {
+    const limiter = rateLimit({
+      legacyHeaders: false,
+      // 15 minutes
+      max: config.rateLimit?.max || 100,
+      // Limit each IP to 100 requests per windowMs
+      standardHeaders: true,
 
-    windowMs: config.rateLimit?.windowMs || 15 * 60 * 1000,
-  });
-  app.use(limiter);
+      windowMs: config.rateLimit?.windowMs || 15 * 60 * 1000,
+    });
+    app.use(limiter);
+  }
 
   // Enable JSON body parsing with size limits
   app.use(express.json({ limit: '1mb' }));
@@ -408,25 +411,14 @@ export async function startHttpServer(
       try {
         const parseResult = promptSchemas.create.safeParse(req.body);
         if (!parseResult.success) {
-          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid prompt data', details: parseResult.error.errors } });
+          // Forward validation error to the global handler
+          return next(new z.ZodError(parseResult.error.errors));
         }
         const prompt = parseResult.data;
-        // Allow id, version, createdAt, and updatedAt to be omitted; service will generate them if missing
-        try {
-          const created = await services.promptService.createPrompt(prompt);
-          return res.status(201).json({ success: true, prompt: created });
-        } catch (err: any) {
-          // Map DuplicateError to 409 Conflict, ValidationError to 400
-          if (err.name === 'DuplicateError') {
-            return res.status(409).json({ success: false, error: { code: 'DUPLICATE', message: err.message } });
-          }
-          if (err.name === 'ValidationError') {
-            return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: err.message, details: err.details || err.issues } });
-          }
-          return next(err);
-        }
+        const created = await services.promptService.createPrompt(prompt);
+        return res.status(201).json({ success: true, prompt: created });
       } catch (err) {
-        next(err);
+        return next(err);
       }
     },
   );
@@ -482,22 +474,16 @@ export async function startHttpServer(
    *             schema:
    *               $ref: '#/components/schemas/Prompt'
    */
-  app.put('/prompts/:id/:version', async (req, res) => {
+  app.put('/prompts/:id/:version', async (req, res, next) => {
     try {
       const prompt = await services.promptService.updatePrompt(
         req.params.id,
         parseInt(req.params.version, 10),
         req.body,
       );
-      if (!prompt) {
-        return res.status(404).json({ error: { message: 'Prompt not found' } });
-      }
       res.json({ prompt });
     } catch (error: any) {
-      if (error instanceof z.ZodError) {
-        return res.status(400).json({ error: { message: 'Invalid prompt data', details: error.errors } });
-      }
-      res.status(500).json({ error: { message: 'An unexpected error occurred.' } });
+      next(error);
     }
   });
 
@@ -521,12 +507,12 @@ export async function startHttpServer(
    *       204:
    *         description: Prompt deleted successfully
    */
-  app.delete('/prompts/:id/:version', async (req, res) => {
+  app.delete('/prompts/:id/:version', async (req, res, next) => {
     try {
       await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
       res.status(204).send();
     } catch (error: any) {
-      res.status(500).json({ error: { message: 'An unexpected error occurred.' } });
+      next(error);
     }
   });
 
@@ -1070,7 +1056,7 @@ export async function startHttpServer(
     res.status(404).json({
       success: false,
       error: {
-        code: 'NOT_FOUND',
+        code: HttpErrorCode.NOT_FOUND,
         message: 'Resource not found',
       },
     });
@@ -1078,39 +1064,40 @@ export async function startHttpServer(
 
   // Global error handler middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    // Handle Zod validation errors and custom ValidationError
-    if (err?.name === 'ValidationError' || err?.name === 'ZodError') {
-      res.status(400).json({
+    if (err instanceof AppError) {
+      const response: { code: string; message: string; details?: any } = {
+        code: err.code,
+        message: err.message,
+      };
+      if ((err as any).details) {
+        response.details = (err as any).details;
+      }
+      return res.status(err.statusCode).json({
+        success: false,
+        error: response,
+      });
+    }
+
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
         success: false,
         error: {
-          code: err.code || 'VALIDATION_ERROR',
-          message: err.message,
-          details: err.issues || err.details,
+          code: HttpErrorCode.VALIDATION_ERROR,
+          message: 'Invalid input data.',
+          details: err.issues,
         },
       });
-      return;
     }
-    let status = 500;
-    let code = 'INTERNAL_SERVER_ERROR';
-    let details = err.details || undefined;
-    if (err && typeof err === 'object') {
-      if (typeof err.statusCode === 'number') {
-        status = err.statusCode;
-      } else if (typeof err.status === 'number') {
-        status = err.status;
-      }
-      if (typeof err.code === 'string') {
-        code = err.code;
-      } else if (status !== 500) {
-        code = (err.name || 'ERROR').toUpperCase();
-      }
-    }
-    res.status(status).json({
+
+    // Log unexpected errors for debugging
+    // In production, use a structured logger like Pino or Winston
+    console.error('UNHANDLED_ERROR:', err);
+
+    res.status(500).json({
       success: false,
       error: {
-        code,
-        message: err.message || 'Internal server error',
-        details,
+        code: HttpErrorCode.INTERNAL_SERVER_ERROR,
+        message: 'An unexpected internal server error occurred.',
       },
     });
   });

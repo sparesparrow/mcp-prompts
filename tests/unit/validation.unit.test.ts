@@ -57,7 +57,7 @@ describe('Validation', () => {
     expect(result.error).toBeUndefined();
   });
 
-  it('should return a failure result when not throwing on error', () => {
+  it('should return a failure result with 4 issues when missing all required fields', () => {
     const invalidPrompt = {
       id: '4',
       version: 1,
@@ -67,7 +67,7 @@ describe('Validation', () => {
     expect(result.success).toBe(false);
     expect(result.data).toBeUndefined();
     expect(result.error).toBeDefined();
-    expect(result.error?.issues.length).toBeGreaterThan(0);
+    expect(result.error?.issues.length).toBe(4);
   });
 
   it('should throw ValidationError for empty required string fields', () => {

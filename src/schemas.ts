@@ -44,8 +44,8 @@ const createPromptSchema = z
 const fullPromptSchema = createPromptSchema.extend({
   id: z.string().min(1),
   version: z.number().int().positive(),
-  createdAt: z.string().datetime().optional(),
-  updatedAt: z.string().datetime().optional(),
+  createdAt: z.string().datetime(),
+  updatedAt: z.string().datetime(),
 });
 
 /**

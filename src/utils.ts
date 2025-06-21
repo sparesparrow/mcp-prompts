@@ -39,3 +39,20 @@ export function applyTemplate(content: string, variables: Record<string, string>
     return variables[key] ?? match;
   });
 }
+
+/**
+ * A replacer function for JSON.stringify to correctly serialize Error objects.
+ * @param _key The key being replaced.
+ * @param value The value to replace.
+ * @returns A serializable representation of the Error object, or the original value.
+ */
+export function jsonFriendlyErrorReplacer(_key: string, value: unknown) {
+  if (value instanceof Error) {
+    return {
+      name: value.name,
+      message: value.message,
+      stack: value.stack,
+    };
+  }
+  return value;
+}

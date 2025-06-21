@@ -1,12 +1,28 @@
 /**
+ * Standardized error codes for HTTP responses.
+ */
+export enum HttpErrorCode {
+  VALIDATION_ERROR = 'VALIDATION_ERROR',
+  NOT_FOUND = 'NOT_FOUND',
+  UNAUTHORIZED = 'UNAUTHORIZED',
+  FORBIDDEN = 'FORBIDDEN',
+  DUPLICATE = 'DUPLICATE',
+  INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
+  RATE_LIMIT = 'RATE_LIMIT',
+  CONFLICT = 'CONFLICT',
+}
+
+/**
  * Base class for all custom application errors.
  */
 export class AppError extends Error {
   public readonly statusCode: number;
+  public readonly code: HttpErrorCode;
 
-  public constructor(message: string, statusCode: number) {
+  public constructor(message: string, statusCode: number, code: HttpErrorCode) {
     super(message);
     this.statusCode = statusCode;
+    this.code = code;
     Object.setPrototypeOf(this, new.target.prototype); // restore prototype chain
     this.name = this.constructor.name;
     Error.captureStackTrace(this, this.constructor);
@@ -20,7 +36,7 @@ export class ValidationError extends AppError {
   public readonly details?: any[];
 
   public constructor(message: string, details?: any[]) {
-    super(message, 400);
+    super(message, 400, HttpErrorCode.VALIDATION_ERROR);
     this.details = details;
   }
 }
@@ -30,7 +46,7 @@ export class ValidationError extends AppError {
  */
 export class NotFoundError extends AppError {
   public constructor(message = 'Resource not found') {
-    super(message, 404);
+    super(message, 404, HttpErrorCode.NOT_FOUND);
   }
 }
 
@@ -39,7 +55,7 @@ export class NotFoundError extends AppError {
  */
 export class UnauthorizedError extends AppError {
   public constructor(message = 'Authentication required') {
-    super(message, 401);
+    super(message, 401, HttpErrorCode.UNAUTHORIZED);
   }
 }
 
@@ -48,7 +64,7 @@ export class UnauthorizedError extends AppError {
  */
 export class ForbiddenError extends AppError {
   public constructor(message = 'You do not have permission to perform this action') {
-    super(message, 403);
+    super(message, 403, HttpErrorCode.FORBIDDEN);
   }
 }
 
@@ -57,6 +73,6 @@ export class ForbiddenError extends AppError {
  */
 export class DuplicateError extends AppError {
   public constructor(message: string) {
-    super(message, 409);
+    super(message, 409, HttpErrorCode.CONFLICT);
   }
 } 

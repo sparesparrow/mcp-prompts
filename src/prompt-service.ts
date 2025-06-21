@@ -11,13 +11,13 @@ import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prom
 import { defaultPrompts } from './prompts.js';
 import { ValidationError } from './validation.js';
 import { DuplicateError } from './errors.js';
-import { getRedisClient } from './utils.js';
+import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
 import { config } from './config.js';
 
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
   toUpperCase: (str: string) => str.toUpperCase(),
   toLowerCase: (str: string) => str.toLowerCase(),
-  jsonStringify: (obj: any) => JSON.stringify(obj, null, 2),
+  jsonStringify: (obj: any) => JSON.stringify(obj, jsonFriendlyErrorReplacer, 2),
   join: (arr: any[], sep = ', ') => arr.join(sep),
   eq: (a: any, b: any) => a === b,
 };

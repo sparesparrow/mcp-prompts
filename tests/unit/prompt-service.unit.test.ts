@@ -159,6 +159,20 @@ describe('PromptService', () => {
       expect(result.content).toBe(JSON.stringify(data, null, 2));
     });
 
+    it('should use jsonStringify helper with an Error object', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-json-error',
+        content: '{{{jsonStringify data}}}',
+        isTemplate: true,
+      });
+      const error = new Error('test error');
+      const result = await service.applyTemplate(prompt.id, { data: error });
+      const parsed = JSON.parse(result.content);
+      expect(parsed.name).toBe('Error');
+      expect(parsed.message).toBe('test error');
+      expect(parsed).toHaveProperty('stack');
+    });
+
     it('should use join helper', async () => {
       const prompt = await service.createPrompt({
         name: 'helper-join',
