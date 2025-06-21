@@ -329,146 +329,189 @@ export class FileAdapter implements StorageAdapter {
 
 /**
  * MemoryAdapter Implementation
- * Stores prompts in memory (volatile storage)
+ * Stores prompts in memory. Useful for testing and development.
  */
 export class MemoryAdapter implements StorageAdapter {
-  private prompts: Record<string, Record<number, Prompt>> = {};
-  private sequences: Map<string, PromptSequence> = new Map();
-  private workflowStates: Map<string, WorkflowExecutionState> = new Map();
+  private prompts = new Map<string, Map<number, Prompt>>();
+  private sequences = new Map<string, PromptSequence>();
+  private workflowStates = new Map<string, WorkflowExecutionState>();
   private connected = false;
+
+  public constructor() {
+    // No-op
+  }
 
   public async connect(): Promise<void> {
     this.connected = true;
-    console.log('Memory storage connected');
-    this.prompts = {};
-    this.sequences.clear();
   }
 
   public async disconnect(): Promise<void> {
-    this.prompts = {};
-    this.sequences.clear();
     this.connected = false;
-    console.log('Memory storage disconnected');
-  }
-
-  public async savePrompt(prompt: Prompt): Promise<Prompt> {
-    if (!prompt.id || typeof prompt.version !== 'number') throw new Error('Prompt must have id and version');
-    if (!this.prompts[prompt.id]) this.prompts[prompt.id] = {};
-    if (this.prompts[prompt.id][prompt.version]) throw new Error('Prompt version already exists');
-    this.prompts[prompt.id][prompt.version] = { ...prompt };
-    return { ...prompt };
-  }
-
-  public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
-    if (!this.prompts[id]) return null;
-    if (version) return this.prompts[id][version] || null;
-    // Return latest version
-    const versions = Object.keys(this.prompts[id]).map(Number).sort((a, b) => b - a);
-    if (versions.length === 0) return null;
-    return this.prompts[id][versions[0]];
-  }
-
-  public async getSequence(id: string): Promise<PromptSequence | null> {
-    if (!this.connected) {
-      throw new Error('Memory storage not connected');
-    }
-    return this.sequences.get(id) || null;
-  }
-
-  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    if (!this.connected) {
-      throw new Error('Memory storage not connected');
-    }
-    this.sequences.set(sequence.id, sequence);
-    return sequence;
-  }
-
-  public async deleteSequence(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error('Memory storage not connected');
-    }
-    this.sequences.delete(id);
-  }
-
-  public async updatePrompt(id: string, version: number, prompt: Prompt): Promise<Prompt> {
-    if (!this.prompts[id] || !this.prompts[id][version]) throw new Error('Prompt version not found');
-    this.prompts[id][version] = { ...prompt };
-    return { ...prompt };
-  }
-
-  public async deletePrompt(id: string, version?: number): Promise<void> {
-    if (!this.prompts[id]) return;
-    if (version) {
-      delete this.prompts[id][version];
-      if (Object.keys(this.prompts[id]).length === 0) delete this.prompts[id];
-    } else {
-      delete this.prompts[id];
-    }
-  }
-
-  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
-    const all: Prompt[] = [];
-    for (const id in this.prompts) {
-      const versions = this.prompts[id];
-      const versionKeys = Object.keys(versions).map(Number);
-      if (allVersions) {
-        for (const v of versionKeys) all.push({ ...versions[v] });
-      } else {
-        const latest = Math.max(...versionKeys);
-        all.push({ ...versions[latest] });
-      }
-    }
-    // ... apply filters from args as before ...
-    return all;
   }
 
   public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
-  public async getAllPrompts(): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error('Memory storage not connected');
-    }
-    const allPrompts: Prompt[] = [];
-    for (const id in this.prompts) {
-      const versions = this.prompts[id];
-      for (const version in versions) {
-        allPrompts.push(versions[parseInt(version)]);
-      }
-    }
-    return allPrompts;
-  }
-
   public async healthCheck(): Promise<boolean> {
-    return this.connected;
+    return this.isConnected();
   }
 
   public async clearAll(): Promise<void> {
-    if (!this.connected) {
-      throw new Error('Memory storage not connected');
-    }
-    this.prompts = {};
+    this.prompts.clear();
     this.sequences.clear();
+    this.workflowStates.clear();
+  }
+
+  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+
+    let promptsToFilter: Prompt[];
+
+    if (allVersions) {
+      const allPrompts: Prompt[] = [];
+      for (const versionMap of this.prompts.values()) {
+        for (const prompt of versionMap.values()) {
+          allPrompts.push(prompt);
+        }
+      }
+      promptsToFilter = allPrompts;
+    } else {
+      // Get the latest version of each prompt
+      const latestPrompts: Prompt[] = [];
+      for (const versionMap of this.prompts.values()) {
+        if (versionMap.size === 0) continue;
+        let latestVersion = 0;
+        let latestPrompt: Prompt | undefined;
+        for (const [version, prompt] of versionMap.entries()) {
+          if (version > latestVersion) {
+            latestVersion = version;
+            latestPrompt = prompt;
+          }
+        }
+        if (latestPrompt) {
+          latestPrompts.push(latestPrompt);
+        }
+      }
+      promptsToFilter = latestPrompts;
+    }
+
+    let filteredPrompts = promptsToFilter;
+
+    // Apply filtering
+    if (options) {
+      if (options.tags) {
+        const tags = Array.isArray(options.tags) ? options.tags : [options.tags];
+        if (tags.length > 0) {
+          filteredPrompts = filteredPrompts.filter(p => p.tags && tags.every(t => p.tags!.includes(t)));
+        }
+      }
+      if (options.isTemplate !== undefined) {
+        filteredPrompts = filteredPrompts.filter(p => p.isTemplate === options.isTemplate);
+      }
+      if (options.category) {
+        filteredPrompts = filteredPrompts.filter(p => p.category === options.category);
+      }
+    }
+
+    return filteredPrompts.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    const versionMap = this.prompts.get(id);
+    if (!versionMap) return null;
+
+    if (version !== undefined) {
+      return versionMap.get(version) ?? null;
+    }
+
+    // If no version is specified, return the latest version
+    if (versionMap.size === 0) return null;
+    const latestVersion = Math.max(...versionMap.keys());
+    return versionMap.get(latestVersion) ?? null;
+  }
+
+  public async getPromptByName(name: string): Promise<Prompt | null> {
+    for (const versionMap of this.prompts.values()) {
+      for (const prompt of versionMap.values()) {
+        if (prompt.name === name) {
+          // This logic might need refinement if names aren't unique.
+          // For now, return the first match.
+          return prompt;
+        }
+      }
+    }
+    return null;
+  }
+
+  public async createPrompt(promptData: Prompt): Promise<Prompt> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    if (!this.prompts.has(promptData.id)) {
+      this.prompts.set(promptData.id, new Map<number, Prompt>());
+    }
+    const versionMap = this.prompts.get(promptData.id)!;
+    versionMap.set(promptData.version, promptData);
+    return promptData;
+  }
+
+  public async updatePrompt(promptData: Prompt): Promise<Prompt> {
+    // For memory adapter, create and update logic is the same.
+    return this.createPrompt(promptData);
+  }
+
+  public async deletePrompt(id: string, version?: number): Promise<void> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    const versionMap = this.prompts.get(id);
+    if (!versionMap) return;
+
+    if (version !== undefined) {
+      versionMap.delete(version);
+      if (versionMap.size === 0) {
+        this.prompts.delete(id);
+      }
+    } else {
+      // If no version is specified, delete all versions for that ID.
+      this.prompts.delete(id);
+    }
+  }
+
+  public async listPromptVersions(id: string): Promise<number[]> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    const versionMap = this.prompts.get(id);
+    return versionMap ? Array.from(versionMap.keys()).sort((a, b) => a - b) : [];
+  }
+
+  public async getSequence(id: string): Promise<PromptSequence | null> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    return this.sequences.get(id) ?? null;
+  }
+
+  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    this.sequences.set(sequence.id, sequence);
+    return sequence;
+  }
+
+  public async deleteSequence(id: string): Promise<void> {
+    if (!this.connected) throw new Error('Memory storage not connected');
+    this.sequences.delete(id);
   }
 
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
+    if (!this.connected) throw new Error('Memory storage not connected');
     this.workflowStates.set(state.executionId, state);
   }
 
   public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
-    return this.workflowStates.get(executionId) || null;
+    if (!this.connected) throw new Error('Memory storage not connected');
+    return this.workflowStates.get(executionId) ?? null;
   }
 
   public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
-    return Array.from(this.workflowStates.values()).filter(
-      state => state.workflowId === workflowId,
-    );
-  }
-
-  public async listPromptVersions(id: string): Promise<number[]> {
-    if (!this.prompts[id]) return [];
-    return Object.keys(this.prompts[id]).map(Number).sort((a, b) => a - b);
+    if (!this.connected) throw new Error('Memory storage not connected');
+    const allStates = Array.from(this.workflowStates.values());
+    return allStates.filter(state => state.workflowId === workflowId);
   }
 }
 
