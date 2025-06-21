@@ -97,169 +97,206 @@ export class WorkflowServiceImpl implements WorkflowService {
     let currentStepId: string | undefined = state.currentStepId;
     const sseManager = getSseManager();
 
-    while (currentStepId) {
-      const step = workflow.steps.find(s => s.id === currentStepId);
-      if (!step) {
-        state.status = 'failed';
-        state.updatedAt = new Date().toISOString();
-        await this.storageAdapter.saveWorkflowState(state);
-        // Broadcast step_failed event
-        sseManager.broadcast({
-          context,
-          error: `Step not found: ${currentStepId}`,
-          event: 'step_failed',
-          executionId: state.executionId,
-          stepId: currentStepId,
-          workflowId: state.workflowId,
-        });
-        return { message: `Step not found: ${currentStepId}`, success: false };
-      }
-
-      // Broadcast step_started event
-      sseManager.broadcast({
-        context,
-        event: 'step_started',
-        executionId: state.executionId,
-        stepId: step.id,
-        workflowId: state.workflowId,
-      });
-
-      // Handle human-approval step: pause and wait for input
-      if (step.type === 'human-approval') {
-        state.status = 'paused';
-        state.currentStepId = currentStepId;
-        state.updatedAt = new Date().toISOString();
-        await this.storageAdapter.saveWorkflowState(state);
-        return {
-          executionId: state.executionId,
-          message: 'Workflow paused for human approval',
-          paused: true,
-          prompt: step.prompt,
-          stepId: step.id,
-          success: false,
-        };
-      }
-
-      // Handle parallel steps
-      if (step.type === 'parallel') {
-        const parallelSteps = (step as any).steps as Workflow['steps'];
-        try {
-          const results = await Promise.all(
-            parallelSteps.map(subStep => this.runSingleStep(subStep, context, stepRunners)),
-          );
-
-          const failedStepResult = results.find(r => !r.success);
-          if (failedStepResult) {
-            if (step.onFailure) {
-              currentStepId = step.onFailure;
-            } else {
-              state.status = 'failed';
-              state.updatedAt = new Date().toISOString();
-              await this.storageAdapter.saveWorkflowState(state);
-              // Broadcast step_failed event
-              sseManager.broadcast({
-                context,
-                error: `Parallel step failed: ${failedStepResult.error}`,
-                event: 'step_failed',
-                executionId: state.executionId,
-                stepId: step.id,
-                workflowId: state.workflowId,
-              });
-              return { message: `Parallel step failed: ${failedStepResult.error}`, success: false };
-            }
-          } else {
-            results.forEach((result, index) => {
-              const subStep = parallelSteps[index];
-              if (result.success && 'output' in subStep && typeof subStep.output === 'string') {
-                context[subStep.output] = result.output;
-              }
-            });
-            currentStepId = step.onSuccess ?? this.findNextStep(workflow, currentStepId);
-          }
-        } catch (e) {
+    try {
+      while (currentStepId) {
+        const step = workflow.steps.find(s => s.id === currentStepId);
+        if (!step) {
           state.status = 'failed';
           state.updatedAt = new Date().toISOString();
           await this.storageAdapter.saveWorkflowState(state);
           // Broadcast step_failed event
           sseManager.broadcast({
             context,
-            error: `Error in parallel step ${step.id}: ${e}`,
+            error: `Step not found: ${currentStepId}`,
             event: 'step_failed',
             executionId: state.executionId,
-            stepId: step.id,
+            stepId: currentStepId,
             workflowId: state.workflowId,
           });
-          return { message: `Error in parallel step ${step.id}: ${e}`, success: false };
+          return { message: `Step not found: ${currentStepId}`, success: false };
         }
-      } else {
-        const result = await this.runSingleStep(step, context, stepRunners);
-        state.history.push({
-          error: result.error,
-          executedAt: new Date().toISOString(),
-          output: result.output,
-          stepId: step.id,
-          success: result.success,
-        });
 
-        // Broadcast step_completed event
+        // Broadcast step_started event
         sseManager.broadcast({
           context,
-          error: result.error,
-          event: 'step_completed',
+          event: 'step_started',
           executionId: state.executionId,
-          output: result.output,
           stepId: step.id,
-          success: result.success,
           workflowId: state.workflowId,
         });
 
-        if (result.success) {
-          currentStepId =
-            'onSuccess' in step && step.onSuccess
-              ? step.onSuccess
-              : this.findNextStep(workflow, currentStepId);
-        } else {
-          if ('errorPolicy' in step && step.errorPolicy === 'continue') {
-            currentStepId =
-              'onFailure' in step && step.onFailure
-                ? step.onFailure
-                : this.findNextStep(workflow, currentStepId);
-          } else {
+        // Handle human-approval step: pause and wait for input
+        if (step.type === 'human-approval') {
+          state.status = 'paused';
+          state.currentStepId = currentStepId;
+          state.updatedAt = new Date().toISOString();
+          await this.storageAdapter.saveWorkflowState(state);
+          return {
+            executionId: state.executionId,
+            message: 'Workflow paused for human approval',
+            paused: true,
+            prompt: step.prompt,
+            stepId: step.id,
+            success: false,
+          };
+        }
+
+        // Handle parallel steps
+        if (step.type === 'parallel') {
+          const parallelSteps = (step as any).steps as Workflow['steps'];
+          try {
+            const results = await Promise.all(
+              parallelSteps.map(subStep => this.runSingleStep(subStep, context, stepRunners)),
+            );
+
+            const failedStepResult = results.find(r => !r.success);
+            if (failedStepResult) {
+              if (step.onFailure) {
+                currentStepId = step.onFailure;
+              } else {
+                state.status = 'failed';
+                state.updatedAt = new Date().toISOString();
+                await this.storageAdapter.saveWorkflowState(state);
+                // Broadcast step_failed event
+                sseManager.broadcast({
+                  context,
+                  error: `Parallel step failed: ${failedStepResult.error}`,
+                  event: 'step_failed',
+                  executionId: state.executionId,
+                  stepId: step.id,
+                  workflowId: state.workflowId,
+                });
+                return {
+                  message: `Parallel step failed: ${failedStepResult.error}`,
+                  success: false,
+                };
+              }
+            } else {
+              results.forEach((result, index) => {
+                const subStep = parallelSteps[index];
+                if (result.success && 'output' in subStep && typeof subStep.output === 'string') {
+                  context[subStep.output] = result.output;
+                }
+              });
+              currentStepId = step.onSuccess ?? this.findNextStep(workflow, currentStepId);
+            }
+          } catch (e) {
             state.status = 'failed';
             state.updatedAt = new Date().toISOString();
-            state.currentStepId = currentStepId;
             await this.storageAdapter.saveWorkflowState(state);
             // Broadcast step_failed event
             sseManager.broadcast({
               context,
-              error: result.error,
+              error: `Error in parallel step ${step.id}: ${e}`,
               event: 'step_failed',
               executionId: state.executionId,
               stepId: step.id,
               workflowId: state.workflowId,
             });
-            return { message: `Step ${step.id} failed: ${result.error}`, success: false };
+            return { message: `Error in parallel step ${step.id}: ${e}`, success: false };
+          }
+        } else {
+          const result = await this.runSingleStep(step, context, stepRunners);
+          state.history.push({
+            error: result.error,
+            executedAt: new Date().toISOString(),
+            output: result.output,
+            stepId: step.id,
+            success: result.success,
+          });
+
+          // Broadcast step_completed event
+          sseManager.broadcast({
+            context,
+            error: result.error,
+            event: 'step_completed',
+            executionId: state.executionId,
+            output: result.output,
+            stepId: step.id,
+            success: result.success,
+            workflowId: state.workflowId,
+          });
+
+          if (result.success) {
+            currentStepId =
+              'onSuccess' in step && step.onSuccess
+                ? step.onSuccess
+                : this.findNextStep(workflow, currentStepId);
+          } else {
+            if ('errorPolicy' in step && step.errorPolicy === 'continue') {
+              currentStepId =
+                'onFailure' in step && step.onFailure
+                  ? step.onFailure
+                  : this.findNextStep(workflow, currentStepId);
+            } else {
+              state.status = 'failed';
+              state.updatedAt = new Date().toISOString();
+              state.currentStepId = currentStepId;
+              await this.storageAdapter.saveWorkflowState(state);
+              // Broadcast step_failed event
+              sseManager.broadcast({
+                context,
+                error: result.error,
+                event: 'step_failed',
+                executionId: state.executionId,
+                stepId: step.id,
+                workflowId: state.workflowId,
+              });
+              return { message: `Step ${step.id} failed: ${result.error}`, success: false };
+            }
           }
         }
+
+        state.currentStepId = currentStepId;
+        state.updatedAt = new Date().toISOString();
+        await this.storageAdapter.saveWorkflowState(state);
       }
 
-      state.currentStepId = currentStepId;
+      // If the loop completes, the workflow is successful
+      state.status = 'completed';
       state.updatedAt = new Date().toISOString();
+      state.currentStepId = undefined;
       await this.storageAdapter.saveWorkflowState(state);
-    }
 
-    state.status = 'completed';
-    state.updatedAt = new Date().toISOString();
-    await this.storageAdapter.saveWorkflowState(state);
-    // Broadcast workflow_completed event
-    sseManager.broadcast({
-      context,
-      event: 'workflow_completed',
-      executionId: state.executionId,
-      status: state.status,
-      workflowId: state.workflowId,
-    });
-    return { message: 'Workflow completed successfully', outputs: state.context, success: true };
+      sseManager.broadcast({
+        context,
+        event: 'workflow_completed',
+        executionId: state.executionId,
+        workflowId: state.workflowId,
+      });
+
+      return {
+        message: 'Workflow completed successfully',
+        outputs: context,
+        success: true,
+      };
+    } catch (err: unknown) {
+      // Catch any unexpected errors during workflow execution
+      state.status = 'failed';
+      state.updatedAt = new Date().toISOString();
+      // currentStepId is preserved from the last loop iteration
+      await this.storageAdapter.saveWorkflowState(state);
+
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      sseManager.broadcast({
+        context,
+        error: errorMessage,
+        event: 'workflow_failed',
+        executionId: state.executionId,
+        stepId: currentStepId,
+        workflowId: state.workflowId,
+      });
+
+      console.error(
+        `Workflow ${state.workflowId} failed during execution ${state.executionId}`,
+        err,
+      );
+      // Since runWorkflow doesn't await, we shouldn't re-throw, just return a failure
+      return {
+        message: `Workflow failed: ${errorMessage}`,
+        success: false,
+      };
+    }
   }
 
   private async runSingleStep(

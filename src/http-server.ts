@@ -453,64 +453,82 @@ export async function startHttpServer(
   );
 
   /**
-   * PUT /prompts/:id
-   * Update a prompt by id and version.
+   * @openapi
+   * /prompts/{id}/{version}:
+   *   put:
+   *     summary: Update an existing prompt
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: version
+   *         required: true
+   *         schema:
+   *           type: integer
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             $ref: '#/components/schemas/Prompt'
+   *     responses:
+   *       200:
+   *         description: The updated prompt
+   *         content:
+   *           application/json:
+   *             schema:
+   *               $ref: '#/components/schemas/Prompt'
    */
-  app.put(
-    '/prompts/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const id = req.params.id;
-        const parseResult = promptSchemas.update.safeParse(req.body);
-        if (!parseResult.success) {
-          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid prompt data', details: parseResult.error.errors } });
-        }
-        const prompt = parseResult.data;
-        if (typeof prompt.version !== 'number') {
-          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing version' } });
-        }
-        try {
-          const updated = await services.promptService.updatePrompt(id, prompt.version, prompt);
-          return res.status(200).json({ success: true, prompt: updated });
-        } catch (err: any) {
-          if (err.message?.includes('not found')) {
-            return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: err.message } });
-          }
-          throw err;
-        }
-      } catch (err) {
-        next(err);
+  app.put('/prompts/:id/:version', async (req, res) => {
+    try {
+      const prompt = await services.promptService.updatePrompt(
+        req.params.id,
+        parseInt(req.params.version, 10),
+        req.body,
+      );
+      if (!prompt) {
+        return res.status(404).json({ error: { message: 'Prompt not found' } });
       }
-    },
-  );
+      res.json({ prompt });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        return res.status(400).json({ error: { message: 'Invalid prompt data', details: error.errors } });
+      }
+      res.status(500).json({ error: { message: 'An unexpected error occurred.' } });
+    }
+  });
 
   /**
-   * DELETE /prompts/:id
-   * Delete a prompt by id and version.
+   * @openapi
+   * /prompts/{id}/{version}:
+   *   delete:
+   *     summary: Delete a prompt
+   *     parameters:
+   *       - in: path
+   *         name: id
+   *         required: true
+   *         schema:
+   *           type: string
+   *       - in: path
+   *         name: version
+   *         required: true
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       204:
+   *         description: Prompt deleted successfully
    */
-  app.delete(
-    '/prompts/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const id = req.params.id;
-        const version = req.query.version ? Number(req.query.version) : undefined;
-        if (typeof version !== 'number') {
-          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing version' } });
-        }
-        try {
-          await services.promptService.deletePrompt(id, version);
-          return res.status(200).json({ success: true });
-        } catch (err: any) {
-          if (err.message?.includes('not found')) {
-            return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: err.message } });
-          }
-          throw err;
-        }
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
+  app.delete('/prompts/:id/:version', async (req, res) => {
+    try {
+      await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
+      res.status(204).send();
+    } catch (error: any) {
+      res.status(500).json({ error: { message: 'An unexpected error occurred.' } });
+    }
+  });
 
   /**
    * GET /prompts/:id/versions

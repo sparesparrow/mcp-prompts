@@ -3,21 +3,49 @@ import { z } from 'zod';
 /**
  * Base schema for a prompt, containing all user-definable fields.
  * Server-generated fields like id, createdAt, and updatedAt are excluded.
+ * This is used for creating new prompts.
  */
-const basePromptSchema = z.object({
-  content: z.string()
-    .trim()
-    .min(1, { message: 'Content cannot be empty or whitespace' }),
-  description: z.string().optional(),
-  name: z
-    .string()
-    .trim()
-    .min(1, { message: 'Name cannot be empty' }),
-  isTemplate: z.boolean().optional().default(false),
-  category: z.string().optional(),
-  metadata: z.record(z.unknown()).nullish(),
-  tags: z.array(z.string()).nullish(),
-  variables: z.array(z.union([z.string(), z.object({})])).nullish(),
+const createPromptSchema = z
+  .object({
+    name: z
+      .string({
+        required_error: 'Name is required.',
+        invalid_type_error: 'Name must be a string.',
+      })
+      .trim()
+      .min(1, { message: 'Name cannot be empty or just whitespace.' })
+      .max(100, { message: 'Name cannot be longer than 100 characters.' }),
+    content: z
+      .string({
+        required_error: 'Content is required.',
+        invalid_type_error: 'Content must be a string.',
+      })
+      .trim()
+      .min(1, { message: 'Content cannot be empty or just whitespace.' }),
+    description: z
+      .string()
+      .trim()
+      .max(500, { message: 'Description cannot be longer than 500 characters.' })
+      .optional(),
+    isTemplate: z.boolean().optional().default(false),
+    category: z.string().optional(),
+    metadata: z.record(z.unknown()).nullish(),
+    tags: z
+      .array(z.string().min(1, { message: 'Tags cannot be empty strings.' }))
+      .nullish(),
+    variables: z.array(z.union([z.string(), z.object({})])).nullish(),
+  })
+  .strict();
+
+/**
+ * Schema for a complete prompt object, including server-generated fields.
+ * This is used for validating prompts read from storage.
+ */
+const fullPromptSchema = createPromptSchema.extend({
+  id: z.string().min(1),
+  version: z.number().int().positive(),
+  createdAt: z.string().datetime().optional(),
+  updatedAt: z.string().datetime().optional(),
 });
 
 /**
@@ -28,11 +56,15 @@ export const promptSchemas = {
   /**
    * Schema for creating a new prompt. All fields from the base schema are required.
    */
-  create: basePromptSchema,
+  create: createPromptSchema,
+  /**
+   * Schema for a full prompt object, including server-side fields.
+   */
+  full: fullPromptSchema,
   /**
    * Schema for updating an existing prompt. All fields are optional.
    */
-  update: basePromptSchema.partial(),
+  update: createPromptSchema.partial(),
   applyTemplate: z.object({
     id: z.string(),
     variables: z.record(z.string()),

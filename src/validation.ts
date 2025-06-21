@@ -14,9 +14,12 @@ export class ValidationError extends Error {
 
 export function validatePrompt(
   prompt: unknown,
+  schema: 'create' | 'full' = 'full',
   throwOnError = true,
 ): { success: boolean; data?: Prompt; error?: z.ZodError } {
-  const result = promptSchemas.create.safeParse(prompt);
+  const selectedSchema =
+    schema === 'create' ? promptSchemas.create : promptSchemas.full;
+  const result = selectedSchema.safeParse(prompt);
   if (!result.success) {
     if (throwOnError) {
       const errorMessages = result.error.issues

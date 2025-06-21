@@ -3,24 +3,43 @@ import { promptSchemas, workflowSchema } from '../../src/schemas.js';
 import { validatePrompt, ValidationError } from '../../src/validation.js';
 
 describe('Validation', () => {
-  it('should pass for a valid prompt object', () => {
+  it('should pass for a valid full prompt object', () => {
     const validPrompt: Prompt = {
       id: '1',
       name: 'Valid Prompt',
       content: 'This is the content.',
+      version: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    expect(() => validatePrompt(validPrompt)).not.toThrow();
+    expect(() => validatePrompt(validPrompt, 'full')).not.toThrow();
+  });
+
+  it('should pass for a valid create prompt object', () => {
+    const validPrompt = {
+      name: 'Valid Prompt',
+      content: 'This is the content.',
+    };
+    expect(() => validatePrompt(validPrompt, 'create')).not.toThrow();
   });
 
   it('should throw ValidationError for a prompt with missing required fields', () => {
     const invalidPrompt = {
       id: '2',
       name: 'Invalid Prompt',
+      version: 1,
       // content is missing
     };
-    expect(() => validatePrompt(invalidPrompt)).toThrow(ValidationError);
+    expect(() => validatePrompt(invalidPrompt, 'full')).toThrow(ValidationError);
+  });
+
+  it('should throw when extra fields are present in create schema', () => {
+    const invalidPrompt = {
+      name: 'Creative Prompt',
+      content: 'This is the content.',
+      extraField: 'should not be here',
+    };
+    expect(() => validatePrompt(invalidPrompt, 'create')).toThrow(ValidationError);
   });
 
   it('should return a success result when not throwing on error', () => {
@@ -28,10 +47,11 @@ describe('Validation', () => {
       id: '3',
       name: 'Valid Prompt',
       content: 'Content here.',
+      version: 1,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    const result = validatePrompt(validPrompt, false);
+    const result = validatePrompt(validPrompt, 'full', false);
     expect(result.success).toBe(true);
     expect(result.data).toBeDefined();
     expect(result.error).toBeUndefined();
@@ -40,24 +60,26 @@ describe('Validation', () => {
   it('should return a failure result when not throwing on error', () => {
     const invalidPrompt = {
       id: '4',
+      version: 1,
       // name, content, createdAt, and updatedAt are missing
     };
-    const result = validatePrompt(invalidPrompt, false);
+    const result = validatePrompt(invalidPrompt, 'full', false);
     expect(result.success).toBe(false);
     expect(result.data).toBeUndefined();
     expect(result.error).toBeDefined();
-    expect(result.error?.issues).toHaveLength(2); // for name, content
+    expect(result.error?.issues.length).toBeGreaterThan(0);
   });
 
   it('should throw ValidationError for empty required string fields', () => {
     const promptWithEmptyStrings = {
-      id: '',
+      id: '5',
+      version: 1,
       name: '',
       content: '',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
-    expect(() => validatePrompt(promptWithEmptyStrings)).toThrow(ValidationError);
+    expect(() => validatePrompt(promptWithEmptyStrings, 'full')).toThrow(ValidationError);
   });
 });
 

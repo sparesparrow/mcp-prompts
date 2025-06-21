@@ -19,6 +19,8 @@ import {
   type WorkflowExecutionState,
 } from './interfaces.js';
 import { ValidationError, validatePrompt } from './validation.js';
+import { z } from 'zod';
+import { promptSchemas, workflowSchema } from './schemas.js';
 
 export type { StorageAdapter };
 
@@ -31,46 +33,36 @@ export class FileAdapter implements StorageAdapter {
   private sequencesDir: string;
   private workflowStatesDir: string;
   private connected = false;
-  private prompts: Map<string, Prompt> = new Map();
-  private useCatalog: boolean;
-  private catalog: any;
 
-  public constructor(promptsDir: string, useCatalog = false) {
+  public constructor(promptsDir: string) {
     this.promptsDir = promptsDir;
     this.sequencesDir = path.join(promptsDir, 'sequences');
     this.workflowStatesDir = path.join(promptsDir, 'workflow-states');
-    this.useCatalog = useCatalog;
   }
 
   public async connect(): Promise<void> {
     try {
-      if (!this.useCatalog) {
-        await fsp.mkdir(this.promptsDir, { recursive: true });
-        await fsp.mkdir(this.sequencesDir, { recursive: true });
-        await fsp.mkdir(this.workflowStatesDir, { recursive: true });
-        console.error(`File storage connected: ${this.promptsDir}`);
+      await fsp.mkdir(this.promptsDir, { recursive: true });
+      await fsp.mkdir(this.sequencesDir, { recursive: true });
+      await fsp.mkdir(this.workflowStatesDir, { recursive: true });
 
-        // Validate existing prompts on startup
-        const files = await fsp.readdir(this.promptsDir);
-        for (const file of files) {
-          if (file.endsWith('.json')) {
-            const filePath = path.join(this.promptsDir, file);
-            try {
-              const content = await fsp.readFile(filePath, 'utf-8');
-              const prompt = JSON.parse(content);
-              validatePrompt(prompt, true);
-            } catch (error: unknown) {
-              if (error instanceof ValidationError) {
-                console.warn(`Validation failed for ${file}: ${error.message}`);
-              } else {
-                console.error(`Error reading or parsing ${file}:`, error);
-              }
+      // Validate existing prompts on startup
+      const files = await fsp.readdir(this.promptsDir);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const filePath = path.join(this.promptsDir, file);
+          try {
+            const content = await fsp.readFile(filePath, 'utf-8');
+            const prompt = JSON.parse(content);
+            validatePrompt(prompt, 'full', true);
+          } catch (error: unknown) {
+            if (error instanceof ValidationError) {
+              console.warn(`Validation failed for ${file}: ${error.message}`);
+            } else {
+              console.error(`Error reading or parsing ${file}:`, error);
             }
           }
         }
-      } else {
-        this.catalog = await import('@sparesparrow/mcp-prompts-catalog');
-        console.error('Catalog storage connected');
       }
       this.connected = true;
     } catch (error: unknown) {
@@ -78,58 +70,80 @@ export class FileAdapter implements StorageAdapter {
       if (error instanceof Error) {
         throw new Error(`Failed to connect to file storage: ${error.message}`);
       }
-      throw new Error(`Failed to connect to file storage`);
+      throw new Error('Failed to connect to file storage');
     }
   }
 
   public async disconnect(): Promise<void> {
     this.connected = false;
-    console.error('File storage disconnected');
   }
 
-  private getPromptFileName(id: string, version: number) {
+  private getPromptFileName(id: string, version: number): string {
     return path.join(this.promptsDir, `${id}-v${version}.json`);
   }
 
-  public async savePrompt(prompt: Prompt): Promise<Prompt> {
+  private generateId(name: string): string {
+    return name.toLowerCase().replace(/\s+/g, '-');
+  }
+
+  public async savePrompt(promptData: Omit<Prompt, 'id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
-    validatePrompt(prompt, true);
-    const finalPath = this.getPromptFileName(prompt.id, prompt.version ?? 1);
+
+    const id = this.generateId(promptData.name);
+
+    const versions = await this.listPromptVersions(id);
+    const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+
+    const promptWithDefaults: Prompt = {
+      id,
+      version: newVersion,
+      ...promptSchemas.create.parse(promptData),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    validatePrompt(promptWithDefaults, 'full', true);
+
+    const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
     try {
-      await fsp.writeFile(tempPath, JSON.stringify(prompt, null, 2));
+      await fsp.writeFile(tempPath, JSON.stringify(promptWithDefaults, null, 2));
       await fsp.rename(tempPath, finalPath);
-      return prompt;
+      return promptWithDefaults;
     } catch (error: unknown) {
-      try { await fsp.unlink(tempPath); } catch {}
+      try {
+        await fsp.unlink(tempPath);
+      } catch {
+        // ignore
+      }
       throw error;
     }
   }
 
   public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
     if (!this.connected) throw new Error('File storage not connected');
-    if (version !== undefined) {
-      try {
-        const content = await fsp.readFile(this.getPromptFileName(id, version), 'utf-8');
-        const prompt = JSON.parse(content);
-        validatePrompt(prompt, true);
-        return prompt;
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return null;
+
+    let versionToFetch = version;
+
+    if (versionToFetch === undefined) {
+      const versions = await this.listPromptVersions(id);
+      if (versions.length === 0) return null;
+      versionToFetch = Math.max(...versions);
+    }
+
+    try {
+      const content = await fsp.readFile(this.getPromptFileName(id, versionToFetch), 'utf-8');
+      const prompt: Prompt = JSON.parse(content);
+      validatePrompt(prompt, 'full', true);
+      return prompt;
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
+      throw error;
     }
-    // If no version, get the highest version
-    const files = (await fsp.readdir(this.promptsDir)).filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
-    if (files.length === 0) return null;
-    const versions = files.map(f => {
-      const match = f.match(/-v(\d+)\.json$/);
-      return match ? parseInt(match[1], 10) : 0;
-    });
-    const maxVersion = Math.max(...versions);
-    return this.getPrompt(id, maxVersion);
   }
 
   public async listPromptVersions(id: string): Promise<number[]> {
@@ -140,22 +154,41 @@ export class FileAdapter implements StorageAdapter {
         const match = f.match(/-v(\d+)\.json$/);
         return match ? parseInt(match[1], 10) : null;
       })
-      .filter(v => v !== null) as number[];
+      .filter((v): v is number => v !== null)
+      .sort((a, b) => a - b);
   }
 
-  public async updatePrompt(id: string, version: number, prompt: Prompt): Promise<Prompt> {
+  public async updatePrompt(id: string, version: number, prompt: Partial<Prompt>): Promise<Prompt> {
     if (!this.connected) throw new Error('File storage not connected');
-    validatePrompt(prompt, true);
-    const finalPath = this.getPromptFileName(id, version);
+
+    const existingPrompt = await this.getPrompt(id, version);
+    if (!existingPrompt) {
+      throw new Error(`Prompt with id ${id} and version ${version} not found`);
+    }
+
+    const newVersion = existingPrompt.version + 1;
+
+    const updatedPrompt: Prompt = {
+      ...existingPrompt,
+      ...prompt,
+      version: newVersion,
+      updatedAt: new Date().toISOString(),
+    };
+
+    validatePrompt(updatedPrompt, 'full', true);
+
+    const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
     try {
-      const updatedPrompt = { ...prompt, id, version, updatedAt: new Date().toISOString() };
-      validatePrompt(updatedPrompt, true);
       await fsp.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
       await fsp.rename(tempPath, finalPath);
       return updatedPrompt;
     } catch (error: unknown) {
-      try { await fsp.unlink(tempPath); } catch {}
+      try {
+        await fsp.unlink(tempPath);
+      } catch {
+        // ignore
+      }
       throw error;
     }
   }
@@ -166,23 +199,63 @@ export class FileAdapter implements StorageAdapter {
       try {
         await fsp.unlink(this.getPromptFileName(id, version));
       } catch (error: unknown) {
-        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return;
+        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return; // Not found is ok
         throw error;
       }
       return;
     }
-    // Delete all versions
-    const files = (await fsp.readdir(this.promptsDir)).filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
-    for (const file of files) {
-      try { await fsp.unlink(path.join(this.promptsDir, file)); } catch {}
+    const allVersions = await this.listPromptVersions(id);
+    for (const v of allVersions) {
+      try {
+        await fsp.unlink(this.getPromptFileName(id, v));
+      } catch (error: unknown) {
+        // Only ignore 'file not found' errors. Re-throw others.
+        if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+          throw error;
+        }
+      }
     }
+  }
+
+  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
+    if (!this.connected) throw new Error('File storage not connected');
+    const allFiles = await fsp.readdir(this.promptsDir);
+    const promptFiles = allFiles.filter(f => f.endsWith('.json'));
+    const prompts: Prompt[] = [];
+
+    for (const file of promptFiles) {
+      try {
+        const content = await fsp.readFile(path.join(this.promptsDir, file), 'utf-8');
+        prompts.push(JSON.parse(content));
+      } catch {
+        // ignore malformed files
+      }
+    }
+
+    let filtered = prompts;
+
+    if (options?.isTemplate !== undefined) {
+      filtered = filtered.filter(p => p.isTemplate === options.isTemplate);
+    }
+
+    if (allVersions) {
+      return filtered;
+    }
+
+    const latestPrompts = new Map<string, Prompt>();
+    for (const prompt of filtered) {
+      const existing = latestPrompts.get(prompt.id);
+      if (!existing || prompt.version > existing.version) {
+        latestPrompts.set(prompt.id, prompt);
+      }
+    }
+    return Array.from(latestPrompts.values());
   }
 
   public async getSequence(id: string): Promise<PromptSequence | null> {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
-
     try {
       const content = await fsp.readFile(path.join(this.sequencesDir, `${id}.json`), 'utf-8');
       return JSON.parse(content);
@@ -190,7 +263,6 @@ export class FileAdapter implements StorageAdapter {
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
-      console.error(`Error getting sequence ${id} from file:`, error);
       throw error;
     }
   }
@@ -199,107 +271,34 @@ export class FileAdapter implements StorageAdapter {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
-
     const finalPath = path.join(this.sequencesDir, `${sequence.id}.json`);
-    const tempPath = `${finalPath}.tmp`;
-
-    try {
-      await fsp.writeFile(tempPath, JSON.stringify(sequence, null, 2));
-      await fsp.rename(tempPath, finalPath);
-      return sequence;
-    } catch (error: unknown) {
-      // Clean up the temp file if it exists
-      try {
-        await fsp.unlink(tempPath);
-      } catch (cleanupError: unknown) {
-        // Ignore errors on cleanup, the original error is more important
-      }
-      console.error('Error saving sequence to file:', error);
-      throw error;
-    }
+    await fsp.writeFile(finalPath, JSON.stringify(sequence, null, 2));
+    return sequence;
   }
 
   public async deleteSequence(id: string): Promise<void> {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
-
     try {
       await fsp.unlink(path.join(this.sequencesDir, `${id}.json`));
     } catch (error: unknown) {
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`Error deleting sequence ${id} from file:`, error);
-        throw error;
-      }
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return;
+      throw error;
     }
-  }
-
-  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
-    if (!this.connected) throw new Error('File storage not connected');
-    const files = (await fsp.readdir(this.promptsDir)).filter(f => f.endsWith('.json'));
-    const promptsById: Record<string, { version: number; file: string }[]> = {};
-    files.forEach(f => {
-      const match = f.match(/^(.*)-v(\d+)\.json$/);
-      if (!match) return;
-      const id = match[1];
-      const version = parseInt(match[2], 10);
-      if (!promptsById[id]) promptsById[id] = [];
-      promptsById[id].push({ version, file: f });
-    });
-    const result: Prompt[] = [];
-    Object.entries(promptsById).forEach(([id, versions]) => {
-      const sorted = versions.sort((a, b) => b.version - a.version);
-      if (allVersions) {
-        sorted.forEach(({ file }) => {
-          result.push(JSON.parse(fs.readFileSync(path.join(this.promptsDir, file), 'utf8')));
-        });
-      } else {
-        const file = sorted[0].file;
-        result.push(JSON.parse(fs.readFileSync(path.join(this.promptsDir, file), 'utf8')));
-      }
-    });
-    // TODO: filter by options (category, tags, etc.)
-    return result;
-  }
-
-  public async getAllPrompts(): Promise<Prompt[]> {
-    if (!this.connected) {
-      throw new Error('File storage not connected');
-    }
-    return Array.from(this.prompts.values());
-  }
-
-  public async healthCheck(): Promise<boolean> {
-    try {
-      await fsp.access(this.promptsDir);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
-  private generateId(name: string): string {
-    // Simple slug-like ID for MDC
-    return name
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, '-')
-      .replace(/^-|-$/g, '');
-  }
-
-  public async isConnected(): Promise<boolean> {
-    return this.connected;
   }
 
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
-    const filePath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
-    await fsp.writeFile(filePath, JSON.stringify(state, null, 2));
+    const finalPath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
+    await fsp.writeFile(finalPath, JSON.stringify(state, null, 2));
   }
 
   public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
-    const filePath = path.join(this.workflowStatesDir, `${executionId}.json`);
     try {
-      const content = await fsp.readFile(filePath, 'utf-8');
-      return JSON.parse(content) as WorkflowExecutionState;
+      const content = await fsp.readFile(path.join(this.workflowStatesDir, `${executionId}.json`), 'utf-8');
+      const state: WorkflowExecutionState = JSON.parse(content);
+      workflowSchema.parse(state);
+      return state;
     } catch (error: unknown) {
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
@@ -310,24 +309,21 @@ export class FileAdapter implements StorageAdapter {
 
   public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
     const states: WorkflowExecutionState[] = [];
-    try {
-      const files = await fsp.readdir(this.workflowStatesDir);
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-          const content = await fsp.readFile(path.join(this.workflowStatesDir, file), 'utf-8');
-          const state = JSON.parse(content) as WorkflowExecutionState;
-          if (state.workflowId === workflowId) {
-            states.push(state);
-          }
+    const files = await fsp.readdir(this.workflowStatesDir);
+    for (const file of files) {
+      if (file.endsWith('.json')) {
+        const content = await fsp.readFile(path.join(this.workflowStatesDir, file), 'utf-8');
+        const state: WorkflowExecutionState = JSON.parse(content);
+        if (state.workflowId === workflowId) {
+          states.push(state);
         }
-      }
-    } catch (error) {
-      // Ignore if directory doesn't exist
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        throw error;
       }
     }
     return states;
+  }
+
+  public async healthCheck(): Promise<boolean> {
+    return this.connected;
   }
 }
 
@@ -673,54 +669,38 @@ export class PostgresAdapter implements StorageAdapter {
     return this.getPromptById(promptId);
   }
 
-  public async updatePrompt(idOrName: string, version: number, prompt: Prompt): Promise<Prompt> {
-    const client = await this.pool.connect();
+  public async updatePrompt(id: string, version: number, prompt: Partial<Prompt>): Promise<Prompt> {
+    if (!this.connected) throw new Error('File storage not connected');
+
+    const existingPrompt = await this.getPrompt(id, version);
+    if (!existingPrompt) {
+      throw new Error(`Prompt with id ${id} and version ${version} not found`);
+    }
+
+    // Merge the existing prompt with the update payload
+    const updatedPromptData = {
+      ...existingPrompt,
+      ...prompt,
+      version: existingPrompt.version, // Ensure version isn't changed by partial update
+      updatedAt: new Date().toISOString(),
+    };
+
+    // Validate the final, merged object against the full schema
+    validatePrompt(updatedPromptData, 'full', true);
+
+    const finalPath = this.getPromptFileName(id, version);
+    const tempPath = `${finalPath}.tmp`;
     try {
-      await client.query('BEGIN');
-
-      const isNumericId = /^\d+$/.test(idOrName);
-      const result = await client.query(
-        `SELECT id FROM prompts WHERE ${isNumericId ? 'id = $1' : 'name = $1'}`,
-        [isNumericId ? parseInt(idOrName, 10) : idOrName],
-      );
-      const promptId = result.rows[0]?.id;
-
-      if (!promptId) {
-        throw new Error(`Prompt not found: ${idOrName}`);
+      await fsp.writeFile(tempPath, JSON.stringify(updatedPromptData, null, 2));
+      await fsp.rename(tempPath, finalPath);
+      return updatedPromptData;
+    } catch (error: unknown) {
+      try {
+        await fsp.unlink(tempPath);
+      } catch {
+        // ignore
       }
-
-      const updateFields: Record<string, any> = {};
-      if (prompt.name) updateFields.name = prompt.name;
-      if (prompt.description) updateFields.description = prompt.description;
-      if (prompt.content) updateFields.content = prompt.content;
-      if (prompt.isTemplate !== undefined) updateFields.is_template = prompt.isTemplate;
-      if (prompt.category) updateFields.category = prompt.category;
-      if (prompt.metadata) updateFields.metadata = prompt.metadata;
-      if (prompt.version) updateFields.version = prompt.version;
-      updateFields.updated_at = new Date();
-
-      const fieldEntries = Object.entries(updateFields);
-      if (fieldEntries.length > 0) {
-        const setClause = fieldEntries.map(([key], i) => `${key} = $${i + 2}`).join(', ');
-        const values = fieldEntries.map(([, value]) => value);
-        await client.query(`UPDATE prompts SET ${setClause} WHERE id = $1`, [promptId, ...values]);
-      }
-
-      if (prompt.tags) {
-        await this.setPromptTags(promptId, prompt.tags);
-      }
-      if (prompt.variables) {
-        await this.setTemplateVariables(promptId, this.extractVariableNames(prompt.variables));
-      }
-
-      await client.query('COMMIT');
-
-      return this.getPromptById(promptId);
-    } catch (e) {
-      await client.query('ROLLBACK');
-      throw e;
-    } finally {
-      client.release();
+      throw error;
     }
   }
 
@@ -779,202 +759,97 @@ export class PostgresAdapter implements StorageAdapter {
       query += ` WHERE ${whereClauses.join(' AND ')}`;
     }
 
-    query += ' ORDER BY p.updated_at DESC';
+    if (!allVersions) {
+      if (whereClauses.length > 0) {
+        query += ` AND`;
+      } else {
+        query += ` WHERE`;
+      }
+      query += ` (p.id, p.version) IN (
+        SELECT id, MAX(version)
+        FROM prompts
+        GROUP BY id
+      )`;
+    }
+
+    query += ' ORDER BY p.name';
+
+    if (options?.limit) {
+      query += ` LIMIT $${paramIndex++}`;
+      params.push(options.limit);
+    }
+    if (options?.offset) {
+      query += ` OFFSET $${paramIndex++}`;
+      params.push(options.offset);
+    }
 
     const res = await this.pool.query(query, params);
-    const prompts = await Promise.all(res.rows.map(row => this.getPromptById(row.id)));
+    return Promise.all(res.rows.map(p => this.getPromptById(p.id)));
+  }
 
-    return prompts;
+  public async getSequence(id: string): Promise<PromptSequence | null> {
+    const res = await this.pool.query('SELECT * FROM sequences WHERE id = $1', [id]);
+    return res.rows[0] || null;
+  }
+
+  public async healthCheck(): Promise<boolean> {
+    try {
+      await fsp.access(this.promptsDir);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  private generateId(name: string): string {
+    // Simple slug-like ID for MDC
+    return name
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, '-')
+      .replace(/^-|-$/g, '');
   }
 
   public async isConnected(): Promise<boolean> {
     return this.connected;
   }
 
-  /**
-   * Expects a 'sequences' table with columns:
-   * id (text, primary key), name (text), description (text), prompt_ids (text[]), created_at (timestamp), updated_at (timestamp), metadata (jsonb)
-   */
-  public async getSequence(id: string): Promise<PromptSequence | null> {
-    const res = await this.pool.query('SELECT * FROM sequences WHERE id = $1', [id]);
-    if (res.rows.length === 0) return null;
-    const row = res.rows[0];
-    return {
-      id: row.id,
-      name: row.name,
-      description: row.description,
-      promptIds: row.prompt_ids,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      metadata: row.metadata,
-    };
-  }
-
-  public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    const now = new Date();
-    await this.pool.query(
-      `INSERT INTO sequences (id, name, description, prompt_ids, created_at, updated_at, metadata)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       ON CONFLICT (id) DO UPDATE SET
-         name = EXCLUDED.name,
-         description = EXCLUDED.description,
-         prompt_ids = EXCLUDED.prompt_ids,
-         updated_at = EXCLUDED.updated_at,
-         metadata = EXCLUDED.metadata`,
-      [
-        sequence.id,
-        sequence.name,
-        sequence.description,
-        sequence.promptIds,
-        sequence.createdAt ?? now,
-        now,
-        sequence.metadata ?? {},
-      ],
-    );
-    return this.getSequence(sequence.id) as Promise<PromptSequence>;
-  }
-
-  public async deleteSequence(id: string): Promise<void> {
-    await this.pool.query('DELETE FROM sequences WHERE id = $1', [id]);
-  }
-
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
-    const {
-      executionId,
-      workflowId,
-      status,
-      context,
-      currentStepId,
-      history,
-      createdAt,
-      updatedAt,
-    } = state;
-    const query = `
-      INSERT INTO workflow_executions (id, workflow_id, status, context, current_step_id, history, created_at, updated_at)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
-      ON CONFLICT (id) DO UPDATE SET
-        status = EXCLUDED.status,
-        context = EXCLUDED.context,
-        current_step_id = EXCLUDED.current_step_id,
-        history = EXCLUDED.history,
-        updated_at = EXCLUDED.updated_at;
-    `;
-    await this.pool.query(query, [
-      executionId,
-      workflowId,
-      status,
-      context,
-      currentStepId,
-      JSON.stringify(history),
-      createdAt,
-      updatedAt,
-    ]);
+    const filePath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
+    await fsp.writeFile(filePath, JSON.stringify(state, null, 2));
   }
 
   public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
-    const res = await this.pool.query('SELECT * FROM workflow_executions WHERE id = $1', [
-      executionId,
-    ]);
-    if (res.rows.length === 0) {
-      return null;
+    const filePath = path.join(this.workflowStatesDir, `${executionId}.json`);
+    try {
+      const content = await fsp.readFile(filePath, 'utf-8');
+      return JSON.parse(content) as WorkflowExecutionState;
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
     }
-    const row = res.rows[0];
-    return {
-      executionId: row.id,
-      workflowId: row.workflow_id,
-      status: row.status,
-      context: row.context,
-      currentStepId: row.current_step_id,
-      history: row.history,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    };
   }
 
   public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
-    const res = await this.pool.query(
-      'SELECT * FROM workflow_executions WHERE workflow_id = $1 ORDER BY updated_at DESC',
-      [workflowId],
-    );
-    return res.rows.map(row => ({
-      executionId: row.id,
-      workflowId: row.workflow_id,
-      status: row.status,
-      context: row.context,
-      currentStepId: row.current_step_id,
-      history: row.history,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-    }));
-  }
-
-  public async clearAll(): Promise<void> {
-    await this.pool.query(
-      'TRUNCATE prompts, tags, prompt_tags, template_variables RESTART IDENTITY',
-    );
-  }
-
-  public async healthCheck(): Promise<boolean> {
+    const states: WorkflowExecutionState[] = [];
     try {
-      const client = await this.pool.connect();
-      try {
-        await client.query('SELECT 1');
-        return true;
-      } finally {
-        client.release();
+      const files = await fsp.readdir(this.workflowStatesDir);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const content = await fsp.readFile(path.join(this.workflowStatesDir, file), 'utf-8');
+          const state = JSON.parse(content) as WorkflowExecutionState;
+          if (state.workflowId === workflowId) {
+            states.push(state);
+          }
+        }
       }
-    } catch {
-      return false;
-    }
-  }
-
-  public async getAllPrompts(): Promise<Prompt[]> {
-    const res = await this.pool.query('SELECT id FROM prompts ORDER BY updated_at DESC');
-    const prompts = await Promise.all(res.rows.map(row => this.getPromptById(row.id)));
-    return prompts;
-  }
-
-  /**
-   * Returns current connection pool metrics: active, idle, waiting, total
-   */
-  public getPoolMetrics(): { total: number; idle: number; waiting: number; active: number } {
-    return {
-      total: this.pool.totalCount,
-      idle: this.pool.idleCount,
-      waiting: this.pool.waitingCount,
-      active: this.pool.totalCount - this.pool.idleCount,
-    };
-  }
-
-  public async listPromptVersions(id: string): Promise<number[]> {
-    const client = await this.pool.connect();
-    try {
-      const res = await client.query('SELECT version FROM prompts WHERE id = $1 ORDER BY version ASC', [id]);
-      return res.rows.map((row: any) => Number(row.version));
-    } finally {
-      client.release();
-    }
-  }
-}
-
-/**
- * A factory function that creates a storage adapter based on the provided configuration.
- * This allows the server to be agnostic about the storage implementation.
- */
-export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
-  switch (config.storage.type) {
-    case 'postgres':
-      logger.info('Using PostgreSQL storage adapter');
-      return new PostgresAdapter(config.storage);
-    case 'file':
-      logger.info(`Using file storage adapter with directory: ${config.storage.promptsDir}`);
-      return new FileAdapter(config.storage.promptsDir);
-    default:
-      if (config.storage.type) {
-        throw new Error(`Unknown storage type: ${config.storage.type}`);
+    } catch (error) {
+      // Ignore if directory doesn't exist
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
       }
-      // Fallback to a default or handle the case where type is not specified
-      logger.warn('Storage type not specified, falling back to in-memory storage.');
-      return new MemoryAdapter();
+    }
+    return states;
   }
 }

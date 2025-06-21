@@ -15,8 +15,8 @@ export default {
     ],
   },
   testMatch: [
-    "**/__tests__/**/*.[jt]s?(x)",
-    "**/?(*.)+(spec|test|unit|integration).[jt]s?(x)"
+    "**/__tests__/**/*.ts?(x)",
+    "**/?(*.)+(spec|test|unit|integration).ts?(x)"
   ],
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
