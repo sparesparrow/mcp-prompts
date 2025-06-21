@@ -1,8 +1,8 @@
 import { jest } from '@jest/globals';
 
+import { PromptService } from '../../src/prompt-service.js';
 import { MemoryAdapter } from '../../src/adapters.js';
 import type { StorageAdapter } from '../../src/interfaces.js';
-import { PromptService } from '../../src/prompt-service.js';
 import {
   HttpRunner,
   PromptRunner,
@@ -30,23 +30,26 @@ const statelessStepRunners = {
 
 // Mocks for stateful tests
 const mockStorageAdapter: StorageAdapter = {
-  saveWorkflowState: jest.fn(),
-  getWorkflowState: jest.fn(),
-  listWorkflowStates: jest.fn(),
-  // Add other required methods as mocks if needed
-  create: jest.fn(),
-  get: jest.fn(),
-  list: jest.fn(),
-  update: jest.fn(),
-  delete: jest.fn(),
-  healthCheck: jest.fn(),
-  init: jest.fn(),
-  isConnected: jest.fn(),
-  getAllPrompts: jest.fn(),
-  createSequence: jest.fn(),
-  getSequence: jest.fn(),
-  updateSequence: jest.fn(),
-  deleteSequence: jest.fn(),
+  connect: jest.fn() as unknown as () => Promise<void>,
+  disconnect: jest.fn() as unknown as () => Promise<void>,
+  isConnected: jest.fn() as unknown as () => boolean | Promise<boolean>,
+  savePrompt: jest.fn() as unknown as () => Promise<any>,
+  getPrompt: jest.fn() as unknown as () => Promise<any>,
+  getAllPrompts: jest.fn() as unknown as () => Promise<any[]>,
+  updatePrompt: jest.fn() as unknown as () => Promise<any>,
+  listPrompts: jest.fn() as unknown as () => Promise<any[]>,
+  deletePrompt: jest.fn() as unknown as () => Promise<void>,
+  clearAll: jest.fn() as unknown as () => Promise<void>,
+  backup: jest.fn() as unknown as () => Promise<string>,
+  restore: jest.fn() as unknown as (backupId: string) => Promise<void>,
+  listBackups: jest.fn() as unknown as () => Promise<string[]>,
+  getSequence: jest.fn() as unknown as (id: string) => Promise<any>,
+  saveSequence: jest.fn() as unknown as () => Promise<any>,
+  deleteSequence: jest.fn() as unknown as (id: string) => Promise<void>,
+  healthCheck: jest.fn() as unknown as () => Promise<boolean>,
+  saveWorkflowState: jest.fn() as unknown as (state: any) => Promise<void>,
+  getWorkflowState: jest.fn() as unknown as (executionId: string) => Promise<any>,
+  listWorkflowStates: jest.fn() as unknown as (workflowId: string) => Promise<any[]>,
 };
 
 const mockPromptService = {} as PromptService;
@@ -74,7 +77,20 @@ describe('WorkflowService (Stateless)', () => {
       ],
     };
 
-    const result = await service.runWorkflowSteps(workflow, { context: {}, history: [], currentStepId: 'step1', status: 'running', executionId: '', workflowId: '', createdAt: '', updatedAt: ''}, statelessStepRunners);
+    const result = await service.runWorkflowSteps(
+      workflow,
+      {
+        context: {},
+        history: [],
+        currentStepId: 'step1',
+        status: 'running',
+        executionId: '',
+        workflowId: '',
+        createdAt: '',
+        updatedAt: '',
+      },
+      statelessStepRunners,
+    );
     expect(result.success).toBe(true);
     expect(mockStatelessPromptRunner.runStep).toHaveBeenCalledTimes(1);
     expect(mockStatelessShellRunner.runStep).toHaveBeenCalledTimes(1);
@@ -103,18 +119,18 @@ describe('WorkflowService (Stateful)', () => {
       name: 'Stateful Workflow',
       version: 1,
       steps: [
-        { id: 'step1', type: 'shell', command: 'echo "hello"' },
-        { id: 'step2', type: 'shell', command: 'echo "world"' },
+        { id: 'step1', type: 'shell', command: 'echo "hello"', output: 'out1' },
+        { id: 'step2', type: 'shell', command: 'echo "world"', output: 'out2' },
       ],
     };
 
     const result = await service.runWorkflow(workflow);
     
     expect(result.success).toBe(true);
-    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(3); // Initial, after step1, final
+    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(4); // Initial, after step1, after step2, final
     
     // Check final state saved
-    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[2][0];
+    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[3][0] as any;
     expect(lastCall).toEqual(expect.objectContaining({
       status: 'completed',
       workflowId: 'stateful-workflow',
@@ -131,8 +147,8 @@ describe('WorkflowService (Stateful)', () => {
           id: 'parallel-step',
           type: 'parallel',
           steps: [
-            { id: 'p-step1', type: 'shell', command: 'echo "first"' },
-            { id: 'p-step2', type: 'shell', command: 'echo "second"' },
+            { id: 'p-step1', type: 'shell', command: 'echo "first"', output: 'out1' },
+            { id: 'p-step2', type: 'shell', command: 'echo "second"', output: 'out2' },
           ],
         },
       ],
@@ -142,9 +158,9 @@ describe('WorkflowService (Stateful)', () => {
 
     expect(result.success).toBe(true);
     // Initial save, then one save after the parallel block completes
-    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(2);
+    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(3); // Initial, after parallel block, final
     
-    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[1][0];
+    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[2][0] as any;
     expect(lastCall.status).toBe('completed');
   });
 }); 
