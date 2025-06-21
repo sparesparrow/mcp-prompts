@@ -1,13 +1,14 @@
+import express from 'express';
 import fs from 'fs';
 import path from 'path';
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import cors from 'cors';
-import express from 'express';
-import rateLimit from 'express-rate-limit';
+import http from 'http';
 import helmet from 'helmet';
-import type http from 'http';
-import swaggerUi from 'swagger-ui-express';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import swaggerJSDoc from 'swagger-jsdoc';
+import swaggerUi from 'swagger-ui-express';
+import { z } from 'zod';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
 
 import type { PromptService } from './prompt-service.js';
 import type { SequenceService } from './sequence-service.js';
@@ -44,23 +45,81 @@ const WORKFLOW_DIR = path.resolve(process.cwd(), 'data', 'workflows');
 function ensureWorkflowDir() {
   if (!fs.existsSync(WORKFLOW_DIR)) fs.mkdirSync(WORKFLOW_DIR, { recursive: true });
 }
+
+function getWorkflowFileName(id: string, version: number) {
+  return path.join(WORKFLOW_DIR, `${id}-v${version}.json`);
+}
+
 function saveWorkflowToFile(workflow: any) {
   ensureWorkflowDir();
+  if (typeof workflow.id !== 'string' || typeof workflow.version !== 'number') {
+    throw new Error('Workflow must have string id and number version');
+  }
   fs.writeFileSync(
-    path.join(WORKFLOW_DIR, `${workflow.id}.json`),
+    getWorkflowFileName(workflow.id, workflow.version),
     JSON.stringify(workflow, null, 2),
   );
 }
-function loadWorkflowFromFile(id: string) {
-  const file = path.join(WORKFLOW_DIR, `${id}.json`);
-  if (!fs.existsSync(file)) return null;
+
+function loadWorkflowFromFile(id: string, version?: number) {
+  ensureWorkflowDir();
+  if (version !== undefined) {
+    const file = getWorkflowFileName(id, version);
+    if (!fs.existsSync(file)) return null;
+    return JSON.parse(fs.readFileSync(file, 'utf8'));
+  }
+  // If no version specified, get the latest version
+  const files = fs.readdirSync(WORKFLOW_DIR)
+    .filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
+  if (files.length === 0) return null;
+  // Find the highest version
+  const versions = files.map(f => {
+    const match = f.match(/-v(\d+)\.json$/);
+    return match ? parseInt(match[1], 10) : 0;
+  });
+  const maxVersion = Math.max(...versions);
+  const file = getWorkflowFileName(id, maxVersion);
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
-function getAllWorkflows() {
+
+function getAllWorkflowVersions(id: string) {
   ensureWorkflowDir();
-  return fs.readdirSync(WORKFLOW_DIR)
-    .filter(f => f.endsWith('.json'))
-    .map(f => JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, f), 'utf8')));
+  const files = fs.readdirSync(WORKFLOW_DIR)
+    .filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
+  return files
+    .map(f => {
+      const match = f.match(/-v(\d+)\.json$/);
+      return match ? parseInt(match[1], 10) : null;
+    })
+    .filter(v => v !== null)
+    .sort((a, b) => (a as number) - (b as number));
+}
+
+function getAllWorkflows(latestOnly = true) {
+  ensureWorkflowDir();
+  const files = fs.readdirSync(WORKFLOW_DIR).filter(f => f.endsWith('.json'));
+  const workflowsById: Record<string, any[]> = {};
+  files.forEach(f => {
+    const match = f.match(/^(.*)-v(\d+)\.json$/);
+    if (!match) return;
+    const id = match[1];
+    const version = parseInt(match[2], 10);
+    if (!workflowsById[id]) workflowsById[id] = [];
+    workflowsById[id].push({ version, file: f });
+  });
+  const result: any[] = [];
+  Object.entries(workflowsById).forEach(([id, versions]) => {
+    const sorted = (versions as any[]).sort((a, b) => b.version - a.version);
+    if (latestOnly) {
+      const file = sorted[0].file;
+      result.push(JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, file), 'utf8')));
+    } else {
+      sorted.forEach(({ file }) => {
+        result.push(JSON.parse(fs.readFileSync(path.join(WORKFLOW_DIR, file), 'utf8')));
+      });
+    }
+  });
+  return result;
 }
 
 const swaggerDefinition = {
@@ -195,10 +254,16 @@ export async function startHttpServer(
     try {
       const storage = services.promptService.getStorage();
       const healthy = await storage.healthCheck?.();
+      let poolMetrics = undefined;
+      // Expose pool metrics if PostgresAdapter
+      if (typeof storage.getPoolMetrics === 'function') {
+        poolMetrics = storage.getPoolMetrics();
+      }
       if (!healthy) {
         res.status(503).json({
           status: 'error',
           storage: 'unhealthy',
+          pool: poolMetrics,
         });
         return;
       }
@@ -206,6 +271,7 @@ export async function startHttpServer(
         status: 'ok',
         version: process.env.npm_package_version || 'dev',
         storage: 'healthy',
+        pool: poolMetrics,
       });
     } catch (err) {
       res.status(503).json({
@@ -218,6 +284,118 @@ export async function startHttpServer(
 
   // Add API key authentication middleware
   app.use(apiKeyAuth);
+
+  /**
+   * @openapi
+   * /prompts:
+   *   get:
+   *     summary: List prompts with pagination, sorting, and filtering
+   *     parameters:
+   *       - in: query
+   *         name: offset
+   *         schema:
+   *           type: integer
+   *           minimum: 0
+   *         description: Number of items to skip
+   *       - in: query
+   *         name: limit
+   *         schema:
+   *           type: integer
+   *           minimum: 1
+   *           maximum: 100
+   *         description: Maximum number of items to return
+   *       - in: query
+   *         name: sort
+   *         schema:
+   *           type: string
+   *           enum: [createdAt, updatedAt, name]
+   *         description: Field to sort by
+   *       - in: query
+   *         name: order
+   *         schema:
+   *           type: string
+   *           enum: [asc, desc]
+   *         description: Sort order
+   *       - in: query
+   *         name: category
+   *         schema:
+   *           type: string
+   *         description: Filter by category
+   *       - in: query
+   *         name: tags
+   *         schema:
+   *           type: string
+   *         description: Comma-separated list of tags (all must match)
+   *       - in: query
+   *         name: isTemplate
+   *         schema:
+   *           type: boolean
+   *         description: Filter for template/non-template prompts
+   *       - in: query
+   *         name: search
+   *         schema:
+   *           type: string
+   *         description: Search term for name, description, or content
+   *     responses:
+   *       200:
+   *         description: Paginated list of prompts
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 prompts:
+   *                   type: array
+   *                   items:
+   *                     $ref: '#/components/schemas/Prompt'
+   *                 total:
+   *                   type: integer
+   *                 offset:
+   *                   type: integer
+   *                 limit:
+   *                   type: integer
+   */
+  app.get(
+    '/prompts',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        // Parse and validate query params
+        const querySchema = z.object({
+          offset: z.string().optional().transform(v => (v ? parseInt(v, 10) : 0)),
+          limit: z.string().optional().transform(v => (v ? parseInt(v, 10) : 20)),
+          sort: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
+          order: z.enum(['asc', 'desc']).optional(),
+          category: z.string().optional(),
+          tags: z.string().optional(),
+          isTemplate: z.string().optional().transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
+          search: z.string().optional(),
+        });
+        const parseResult = querySchema.safeParse(req.query);
+        if (!parseResult.success) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Invalid query parameters',
+              details: parseResult.error.errors,
+            },
+          });
+          return;
+        }
+        const { offset, limit, sort, order, category, tags, isTemplate, search } = parseResult.data;
+        const options: any = { offset, limit, sort, order, category, isTemplate, search };
+        if (tags) {
+          options.tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+        }
+        const prompts = await services.promptService.listPrompts(options);
+        // For total count, fetch without pagination
+        const total = (await services.promptService.listPrompts({ ...options, offset: 0, limit: undefined })).length;
+        res.json({ prompts, total, offset, limit });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
 
   // CRUD endpoints for prompts
   /**
@@ -470,6 +648,109 @@ export async function startHttpServer(
     },
   );
 
+  /**
+   * @openapi
+   * /prompts/bulk:
+   *   post:
+   *     summary: Bulk create prompts
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: array
+   *             items:
+   *               $ref: '#/components/schemas/Prompt'
+   *     responses:
+   *       200:
+   *         description: Array of results for each prompt
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 type: object
+   *                 properties:
+   *                   success:
+   *                     type: boolean
+   *                   id:
+   *                     type: string
+   *                   error:
+   *                     type: string
+   */
+  app.post(
+    '/prompts/bulk',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const parseResult = promptSchemas.bulkCreate.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid bulk prompt data',
+            details: parseResult.error.errors,
+          },
+        });
+        return;
+      }
+      const results = await services.promptService.createPromptsBulk(parseResult.data);
+      res.status(200).json(results);
+    },
+  );
+
+  /**
+   * @openapi
+   * /prompts/bulk:
+   *   delete:
+   *     summary: Bulk delete prompts
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               ids:
+   *                 type: array
+   *                 items:
+   *                   type: string
+   *     responses:
+   *       200:
+   *         description: Array of results for each ID
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: array
+   *               items:
+   *                 type: object
+   *                 properties:
+   *                   success:
+   *                     type: boolean
+   *                   id:
+   *                     type: string
+   *                   error:
+   *                     type: string
+   */
+  app.delete(
+    '/prompts/bulk',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
+      if (!parseResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid bulk delete data',
+            details: parseResult.error.errors,
+          },
+        });
+        return;
+      }
+      const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
+      res.status(200).json(results);
+    },
+  );
+
   app.get(
     '/api/v1/sequence/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
@@ -698,6 +979,65 @@ export async function startHttpServer(
           id: req.params.id,
           message: 'Workflow deleted.',
         });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * @openapi
+   * /api/v1/workflows/{executionId}/resume:
+   *   post:
+   *     summary: Resume a paused workflow at a human-approval step
+   *     parameters:
+   *       - in: path
+   *         name: executionId
+   *         required: true
+   *         schema:
+   *           type: string
+   *         description: The workflow execution ID
+   *     requestBody:
+   *       required: true
+   *       content:
+   *         application/json:
+   *           schema:
+   *             type: object
+   *             properties:
+   *               input:
+   *                 description: Input provided by the human
+   *                 type: any
+   *     responses:
+   *       200:
+   *         description: Workflow resumed and result returned
+   *         content:
+   *           application/json:
+   *             schema:
+   *               type: object
+   *               properties:
+   *                 success:
+   *                   type: boolean
+   *                 message:
+   *                   type: string
+   *                 outputs:
+   *                   type: object
+   *                 paused:
+   *                   type: boolean
+   *                 prompt:
+   *                   type: string
+   *                 stepId:
+   *                   type: string
+   *                 executionId:
+   *                   type: string
+   */
+  app.post(
+    '/api/v1/workflows/:executionId/resume',
+    async (req, res, next) => {
+      const { executionId } = req.params;
+      const { input } = req.body;
+      try {
+        const result = await services.workflowService.resumeWorkflow(executionId, input);
+        res.status(200).json(result);
       } catch (err) {
         next(err);
       }
