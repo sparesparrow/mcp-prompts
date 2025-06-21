@@ -802,9 +802,9 @@ export async function startHttpServer(
 
   /**
    * POST /api/v1/workflows
-   * Save a workflow definition by ID
+   * Create a new workflow version. If version is not specified, auto-increment.
    * Request body: { ...workflow }
-   * Response: { success, id, message }
+   * Response: { success, id, version, message }
    */
   app.post(
     '/api/v1/workflows',
@@ -812,29 +812,51 @@ export async function startHttpServer(
       try {
         const workflow = req.body;
         if (!services.workflowService.validateWorkflow(workflow)) {
-          res.status(400)
-            .json({
-              success: false,
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: 'Invalid workflow definition.',
-              },
-            });
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Invalid workflow definition.',
+            },
+          });
           return;
         }
         if (!workflow.id || typeof workflow.id !== 'string') {
-          res.status(400)
-            .json({
-              success: false,
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: 'Workflow must have a string id.',
-              },
-            });
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Workflow must have a string id.',
+            },
+          });
+          return;
+        }
+        // Determine version
+        let version = workflow.version;
+        if (typeof version !== 'number') {
+          // Auto-increment version
+          const versions = getAllWorkflowVersions(workflow.id);
+          version = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+          workflow.version = version;
+        }
+        // Check if this version already exists
+        if (loadWorkflowFromFile(workflow.id, version)) {
+          res.status(409).json({
+            success: false,
+            error: {
+              code: 'CONFLICT',
+              message: `Workflow version ${version} already exists for id ${workflow.id}`,
+            },
+          });
           return;
         }
         saveWorkflowToFile(workflow);
-        res.status(201).json({ id: workflow.id, message: 'Workflow saved.', success: true });
+        res.status(201).json({
+          id: workflow.id,
+          version,
+          message: 'Workflow version saved.',
+          success: true,
+        });
       } catch (err) {
         next(err);
       }
@@ -843,7 +865,7 @@ export async function startHttpServer(
 
   /**
    * GET /api/v1/workflows/:id
-   * Retrieve a workflow definition by ID
+   * Retrieve the latest version of a workflow by ID
    * Response: { ...workflow } or 404
    */
   app.get(
@@ -852,14 +874,13 @@ export async function startHttpServer(
       try {
         const workflow = loadWorkflowFromFile(req.params.id);
         if (!workflow) {
-          res.status(404)
-            .json({
-              success: false,
-              error: {
-                code: 'NOT_FOUND',
-                message: 'Workflow not found.',
-              },
-            });
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Workflow not found.',
+            },
+          });
           return;
         }
         res.json(workflow);
@@ -870,8 +891,139 @@ export async function startHttpServer(
   );
 
   /**
+   * GET /api/v1/workflows/:id/versions
+   * List all versions for a workflow ID
+   * Response: [ { version, createdAt } ]
+   */
+  app.get(
+    '/api/v1/workflows/:id/versions',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const versions = getAllWorkflowVersions(req.params.id);
+        if (!versions.length) {
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'NOT_FOUND',
+              message: 'No versions found for workflow.',
+            },
+          });
+          return;
+        }
+        // Optionally, include createdAt for each version
+        const result = versions.map(v => {
+          const wf = loadWorkflowFromFile(req.params.id, v);
+          return { version: v, createdAt: wf?.createdAt };
+        });
+        res.json(result);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/workflows/:id/versions/:version
+   * Retrieve a specific version of a workflow
+   * Response: { ...workflow } or 404
+   */
+  app.get(
+    '/api/v1/workflows/:id/versions/:version',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const version = parseInt(req.params.version, 10);
+        if (isNaN(version)) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Version must be a number.',
+            },
+          });
+          return;
+        }
+        const workflow = loadWorkflowFromFile(req.params.id, version);
+        if (!workflow) {
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Workflow version not found.',
+            },
+          });
+          return;
+        }
+        res.json(workflow);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * DELETE /api/v1/workflows/:id/versions/:version
+   * Delete a specific version of a workflow
+   * Response: { success, id, version, message }
+   */
+  app.delete(
+    '/api/v1/workflows/:id/versions/:version',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const version = parseInt(req.params.version, 10);
+        if (isNaN(version)) {
+          res.status(400).json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: 'Version must be a number.',
+            },
+          });
+          return;
+        }
+        const file = getWorkflowFileName(req.params.id, version);
+        if (!fs.existsSync(file)) {
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Workflow version not found.',
+            },
+          });
+          return;
+        }
+        fs.unlinkSync(file);
+        res.json({
+          success: true,
+          id: req.params.id,
+          version,
+          message: 'Workflow version deleted.',
+        });
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * GET /api/v1/workflows
+   * List all workflows (latest version only)
+   * Response: [ { ...workflow }, ... ]
+   */
+  app.get(
+    '/api/v1/workflows',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const workflows = getAllWorkflows(true); // latestOnly = true
+        res.json(workflows);
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
    * POST /api/v1/workflows/:id/run
-   * Run a saved workflow by ID
+   * Optionally accepts ?version= in query to run a specific version
    * Response: { success, message, outputs } or 404
    */
   app.post(
@@ -879,29 +1031,42 @@ export async function startHttpServer(
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const userId = (req.headers['x-user-id'] as string) || 'anonymous';
       const workflowId = req.params.id;
-      if (!checkWorkflowRateLimit(userId)) {
-        res.status(429)
-          .json({
+      const versionParam = req.query.version;
+      let version: number | undefined = undefined;
+      if (versionParam !== undefined) {
+        version = parseInt(versionParam as string, 10);
+        if (isNaN(version)) {
+          res.status(400).json({
             success: false,
             error: {
-              code: 'RATE_LIMIT',
-              message: 'Too many concurrent workflows. Please wait and try again.',
+              code: 'VALIDATION_ERROR',
+              message: 'Version must be a number.',
             },
           });
+          return;
+        }
+      }
+      if (!checkWorkflowRateLimit(userId)) {
+        res.status(429).json({
+          success: false,
+          error: {
+            code: 'RATE_LIMIT',
+            message: 'Too many concurrent workflows. Please wait and try again.',
+          },
+        });
         return;
       }
       let result;
       try {
-        const workflow = loadWorkflowFromFile(workflowId);
+        const workflow = loadWorkflowFromFile(workflowId, version);
         if (!workflow) {
-          res.status(404)
-            .json({
-              success: false,
-              error: {
-                code: 'NOT_FOUND',
-                message: 'Workflow not found.',
-              },
-            });
+          res.status(404).json({
+            success: false,
+            error: {
+              code: 'NOT_FOUND',
+              message: 'Workflow not found.',
+            },
+          });
           return;
         }
         // Audit: workflow start
@@ -931,56 +1096,6 @@ export async function startHttpServer(
         next(err);
       } finally {
         releaseWorkflowSlot(userId);
-      }
-    },
-  );
-
-  /**
-   * GET /api/v1/workflows
-   * List all workflows
-   * Response: [ { ...workflow }, ... ]
-   */
-  app.get(
-    '/api/v1/workflows',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const workflows = getAllWorkflows();
-        res.json(workflows);
-      } catch (err) {
-        next(err);
-      }
-    },
-  );
-
-  /**
-   * DELETE /api/v1/workflows/:id
-   * Delete a workflow by ID
-   * Response: { success, id, message }
-   */
-  app.delete(
-    '/api/v1/workflows/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const file = path.join(WORKFLOW_DIR, `${req.params.id}.json`);
-        if (!fs.existsSync(file)) {
-          res.status(404)
-            .json({
-              success: false,
-              error: {
-                code: 'NOT_FOUND',
-                message: 'Workflow not found.',
-              },
-            });
-          return;
-        }
-        fs.unlinkSync(file);
-        res.json({
-          success: true,
-          id: req.params.id,
-          message: 'Workflow deleted.',
-        });
-      } catch (err) {
-        next(err);
       }
     },
   );
