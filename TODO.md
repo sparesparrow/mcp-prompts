@@ -104,13 +104,14 @@ It is assumed that the foundational components and principal functionalities of 
 
 - [ ] **Workflow Versioning**
   - **Objective:** Implement workflow versioning for non-disruptive updates.
-  - **Status:** In Progress (integration tests updated, prompt CRUD tests failing)
+  - **Status:** In Progress (prompt CRUD/bulk tests updated, some failures remain)
   - **Details:**
     - [x] Storage layer and helpers in http-server.ts now support versioned workflow storage as {id}-v{version}.json, with helpers to get latest, all versions, or a specific version.
     - [x] API endpoints to support versioned workflow CRUD are implemented: create, get latest, get all versions, get specific version, delete version, run specific version.
     - [x] Integration tests for workflow versioning updated to match new API; most workflow versioning tests now pass.
-    - [ ] Update/fix prompt CRUD and bulk operation tests to match new versioning logic and address regressions.
-    - Test suite rerun: 21/23 suites passing, 127/153 tests passing.
+    - [x] Prompt CRUD and bulk operation tests updated for versioning, but some failures remain due to API/test misalignment (e.g., 404s on GET/DELETE by ID/version, bulk operation result mismatches).
+    - [ ] Investigate and fix remaining prompt CRUD/bulk test failures, focusing on test setup and API logic for versioned prompt operations.
+    - Test suite rerun: 21/23 suites passing, 125/153 tests passing.
     - Modifying a workflow will create a new, incrementally versioned entity.
     - Existing instances continue with their original version; new instances use the latest (unless specified).
     - Enables stability, auditability, and A/B testing.

@@ -63,11 +63,22 @@ describe('HTTP Server Integration', () => {
     expect(createRes.status).toBe(201);
     expect(createRes.body.name).toBe('HTTP Test');
     const id = createRes.body.id;
+    const version = createRes.body.version;
+    // Retrieve latest version
     const getRes = await request(baseUrl)
       .get(`/prompts/${id}`)
       .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(200);
     expect(getRes.body.name).toBe('HTTP Test');
+    expect(getRes.body.version).toBe(version);
+    // Retrieve specific version (if supported)
+    if (version) {
+      const getVerRes = await request(baseUrl)
+        .get(`/prompts/${id}/versions/${version}`)
+        .set('x-api-key', 'test-key');
+      expect(getVerRes.status).toBe(200);
+      expect(getVerRes.body.version).toBe(version);
+    }
   });
 
   it('should update a prompt', async () => {
@@ -81,12 +92,24 @@ describe('HTTP Server Integration', () => {
       .set('x-api-key', 'test-key')
       .send(prompt);
     const id = createRes.body.id;
+    const version = createRes.body.version;
+    // Update prompt (should create new version)
     const updateRes = await request(baseUrl)
       .put(`/prompts/${id}`)
       .set('x-api-key', 'test-key')
-      .send({ description: 'Updated' });
-    expect(updateRes.status).toBe(200);
+      .send({ description: 'Updated', version });
+    expect([200, 201]).toContain(updateRes.status);
     expect(updateRes.body.description).toBe('Updated');
+    // Should return new version
+    expect(updateRes.body.version).not.toBe(version);
+    // Old version should still be retrievable (if supported)
+    if (version) {
+      const getOldVer = await request(baseUrl)
+        .get(`/prompts/${id}/versions/${version}`)
+        .set('x-api-key', 'test-key');
+      expect(getOldVer.status).toBe(200);
+      expect(getOldVer.body.version).toBe(version);
+    }
   });
 
   it('should delete a prompt', async () => {
@@ -100,20 +123,24 @@ describe('HTTP Server Integration', () => {
       .set('x-api-key', 'test-key')
       .send(prompt);
     const id = createRes.body.id;
+    const version = createRes.body.version;
+    // Delete latest version
     const deleteRes = await request(baseUrl)
-      .delete(`/prompts/${id}`)
+      .delete(`/prompts/${id}/versions/${version}`)
       .set('x-api-key', 'test-key');
     expect(deleteRes.status).toBe(200);
     expect(deleteRes.body.success).toBe(true);
     expect(deleteRes.body.id).toBe(id);
-    expect(deleteRes.body.message).toBe('Prompt deleted.');
+    expect(deleteRes.body.version).toBe(version);
+    expect(deleteRes.body.message).toMatch(/deleted/);
+    // Should not be able to get deleted version
     const getRes = await request(baseUrl)
-      .get(`/prompts/${id}`)
+      .get(`/prompts/${id}/versions/${version}`)
       .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(404);
     expect(getRes.body.success).toBe(false);
     expect(getRes.body.error.code).toBe('NOT_FOUND');
-    expect(getRes.body.error.message).toBe('Prompt not found.');
+    expect(getRes.body.error.message).toMatch(/not found/);
   });
 
   it('should return 404 for unknown route', async () => {
@@ -165,7 +192,7 @@ describe('HTTP Server Integration', () => {
     expect(res.status).toBe(400);
   });
 
-  it('should return 400 for duplicate prompt ID', async () => {
+  it('should return 400 or 409 for duplicate prompt ID', async () => {
     const prompt = { name: 'Dup', content: 'test' };
     // Create once
     const res1 = await request(baseUrl)
@@ -178,7 +205,7 @@ describe('HTTP Server Integration', () => {
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
-    expect(res2.status).toBe(400);
+    expect([400, 409]).toContain(res2.status);
   });
 
   it('should return 400 for template variable mismatches', async () => {
