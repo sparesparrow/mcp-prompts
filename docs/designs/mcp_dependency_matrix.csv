@@ -1,0 +1,8 @@
+,mcp-prompts,mcp-prompts-collection,mcp-prompts-ts,mcp-prompts-rs,mcp-prompts-pg,mcp-prompts-aidl,mcp-prompts-py
+mcp-prompts,0,1,1,1,1,1,1
+mcp-prompts-collection,0,0,0,0,0,0,0
+mcp-prompts-ts,0,1,0,0,0,0,0
+mcp-prompts-rs,0,1,0,0,0,0,0
+mcp-prompts-pg,0,1,0,0,0,0,0
+mcp-prompts-aidl,0,1,0,1,0,0,0
+mcp-prompts-py,0,1,0,0,0,0,0

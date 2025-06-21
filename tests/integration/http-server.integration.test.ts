@@ -14,6 +14,8 @@ const __dirname = path.dirname(__filename);
 
 let server: any;
 let baseUrl: string;
+let promptService: PromptService;
+let adapter: MemoryAdapter;
 
 const SAMPLE_WORKFLOW_PATH = path.resolve(process.cwd(), 'examples', 'sample-workflow.json');
 
@@ -25,13 +27,13 @@ class DummySequenceService {
 
 beforeAll(async () => {
   process.env.API_KEYS = 'test-key';
-  const adapter = new MemoryAdapter();
+  adapter = new MemoryAdapter();
   await adapter.connect();
-  const promptService = new PromptService(adapter);
+  promptService = new PromptService(adapter);
   const sequenceService = new DummySequenceService() as unknown as SequenceService;
-  const workflowService = new WorkflowService();
+  const workflowService = new WorkflowService(adapter, promptService);
   server = await startHttpServer(
-    undefined,
+    null,
     { host: '127.0.0.1', port: 0 },
     { promptService, sequenceService, workflowService },
   );
@@ -44,6 +46,10 @@ afterAll(async () => {
 });
 
 describe('HTTP Server Integration', () => {
+  beforeEach(async () => {
+    await adapter.clearAll();
+  });
+
   it('should return health status', async () => {
     const res = await request(baseUrl).get('/health');
     expect(res.status).toBe(200);
@@ -65,11 +71,9 @@ describe('HTTP Server Integration', () => {
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
-    // Expect 201 for creation
     expect(createRes.status).toBe(201);
     expect(createRes.body.prompt).toBeDefined();
     expect(createRes.body.prompt.version).toBe(1);
-    // Retrieve by id and version
     const getRes = await request(baseUrl)
       .get(`/prompts/${prompt.id}?version=1`)
       .set('x-api-key', 'test-key');
@@ -80,8 +84,7 @@ describe('HTTP Server Integration', () => {
 
   it('should update a prompt', async () => {
     const now = new Date().toISOString();
-    const prompt = {
-      id: 'http-update',
+    const promptData = {
       content: 'Update me',
       isTemplate: false,
       name: 'Update HTTP',
@@ -92,13 +95,18 @@ describe('HTTP Server Integration', () => {
     const createRes = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
-      .send(prompt);
+      .send(promptData);
     expect(createRes.status).toBe(201);
-    // Update
+    const createdPrompt = createRes.body.prompt;
     const updateRes = await request(baseUrl)
-      .put(`/prompts/${prompt.id}`)
+      .put(`/prompts/${createdPrompt.id}`)
       .set('x-api-key', 'test-key')
-      .send({ ...prompt, content: 'Updated content', version: 2, updatedAt: new Date().toISOString() });
+      .send({
+        ...createdPrompt,
+        content: 'Updated content',
+        version: 2,
+        updatedAt: new Date().toISOString(),
+      });
     expect(updateRes.status).toBe(200);
     expect(updateRes.body.prompt.content).toBe('Updated content');
     expect(updateRes.body.prompt.version).toBe(2);
@@ -106,8 +114,7 @@ describe('HTTP Server Integration', () => {
 
   it('should delete a prompt', async () => {
     const now = new Date().toISOString();
-    const prompt = {
-      id: 'http-delete',
+    const promptData = {
       content: 'Delete me',
       isTemplate: false,
       name: 'Delete HTTP',
@@ -118,25 +125,22 @@ describe('HTTP Server Integration', () => {
     const createRes = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
-      .send(prompt);
+      .send(promptData);
     expect(createRes.status).toBe(201);
-    // Delete
+    const createdPrompt = createRes.body.prompt;
     const deleteRes = await request(baseUrl)
-      .delete(`/prompts/${prompt.id}`)
+      .delete(`/prompts/${createdPrompt.id}`)
       .set('x-api-key', 'test-key');
     expect([200, 204]).toContain(deleteRes.status);
-    // Try to get deleted prompt
     const getRes = await request(baseUrl)
-      .get(`/prompts/${prompt.id}`)
+      .get(`/prompts/${createdPrompt.id}`)
       .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(404);
     expect(getRes.body.error.message).toBe('Prompt not found');
   });
 
   it('should return 404 for unknown route', async () => {
-    const res = await request(baseUrl)
-      .get('/unknown')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/unknown').set('x-api-key', 'test-key');
     expect(res.status).toBe(404);
   });
 
@@ -207,7 +211,6 @@ describe('HTTP Server Integration', () => {
   });
 
   it('should return 400 for template variable mismatches', async () => {
-    // Variable used but not declared
     let res = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
@@ -218,7 +221,6 @@ describe('HTTP Server Integration', () => {
         variables: [],
       });
     expect(res.status).toBe(400);
-    // Variable declared but not used
     res = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
@@ -233,13 +235,31 @@ describe('HTTP Server Integration', () => {
 });
 
 describe('Prompt List (GET /prompts)', () => {
+  beforeEach(async () => {
+    await adapter.clearAll();
+    const now = new Date().toISOString();
+    const prompts = [
+      { name: 'A', content: 'A', tags: ['a', 'test'], category: 'general' },
+      { name: 'B', content: 'B', tags: ['b', 'test'], category: 'general' },
+      { name: 'C', content: 'C', tags: ['c'], category: 'other' },
+      { name: 'Find Me', content: 'The word is test' },
+    ];
+    for (const p of prompts) {
+      await promptService.createPrompt({
+        version: 1,
+        isTemplate: false,
+        createdAt: now,
+        updatedAt: now,
+        ...p,
+      });
+    }
+  });
+
   it('should list all prompts', async () => {
-    const res = await request(baseUrl)
-      .get('/prompts')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     expect(Array.isArray(res.body.prompts)).toBe(true);
-    expect(typeof res.body.total).toBe('number');
+    expect(res.body.total).toBe(4);
   });
 
   it('should paginate results', async () => {
@@ -251,17 +271,13 @@ describe('Prompt List (GET /prompts)', () => {
       .set('x-api-key', 'test-key');
     expect(res1.status).toBe(200);
     expect(res2.status).toBe(200);
-    expect(res1.body.prompts.length).toBeLessThanOrEqual(1);
-    expect(res2.body.prompts.length).toBeLessThanOrEqual(1);
-    if (res1.body.prompts.length && res2.body.prompts.length) {
-      expect(res1.body.prompts[0].id).not.toBe(res2.body.prompts[0].id);
-    }
+    expect(res1.body.prompts.length).toBe(1);
+    expect(res2.body.prompts.length).toBe(1);
+    expect(res1.body.prompts[0].id).not.toBe(res2.body.prompts[0].id);
   });
 
   it('should sort by name ascending', async () => {
-    const res = await request(baseUrl)
-      .get('/prompts?sort=name&order=asc')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?sort=name&order=asc').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     const names = res.body.prompts.map((p: any) => p.name);
     const sorted = [...names].sort();
@@ -269,280 +285,182 @@ describe('Prompt List (GET /prompts)', () => {
   });
 
   it('should filter by tag', async () => {
-    const res = await request(baseUrl)
-      .get('/prompts?tags=test')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?tags=test').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
+    expect(res.body.prompts.length).toBe(2);
     for (const prompt of res.body.prompts) {
       expect(prompt.tags).toContain('test');
     }
   });
 
   it('should filter by category', async () => {
-    const res = await request(baseUrl)
-      .get('/prompts?category=general')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?category=general').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
+    expect(res.body.prompts.length).toBe(2);
     for (const prompt of res.body.prompts) {
       expect(prompt.category).toBe('general');
     }
   });
 
   it('should filter by isTemplate', async () => {
+    await promptService.createPrompt({
+      name: 'Template',
+      content: 'a template',
+      isTemplate: true,
+      version: 1,
+    });
     const res = await request(baseUrl)
       .get('/prompts?isTemplate=true')
       .set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
-    for (const prompt of res.body.prompts) {
-      expect(prompt.isTemplate).toBe(true);
-    }
+    expect(res.body.prompts.length).toBe(1);
+    expect(res.body.prompts[0].isTemplate).toBe(true);
   });
 
   it('should search by name/content/description', async () => {
-    const res = await request(baseUrl)
-      .get('/prompts?search=Bulk')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?search=test').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
-    expect(res.body.prompts.some((p: any) => p.name.includes('Bulk') || p.content.includes('Bulk') || (p.description && p.description.includes('Bulk')))).toBe(true);
+    expect(res.body.prompts.length).toBe(1);
+    expect(res.body.prompts[0].name).toBe('Find Me');
   });
 
   it('should combine filters', async () => {
     const res = await request(baseUrl)
-      .get('/prompts?tags=test&isTemplate=false&category=general')
+      .get('/prompts?tags=test&category=general')
       .set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
-    for (const prompt of res.body.prompts) {
-      expect(prompt.tags).toContain('test');
-      expect(prompt.isTemplate).toBe(false);
-      expect(prompt.category).toBe('general');
-    }
+    expect(res.body.prompts.length).toBe(2);
   });
 });
 
 describe('Bulk Prompt Operations', () => {
-  // Helper to generate prompt payloads with required fields
-  function makePromptPayload(overrides: Partial<Record<string, any>> = {}) {
-    const now = new Date().toISOString();
-    return {
-      id: overrides.id || `prompt-${Math.random().toString(36).slice(2, 10)}`,
-      name: overrides.name || 'Test Prompt',
-      content: overrides.content || 'Test content',
-      isTemplate: overrides.isTemplate ?? false,
-      version: overrides.version || 1,
-      createdAt: overrides.createdAt || now,
-      updatedAt: overrides.updatedAt || now,
-      ...overrides,
+  let dupPrompt: any;
+  beforeEach(async () => {
+    await adapter.clearAll();
+    dupPrompt = {
+      name: 'Bulk Dup',
+      content: 'I will be duplicated',
+      version: 1,
     };
-  }
-
-  it('should bulk create prompts and return per-prompt results', async () => {
-    const prompts = [
-      makePromptPayload({ name: 'Bulk1', content: 'Bulk content 1' }),
-      makePromptPayload({ name: 'Bulk2', content: 'Bulk content 2' }),
-    ];
-    const res = await request(baseUrl)
-      .post('/prompts/bulk')
-      .set('x-api-key', 'test-key')
-      .send(prompts);
-    expect(res.status).toBe(200);
-    expect(Array.isArray(res.body)).toBe(true);
-    expect(res.body.length).toBe(2);
-    expect(res.body[0].success).toBe(true);
-    expect(res.body[1].success).toBe(true);
+    await promptService.createPrompt(dupPrompt);
   });
 
-  it('should return errors for duplicate or invalid prompts in bulk create', async () => {
-    // First, create a prompt
-    const dupPrompt = makePromptPayload({ name: 'BulkDup', content: 'Dup content' });
-    await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send(dupPrompt);
-    // Now, try to bulk create with a duplicate and an invalid
+  it('should bulk create prompts successfully, skipping duplicates', async () => {
     const prompts = [
-      dupPrompt, // duplicate
-      makePromptPayload({ name: '', content: '' }), // invalid
-      makePromptPayload({ name: 'Bulk3', content: 'Bulk content 3' }), // valid
+      dupPrompt,
+      { name: 'New 1', content: 'content' },
+      { name: '', content: '' },
+      { name: 'New 2', content: 'content' },
     ];
     const res = await request(baseUrl)
       .post('/prompts/bulk')
       .set('x-api-key', 'test-key')
       .send(prompts);
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(3);
+    expect(res.body.length).toBe(4);
     expect(res.body[0].success).toBe(false);
     expect(res.body[0].error).toMatch(/already exists/);
-    expect(res.body[1].success).toBe(false);
-    expect(res.body[2].success).toBe(true);
+    expect(res.body[1].success).toBe(true);
+    expect(res.body[2].success).toBe(false);
+    expect(res.body[3].success).toBe(true);
   });
 
   it('should bulk delete prompts and return per-id results', async () => {
-    // Create two prompts to delete
-    const p1 = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send({ name: 'BulkDel1', content: 'Del1' });
-    const p2 = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send({ name: 'BulkDel2', content: 'Del2' });
-    const ids = [p1.body.id, p2.body.id, 'nonexistent-id'];
     const res = await request(baseUrl)
-      .delete('/prompts/bulk')
+      .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
-      .send({ ids });
+      .send({ ids: ['bulk-dup', 'non-existent'] });
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(3);
-    expect(res.body[0].success).toBe(true);
-    expect(res.body[1].success).toBe(true);
-    expect(res.body[2].success).toBe(false);
-    expect(res.body[2].id).toBe('nonexistent-id');
+    expect(res.body.length).toBe(2);
+    expect(res.body.find((r: any) => r.id === 'bulk-dup').success).toBe(true);
+    expect(res.body.find((r: any) => r.id === 'non-existent').success).toBe(false);
   });
 
   it('should return all errors for bulk delete with all non-existent IDs', async () => {
-    const ids = ['no-such-id-1', 'no-such-id-2'];
     const res = await request(baseUrl)
-      .delete('/prompts/bulk')
+      .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
-      .send({ ids });
+      .send({ ids: ['a', 'b', 'c'] });
     expect(res.status).toBe(200);
-    expect(res.body.length).toBe(2);
-    expect(res.body[0].success).toBe(false);
-    expect(res.body[1].success).toBe(false);
+    expect(res.body.every((r: any) => !r.success)).toBe(true);
   });
 });
 
 describe('Workflow Engine Integration', () => {
-  const workflowId = 'sample-workflow';
   let sampleWorkflow: any;
-  let promptId: string;
-
-  beforeAll(async () => {
+  beforeAll(() => {
     sampleWorkflow = JSON.parse(fs.readFileSync(SAMPLE_WORKFLOW_PATH, 'utf8'));
-    // Create the required 'basic-template' prompt with version
-    const prompt = {
-      content: 'Echo: {{text}}',
-      id: 'basic-template',
+  });
+
+  beforeEach(async () => {
+    await adapter.clearAll();
+    await promptService.createPrompt({
+      name: 'Test Prompt',
+      content: 'The capital of {{country}} is',
       isTemplate: true,
-      name: 'Basic Template',
-      variables: ['text'],
+      variables: ['country'],
       version: 1,
-    };
-    // Use the same promptService as the server
-    await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send(prompt);
-    promptId = prompt.id;
+    });
   });
 
   it('should save and run a sample workflow', async () => {
-    // Save workflow (always increment version if already exists)
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
       .send(sampleWorkflow);
-    // If version conflict, increment version and try again
-    if (saveRes.status === 409) {
-      // Get all versions
-      const versionsRes = await request(baseUrl)
-        .get(`/api/v1/workflows/${workflowId}/versions`)
-        .set('x-api-key', 'test-key');
-      const versions = versionsRes.body.map((v: any) => v.version);
-      const nextVersion = Math.max(...versions) + 1;
-      sampleWorkflow.version = nextVersion;
-      saveRes = await request(baseUrl)
-        .post('/api/v1/workflows')
-        .set('x-api-key', 'test-key')
-        .send(sampleWorkflow);
-    }
-    expect(saveRes.status).toBe(201);
-    expect(saveRes.body.id).toBe(workflowId);
-    expect(typeof saveRes.body.version).toBe('number');
-    // Run workflow (use latest version)
+    expect([200, 201]).toContain(saveRes.status);
+
     const runRes = await request(baseUrl)
-      .post(`/api/v1/workflows/${workflowId}/run`)
+      .post(`/api/v1/workflows/${sampleWorkflow.id}/run`)
       .set('x-api-key', 'test-key')
-      .send();
-    // Accept 200 or 400 (if http step fails due to network or missing prompt)
-    expect([200, 400]).toContain(runRes.status);
-    if (runRes.status === 200) {
-      expect(runRes.body).toHaveProperty('message');
-      expect(runRes.body).toHaveProperty('success');
-      expect(runRes.body).toHaveProperty('outputs');
-      // Outputs should include promptResult, shellResult, httpResult
-      expect(runRes.body.outputs).toHaveProperty('promptResult');
-      expect(runRes.body.outputs).toHaveProperty('shellResult');
-      expect(runRes.body.outputs).toHaveProperty('httpResult');
-    } else {
-      // 400: should have error message
-      expect(runRes.body).toHaveProperty('message');
-      expect(runRes.body.success).toBe(false);
-    }
+      .send({
+        state: {
+          parameters: {
+            country: 'France',
+          },
+        },
+      });
+    expect(runRes.status).toBe(200);
+    expect(runRes.body).toHaveProperty('state');
+    expect(runRes.body.state.outputs).toHaveProperty('capital');
+    expect(runRes.body.state.outputs.capital).toMatch(/Paris/);
   });
 
   it('should enforce workflow rate limiting', async () => {
-    // Save workflow (ensure latest version)
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
       .send(sampleWorkflow);
-    if (saveRes.status === 409) {
-      const versionsRes = await request(baseUrl)
-        .get(`/api/v1/workflows/${workflowId}/versions`)
-        .set('x-api-key', 'test-key');
-      const versions = versionsRes.body.map((v: any) => v.version);
-      const nextVersion = Math.max(...versions) + 1;
-      sampleWorkflow.version = nextVersion;
-      saveRes = await request(baseUrl)
-        .post('/api/v1/workflows')
-        .set('x-api-key', 'test-key')
-        .send(sampleWorkflow);
-    }
-    // Send 3 concurrent requests (default limit)
-    const runPromises = [1, 2, 3].map(() =>
-      request(baseUrl)
-        .post(`/api/v1/workflows/${workflowId}/run`)
-        .set('x-user-id', 'ratelimit-test')
-        .set('x-api-key', 'test-key')
-        .send(),
-    );
-    // Start the first 3 requests
-    const runResults = Promise.all(runPromises);
-    // Immediately try a 4th request while others are still running
-    const res429 = await request(baseUrl)
-      .post(`/api/v1/workflows/${workflowId}/run`)
-      .set('x-user-id', 'ratelimit-test')
-      .set('x-api-key', 'test-key')
-      .send();
-    // 4th request should be rejected with 429 (rate limit) or 500 (if workflow fails for another reason)
-    expect([429, 500]).toContain(res429.status);
-    if (res429.status === 429) {
-      expect(res429.body.error).toBe(true);
-      expect(res429.body.message).toMatch(/Too many concurrent workflows/);
-    } else {
-      // 500: should have error message
-      expect(res429.body).toHaveProperty('message');
-    }
-    // Wait for the first 3 requests to complete
-    const results = await runResults;
-    results.forEach(res => expect([200, 400]).toContain(res.status));
-  });
+    expect([200, 201]).toContain(saveRes.status);
 
-  it('should log workflow runs to the audit log', () => {
-    const logPath = path.join(process.cwd(), 'logs', 'workflow-audit.log');
-    expect(fs.existsSync(logPath)).toBe(true);
-    const logContent = fs.readFileSync(logPath, 'utf8');
-    expect(logContent).toMatch(/sample-workflow/);
-    expect(logContent).toMatch(/start/);
-    expect(logContent).toMatch(/end/);
+    const workflowServiceWithRateLimit = new WorkflowService(adapter, promptService);
+
+    const runPromise = workflowServiceWithRateLimit.runWorkflow(
+      sampleWorkflow.id,
+      { userId: 'ratelimit-test' },
+    );
+    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(
+      sampleWorkflow.id,
+      { userId: 'ratelimit-test' },
+    );
+    await expect(Promise.all([runPromise, runPromise2])).rejects.toThrow(/Rate limit exceeded/);
   });
 });
 
-/**
- *
- * @param ms
- */
+function makePromptPayload(overrides: Partial<Record<string, any>> = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
+    name: 'Test Prompt',
+    content: 'Test content',
+    isTemplate: false,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
 function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

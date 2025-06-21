@@ -1,229 +1,207 @@
-# Analysis and Updated TODO for mcp-prompts
+# MCP Prompts: Multi-Repository Migration & Roadmap
+
+This document serves as the master plan for the strategic migration of the MCP Prompts server from a monorepo to a federated, multi-repository ecosystem. It synthesizes the project's strategic analysis, architectural designs, and phased implementation plans into a single, actionable roadmap.
 
 ---
 
-## 1. Project Analysis Summary
+## 🎯 Strategic Vision & Principles
 
-### Project Goal
-
-The project aims to create a versatile and extensible **Prompt-as-a-Service** platform. Its core purpose is to manage, store, and execute prompts and complex workflows. The architecture is designed with flexibility in mind, supporting:
-
-- Multiple storage backends (Memory, File, Postgres)
-- A templating engine
-- A workflow engine for complex sequences
-- An HTTP API for integration
-
-Future goals include native integration with Android applications.
-
-### Codebase State
-
-The project is in an early but well-structured development phase. The foundation is solid, with a clear separation of concerns:
-
-- **Server:** An Express server provides the main API endpoints.
-- **Storage:** An `IStorageAdapter` interface defines a clear contract for data persistence, with three initial implementations.
-- **Services:** Services for prompts (`PromptService`), workflows (`WorkflowService`), and sequences (`SequenceService`) encapsulate the core business logic.
-- **Configuration:** A typed configuration system is in place.
-- **Tooling:** The project uses TypeScript, ESLint, Prettier, and Jest for a modern development experience.
-
-However, many of the features outlined in the GitHub issues and the roadmap are still placeholders or are yet to be implemented. The current state represents a functional "skeleton" waiting for the core logic to be fleshed out.
+- **Goal:** Evolve from a monolithic product into a modular, platform-centric ecosystem that serves as a reference implementation for the Model Context Protocol (MCP).
+- **Core Principle:** Separate concerns by decoupling data (prompts), contracts (API definitions), and implementations (language-specific servers).
+- **Architecture:** A federated model with a central meta-repository for orchestration, a versioned repository for the prompt collection, a language-agnostic repository for API contracts, and independent repositories for each implementation (TypeScript, Rust, PostgreSQL, Android).
 
 ---
 
-## 2. GitHub Issues: Status and Action Plan
+##  migration-plan: Migration Plan
 
-Based on the codebase review, none of the tracked issues are currently resolved. The resolution steps provided in the original TODO.md are accurate and form a clear implementation plan.
+### Phase 0: Pre-Migration & Stabilization
 
-- **Issue #30: Implement full CRUD operations for prompts**
-  - **Status:** Open. The `IStorageAdapter` interface and its implementations (Memory, File, Postgres) are missing update and delete methods. The HTTP server also lacks the corresponding PUT and DELETE endpoints.
-  - **Action:** The proposed resolution steps are correct and necessary. This is a critical feature for core functionality.
+**Objective:** Complete core features, fix all critical bugs, stabilize the current monorepo, and prepare for a safe extraction process. These tasks must be completed *before* starting the repository split.
 
-- **Issue #29: Add more advanced validation and transformation logic**
-  - **Status:** Open. The Zod schemas in `src/schemas.ts` are basic and only validate types. They lack refined rules like minimum length, default values, or transformations.
-  - **Action:** Implementing the suggested validation enhancements (`.min()`, `.nonempty()`, `.transform()`) will greatly improve data integrity and robustness.
+#### 1. Core Feature Completion (High Priority)
 
-- **Issue #28: Enhance with more template helper functions**
-  - **Status:** Open. The `PromptService` currently has hardcoded template helpers. It lacks a flexible, extensible mechanism for adding new helpers.
-  - **Action:** The plan to create a `templateHelpers` map and pass it to the Handlebars rendering context is the correct approach to make the templating engine more powerful.
+##### Enhanced File Adapter (Storage)
+- [ ] **Schema Validation (High):** Strictly validate all JSON files on read/write to prevent data corruption.
+- [ ] **Concurrency Control (High):** Implement file locking to prevent race conditions during write operations.
+- [ ] **Indexing (Medium):** Create a metadata index file to speed up list operations for large prompt collections.
+- [ ] **Atomic Writes (Low):** Use a "write-then-rename" pattern for safe, atomic updates.
 
-- **Issues #27 & #26: Add more sequence and workflow logic**
-  - **Status:** Open. The `WorkflowService` and `SequenceService` can only execute steps in a linear fashion. There is no support for conditional logic, branching, or parallel execution.
-  - **Action:** This is a major feature enhancement. It requires modifying the `IWorkflowStep` interface and significantly refactoring the service logic to support a dynamic execution flow.
+##### Advanced Templating Engine
+- [ ] **Conditional Logic (High):** Support `if/else` constructs within templates for dynamic content generation.
+- [ ] **Loops (Medium):** Support iteration over arrays (`#each`) to dynamically generate content.
+- [ ] **Nested Templates / Partials (Medium):** Allow templates to include other templates to promote reuse.
+- [ ] **Configurable Delimiters (Low):** Allow users to specify variable delimiters (e.g., `{{var}}`, `${var}`).
+- [ ] **Variable Extraction (Low):** Implement a server-side function to automatically extract all variables from a template.
+- [ ] **Helper Functions (Low):** Create a library of built-in helper functions (e.g., `toUpperCase`, `formatDate`).
 
-- **Issue #25: Add a more robust health check**
-  - **Status:** Open. The `/health` endpoint is static and does not provide a true indication of the service's health, as it doesn't check its dependencies (e.g., the database connection).
-  - **Action:** Implementing a `healthCheck` method in the storage adapters and calling it from the health endpoint is the standard and correct way to resolve this.
+#### 2. Bug Fixes & Stabilization
+- [x] **Fix HTTP Server Integration tests** (`tests/integration/http-server.integration.test.ts`)
+- [ ] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
+- [ ] **Fix HTTP Server error handling unit tests** (`src/__tests__/http-server.test.ts`)
+- [ ] **Fix Validation unit tests** (`tests/unit/validation.unit.test.ts`)
+- [ ] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)
+- [ ] **Fix PromptService template helpers unit tests** (`tests/unit/prompt-service.unit.test.ts`)
 
-- **Issue #24: Implement Eleven Labs API integration**
-  - **Status:** Open. The `ElevenLabsService` exists but contains only placeholder code. It does not connect to the Eleven Labs API.
-  - **Action:** Completing this service requires implementing the API client logic, managing API keys via configuration, and creating an endpoint to expose the functionality.
-
----
-
-## 3. Updated and Consolidated TODO Roadmap
-
-This roadmap integrates the tasks from the GitHub issues into the phased development plan.
-
----
-
-# Formalized Developmental Trajectory for the mcp-prompts System
-
-It is assumed that the foundational components and principal functionalities of the system have been established. The following roadmap outlines a strategic progression to elevate the project to production-readiness and enterprise-grade utility, with emphasis on scalability, security, and developer experience. Each objective includes rationale and detailed implementation directives.
-
----
-
-## **Phase I: Fortification of the Core API & Storage Scalability**
-
-**Goal:** Ensure the system can reliably manage enterprise-level workloads. Completion of this phase is a prerequisite for further advancements.
-
-- [x] **Bulk Data Manipulation Operations**
-  - **Implemented:** Added `/prompts/bulk` POST and DELETE endpoints for bulk create and delete of prompts. Each returns per-item success/error results. Integration tests cover valid, partial, and all-error cases. All tests pass except for unrelated known issues. Best practices for partial success and error reporting were followed. See integration tests and OpenAPI docs for usage.
-
-- [x] **Data Set Control Mechanisms**
-  - **Implemented:** Added GET `/prompts` endpoint with pagination, sorting, and filtering (by category, tags, isTemplate, search, etc.). Query parameters are validated, and results include pagination metadata. Integration tests cover all features. Best practices for API design and error handling were followed. See OpenAPI docs and integration tests for usage. Some unrelated test failures remain.
-
-- [x] **Rectification of Postgres Connection Instability**
-  - **Implemented:** Postgres connection pooling is robustly configured (max, idleTimeoutMillis, connectionTimeoutMillis). Pool metrics (active, idle, waiting, total) are now exposed via the `/health` endpoint and documented. Best practices for pool sizing, timeouts, and observability are followed. Some unrelated test failures remain.
-
-- [x] **Introduction of a Caching Layer**
-  - **Implemented:** Redis cache-aside pattern for prompt fetch/list operations, with LRU/TTL and invalidation on mutation. Configuration is type-safe and documented. All config/type errors resolved. All tests pass except for unrelated known integration test failures. See PromptService and config docs for details.
+#### 3. Migration Preparation
+- [x] **Simulate Repository Structure:** Create local directories to mirror the target multi-repo architecture before performing the full migration.
+    - [x] Create directories: `mcp-prompts-ts`, `mcp-prompts-rs`, `mcp-prompts-aidl`, `mcp-prompts-collection`, `mcp-prompts-py`, `mcp-prompts-contracts`.
+    - [x] Add placeholder `README.md` files to each directory to define its purpose.
+- [ ] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
+- [ ] **Prepare extraction scripts:**
+    - [ ] Create `scripts/extract-collection.sh` for prompt data.
+    - [ ] Create `scripts/extract-contracts.sh` for type definitions.
+    - [ ] Create `scripts/extract-implementations.sh` for each language.
+    - [ ] Add verification scripts to ensure history is preserved using `git-filter-repo`.
+- [ ] **Create final monorepo tag and documentation:**
+    - [ ] Add tag `monorepo-final-v1.8.0` with comprehensive release notes.
+    - [ ] Update `README.md` with a migration notice and links to the new meta-repository.
+    - [ ] Create `MIGRATION.md` explaining the transition in detail.
 
 ---
 
-## **Phase II: Advancement of the Workflow & Real-time Processing Engine**
+### Phase 1: Foundational Repositories
 
-**Goal:** Transform the workflow engine into a dynamic, stateful, and resilient orchestration platform.
+**Objective:** Establish the core, shared components of the ecosystem. These repositories are dependencies for all other implementations.
 
-- [x] **Workflow State Persistence**
-  - **Implemented:** Workflow state is now persisted in the `workflow_executions` table (Postgres). The schema and adapter methods (`saveWorkflowState`, `getWorkflowState`, `listWorkflowStates`) are implemented and tested. This enables pausing, resuming, and auditing workflows. See Postgres init SQL and adapter code for details. Some unrelated integration test failures remain.
+#### Repository: `mcp-prompts-contracts`
+- [ ] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
+    - [ ] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
+    - [ ] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
+- [ ] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
+- [ ] **Set up OpenAPI Generation:** Configure automatic generation of an OpenAPI specification from the Zod schemas.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Implement lint, test, and build pipeline.
+    - [ ] Add automatic schema validation against examples.
+    - [ ] Configure automatic NPM package publishing (`@sparesparrow/mcp-prompts-contracts`) on tag.
+    - [ ] Trigger a `repository_dispatch` event to the meta-repo on release.
 
-- [x] **"Human-in-the-Loop" Step Modality**
-  - **Implemented:** Workflows now support pausing at `human-approval` steps, saving state and waiting for external input. A new endpoint (`POST /api/v1/workflows/:executionId/resume`) allows resuming execution with user input. All type/linter errors are resolved. All tests pass except for unrelated known integration test failures. See workflow engine and API docs for details.
-
-- [x] **Real-time Progress Streaming**
-  - **Implemented:** Workflow progress events (`step_started`, `step_completed`, `step_failed`, `workflow_completed`) are now broadcast to all connected clients via SSE using `SseManager`. The event payloads include stepId, executionId, workflowId, output, error, and context. All type/linter errors are resolved. All tests pass except for unrelated known integration test failures. See workflow engine and `/events` SSE endpoint for details.
-
-- [x] **Workflow Versioning**
-  - **Objective:** Implement workflow versioning for non-disruptive updates.
-  - **Status:** Complete (all adapter/service tests and HTTP API/integration tests updated, all known failures resolved)
-  - **Details:**
-    - [x] Storage layer and helpers in http-server.ts now support versioned workflow storage as {id}-v{version}.json, with helpers to get latest, all versions, or a specific version.
-    - [x] API endpoints to support versioned workflow CRUD are implemented: create, get latest, get all versions, get specific version, delete version, run specific version.
-    - [x] Integration tests for workflow versioning updated to match new API; all workflow versioning tests now pass.
-    - [x] Prompt CRUD and bulk operation tests updated for versioning; all failures resolved.
-    - [x] MemoryAdapter, FileAdapter, and PromptService tests updated for versioned prompt CRUD; all tests pass.
-    - [x] HTTP API and integration test failures addressed; prompt creation, update, delete, and validation now aligned.
-    - Test suite rerun: all suites passing.
-    - Modifying a workflow will create a new, incrementally versioned entity.
-    - Existing instances continue with their original version; new instances use the latest (unless specified).
-    - Enables stability, auditability, and A/B testing.
+#### Repository: `mcp-prompts-collection`
+- [ ] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
+    - [ ] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
+    - [ ] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Add a pipeline to validate all prompts against the JSON schema from `mcp-prompts-contracts`.
+    - [ ] Set up multi-format package publishing (NPM `@sparesparrow/mcp-prompts-collection`, Crates.io `mcp-prompts-collection`).
+    - [ ] Implement automated prompt quality checks (e.g., checking for placeholders).
+    - [ ] Configure versioning based on data changes.
 
 ---
 
-## **Phase III: Enhancement of Security & Observability**
+### Phase 2: Core Implementations
 
-**Goal:** Harden the application for secure, auditable, and transparent production deployment.
+**Objective:** Migrate the primary TypeScript and Rust implementations, making them consume the new foundational packages.
 
-- [ ] **API Authentication & Authorization**
-  - **Objective:** Secure all endpoints using stateless, token-based authentication (e.g., JWT).
-  - **Details:** 
-    - Create authentication endpoints to issue JWTs.
-    - Middleware to validate tokens and attach user identity/roles.
-    - Enable role-based access control (RBAC) for sensitive endpoints.
+#### Repository: `mcp-prompts-ts`
+- [ ] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
+    - [ ] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
+    - [ ] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
+- [ ] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
+- [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-collection`.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Implement a comprehensive test suite (unit, integration).
+    - [ ] Set up Docker image building and publishing to Docker Hub/GHCR.
+    - [ ] Configure automatic NPM package publishing (`@sparesparrow/mcp-prompts`).
+    - [ ] Add a step to dispatch an event to the meta-repo on release.
 
-- [ ] **Structured Logging**
-  - **Objective:** Replace `console.log` with a structured logging library (e.g., pino, winston).
-  - **Details:** 
-    - Output logs in JSON format with `traceId`, timestamp, log level, and contextual data (`workflowId`, `userId`).
-    - Facilitates powerful querying and request tracing.
-
-- [ ] **Automated Vulnerability Scanning**
-  - **Objective:** Integrate security scans into CI/CD (GitHub Actions).
-  - **Details:** 
-    - Run `npm audit` for dependency vulnerabilities.
-    - Integrate SAST tools (e.g., Snyk, Dependabot) for code analysis and remediation guidance.
-
-- [ ] **API Rate Limiting**
-  - **Objective:** Apply rate limiting to all API endpoints (e.g., via `express-rate-limit`).
-  - **Details:** 
-    - Default: 100 requests/minute per IP; return HTTP 429 with `Retry-After` header.
-    - Apply stricter limits to expensive endpoints as needed.
+#### Repository: `mcp-prompts-rs`
+- [ ] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
+    - [ ] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
+- [ ] **Update Dependencies:** Add `mcp-prompts-collection` as a Cargo dependency.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Configure a Cargo build and test pipeline, including `clippy` and `rustfmt` checks.
+    - [ ] Set up crates.io publishing (`mcp-prompts-rs`).
+    - [ ] Configure Docker image building and publishing.
+    - [ ] Add a step to dispatch an event to the meta-repo on release.
 
 ---
 
-## 🐞 Known Test Failures (see GitHub issues)
+### Phase 3: Specialized Implementations
 
-### [Failing test: WorkflowService (Stateful) unit tests](https://github.com/sparesparrow/mcp-prompts/issues/21)
-- **File:** `tests/unit/workflow-service.unit.test.ts`
-- **Failures:**
-  - should run a simple workflow and save state correctly
-  - should handle parallel steps and save state
-- **Steps to Fix:**
-  1. Review the test logic and the number of expected calls to mocked functions.
-  2. Ensure the workflow service saves state the correct number of times for both serial and parallel steps.
-  3. Update the test or the implementation to match the intended behavior.
-  4. Rerun tests and verify call counts.
+**Objective:** Migrate the more complex, platform-specific implementations.
 
-### [Failing test: HTTP Server Integration tests](https://github.com/sparesparrow/mcp-prompts/issues/22)
-- **File:** `tests/integration/http-server.integration.test.ts`
-- **Failures:**
-  - should return 400 for invalid prompt creation
-  - should return 400 for missing required fields
-  - should return 400 for whitespace-only content
-  - should return 400 for duplicate prompt ID
-  - should return 400 for template variable mismatches
-  - should save and run a sample workflow
-  - should enforce workflow rate limiting
-- **Steps to Fix:**
-  1. Review validation logic in API endpoints and Zod schemas.
-  2. Ensure all invalid input cases return 400, not 201 or 500.
-  3. Check error handling and response formatting in the HTTP server.
-  4. Debug workflow engine integration for correct status codes and outputs.
-  5. Add/adjust tests for edge cases as needed.
+#### Repository: `mcp-prompts-pg`
+- [ ] **Initialize repository:** Extract PostgreSQL-specific code (`PostgresAdapter`, `docker/postgres/init/`, etc.) into a new repository.
+- [ ] **Design dedicated schema:** Formalize the `prompts.schema` with versioning and audit logging capabilities.
+- [ ] **Implement pgvector integration:** Add full support for semantic search using embeddings.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Add `sqlfluff` for SQL linting.
+    - [ ] Implement database migration testing.
+    - [ ] Set up Docker image publishing with init scripts.
+    - [ ] Add performance benchmarks (target: <=100ms for 1M vectors).
+    - [ ] Configure Helm chart publishing.
 
-### [Failing test: HTTP Server error handling unit tests](https://github.com/sparesparrow/mcp-prompts/issues/23)
-- **File:** `src/__tests__/http-server.test.ts`
-- **Failures:**
-  - should handle internal server errors
-- **Steps to Fix:**
-  1. Review error code mapping in the HTTP server error handler.
-  2. Ensure internal errors are mapped to the correct error code ("INTERNAL_SERVER_ERROR").
-  3. Update error handling middleware or test expectations as needed.
+#### Repository: `mcp-prompts-aidl`
+- [ ] **Initialize repository:** Move the Android application source code into `mcp-prompts-aidl/`.
+    - [ ] Move the contents of `android_app/` (excluding the native Rust service) into `mcp-prompts-aidl/`.
+- [ ] **Embed Rust micro-service:** Integrate `mcp-prompts-rs` as the core engine.
+- [ ] **Develop Tasker integration:** Create profiles for integration with the Android automation app Tasker.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Configure a Gradle/Cargo build pipeline for the AAR library and APK.
+    - [ ] Set up AAR library publishing to Maven Central.
+    - [ ] Configure Docker image for Android emulator testing.
 
-### [Failing test: Validation unit tests](https://github.com/sparesparrow/mcp-prompts/issues/24)
-- **File:** `tests/unit/validation.unit.test.ts`
-- **Failures:**
-  - should return a failure result when not throwing on error
-- **Steps to Fix:**
-  1. Review the validation logic and error reporting in the validation module.
-  2. Ensure all expected validation errors are reported (expected 4, received 2).
-  3. Update the test or validation implementation to match the intended error reporting.
+---
 
-### [Failing test: FileAdapter integration tests](https://github.com/sparesparrow/mcp-prompts/issues/25)
-- **File:** `tests/integration/file-adapter.integration.test.ts`
-- **Failures:**
-  - should delete a prompt
-- **Steps to Fix:**
-  1. Review file deletion logic in FileAdapter.
-  2. Ensure deleted prompt files are handled gracefully (no ENOENT error).
-  3. Update error handling for missing files after deletion.
+### Phase 4: Ecosystem Orchestration & Validation
 
-### [Failing test: PromptService template helpers unit tests](https://github.com/sparesparrow/mcp-prompts/issues/26)
-- **File:** `tests/unit/prompt-service.unit.test.ts`
-- **Failures:**
-  - Template Helpers: should use jsonStringify helper
-- **Steps to Fix:**
-  1. Review the `jsonStringify` helper implementation.
-  2. Ensure it produces pretty-printed JSON as expected by the test.
-  3. Update the helper or the test to match the intended output.
+**Objective:** Tie the federated ecosystem together with central orchestration and end-to-end testing.
 
-## In Progress
+#### Repository: `mcp-prompts-meta`
+- [ ] **Initialize repository:** Create a new repository to serve as the project's central hub.
+- [ ] **Populate with documentation:** Move high-level architecture docs, roadmap, and contributing guides here.
+- [ ] **Implement reusable workflows:** Create shared GitHub Actions workflows (`workflow_call`) for common tasks like linting, building, and publishing.
+- [ ] **Implement orchestration logic:**
+    - [ ] Create a `repository_dispatch` handler to listen for releases from other repos.
+    - [ ] Automate the building of a "suite" Docker image containing all server implementations.
+    - [ ] Automate the generation of a compatibility matrix.
+    - [ ] Automate the creation of consolidated release notes.
 
-- [ ] **API prompt creation required fields: document and align tests**
-  - **Objective:** Ensure all prompt creation tests and documentation reflect the requirement for id, version, createdAt, and updatedAt fields in POST /prompts.
-  - **Status:** In Progress
-  - **Details:**
-    - [ ] Review and update all prompt creation tests to always provide all required fields.
-    - [ ] Add documentation and comments to clarify this requirement.
-    - [ ] Consider relaxing the API to generate these fields server-side in the future for better UX.
-    - [ ] Rerun all tests after changes.
-    - [ ] Commit and close related GitHub issues if resolved.
+#### Repository: `mcp-prompts-e2e`
+- [ ] **Initialize repository:** Create a new repository for end-to-end tests.
+- [ ] **Develop multi-server test suite:** Create tests that validate workflows across multiple server implementations running together.
+- [ ] **Create docker-compose environments:** Define test environments that spin up various combinations of the servers.
+- [ ] **CI/CD Pipeline:**
+    - [ ] Configure automated execution of the E2E suite.
+    - [ ] Set up scheduled nightly runs.
+    - [ ] Implement comprehensive test reporting and metrics.
+
+---
+
+### Phase 5: Migration Execution & Archival
+
+**Objective:** Finalize the transition and formally archive the original monorepo.
+
+- [ ] **Execute repository migration:** Run all extraction scripts, verify history, and set up new repositories on GitHub.
+- [ ] **Update all cross-repository dependencies** to point to the new versioned packages.
+- [ ] **Test the complete multi-repo workflow** from a code change in one repo to a final orchestrated release.
+- [ ] **Archive the original monorepo:**
+    - [ ] Mark the `mcp-prompts-ts` repository (the renamed monorepo) as the official TypeScript implementation.
+    - [ ] Update its README to reflect its new, focused role.
+    - [ ] Make the now-empty `sparesparrow/mcp-prompts` the new meta-repository.
+    - [ ] Add deprecation notices to old NPM packages if necessary.
+
+---
+
+## backlog: Future Vision & Advanced Features (Post-Migration)
+
+This section contains features to be implemented after the core migration is complete.
+
+### Advanced Templating Engine
+- [ ] **Conditional Logic:** Support `if/else` constructs within templates.
+- [ ] **Loops:** Support iteration over arrays to dynamically generate content.
+- [ ] **Configurable Delimiters:** Allow users to specify variable delimiters (e.g., `{{var}}`, `${var}`).
+- [ ] **Nested Templates (Partials):** Allow templates to include other templates.
+- [ ] **Variable Extraction:** Implement a server-side function to automatically extract all variables from a template.
+
+### Enhanced File Adapter
+- [ ] **Schema Validation:** Strictly validate all JSON files on read/write.
+- [ ] **Concurrency Control:** Implement file locking to prevent race conditions.
+- [ ] **Indexing:** Create a metadata index file to speed up list operations.
+- [ ] **Atomic Writes:** Use a "write-then-rename" pattern for safe updates.
+
+### Enterprise & Ecosystem Features
+- [ ] **Python Implementation:** Create a Python port (`mcp-prompts-py`).
+- [ ] **Advanced RBAC:** Implement fine-grained, role-based access control.
+- [ ] **Enterprise Audit Logging:** Standardize audit logs across all implementations.
+- [ ] **Resource URI System:** Implement a full Resource URI parser and router for deep ecosystem integration (`@github:`, `@filesystem:`, etc.).
+- [ ] **Bidirectional GitHub Sync:** Allow for a full Git-based workflow for managing prompts.

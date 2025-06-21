@@ -1,0 +1,318 @@
+Analýza Restrukturalizace MCP Prompts
+Server: Komplexní Přehled Vývoje a
+Strategických Plánů
+Tento dokument představuje hloubkovou analýzu codebase a dokumentace repozitáře
+sparesparrow/mcp-prompts, včetně porovnání s dřívější verzí NPM balíčku a vizualizace
+nejnovějšího úsilí v restrukturalizaci systému. Zpráva hodnotí strategické dokumenty projektu,
+formuluje komplexní strategii pro další vývoj, testování a vydávání a poskytuje podrobný pohled
+na technickou architekturu a její evoluci.
+
+Strategický Kontext a Mise Projektu
+Řešení Problému Fragmentace a Chaosu
+MCP Prompts Server představuje robustní řešení problému fragmentace promptů napříč
+vývojovými týmy. Jeho hlavním posláním je fungovat jako "jediný zdroj pravdy" (jediný zdroj
+pravdy) pro správu, ukládání a poskytování promptů a jejich šablon pro interakce s velkými
+jazykovými modely. Projekt se zaměřuje na řešení kritických problémů moderního AI vývoje,
+včetně absence verzování, obtížného A/B testování, bezpečnostních rizik a neefektivní
+spolupráce, které vznikají, když jsou prompty roztroušeny v kódu, sdílených dokumentech nebo
+ztraceny v komunikačních kanálech. Identifikace těchto problémů ukazuje, že projekt není
+pouhým nástrojem, ale strategickým řešením všudypřítomného a nákladného problému v
+životním cyklu LLMOps. S rostoucím měřítkem AI aplikací se správa promptů stává klíčovou,
+podobně jako se správa API kontraktů nebo infrastruktury jako kódu stala kritickou v
+předchozích softwarových paradigmatech. Projekt se tak implicitně pozicuje jako základní
+infrastrukturní komponenta pro AI vývojové týmy.
+
+Vize: Centralizovaný Hub pro Životní Cyklus Promptů
+Mise serveru spočívá ve vytvoření centralizovaného a standardizovaného systému pro celý
+životní cyklus promptů, od jejich vytvoření a testování až po bezpečné sdílení v rámci
+organizace i s externími systémy. Tato vize je komplexní a pokrývá nejen ukládání (store and
+retrieve prompts) , ale celý hodnotový řetězec: šablonování (Create and use templates with
+variables) , orchestraci (Project orchestration capabilities) a bezpečný přístup (Full control over
+who can read and modify). Tento holistický přístup je klíčovým odlišujícím prvkem projektu.
+
+Strategické Sladění s Protokolem MCP (Model Context Protocol)
+Projekt je referenční implementací MCP serveru a je postaven na Model Context Protocol.
+Tento protokol je často přirovnáván k "USB-C pro AI", což zdůrazňuje jeho cíl standardizovat
+komunikaci v AI ekosystému. Toto úzké propojení s MCP standardem je záměrnou a silnou
+strategickou volbou, která zabraňuje problému "dalšího proprietárního standardu". Díky
+dodržování MCP zajišťuje server interoperabilitu a kompozabilitu s širším ekosystémem
+
+nástrojů, jako jsou jiné MCP servery pro soubory, GitHub nebo paměť , což představuje
+významnou hodnotu pro uživatele, kteří se chtějí vyhnout závislosti na jednom dodavateli.
+Specializované zaměření projektu pouze na správu promptů, i když se může zdát omezující, je
+ve skutečnosti jeho strategickou výhodou. Modulární povaha MCP ekosystému umožňuje, aby
+se různé servery specializovaly na různé úkoly. Tím, že se mcp-prompts soustředí výhradně na
+správu promptů, může tento problém řešit výjimečně dobře a do hloubky, například pomocí
+pokročilých funkcí jako MutablePrompt interface, zatímco se spoléhá na MCP standard pro
+integraci s ostatními aspekty vývojového procesu.
+
+Fundamentální Transformace: Verze 1.2.11 vs 1.8.0
+Klíčové Architektonické Změny
+Mezi verzí 1.2.11, známou z NPM registru, a současnou verzí 1.8.0 došlo k zásadní
+transformaci architektury systému. Starší verze 1.2.11 nabízela základní funkce, jako je
+ukládání a načítání promptů, vytváření šablon s proměnnými, filtrování podle tagů a podpora
+více úložných backendů (souborový systém, PostgreSQL). Byla to funkční, ale jednoduchá
+utilita.
+Současná verze 1.8.0 představuje komplexní ekosystém s pokročilými funkcemi, jako je
+MutablePrompt interface, podpora Server-Sent Events, integrace s více servery a systém
+Resource URI. Nejpodstatnější změnou, která tuto transformaci odstartovala, byl upgrade na
+MCP SDK verze 1.6.1, jenž přinesl kompletní refaktoring registračních metod a výrazné
+zjednodušení codebase. Tento upgrade nebyl jen drobnou aktualizací, ale architektonickým
+zlomovým bodem, který posunul projekt od ad-hoc systému k strukturovanějšímu, protokolem
+řízenému přístupu.
+
+Nové Registrační Vzory
+Klíčovou inovací je zavedení nových registračních metod poskytovaných MCP SDK:
+server.resource pro definování resource endpointů (např. pro prompty), server.tool pro registraci
+CRUD-like operací (např. add_prompt, get_prompt) a server.prompt pro specifické operace
+vázané na prompty. Tyto změny výrazně zjednodušily codebase, zlepšily její udržovatelnost a
+zajistily lepší kompatibilitu s nejnovějším MCP SDK.
+Tato nová struktura zásadně zlepšuje zkušenost vývojářů (Developer Experience) a zajišťuje
+budoucí udržitelnost architektury. Zatímco starší model pravděpodobně vyžadoval manuální
+propojování Express routes pro každou novou funkci, nový deklarativní přístup
+(server.tool('add_prompt', handler)) abstrahuje podkladovou transportní vrstvu (HTTP, SSE).
+Vývojář pouze definuje nástroj a jeho logiku, což činí kód čistším a robustnějším. Každá nová
+funkce tak automaticky odpovídá MCP standardu.
+
+Matice Evoluce Funkcí
+Následující tabulka vizuálně porovnává evoluci funkcí mezi verzemi a zdůrazňuje strategickou
+hodnotu refaktoringu.
+Funkce
+Verze 1.2.11
+Verze 1.8.0 (Potvrzeno) Strategický Dopad
+(Odvozeno)
+Registrace Jádra
+Ad-hoc / Vlastní
+MCP SDK v1.6.1
+Standardizace,
+
+Funkce
+
+Formáty Promptů
+Aktualizace v
+Reálném Čase
+Integrace
+Ekosystému
+
+Workflow Engine
+
+Kontejnerizace
+Mobilní Strategie
+
+Verze 1.2.11
+(Odvozeno)
+
+Verze 1.8.0 (Potvrzeno) Strategický Dopad
+
+(resource, tool, prompt) Udržovatelnost
+Pravděpodobně pouze MutablePrompt: JSON, Interoperabilita,
+JSON
+MDC, PGAI, Template Vektorové Vyhledávání
+Žádné
+Server-Sent Events
+Responzivní UI,
+(SSE)
+Synchronizace v
+Reálném Čase
+Základní
+Resource URI
+Kompozabilita,
+(@github, @file),
+Pokročilé Workflows
+Orchestrace více
+serverů
+Žádný
+Stavový, vícekrokový Automatizace
+engine (Shell, HTTP, Komplexních Úkolů
+Prompt kroky)
+Základní podpora
+Pokročilá "Docker-first" Produkční
+Dockeru
+strategie
+Připravenost, DevOps
+Žádná
+Formalizovaná
+Budoucí Růst,
+strategie pro nasazení Rozšíření Platformy
+na Androidu
+
+Pokročilá Architektura Verze 1.8.0
+MutablePrompt Interface: Motor Interoperability
+Srdcem nové architektury je MutablePrompt interface, které umožňuje dynamickou konverzi
+promptů mezi čtyřmi různými formáty. Tento interface je definován v src/interfaces.ts a zahrnuje
+metody jako toFormat, applyVariables a extractVariables. Podporované formáty zahrnují:
+●​ JSON: Standardní interní reprezentace.
+●​ MDC: Formát Cursor Rules pro přímou integraci s moderními AI-first IDE jako Cursor.
+●​ PGAI: Formát s podporou embeddings pro PostgreSQL, který umožňuje vektorové
+vyhledávání.
+●​ Template: Formát s dynamickými proměnnými {{variable}}.
+Toto řešení poskytuje mimořádnou flexibilitu a cross-platform kompatibilitu. Podpora PGAI
+formátu, explicitně konfigurovatelná přes docker-compose.pgai.yml a inicializační SQL skript
+pgai-init , odemyká pokročilé sémantické vyhledávání. Tím se server transformuje z
+jednoduchého datového úložiště na dynamickou službu pro transformaci obsahu. Již to není jen
+"CRUD pro prompty", ale "CRUD + Transformace pro prompty", což je mnohem silnější nabídka
+hodnoty.
+
+Resource Integration System
+Nová architektura zahrnuje sofistikovaný Resource Integration System s Resource URI
+Parserem a Resource Routerem. Systém podporuje URI formáty jako @filesystem:/path,
+@memory:key a @github:owner/repo/path pro přístup k externím zdrojům. Tento systém je
+praktickou implementací klíčové filozofie MCP – kompozability. Umožňuje, aby prompt uložený
+na tomto serveru dynamicky odkazoval a načítal obsah z jiných serverů nebo zdrojů za běhu,
+
+což je patrné z pokročilých šablon jako advanced-multi-server-template.json. Resource Router
+zajišťuje dynamické směrování požadavků na příslušné handlery a implementuje fallback
+strategie pro nedostupné zdroje.
+
+Server-Sent Events a Real-time Capabilities
+Významnou novinkou je podpora Server-Sent Events (SSE) pro real-time aktualizace. Systém
+poskytuje /events endpoint s heartbeat mechanismem pro udržení spojení a umožňuje
+sledování změn v promptech v reálném čase. Implementace je robustní, což dokazuje
+dedikovaný modul sse.ts , podpora v Docker Compose a testovací skript sse-test.ts. Tato
+funkcionalita výrazně zlepšuje uživatelskou zkušenost a umožňuje vytváření responzivních
+klientských aplikací bez neefektivního pollingu.
+
+Multi-Server Ekosystém a Integrace
+Rozšířená Konektivita
+Současná verze podporuje integraci s více než šesti dalšími MCP servery, včetně Memory
+Server, Filesystem Server, GitHub Server, Mermaid Diagram Server, Orchestrator Server a
+ElevenLabs Server. Tato integrace, konfigurovatelná pomocí docker-compose.integration.yml ,
+vytváří komplexní ekosystém pro potřeby AI kontextu. Umožňuje pokročilé schopnosti
+prostřednictvím kombinované síly specializovaných serverů, kde mcp-prompts funguje jako
+centrální uzel.
+Systém implementuje orchestrační vzory prostřednictvím svého workflow enginu , který
+koordinuje úkoly napříč více servery. To umožňuje složité workflows zahrnující více kroků a
+různé typy zpracování, například načtení souboru pomocí @filesystem, jeho použití v promptu z
+@prompts a uložení výsledku do @memory. Integrace s Mermaid Diagram Serverem navíc
+poskytuje možnosti vizualizace vztahů mezi prompty, strukturou šablon a závislostmi zdrojů.
+
+Strategické Plány a Implementační Roadmap
+Analýza Přiložených Dokumentů
+Přiložené strategické dokumenty poskytují detailní plán pro další vývoj projektu, organizovaný
+do šesti hlavních fází s jasně definovanými prioritami. Strategická analýza identifikuje klíčové
+problémy fragmentace promptů a navrhuje řešení prostřednictvím centralizované platformy s
+pokročilými funkcemi správy. Dokument zdůrazňuje význam Adapter Factory vzoru a
+MutablePrompt interface jako základních architektonických prvků. Tyto plány jsou dále
+podpořeny refaktoringovým přehledem v docs/designs/refactoring-overview.md, který rovněž
+popisuje fázový přístup k modularizaci systému.
+
+Fázovaný Implementační Plán
+Implementační plán je strukturován do šesti logických fází, počínaje dokončením základní
+architektury a končící pokročilými funkcemi jako vektorové vyhledávání a řízení přístupu na
+základě rolí (RBAC).
+●​ Fáze I & II: Stabilizace Jádra a Pokročilé Šablonování: Kritická priorita je přiřazena
+
+dokončení implementace MutablePrompt pro všechny adaptéry a dokončení PostgreSQL
+adaptéru s podporou PGAI. Tato priorita je správná, protože stabilní a funkčně kompletní
+jádro je nezbytným základem pro další rozvoj. Vysoká priorita je také věnována rozšíření
+funkcionality šablonování, včetně pokročilého enginu s podmíněnou logikou,
+konfigurovatelných oddělovačů a validace proměnných s typovou kontrolou. To promění
+prompty ze statického textu na znovupoužitelné mini-programy.
+●​ Fáze III & IV: Integrace Ekosystému a Enterprise Funkce: Střední priorita zahrnuje
+dokončení Resource URI systému pro plnou integraci s MCP ekosystémem. Následně se
+plán zaměřuje na enterprise funkce jako vektorové vyhledávání a RBAC, což je v souladu
+s oficiálním roadmap dokumentem, který zmiňuje Elasticsearch adaptér a sjednocený
+vyhledávací endpoint. Tyto funkce jsou klíčové pro přechod od mocného nástroje k
+plnohodnotné enterprise platformě.
+
+Produkční Zralost a DevOps Excellence
+Docker-First Přístup
+Projekt demonstruje výjimečnou úroveň produkční zralosti prostřednictvím komplexní Docker
+strategie, jak je podrobně popsáno v docker/README.md. Architektura zahrnuje účelově
+zaměřené kontejnery pro různá prostředí (produkce, vývoj, testování) s vícestupňovými buildy
+pro optimalizaci velikosti obrazů.
+Systém poskytuje Docker Compose orchestraci s několika konfiguračními soubory, které lze
+kombinovat podle potřeb nasazení pomocí skriptu docker-compose-manager.sh. Tento skript je
+jasným znakem zralého DevOps myšlení, které abstrahuje složitost a zjednodušuje správu
+různých profilů a prostředí. Existence skriptů jako cleanup-docker-files.sh a
+consolidate-docker.sh navíc odhaluje historii záměrného refaktoringu a profesionalizace.
+Naznačuje to, že tým aktivně investoval do zlepšování podkladové DevOps infrastruktury a
+odstraňování technického dluhu, což je silný pozitivní signál o dlouhodobém zdraví a
+udržitelnosti projektu.
+
+Kontinuální Integrace a Automatizace
+Projekt implementuje robustní CI/CD pipeline pomocí GitHub Actions. Workflow ci.yml
+automatizuje linting, formátování, testování (jednotkové i integrační), build a auditování.
+Workflow release.yml a publish.yml dále automatizují verzování, publikaci balíčků na NPM a
+publikaci Docker obrazů na registry jako GHCR nebo Docker Hub. Tato úroveň automatizace
+snižuje riziko lidské chyby a zajišťuje konzistentní a vysoce kvalitní vydání. Health check
+endpointy umožňují monitoring stavu serveru a zajišťují spolehlivý provoz v kontejnerizovaných
+prostředích.
+
+Vývojová Timeline a Milníky
+Historický Vývoj
+Vývoj projektu od verze 1.0.0 po současnou verzi 1.8.0 ukazuje postupný růst od základního
+nástroje pro správu promptů po sofistikovaný ekosystém.
+●​ Verze 1.0.0 (únor 2024): Zavedla základní funkcionalitu včetně správy promptů, template
+
+●​
+●​
+●​
+●​
+
+proměnných a file-based storage.
+Verze 1.1.0: Přidala PGAI vector search a PostgreSQL embeddings.
+Verze 1.2.0: Významná restrukturalizace, která reorganizovala codebase a zavedla lepší
+vývojovou dokumentaci.
+Verze 0.7.0 (v changelogu, pravděpodobně starší větev): Přidala podporu SSE, nové
+Docker Compose konfigurace a pokročilé šablony pro integraci více serverů.
+Verze 1.8.0: Představuje kulminaci vývoje s kompletním refaktoringem pro MCP SDK
+1.6.1, zavedením MutablePrompt interface, stavového workflow enginu a rozšířenými
+integračními možnostmi, včetně zahájení práce na nativní Android službě v Rustu.
+
+Strategická Hodnota a Budoucí Perspektivy
+Řešení Klíčových Problémů
+Projekt řeší fundamentální problém fragmentace promptů v moderním AI vývoji prostřednictvím
+centralizovaného přístupu s verzováním, A/B testováním a bezpečnou správou. Implementace
+MCP standardu zajišťuje interoperabilitu a zaměnitelnost v širším ekosystému AI nástrojů.
+Strategická pozice projektu jako specializovaného serveru pro správu promptů v MCP
+ekosystému mu umožňuje soustředit se na jeden problém a řešit ho výjimečně dobře. Toto
+zaměření na úzkou specializaci je, jak bylo zmíněno, strategickou výhodou, nikoli omezením.
+
+Doporučení pro Budoucí Vývoj
+Analýza doporučuje prioritizovat stabilizaci jádra systému před přidáváním pokročilých funkcí.
+Iterativní přístup s rychlým dodáním stabilního jádra a postupným rozšiřováním funkcí na
+základě zpětné vazby od komunity představuje optimální strategii. Kromě toho jsou doporučeny
+následující kroky:
+1.​ Zavedení End-to-End Testování: Ačkoli je testovací pyramida solidní, dalším logickým
+krokem je zavedení end-to-end (E2E) testů. Ty by měly využívat
+docker-compose-manager.sh ke spuštění plného, multi-serverového prostředí a simulovat
+kompletní uživatelské workflows napříč více službami, což poskytne nejvyšší úroveň
+důvěry ve funkčnost celého systému.
+2.​ Formalizace API Kontraktů: Urychlit práci na balíčku mcp-prompts-contracts a
+generování OpenAPI specifikací pro poskytnutí stabilních, verzovaných kontraktů pro
+všechny klienty.
+3.​ Realizace Mobilní Strategie: Projekt má mimořádně prozíravou strategii pro Android.
+Doporučuje se dodržet navržený dvoufázový přístup:
+○​ Fáze 1 (MVP): Vytvořit MVP pomocí "Hybrid API-Client (Localhost Server) Modelu".
+To zahrnuje zabalení zkompilovaného Rust serveru do Android aplikace a
+komunikaci přes localhost HTTP. To nabízí nejlepší rovnováhu mezi rychlostí
+uvedení na trh a uživatelským zážitkem.
+○​ Fáze 2 (Finální Produkt): Migrovat na "Native Systems Integration" model s
+využitím AIDL. To představuje "zlatý standard" pro výkon, stabilitu a efektivitu na
+platformě Android a promění aplikaci v základní kámen pro sadu mobilních
+vývojářských nástrojů.
+Projekt má vynikající pozici k tomu, aby se stal kritickou součástí infrastruktury pro jakýkoli tým
+budující aplikace na MCP stacku. Úspěšná realizace navrženého plánu upevní jeho roli jako
+
+klíčové komponenty v budoucnosti modulárního a interoperabilního vývoje AI.
+
+Závěr
+MCP Prompts Server představuje promyšlené řešení naléhavého problému v oboru s jasnou
+cestou k tomu, aby se stal nejlepším ve své třídě a produkčně připraveným systémem.
+Restrukturalizace od verze 1.2.11 k 1.8.0 demonstruje významný pokrok v architektuře,
+funkcionalitě a produkční zralosti, zatímco strategické plány poskytují jasný roadmap pro další
+vývoj.
+Kombinace pokročilé architektury s MutablePrompt interface, rozšířené integrace s MCP
+ekosystémem a důraz na produkční zralost a DevOps excelenci činí z tohoto projektu klíčovou
+komponentu pro budoucnost vývoje AI aplikací. Realizace navržených plánů, zejména v oblasti
+testování a mobilní strategie, upevní jeho pozici jako nepostradatelného nástroje v modulárním
+a interoperabilním světě umělé inteligence.
+
+Works cited
+1. MCP Prompts Server - Glama, https://glama.ai/mcp/servers/@sparesparrow/mcp-prompts 2.
+sparesparrow/mcp-prompts: Model Context Protocol server for managing, storing, and providing
+prompts and prompt templates for LLM interactions. - GitHub,
+https://github.com/sparesparrow/mcp-prompts
+
+
