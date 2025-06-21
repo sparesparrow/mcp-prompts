@@ -88,51 +88,77 @@ describe('FileAdapter Integration', () => {
     expect(retrieved).toEqual(prompt);
   });
 
-  it('should update an existing prompt', async () => {
+  it('should update an existing prompt (versioned)', async () => {
     await adapter.connect();
-    const originalPrompt = {
-      id: 'update-test',
-      name: 'Update Test',
-      content: 'Original',
-      createdAt: 'date',
-      updatedAt: 'date',
-      version: 1,
-    };
-    await adapter.savePrompt(originalPrompt);
-    const updatedData = {
-      ...originalPrompt,
-      content: 'Updated',
-      version: 2,
-      updatedAt: 'new-date',
-    };
-    const updatedPrompt = await adapter.updatePrompt('update-test', updatedData);
-    expect(updatedPrompt.content).toBe('Updated');
-    expect(updatedPrompt.version).toBe(2);
-    const retrieved = await adapter.getPrompt('update-test');
-    expect(retrieved?.content).toBe('Updated');
-  });
-
-  it('should delete a prompt', async () => {
-    await adapter.connect();
+    const now = new Date().toISOString();
     const prompt = {
-      id: 'delete-test',
-      name: 'Delete Test',
-      content: 'Delete me',
-      createdAt: 'date',
-      updatedAt: 'date',
+      id: 'update-prompt',
+      content: 'Initial content',
+      isTemplate: false,
+      name: 'Update Test',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
     };
     await adapter.savePrompt(prompt);
-    console.log('[DEBUG] Saved prompt:', testPromptFile, 'Exists:', fs.existsSync(testPromptFile));
-    let retrieved = await adapter.getPrompt('delete-test');
+    const updatedPrompt = {
+      ...prompt,
+      content: 'Updated content',
+      updatedAt: new Date().toISOString(),
+    };
+    await adapter.updatePrompt('update-prompt', 1, updatedPrompt);
+    const retrieved = await adapter.getPrompt('update-prompt', 1);
     expect(retrieved).toBeDefined();
-    await adapter.deletePrompt('delete-test');
-    console.log(
-      '[DEBUG] Deleted prompt:',
-      testPromptFile,
-      'Exists:',
-      fs.existsSync(testPromptFile)
-    );
-    retrieved = await adapter.getPrompt('delete-test');
+    expect(retrieved?.content).toBe('Updated content');
+  });
+
+  it('should list all prompts (versioned)', async () => {
+    await adapter.connect();
+    const now = new Date().toISOString();
+    const prompts = [
+      {
+        id: 'list-prompt-1',
+        content: 'Prompt 1',
+        isTemplate: false,
+        name: 'List 1',
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+      {
+        id: 'list-prompt-2',
+        content: 'Prompt 2',
+        isTemplate: false,
+        name: 'List 2',
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
+      },
+    ];
+    for (const p of prompts) {
+      await adapter.savePrompt(p);
+    }
+    const all = await adapter.listPrompts({}, true);
+    expect(all.length).toBeGreaterThanOrEqual(2);
+    expect(all.some(p => p.id === 'list-prompt-1')).toBe(true);
+    expect(all.some(p => p.id === 'list-prompt-2')).toBe(true);
+  });
+
+  it('should delete a prompt (versioned)', async () => {
+    await adapter.connect();
+    const now = new Date().toISOString();
+    const prompt = {
+      id: 'delete-prompt',
+      content: 'To be deleted',
+      isTemplate: false,
+      name: 'Delete Test',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await adapter.savePrompt(prompt);
+    await adapter.deletePrompt('delete-prompt', 1);
+    const retrieved = await adapter.getPrompt('delete-prompt', 1);
     expect(retrieved).toBeNull();
   });
 });

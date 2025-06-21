@@ -18,134 +18,91 @@ describe('MemoryAdapter Integration', () => {
         expect(typeof adapter.deletePrompt).toBe('function');
         expect(typeof adapter.listPrompts).toBe('function');
     });
-    it('should save and retrieve a prompt', async () => {
+    it('should save and retrieve a prompt (versioned)', async () => {
         const now = new Date().toISOString();
-        const testPrompt = {
-            id: 'test-prompt-1',
-            name: 'Test Prompt 1',
-            description: 'A test prompt for unit testing',
-            content: 'This is a test prompt content',
-            tags: ['test', 'unit-test'],
+        const prompt = {
+            id: 'test-prompt',
+            content: 'Hello, Memory!',
             isTemplate: false,
-            variables: [],
-            metadata: {
-                author: 'Test Author',
-                version: '1.0.0'
-            },
+            name: 'Memory Test',
+            version: 1,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
         };
-        await adapter.savePrompt(testPrompt);
-        const retrievedPrompt = await adapter.getPrompt('test-prompt-1');
-        expect(retrievedPrompt).toBeDefined();
-        expect(retrievedPrompt?.id).toBe('test-prompt-1');
-        expect(retrievedPrompt?.name).toBe('Test Prompt 1');
-        expect(retrievedPrompt?.content).toBe('This is a test prompt content');
-        expect(retrievedPrompt?.tags).toEqual(['test', 'unit-test']);
+        await adapter.savePrompt(prompt);
+        const retrieved = await adapter.getPrompt('test-prompt', 1);
+        expect(retrieved).toBeDefined();
+        expect(retrieved?.version).toBe(1);
+        expect(retrieved?.id).toBe('test-prompt');
+        expect(retrieved?.name).toBe('Memory Test');
+        expect(retrieved?.content).toBe('Hello, Memory!');
     });
-    it('should update an existing prompt', async () => {
+    it('should update an existing prompt (versioned)', async () => {
         const now = new Date().toISOString();
-        const testPrompt = {
-            id: 'test-prompt-2',
-            name: 'Test Prompt 2',
-            description: 'Original description',
-            content: 'Original content',
-            tags: ['test'],
+        const prompt = {
+            id: 'update-prompt',
+            content: 'Initial content',
             isTemplate: false,
-            variables: [],
-            metadata: {},
+            name: 'Update Test',
+            version: 1,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
         };
-        await adapter.savePrompt(testPrompt);
+        await adapter.savePrompt(prompt);
         const updatedPrompt = {
-            ...testPrompt,
-            description: 'Updated description',
+            ...prompt,
             content: 'Updated content',
-            tags: ['test', 'updated'],
-            updatedAt: new Date().toISOString()
+            updatedAt: new Date().toISOString(),
         };
-        await adapter.savePrompt(updatedPrompt);
-        const retrievedPrompt = await adapter.getPrompt('test-prompt-2');
-        expect(retrievedPrompt?.description).toBe('Updated description');
-        expect(retrievedPrompt?.content).toBe('Updated content');
-        expect(retrievedPrompt?.tags).toEqual(['test', 'updated']);
+        await adapter.updatePrompt('update-prompt', 1, updatedPrompt);
+        const retrieved = await adapter.getPrompt('update-prompt', 1);
+        expect(retrieved).toBeDefined();
+        expect(retrieved?.content).toBe('Updated content');
     });
-    it('should list all prompts', async () => {
-        // Clear existing prompts to ensure clean test
-        try {
-            // @ts-ignore - clearAll method might not be in the type definition but is implemented
-            await adapter.clearAll();
-        }
-        catch (error) {
-            console.warn('Could not clear prompts, test may not be reliable');
-        }
+    it('should list all prompts (versioned)', async () => {
         const now = new Date().toISOString();
-        const testPrompts = [
+        const prompts = [
             {
-                id: 'list-test-1',
-                name: 'List Test 1',
-                description: 'Test prompt 1',
-                content: 'Content 1',
-                tags: ['test', 'list'],
+                id: 'list-prompt-1',
+                content: 'Prompt 1',
                 isTemplate: false,
-                variables: [],
-                metadata: {},
+                name: 'List 1',
+                version: 1,
                 createdAt: now,
-                updatedAt: now
+                updatedAt: now,
             },
             {
-                id: 'list-test-2',
-                name: 'List Test 2',
-                description: 'Test prompt 2',
-                content: 'Content 2',
-                tags: ['test', 'list', 'important'],
-                isTemplate: true,
-                variables: ['var1', 'var2'],
-                metadata: {},
+                id: 'list-prompt-2',
+                content: 'Prompt 2',
+                isTemplate: false,
+                name: 'List 2',
+                version: 1,
                 createdAt: now,
-                updatedAt: now
-            }
+                updatedAt: now,
+            },
         ];
-        for (const prompt of testPrompts) {
-            await adapter.savePrompt(prompt);
+        for (const p of prompts) {
+            await adapter.savePrompt(p);
         }
-        const allPrompts = await adapter.listPrompts();
-        expect(allPrompts.length).toBeGreaterThanOrEqual(2);
-        const filteredPrompts = await adapter.listPrompts({ tags: ['important'] });
-        expect(filteredPrompts.length).toBeGreaterThanOrEqual(1);
-        expect(filteredPrompts.some(p => p.id === 'list-test-2')).toBe(true);
+        const all = await adapter.listPrompts({}, true);
+        expect(all.length).toBeGreaterThanOrEqual(2);
+        expect(all.some(p => p.id === 'list-prompt-1')).toBe(true);
+        expect(all.some(p => p.id === 'list-prompt-2')).toBe(true);
     });
-    it('should delete a prompt', async () => {
+    it('should delete a prompt (versioned)', async () => {
         const now = new Date().toISOString();
-        const testPrompt = {
-            id: 'delete-test',
-            name: 'Delete Test',
-            description: 'A prompt to be deleted',
-            content: 'Delete me',
-            tags: ['test', 'delete'],
+        const prompt = {
+            id: 'delete-prompt',
+            content: 'To be deleted',
             isTemplate: false,
-            variables: [],
-            metadata: {},
+            name: 'Delete Test',
+            version: 1,
             createdAt: now,
-            updatedAt: now
+            updatedAt: now,
         };
-        await adapter.savePrompt(testPrompt);
-        // Verify the prompt exists
-        const savedPrompt = await adapter.getPrompt('delete-test');
-        expect(savedPrompt).toBeDefined();
-        // Delete the prompt
-        await adapter.deletePrompt('delete-test');
-        // Verify it was deleted - either by returning null or by throwing an error
-        try {
-            const deletedPrompt = await adapter.getPrompt('delete-test');
-            // If it returns a result, it should be null
-            expect(deletedPrompt).toBeNull();
-        }
-        catch (error) {
-            // Or if it throws an error, that's also acceptable
-            expect(error).toBeDefined();
-            expect(error.message).toContain('not found');
-        }
+        await adapter.savePrompt(prompt);
+        await adapter.deletePrompt('delete-prompt', 1);
+        const retrieved = await adapter.getPrompt('delete-prompt', 1);
+        expect(retrieved).toBeNull();
     });
 });

@@ -26,14 +26,26 @@ describe('PromptService', () => {
   });
 
   it('should update a prompt', async () => {
-    const prompt = await service.createPrompt({
-      content: 'Test',
+    const now = new Date().toISOString();
+    const prompt = {
+      id: 'update-test',
+      content: 'Original content',
       isTemplate: false,
       name: 'Update Test',
-    });
-    await service.updatePrompt(prompt.id, { description: 'Updated' });
-    const updated = await service.getPrompt(prompt.id);
-    expect(updated?.description).toBe('Updated');
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    await service.createPrompt(prompt);
+    const updatedPrompt = {
+      ...prompt,
+      content: 'Updated content',
+      updatedAt: new Date().toISOString(),
+    };
+    await service.updatePrompt('update-test', 1, updatedPrompt);
+    const retrieved = await service.getPrompt('update-test', 1);
+    expect(retrieved).toBeDefined();
+    expect(retrieved?.content).toBe('Updated content');
   });
 
   it('should delete a prompt', async () => {
