@@ -36,7 +36,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### 2. Bug Fixes & Stabilization
 - [x] **Fix HTTP Server Integration tests** (`tests/integration/http-server.integration.test.ts`)
-- [ ] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
+- [x] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
 - [ ] **Fix HTTP Server error handling unit tests** (`src/__tests__/http-server.test.ts`)
 - [ ] **Fix Validation unit tests** (`tests/unit/validation.unit.test.ts`)
 - [ ] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)

@@ -10,7 +10,7 @@ import type { SequenceService } from '../sequence-service.js';
 import type { WorkflowService } from '../workflow-service.js';
 
 // Temporarily disabling these tests to unblock the pipeline
-describe.skip('HTTP Server', () => {
+describe('HTTP Server', () => {
   let server: Server;
   let promptService: DeepMockProxy<PromptService>;
   let sequenceService: DeepMockProxy<SequenceService>;
@@ -190,7 +190,7 @@ describe.skip('HTTP Server', () => {
   });
 });
 
-describe.skip('errorHandler', () => {
+describe('errorHandler', () => {
   let req: Partial<Request>;
   let res: Partial<Response>;
   let next: NextFunction;

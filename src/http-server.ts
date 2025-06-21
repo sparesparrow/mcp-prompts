@@ -26,6 +26,12 @@ import {
 import { promptSchemas } from './prompts.js';
 import { StorageAdapter } from './interfaces.js';
 
+const catchAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res, next).catch(next);
+  };
+};
+
 export interface HttpServerConfig {
   port: number;
   host: string;
@@ -362,7 +368,7 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         // Parse and validate query params
         const querySchema = z.object({
@@ -399,7 +405,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -408,7 +414,7 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const parseResult = promptSchemas.create.safeParse(req.body);
         if (!parseResult.success) {
@@ -421,7 +427,7 @@ export async function startHttpServer(
       } catch (err) {
         return next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -430,7 +436,7 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const id = req.params.id;
         const version = req.query.version ? Number(req.query.version) : undefined;
@@ -442,7 +448,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -475,7 +481,7 @@ export async function startHttpServer(
    *             schema:
    *               $ref: '#/components/schemas/Prompt'
    */
-  app.put('/prompts/:id/:version', async (req, res, next) => {
+  app.put('/prompts/:id/:version', catchAsync(async (req, res, next) => {
     try {
       const prompt = await services.promptService.updatePrompt(
         req.params.id,
@@ -486,7 +492,7 @@ export async function startHttpServer(
     } catch (error: any) {
       next(error);
     }
-  });
+  }));
 
   /**
    * @openapi
@@ -508,14 +514,14 @@ export async function startHttpServer(
    *       204:
    *         description: Prompt deleted successfully
    */
-  app.delete('/prompts/:id/:version', async (req, res, next) => {
+  app.delete('/prompts/:id/:version', catchAsync(async (req, res, next) => {
     try {
       await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
       res.status(204).send();
     } catch (error: any) {
       next(error);
     }
-  });
+  }));
 
   /**
    * GET /prompts/:id/versions
@@ -523,14 +529,14 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts/:id/versions',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const versions = await services.promptService.listPromptVersions(req.params.id);
         res.json({ success: true, id: req.params.id, versions });
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -565,7 +571,7 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts/bulk',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const parseResult = promptSchemas.bulkCreate.safeParse(req.body);
       if (!parseResult.success) {
         res.status(400).json({
@@ -580,7 +586,7 @@ export async function startHttpServer(
       }
       const results = await services.promptService.createPromptsBulk(parseResult.data);
       res.status(200).json(results);
-    },
+    }),
   );
 
   /**
@@ -618,7 +624,7 @@ export async function startHttpServer(
    */
   app.delete(
     '/prompts/bulk',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
       if (!parseResult.success) {
         res.status(400).json({
@@ -633,12 +639,12 @@ export async function startHttpServer(
       }
       const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
       res.status(200).json(results);
-    },
+    }),
   );
 
   app.get(
     '/api/v1/sequence/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const { id } = req.params;
       try {
         const result = await services.sequenceService.getSequenceWithPrompts(id);
@@ -650,13 +656,13 @@ export async function startHttpServer(
         error.details = { id };
         next(error);
       }
-    },
+    }),
   );
 
   // Add after other endpoints, before the 404 handler
   app.post(
     '/diagram',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const { promptIds } = req.body;
         if (!Array.isArray(promptIds) || promptIds.length === 0) {
@@ -680,7 +686,7 @@ export async function startHttpServer(
           .status(500)
           .json({ error: true, message: err instanceof Error ? err.message : String(err) });
       }
-    },
+    }),
   );
 
   const checkWorkflowRateLimit = getWorkflowRateLimiter();
@@ -693,7 +699,7 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const workflow = req.body;
         if (!services.workflowService.validateWorkflow(workflow)) {
@@ -745,7 +751,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -755,7 +761,7 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const workflow = loadWorkflowFromFile(req.params.id);
         if (!workflow) {
@@ -772,7 +778,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -782,7 +788,7 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id/versions',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const versions = getAllWorkflowVersions(req.params.id);
         if (!versions.length) {
@@ -804,7 +810,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -814,7 +820,7 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id/versions/:version',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const version = parseInt(req.params.version, 10);
         if (isNaN(version)) {
@@ -842,7 +848,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -852,7 +858,7 @@ export async function startHttpServer(
    */
   app.delete(
     '/api/v1/workflows/:id/versions/:version',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const version = parseInt(req.params.version, 10);
         if (isNaN(version)) {
@@ -886,7 +892,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -896,14 +902,14 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         const workflows = getAllWorkflows(true); // latestOnly = true
         res.json(workflows);
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   /**
@@ -913,7 +919,7 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows/:id/run',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const userId = (req.headers['x-user-id'] as string) || 'anonymous';
       const workflowId = req.params.id;
       const versionParam = req.query.version;
@@ -982,7 +988,7 @@ export async function startHttpServer(
       } finally {
         releaseWorkflowSlot(userId);
       }
-    },
+    }),
   );
 
   /**
@@ -1032,7 +1038,7 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows/:executionId/resume',
-    async (req, res, next) => {
+    catchAsync(async (req, res, next) => {
       const { executionId } = req.params;
       const { input } = req.body;
       try {
@@ -1041,7 +1047,7 @@ export async function startHttpServer(
       } catch (err) {
         next(err);
       }
-    },
+    }),
   );
 
   // Set up SSE if enabled

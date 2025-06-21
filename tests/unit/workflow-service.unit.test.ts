@@ -1,4 +1,5 @@
 import { jest } from '@jest/globals';
+import { mock } from 'jest-mock-extended';
 
 import { PromptService } from '../../src/prompt-service.js';
 import { MemoryAdapter } from '../../src/adapters.js';
@@ -54,13 +55,14 @@ const mockStorageAdapter: StorageAdapter = {
 
 const mockPromptService = {} as PromptService;
 
-describe.skip('WorkflowService (Stateless)', () => {
+describe('WorkflowService (Stateless)', () => {
   let service: WorkflowServiceImpl;
-  let mockStorageAdapter: StorageAdapter;
+  let mockStorageAdapter: jest.Mocked<StorageAdapter>;
   let mockPromptService: jest.Mocked<PromptService>;
 
   beforeEach(() => {
-    // Note: This service instance is not fully initialized for stateful tests.
+    mockStorageAdapter = mock<StorageAdapter>();
+    mockPromptService = mock<PromptService>();
     service = new WorkflowServiceImpl(mockStorageAdapter, mockPromptService);
     jest.clearAllMocks();
   });
@@ -103,16 +105,15 @@ describe.skip('WorkflowService (Stateless)', () => {
 });
 
 
-describe.skip('WorkflowService (Stateful)', () => {
+describe('WorkflowService (Stateful)', () => {
   let service: WorkflowServiceImpl;
+  let mockStorageAdapter: jest.Mocked<StorageAdapter>;
+  let mockPromptService: jest.Mocked<PromptService>;
 
   beforeEach(() => {
-    // Use real runners and mocked services for stateful tests
-    const storage = new MemoryAdapter();
-    const promptService = new PromptService(storage);
-    service = new WorkflowServiceImpl(mockStorageAdapter, promptService);
-    jest.clearAllMocks();
-    (mockStorageAdapter.saveWorkflowState as jest.Mock).mockClear();
+    mockStorageAdapter = mock<StorageAdapter>();
+    mockPromptService = mock<PromptService>();
+    service = new WorkflowServiceImpl(mockStorageAdapter, mockPromptService);
   });
 
   it('should run a simple workflow and save state correctly', async () => {
@@ -142,8 +143,8 @@ describe.skip('WorkflowService (Stateful)', () => {
   it('should handle parallel steps and save state', async () => {
     const workflow: Workflow = {
       id: 'parallel-workflow',
-      name: 'Parallel Workflow',
-      version: 1,
+      name: 'Parallel Test',
+      threads: 2,
       steps: [
         {
           id: 'parallel-step',
@@ -159,10 +160,12 @@ describe.skip('WorkflowService (Stateful)', () => {
     const result = await service.runWorkflow(workflow);
 
     expect(result.success).toBe(true);
-    // Initial save, then one save after the parallel block completes
-    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(3); // Initial, after parallel block, final
+    // Note: The number of saves is now threads + completion
+    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(
+      workflow.threads + 1,
+    );
     
-    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[2][0] as any;
+    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[workflow.threads][0] as any;
     expect(lastCall.status).toBe('completed');
   });
 }); 
