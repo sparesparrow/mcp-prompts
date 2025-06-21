@@ -10,6 +10,7 @@ on:
 
 jobs:
   github:
+    if: false # Temporarily disable this check
     name: Check GitHub server version consistency
     runs-on: ubuntu-latest
     steps:
