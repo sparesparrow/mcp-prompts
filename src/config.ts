@@ -100,6 +100,14 @@ export const EnvSchema = z.object({
   STREAMING_MAX_TOKENS: z.coerce.number().optional(),
 
   VERSION: z.string().default('1.0.0'),
+
+  redis: z.object({
+    host: z.string().optional(),
+    port: z.coerce.number().optional(),
+    password: z.string().optional(),
+    db: z.coerce.number().optional(),
+    ttl: z.coerce.number().optional(),
+  }).optional(),
 });
 
 export type EnvVars = z.infer<typeof EnvSchema>;
@@ -132,3 +140,5 @@ export function loadConfig(): EnvVars {
   }
   return result.data;
 }
+
+export const config = loadConfig();

@@ -75,31 +75,28 @@ describe('HTTP Server', () => {
 
   describe('Prompt Endpoints', () => {
     it('should create a prompt', async () => {
+      // NOTE: The API requires id, version, createdAt, and updatedAt fields for prompt creation.
+      const now = new Date().toISOString();
       const prompt = {
+        id: 'test-prompt',
         content: 'Hello, {{name}}!',
         isTemplate: true,
         name: 'Test Prompt',
         variables: ['name'],
+        version: 1,
+        createdAt: now,
+        updatedAt: now,
       };
 
-      promptService.createPrompt.mockResolvedValue({
-        id: '123',
-        ...prompt,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: 1,
-      });
+      promptService.createPrompt.mockResolvedValue({ ...prompt });
 
       const apiKey = 'test-key';
       const response = await request(server).post('/prompts').set('x-api-key', apiKey).send(prompt);
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
-        id: '123',
-        ...prompt,
-        createdAt: expect.any(String),
-        updatedAt: expect.any(String),
-        version: 1,
+        success: true,
+        prompt,
       });
     });
 
@@ -131,7 +128,10 @@ describe('HTTP Server', () => {
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(200);
-      expect(response.body).toMatchObject(prompt);
+      expect(response.body).toMatchObject({
+        success: true,
+        prompt,
+      });
     });
 
     it('should handle not found prompt', async () => {
@@ -143,7 +143,7 @@ describe('HTTP Server', () => {
       expect(response.status).toBe(404);
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('NOT_FOUND');
-      expect(response.body.error.message).toBe('Prompt not found.');
+      expect(response.body.error.message).toBe('Prompt not found');
     });
   });
 

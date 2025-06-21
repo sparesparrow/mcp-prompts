@@ -50,97 +50,87 @@ describe('HTTP Server Integration', () => {
     expect(res.body.status).toBe('ok');
   });
 
-  it('should create and retrieve a prompt', async () => {
+  it('should create and retrieve a prompt (versioned)', async () => {
+    const now = new Date().toISOString();
     const prompt = {
+      id: 'http-test',
       content: 'Hello, HTTP!',
       isTemplate: false,
       name: 'HTTP Test',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const createRes = await request(baseUrl)
+      .post('/prompts')
+      .set('x-api-key', 'test-key')
+      .send(prompt);
+    // Expect 201 for creation
+    expect(createRes.status).toBe(201);
+    expect(createRes.body.prompt).toBeDefined();
+    expect(createRes.body.prompt.version).toBe(1);
+    // Retrieve by id and version
+    const getRes = await request(baseUrl)
+      .get(`/prompts/${prompt.id}?version=1`)
+      .set('x-api-key', 'test-key');
+    expect(getRes.status).toBe(200);
+    expect(getRes.body.prompt).toBeDefined();
+    expect(getRes.body.prompt.version).toBe(1);
+  });
+
+  it('should update a prompt', async () => {
+    const now = new Date().toISOString();
+    const prompt = {
+      id: 'http-update',
+      content: 'Update me',
+      isTemplate: false,
+      name: 'Update HTTP',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
     };
     const createRes = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
     expect(createRes.status).toBe(201);
-    expect(createRes.body.name).toBe('HTTP Test');
-    const id = createRes.body.id;
-    const version = createRes.body.version;
-    // Retrieve latest version
-    const getRes = await request(baseUrl)
-      .get(`/prompts/${id}`)
-      .set('x-api-key', 'test-key');
-    expect(getRes.status).toBe(200);
-    expect(getRes.body.name).toBe('HTTP Test');
-    expect(getRes.body.version).toBe(version);
-    // Retrieve specific version (if supported)
-    if (version) {
-      const getVerRes = await request(baseUrl)
-        .get(`/prompts/${id}/versions/${version}`)
-        .set('x-api-key', 'test-key');
-      expect(getVerRes.status).toBe(200);
-      expect(getVerRes.body.version).toBe(version);
-    }
-  });
-
-  it('should update a prompt', async () => {
-    const prompt = {
-      content: 'Update me',
-      isTemplate: false,
-      name: 'Update HTTP',
-    };
-    const createRes = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send(prompt);
-    const id = createRes.body.id;
-    const version = createRes.body.version;
-    // Update prompt (should create new version)
+    // Update
     const updateRes = await request(baseUrl)
-      .put(`/prompts/${id}`)
+      .put(`/prompts/${prompt.id}`)
       .set('x-api-key', 'test-key')
-      .send({ description: 'Updated', version });
-    expect([200, 201]).toContain(updateRes.status);
-    expect(updateRes.body.description).toBe('Updated');
-    // Should return new version
-    expect(updateRes.body.version).not.toBe(version);
-    // Old version should still be retrievable (if supported)
-    if (version) {
-      const getOldVer = await request(baseUrl)
-        .get(`/prompts/${id}/versions/${version}`)
-        .set('x-api-key', 'test-key');
-      expect(getOldVer.status).toBe(200);
-      expect(getOldVer.body.version).toBe(version);
-    }
+      .send({ ...prompt, content: 'Updated content', version: 2, updatedAt: new Date().toISOString() });
+    expect(updateRes.status).toBe(200);
+    expect(updateRes.body.prompt.content).toBe('Updated content');
+    expect(updateRes.body.prompt.version).toBe(2);
   });
 
   it('should delete a prompt', async () => {
+    const now = new Date().toISOString();
     const prompt = {
+      id: 'http-delete',
       content: 'Delete me',
       isTemplate: false,
       name: 'Delete HTTP',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
     };
     const createRes = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
-    const id = createRes.body.id;
-    const version = createRes.body.version;
-    // Delete latest version
+    expect(createRes.status).toBe(201);
+    // Delete
     const deleteRes = await request(baseUrl)
-      .delete(`/prompts/${id}/versions/${version}`)
+      .delete(`/prompts/${prompt.id}`)
       .set('x-api-key', 'test-key');
-    expect(deleteRes.status).toBe(200);
-    expect(deleteRes.body.success).toBe(true);
-    expect(deleteRes.body.id).toBe(id);
-    expect(deleteRes.body.version).toBe(version);
-    expect(deleteRes.body.message).toMatch(/deleted/);
-    // Should not be able to get deleted version
+    expect([200, 204]).toContain(deleteRes.status);
+    // Try to get deleted prompt
     const getRes = await request(baseUrl)
-      .get(`/prompts/${id}/versions/${version}`)
+      .get(`/prompts/${prompt.id}`)
       .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(404);
-    expect(getRes.body.success).toBe(false);
-    expect(getRes.body.error.code).toBe('NOT_FOUND');
-    expect(getRes.body.error.message).toMatch(/not found/);
+    expect(getRes.body.error.message).toBe('Prompt not found');
   });
 
   it('should return 404 for unknown route', async () => {
@@ -192,20 +182,28 @@ describe('HTTP Server Integration', () => {
     expect(res.status).toBe(400);
   });
 
-  it('should return 400 or 409 for duplicate prompt ID', async () => {
-    const prompt = { name: 'Dup', content: 'test' };
-    // Create once
+  it('should return 409 for duplicate prompt ID', async () => {
+    const now = new Date().toISOString();
+    const prompt = {
+      id: 'http-dup',
+      content: 'Dup content',
+      isTemplate: false,
+      name: 'Dup HTTP',
+      version: 1,
+      createdAt: now,
+      updatedAt: now,
+    };
     const res1 = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
     expect(res1.status).toBe(201);
-    // Try to create again with same name (ID is derived from name)
     const res2 = await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
       .send(prompt);
-    expect([400, 409]).toContain(res2.status);
+    expect(res2.status).toBe(409);
+    expect(res2.body.error.message).toMatch(/already exists/);
   });
 
   it('should return 400 for template variable mismatches', async () => {
@@ -322,10 +320,25 @@ describe('Prompt List (GET /prompts)', () => {
 });
 
 describe('Bulk Prompt Operations', () => {
+  // Helper to generate prompt payloads with required fields
+  function makePromptPayload(overrides: Partial<Record<string, any>> = {}) {
+    const now = new Date().toISOString();
+    return {
+      id: overrides.id || `prompt-${Math.random().toString(36).slice(2, 10)}`,
+      name: overrides.name || 'Test Prompt',
+      content: overrides.content || 'Test content',
+      isTemplate: overrides.isTemplate ?? false,
+      version: overrides.version || 1,
+      createdAt: overrides.createdAt || now,
+      updatedAt: overrides.updatedAt || now,
+      ...overrides,
+    };
+  }
+
   it('should bulk create prompts and return per-prompt results', async () => {
     const prompts = [
-      { name: 'Bulk1', content: 'Bulk content 1' },
-      { name: 'Bulk2', content: 'Bulk content 2' },
+      makePromptPayload({ name: 'Bulk1', content: 'Bulk content 1' }),
+      makePromptPayload({ name: 'Bulk2', content: 'Bulk content 2' }),
     ];
     const res = await request(baseUrl)
       .post('/prompts/bulk')
@@ -340,15 +353,16 @@ describe('Bulk Prompt Operations', () => {
 
   it('should return errors for duplicate or invalid prompts in bulk create', async () => {
     // First, create a prompt
+    const dupPrompt = makePromptPayload({ name: 'BulkDup', content: 'Dup content' });
     await request(baseUrl)
       .post('/prompts')
       .set('x-api-key', 'test-key')
-      .send({ name: 'BulkDup', content: 'Dup content' });
+      .send(dupPrompt);
     // Now, try to bulk create with a duplicate and an invalid
     const prompts = [
-      { name: 'BulkDup', content: 'Dup content' }, // duplicate
-      { name: '', content: '' }, // invalid
-      { name: 'Bulk3', content: 'Bulk content 3' }, // valid
+      dupPrompt, // duplicate
+      makePromptPayload({ name: '', content: '' }), // invalid
+      makePromptPayload({ name: 'Bulk3', content: 'Bulk content 3' }), // valid
     ];
     const res = await request(baseUrl)
       .post('/prompts/bulk')

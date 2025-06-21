@@ -29,12 +29,19 @@ const listPromptsArgsSchema = z.object({
   tag: z.string().optional().describe('Filter prompts by tag'),
 });
 
+// Bulk create: array of createPromptArgsSchema
+const bulkCreatePromptsArgsSchema = z.array(createPromptArgsSchema);
+// Bulk delete: array of string IDs
+const bulkDeletePromptsArgsSchema = z.object({ ids: z.array(z.string().min(1)) });
+
 // Export schemas for use in server registration
 export const promptSchemas = {
   create: createPromptArgsSchema,
   delete: deletePromptArgsSchema,
   list: listPromptsArgsSchema,
   update: updatePromptArgsSchema,
+  bulkCreate: bulkCreatePromptsArgsSchema,
+  bulkDelete: bulkDeletePromptsArgsSchema,
 };
 
 // Export types derived from schemas

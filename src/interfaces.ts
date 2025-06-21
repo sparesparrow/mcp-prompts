@@ -212,11 +212,26 @@ export interface StorageAdapter {
   disconnect(): Promise<void>;
   isConnected(): boolean | Promise<boolean>;
   savePrompt(prompt: Prompt): Promise<Prompt>;
-  getPrompt(id: string): Promise<Prompt | null>;
-  getAllPrompts(): Promise<Prompt[]>;
-  updatePrompt(id: string, prompt: Prompt): Promise<Prompt>;
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  deletePrompt(id: string): Promise<void>;
+  /**
+   * Get a prompt by ID and version. If version is omitted, returns the latest version.
+   */
+  getPrompt(id: string, version?: number): Promise<Prompt | null>;
+  /**
+   * List all versions for a prompt ID (sorted ascending).
+   */
+  listPromptVersions(id: string): Promise<number[]>;
+  /**
+   * Update a specific version of a prompt. If version is omitted, updates the latest.
+   */
+  updatePrompt(id: string, version: number, prompt: Prompt): Promise<Prompt>;
+  /**
+   * Delete a specific version of a prompt. If version is omitted, deletes all versions.
+   */
+  deletePrompt(id: string, version?: number): Promise<void>;
+  /**
+   * List prompts (latest version only by default).
+   */
+  listPrompts(options?: ListPromptsOptions, allVersions?: boolean): Promise<Prompt[]>;
   clearAll?(): Promise<void>;
   backup?(): Promise<string>;
   restore?(backupId: string): Promise<void>;
@@ -235,9 +250,12 @@ export interface StorageAdapter {
 export interface WorkflowExecutionState {
   executionId: string;
   workflowId: string;
+  version: number;
   status: 'running' | 'paused' | 'completed' | 'failed';
-  context: Record<string, any>;
   currentStepId?: string;
+  context: Record<string, any>;
+  createdAt: string;
+  updatedAt: string;
   history: Array<{
     stepId: string;
     executedAt: string;
@@ -245,8 +263,6 @@ export interface WorkflowExecutionState {
     output?: any;
     error?: string;
   }>;
-  createdAt: string;
-  updatedAt: string;
 }
 
 export type TemplateVariables = Record<string, string>;
@@ -259,12 +275,17 @@ export interface ApplyTemplateResult {
 }
 
 export interface PromptService {
-  getPrompt(id: string): Promise<Prompt | null>;
+  getPrompt(id: string, version?: number): Promise<Prompt | null>;
   addPrompt(data: Partial<Prompt>): Promise<Prompt>;
-  updatePrompt(id: string, data: Partial<Prompt>): Promise<Prompt>;
-  listPrompts(options?: ListPromptsOptions): Promise<Prompt[]>;
-  deletePrompt(id: string): Promise<void>;
-  applyTemplate(id: string, variables: TemplateVariables): Promise<ApplyTemplateResult>;
+  updatePrompt(id: string, version: number, data: Partial<Prompt>): Promise<Prompt>;
+  listPrompts(options?: ListPromptsOptions, allVersions?: boolean): Promise<Prompt[]>;
+  deletePrompt(id: string, version?: number): Promise<void>;
+  listPromptVersions(id: string): Promise<number[]>;
+  applyTemplate(
+    id: string,
+    variables: TemplateVariables,
+    version?: number,
+  ): Promise<ApplyTemplateResult>;
 }
 
 export interface CreatePromptParams {
@@ -360,6 +381,13 @@ export interface ServerConfig {
     password: string;
     ssl: boolean;
     connectionString?: string;
+  };
+  redis?: {
+    host: string;
+    port: number;
+    password?: string;
+    db?: number;
+    ttl?: number;
   };
 }
 

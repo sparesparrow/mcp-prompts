@@ -8,6 +8,7 @@ import type { z } from 'zod';
 import type { StorageAdapter, WorkflowExecutionState } from './interfaces.js';
 import type { PromptService } from './prompt-service.js';
 import { workflowSchema } from './schemas.js';
+import { getSseManager } from './sse';
 // If using Node <18, uncomment the following line:
 // import fetch from 'node-fetch';
 
@@ -25,6 +26,10 @@ export interface RunWorkflowResult {
   success: boolean;
   message: string;
   outputs?: Record<string, unknown>;
+  paused?: boolean;
+  prompt?: string;
+  stepId?: string;
+  executionId?: string;
 }
 
 /**
@@ -52,7 +57,7 @@ export interface WorkflowService {
    * @returns Result of the workflow run
    */
   runWorkflow(workflow: Workflow, initialContext?: WorkflowContext): Promise<RunWorkflowResult>;
-  resumeWorkflow(executionId: string): Promise<RunWorkflowResult>;
+  resumeWorkflow(executionId: string, input: unknown): Promise<RunWorkflowResult>;
 }
 
 export class WorkflowServiceImpl implements WorkflowService {
@@ -79,6 +84,7 @@ export class WorkflowServiceImpl implements WorkflowService {
   /**
    * Run all steps in a workflow, updating the shared context after each step
    * @param workflow The workflow to run
+   * @param state
    * @param stepRunners Map of step type to StepRunner instance
    * @returns RunWorkflowResult with outputs and success status
    */
@@ -89,6 +95,7 @@ export class WorkflowServiceImpl implements WorkflowService {
   ): Promise<RunWorkflowResult> {
     const context: WorkflowContext = state.context;
     let currentStepId: string | undefined = state.currentStepId;
+    const sseManager = getSseManager();
 
     while (currentStepId) {
       const step = workflow.steps.find(s => s.id === currentStepId);
@@ -96,7 +103,41 @@ export class WorkflowServiceImpl implements WorkflowService {
         state.status = 'failed';
         state.updatedAt = new Date().toISOString();
         await this.storageAdapter.saveWorkflowState(state);
+        // Broadcast step_failed event
+        sseManager.broadcast({
+          context,
+          error: `Step not found: ${currentStepId}`,
+          event: 'step_failed',
+          executionId: state.executionId,
+          stepId: currentStepId,
+          workflowId: state.workflowId,
+        });
         return { message: `Step not found: ${currentStepId}`, success: false };
+      }
+
+      // Broadcast step_started event
+      sseManager.broadcast({
+        context,
+        event: 'step_started',
+        executionId: state.executionId,
+        stepId: step.id,
+        workflowId: state.workflowId,
+      });
+
+      // Handle human-approval step: pause and wait for input
+      if (step.type === 'human-approval') {
+        state.status = 'paused';
+        state.currentStepId = currentStepId;
+        state.updatedAt = new Date().toISOString();
+        await this.storageAdapter.saveWorkflowState(state);
+        return {
+          executionId: state.executionId,
+          message: 'Workflow paused for human approval',
+          paused: true,
+          prompt: step.prompt,
+          stepId: step.id,
+          success: false,
+        };
       }
 
       // Handle parallel steps
@@ -115,7 +156,16 @@ export class WorkflowServiceImpl implements WorkflowService {
               state.status = 'failed';
               state.updatedAt = new Date().toISOString();
               await this.storageAdapter.saveWorkflowState(state);
-              return { success: false, message: `Parallel step failed: ${failedStepResult.error}` };
+              // Broadcast step_failed event
+              sseManager.broadcast({
+                context,
+                error: `Parallel step failed: ${failedStepResult.error}`,
+                event: 'step_failed',
+                executionId: state.executionId,
+                stepId: step.id,
+                workflowId: state.workflowId,
+              });
+              return { message: `Parallel step failed: ${failedStepResult.error}`, success: false };
             }
           } else {
             results.forEach((result, index) => {
@@ -130,16 +180,37 @@ export class WorkflowServiceImpl implements WorkflowService {
           state.status = 'failed';
           state.updatedAt = new Date().toISOString();
           await this.storageAdapter.saveWorkflowState(state);
-          return { success: false, message: `Error in parallel step ${step.id}: ${e}` };
+          // Broadcast step_failed event
+          sseManager.broadcast({
+            context,
+            error: `Error in parallel step ${step.id}: ${e}`,
+            event: 'step_failed',
+            executionId: state.executionId,
+            stepId: step.id,
+            workflowId: state.workflowId,
+          });
+          return { message: `Error in parallel step ${step.id}: ${e}`, success: false };
         }
       } else {
         const result = await this.runSingleStep(step, context, stepRunners);
         state.history.push({
-          stepId: step.id,
-          executedAt: new Date().toISOString(),
-          success: result.success,
-          output: result.output,
           error: result.error,
+          executedAt: new Date().toISOString(),
+          output: result.output,
+          stepId: step.id,
+          success: result.success,
+        });
+
+        // Broadcast step_completed event
+        sseManager.broadcast({
+          context,
+          error: result.error,
+          event: 'step_completed',
+          executionId: state.executionId,
+          output: result.output,
+          stepId: step.id,
+          success: result.success,
+          workflowId: state.workflowId,
         });
 
         if (result.success) {
@@ -158,6 +229,15 @@ export class WorkflowServiceImpl implements WorkflowService {
             state.updatedAt = new Date().toISOString();
             state.currentStepId = currentStepId;
             await this.storageAdapter.saveWorkflowState(state);
+            // Broadcast step_failed event
+            sseManager.broadcast({
+              context,
+              error: result.error,
+              event: 'step_failed',
+              executionId: state.executionId,
+              stepId: step.id,
+              workflowId: state.workflowId,
+            });
             return { message: `Step ${step.id} failed: ${result.error}`, success: false };
           }
         }
@@ -171,6 +251,14 @@ export class WorkflowServiceImpl implements WorkflowService {
     state.status = 'completed';
     state.updatedAt = new Date().toISOString();
     await this.storageAdapter.saveWorkflowState(state);
+    // Broadcast workflow_completed event
+    sseManager.broadcast({
+      context,
+      event: 'workflow_completed',
+      executionId: state.executionId,
+      status: state.status,
+      workflowId: state.workflowId,
+    });
     return { message: 'Workflow completed successfully', outputs: state.context, success: true };
   }
 
@@ -184,17 +272,17 @@ export class WorkflowServiceImpl implements WorkflowService {
       try {
         const conditionResult = new Function('context', `return ${step.condition}`)(context);
         if (!conditionResult) {
-          return { success: true, output: null }; // Condition not met, but not a failure
+          return { output: null, success: true }; // Condition not met, but not a failure
         }
       } catch (e) {
-        return { success: false, error: `Condition evaluation failed for step ${step.id}: ${e}` };
+        return { error: `Condition evaluation failed for step ${step.id}: ${e}`, success: false };
       }
     }
 
     // 2. Execute step
     const runner = stepRunners[step.type];
     if (!runner) {
-      return { success: false, error: `No runner for step type: ${step.type}` };
+      return { error: `No runner for step type: ${step.type}`, success: false };
     }
 
     const result = await runner.runStep(step, context);
@@ -203,7 +291,7 @@ export class WorkflowServiceImpl implements WorkflowService {
     if (result.success && 'output' in step && typeof step.output === 'string') {
       context[step.output] = result.output;
     }
-    
+
     return result;
   }
 
@@ -212,48 +300,86 @@ export class WorkflowServiceImpl implements WorkflowService {
     return workflow.steps[currentIndex + 1]?.id;
   }
 
-  public async runWorkflow(workflow: Workflow, initialContext: WorkflowContext = {}): Promise<RunWorkflowResult> {
+  public async runWorkflow(
+    workflow: Workflow,
+    initialContext: WorkflowContext = {},
+  ): Promise<RunWorkflowResult> {
     const stepRunners: Record<string, StepRunner> = {
+      http: new HttpRunner(),
       prompt: new PromptRunner(this.promptService),
       shell: new ShellRunner(),
-      http: new HttpRunner(),
     };
 
     const executionId = randomUUID();
     const initialState: WorkflowExecutionState = {
-      executionId,
-      workflowId: workflow.id,
-      status: 'running',
       context: { ...workflow.variables, ...initialContext },
-      currentStepId: workflow.steps[0]?.id,
-      history: [],
       createdAt: new Date().toISOString(),
+      currentStepId: workflow.steps[0]?.id,
+      executionId,
+      history: [],
+      status: 'running',
       updatedAt: new Date().toISOString(),
+      version: workflow.version,
+      workflowId: workflow.id,
     };
 
     await this.storageAdapter.saveWorkflowState(initialState);
     return this.runWorkflowSteps(workflow, initialState, stepRunners);
   }
 
-  public async resumeWorkflow(executionId: string): Promise<RunWorkflowResult> {
+  /**
+   * Helper to load a workflow definition by ID (assumes promptService or storageAdapter can provide it)
+   * @param workflowId
+   */
+  private async getWorkflowById(workflowId: string): Promise<Workflow | null> {
+    // Try to load from storageAdapter if method exists
+    if (typeof (this.storageAdapter as any).getWorkflow === 'function') {
+      return await (this.storageAdapter as any).getWorkflow(workflowId);
+    }
+    // Otherwise, not implemented
+    return null;
+  }
+
+  /**
+   * Resume a paused workflow from a human-approval step.
+   * @param executionId The workflow execution ID
+   * @param input The input provided by the human
+   * @returns RunWorkflowResult
+   */
+  public async resumeWorkflow(executionId: string, input: unknown): Promise<RunWorkflowResult> {
+    // Load the paused state
     const state = await this.storageAdapter.getWorkflowState(executionId);
     if (!state) {
-      throw new Error(`Workflow execution not found: ${executionId}`);
+      return { message: 'Workflow execution not found', success: false };
     }
-
-    if (state.status === 'completed' || state.status === 'failed') {
-      throw new Error(`Cannot resume a workflow that is already ${state.status}.`);
+    if (state.status !== 'paused' || !state.currentStepId) {
+      return { message: 'Workflow is not paused or missing current step', success: false };
     }
-
-    // This is a bit of a hack. We need the full workflow definition, which isn't stored in the state.
-    // A proper implementation would need a way to retrieve the workflow definition by its ID.
-    // For now, we'll assume the caller can provide it or we can fetch it somehow.
-    // Let's assume a `getWorkflowById` method exists on the storage adapter.
-    // const workflow = await this.storageAdapter.getWorkflow(state.workflowId);
-    // if (!workflow) {
-    //   throw new Error(`Workflow definition not found for ID: ${state.workflowId}`);
-    // }
-    throw new Error('Resuming workflows is not fully implemented yet.');
+    // Load the workflow definition
+    const workflow = await this.getWorkflowById(state.workflowId);
+    if (!workflow) {
+      return { message: 'Workflow definition not found', success: false };
+    }
+    const step: any = workflow.steps.find((s: any) => s.id === state.currentStepId);
+    if (!step || step.type !== 'human-approval') {
+      return { message: 'Current step is not a human-approval step', success: false };
+    }
+    // Inject input into context under the step's output key
+    state.context[step.output] = input;
+    state.status = 'running';
+    state.updatedAt = new Date().toISOString();
+    // Advance to onSuccess or next step
+    let nextStepId = step.onSuccess ?? this.findNextStep(workflow, step.id);
+    state.currentStepId = nextStepId;
+    await this.storageAdapter.saveWorkflowState(state);
+    // Prepare step runners
+    const stepRunners: Record<string, StepRunner> = {
+      http: new HttpRunner(),
+      prompt: new PromptRunner(this.promptService),
+      shell: new ShellRunner(),
+    };
+    // Continue execution from the next step
+    return this.runWorkflowSteps(workflow, state, stepRunners);
   }
 }
 
@@ -404,7 +530,7 @@ export class ShellRunner implements StepRunner {
       } else {
         // Fallback: warn and run unsandboxed
         console.warn(
-          '[SECURITY WARNING] ShellRunner is not sandboxed! This is unsafe for production. Set SHELL_SANDBOX_IMAGE to enable Docker-based sandboxing.'
+          '[SECURITY WARNING] ShellRunner is not sandboxed! This is unsafe for production. Set SHELL_SANDBOX_IMAGE to enable Docker-based sandboxing.',
         );
         const { stdout, stderr } = await execAsync(command, { timeout: 60000 }); // 60s timeout
         if (stderr) {
@@ -456,7 +582,7 @@ export class HttpRunner implements StepRunner {
       'Content-Type': 'application/json',
       ...(headers || {}),
     };
-    let fetchOptions: any = { method, headers: fetchHeaders };
+    let fetchOptions: any = { headers: fetchHeaders, method };
     if (body) fetchOptions.body = JSON.stringify(body);
     if (auth && auth.username && auth.password) {
       const encoded = Buffer.from(`${auth.username}:${auth.password}`).toString('base64');

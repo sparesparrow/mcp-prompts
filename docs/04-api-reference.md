@@ -21,9 +21,25 @@ Host: localhost:3003
 #### Example Response
 ```json
 {
-  "status": "ok"
+  "status": "ok",
+  "version": "1.4.0",
+  "storage": "healthy",
+  "pool": {
+    "total": 10,
+    "idle": 8,
+    "waiting": 0,
+    "active": 2
+  }
 }
 ```
+
+- `pool` (object, optional): Only present if the storage backend is Postgres. Shows connection pool metrics:
+  - `total`: Total connections in the pool
+  - `idle`: Idle (available) connections
+  - `waiting`: Number of queued requests waiting for a connection
+  - `active`: Connections currently in use
+
+If the storage backend does not support pooling metrics, `pool` will be omitted or `null`.
 
 ---
 
@@ -194,4 +210,16 @@ Key fields:
 ## See Also
 - [How to document API endpoints (idratherbewriting.com)](https://idratherbewriting.com/learnapidoc/docendpoints.html)
 - [Postman: API documentation best practices](https://www.postman.com/api-platform/api-documentation/)
-- [MCP-Prompts README](../README.md) 
+- [MCP-Prompts README](../README.md)
+
+### Prompt Creation (POST /prompts)
+
+> **Note:** The API currently requires the following fields in the request body for prompt creation:
+> - `id` (string)
+> - `name` (string)
+> - `content` (string)
+> - `version` (number)
+> - `createdAt` (string, ISO date)
+> - `updatedAt` (string, ISO date)
+>
+> These must be provided by the client. This requirement may be relaxed in the future to allow the server to generate these fields automatically for better API usability. 

@@ -1,3 +1,28 @@
+import Redis from 'ioredis';
+import { config } from './config';
+
+let redisClient: Redis | null = null;
+
+/**
+ * Returns a singleton Redis client, initialized from config.
+ */
+export function getRedisClient(): Redis | null {
+  if (!config.redis || !config.redis.host) return null;
+  if (!redisClient) {
+    redisClient = new Redis({
+      host: config.redis.host,
+      port: config.redis.port,
+      password: config.redis.password,
+      db: config.redis.db,
+      lazyConnect: true,
+    });
+    redisClient.on('error', (err: Error) => {
+      console.error('[Redis] Connection error:', err);
+    });
+  }
+  return redisClient;
+}
+
 /**
  * Applies variables to a string template.
  *

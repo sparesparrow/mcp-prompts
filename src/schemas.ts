@@ -72,7 +72,7 @@ export const promptSchemas = {
  * All step types support 'output', 'condition', and 'errorPolicy'.
  */
 
-export const workflowStepSchema = z.discriminatedUnion('type', [
+export const workflowStepSchema: z.ZodTypeAny = z.lazy(() => z.discriminatedUnion('type', [
   z.object({
     condition: z.string().optional(),
     errorPolicy: z.string().optional(),
@@ -113,7 +113,18 @@ export const workflowStepSchema = z.discriminatedUnion('type', [
     onSuccess: z.string().optional(),
     onFailure: z.string().optional(),
   }),
-]);
+  z.object({
+    id: z.string(),
+    type: z.literal('human-approval'),
+    prompt: z.string(),
+    output: z.string().min(1),
+    timeout: z.number().optional(),
+    onSuccess: z.string().optional(),
+    onFailure: z.string().optional(),
+    condition: z.string().optional(),
+    errorPolicy: z.string().optional(),
+  }),
+]));
 
 export const workflowSchema = z.object({
   id: z.string(),

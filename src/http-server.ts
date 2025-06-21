@@ -9,6 +9,7 @@ import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { z } from 'zod';
 import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Request, Response, NextFunction } from 'express';
 
 import type { PromptService } from './prompt-service.js';
 import type { SequenceService } from './sequence-service.js';
@@ -397,25 +398,9 @@ export async function startHttpServer(
     },
   );
 
-  // CRUD endpoints for prompts
   /**
-   * @openapi
-   * /prompts:
-   *   post:
-   *     summary: Create a new prompt
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/Prompt'
-   *     responses:
-   *       201:
-   *         description: Prompt created
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Prompt'
+   * POST /prompts
+   * Create a new prompt version. If version is not specified, auto-increment.
    */
   app.post(
     '/prompts',
@@ -423,110 +408,23 @@ export async function startHttpServer(
       try {
         const parseResult = promptSchemas.create.safeParse(req.body);
         if (!parseResult.success) {
-          res.status(400)
-            .json({
-              success: false,
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: 'Invalid prompt data',
-                details: parseResult.error.errors,
-              },
-            });
-          return;
+          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid prompt data', details: parseResult.error.errors } });
         }
-        const { name, content, isTemplate, description, variables, tags, category, createdAt, updatedAt, version } = parseResult.data;
-        const prompt = await services.promptService.createPrompt({
-          category,
-          content,
-          description,
-          isTemplate: !!isTemplate,
-          name,
-          tags,
-          variables,
-          createdAt,
-          updatedAt,
-          version,
-        });
-        res.status(201).json({
-          success: true,
-          id: prompt.id,
-          name: prompt.name,
-          content: prompt.content,
-          isTemplate: prompt.isTemplate,
-          description: prompt.description,
-          variables: prompt.variables,
-          tags: prompt.tags,
-          category: prompt.category,
-          createdAt: prompt.createdAt,
-          updatedAt: prompt.updatedAt,
-          version: prompt.version,
-        });
-      } catch (err: any) {
-        res.status(400)
-          .json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: err.message,
-              details: err.details,
-            },
-          });
-        return;
-      }
-    },
-  );
-
-  /**
-   * @openapi
-   * /prompts/{id}:
-   *   get:
-   *     summary: Get a prompt by ID
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *     responses:
-   *       200:
-   *         description: Prompt object
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Prompt'
-   *       404:
-   *         description: Prompt not found
-   */
-  app.get(
-    '/prompts/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const prompt = await services.promptService.getPrompt(req.params.id);
-        if (!prompt) {
-          res.status(404)
-            .json({
-              success: false,
-              error: {
-                code: 'NOT_FOUND',
-                message: 'Prompt not found.',
-              },
-            });
-          return;
+        const prompt = parseResult.data;
+        // Allow id, version, createdAt, and updatedAt to be omitted; service will generate them if missing
+        try {
+          const created = await services.promptService.createPrompt(prompt);
+          return res.status(201).json({ success: true, prompt: created });
+        } catch (err: any) {
+          // Map DuplicateError to 409 Conflict, ValidationError to 400
+          if (err.name === 'DuplicateError') {
+            return res.status(409).json({ success: false, error: { code: 'DUPLICATE', message: err.message } });
+          }
+          if (err.name === 'ValidationError') {
+            return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: err.message, details: err.details || err.issues } });
+          }
+          return next(err);
         }
-        res.json({
-          success: true,
-          id: prompt.id,
-          name: prompt.name,
-          content: prompt.content,
-          isTemplate: prompt.isTemplate,
-          description: prompt.description,
-          variables: prompt.variables,
-          tags: prompt.tags,
-          category: prompt.category,
-          createdAt: prompt.createdAt,
-          updatedAt: prompt.updatedAt,
-          version: prompt.version,
-        });
       } catch (err) {
         next(err);
       }
@@ -534,116 +432,98 @@ export async function startHttpServer(
   );
 
   /**
-   * @openapi
-   * /prompts/{id}:
-   *   put:
-   *     summary: Update a prompt by ID
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *     requestBody:
-   *       required: true
-   *       content:
-   *         application/json:
-   *           schema:
-   *             $ref: '#/components/schemas/Prompt'
-   *     responses:
-   *       200:
-   *         description: Updated prompt
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Prompt'
-   *       404:
-   *         description: Prompt not found
+   * GET /prompts/:id
+   * Get a prompt by id and optional version.
    */
-  app.put(
+  app.get(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        // Validate update payload
-        const parseResult = promptSchemas.update.safeParse(req.body);
-        if (!parseResult.success) {
-          res.status(400)
-            .json({
-              success: false,
-              error: {
-                code: 'VALIDATION_ERROR',
-                message: 'Invalid prompt update data',
-                details: parseResult.error.errors,
-              },
-            });
-          return;
+        const id = req.params.id;
+        const version = req.query.version ? Number(req.query.version) : undefined;
+        const prompt = await services.promptService.getPrompt(id, version);
+        if (!prompt) {
+          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found' } });
         }
-        const updated = await services.promptService.updatePrompt(req.params.id, parseResult.data);
-        if (!updated) {
-          res.status(404)
-            .json({
-              success: false,
-              error: {
-                code: 'NOT_FOUND',
-                message: 'Prompt not found.',
-              },
-            });
-          return;
-        }
-        res.json({
-          success: true,
-          id: updated.id,
-          name: updated.name,
-          content: updated.content,
-          isTemplate: updated.isTemplate,
-          description: updated.description,
-          variables: updated.variables,
-          tags: updated.tags,
-          category: updated.category,
-          createdAt: updated.createdAt,
-          updatedAt: updated.updatedAt,
-          version: updated.version,
-        });
-      } catch (err: any) {
-        res.status(400)
-          .json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: err.message,
-              details: err.details,
-            },
-          });
-        return;
+        return res.status(200).json({ success: true, prompt });
+      } catch (err) {
+        next(err);
       }
     },
   );
 
   /**
-   * @openapi
-   * /prompts/{id}:
-   *   delete:
-   *     summary: Delete a prompt by ID
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *     responses:
-   *       200:
-   *         description: Prompt deleted
-   *       404:
-   *         description: Prompt not found
+   * PUT /prompts/:id
+   * Update a prompt by id and version.
+   */
+  app.put(
+    '/prompts/:id',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const id = req.params.id;
+        const parseResult = promptSchemas.update.safeParse(req.body);
+        if (!parseResult.success) {
+          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Invalid prompt data', details: parseResult.error.errors } });
+        }
+        const prompt = parseResult.data;
+        if (typeof prompt.version !== 'number') {
+          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing version' } });
+        }
+        try {
+          const updated = await services.promptService.updatePrompt(id, prompt.version, prompt);
+          return res.status(200).json({ success: true, prompt: updated });
+        } catch (err: any) {
+          if (err.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: err.message } });
+          }
+          throw err;
+        }
+      } catch (err) {
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * DELETE /prompts/:id
+   * Delete a prompt by id and version.
    */
   app.delete(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        await services.promptService.deletePrompt(req.params.id);
-        res.json({ success: true, id: req.params.id, message: 'Prompt deleted.' });
+        const id = req.params.id;
+        const version = req.query.version ? Number(req.query.version) : undefined;
+        if (typeof version !== 'number') {
+          return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'Missing version' } });
+        }
+        try {
+          await services.promptService.deletePrompt(id, version);
+          return res.status(200).json({ success: true });
+        } catch (err: any) {
+          if (err.message?.includes('not found')) {
+            return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: err.message } });
+          }
+          throw err;
+        }
       } catch (err) {
-        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found.' } });
+        next(err);
+      }
+    },
+  );
+
+  /**
+   * GET /prompts/:id/versions
+   * List all versions for a prompt ID
+   */
+  app.get(
+    '/prompts/:id/versions',
+    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      try {
+        const versions = await services.promptService.listPromptVersions(req.params.id);
+        res.json({ success: true, id: req.params.id, versions });
+      } catch (err) {
+        next(err);
       }
     },
   );

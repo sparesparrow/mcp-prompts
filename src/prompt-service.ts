@@ -10,6 +10,9 @@ import type { ApplyTemplateResult, Prompt } from './interfaces.js';
 import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
 import { defaultPrompts } from './prompts.js';
 import { ValidationError } from './validation.js';
+import { DuplicateError } from './errors.js';
+import { getRedisClient } from './utils.js';
+import { config } from './config.js';
 
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
   toUpperCase: (str: string) => str.toUpperCase(),
@@ -47,19 +50,41 @@ export class PromptService {
     }
   }
 
+  /**
+   * Create a new prompt (version 1 or specified version). Throws if (id, version) exists.
+   */
   public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
+    // Validate required fields
+    if (!args.name || typeof args.name !== 'string' || !args.name.trim()) {
+      throw new ValidationError('Prompt name is required and cannot be empty or whitespace.');
+    }
+    if (!args.content || typeof args.content !== 'string' || !args.content.trim()) {
+      throw new ValidationError('Prompt content is required and cannot be empty or whitespace.');
+    }
+    if (args.version !== undefined && typeof args.version !== 'number') {
+      throw new ValidationError('Prompt version must be a number.');
+    }
+    if (args.createdAt !== undefined && typeof args.createdAt !== 'string') {
+      throw new ValidationError('createdAt must be an ISO string.');
+    }
+    if (args.updatedAt !== undefined && typeof args.updatedAt !== 'string') {
+      throw new ValidationError('updatedAt must be an ISO string.');
+    }
     const id = args.name.toLowerCase().replace(/\s+/g, '-');
-    // Check for duplicate prompt ID
-    const existing = await this.storage.getPrompt(id);
+    const version = args.version ?? 1;
+    // Check for duplicate prompt ID/version
+    const existing = await this.storage.getPrompt(id, version);
     if (existing) {
-      throw new ValidationError(`Prompt with id '${id}' already exists.`, []);
+      throw new DuplicateError(
+        `Prompt with id '${id}' and version '${version}' already exists.`
+      );
     }
     const prompt: Prompt = {
       id,
       ...args,
       createdAt: args.createdAt ?? new Date().toISOString(),
       updatedAt: args.updatedAt ?? new Date().toISOString(),
-      version: args.version ?? 1,
+      version,
     };
 
     // Template variable validation
@@ -109,56 +134,75 @@ export class PromptService {
       }
     }
 
-    return this.storage.savePrompt(prompt);
+    const result = await this.storage.savePrompt(prompt);
+    await this.invalidatePromptCache(result.id);
+    return result;
   }
 
-  public async updatePrompt(id: string, args: Partial<UpdatePromptArgs>): Promise<Prompt> {
-    const existing = await this.storage.getPrompt(id);
+  /**
+   * Get a prompt by ID and version (latest if not specified).
+   */
+  public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
+    return this.storage.getPrompt(id, version);
+  }
+
+  /**
+   * Update a specific version of a prompt. Throws if not found.
+   */
+  public async updatePrompt(
+    id: string,
+    version: number,
+    args: Partial<UpdatePromptArgs>,
+  ): Promise<Prompt> {
+    const existing = await this.storage.getPrompt(id, version);
     if (!existing) {
-      throw new ValidationError(`Prompt not found: ${id}`, []);
+      throw new ValidationError(`Prompt not found: ${id} v${version}`, []);
     }
     const updated: Prompt = {
       ...existing,
       ...args,
       id, // Preserve original ID
+      version, // Preserve version
       updatedAt: new Date().toISOString(),
-      version: (existing.version || 1) + 1,
     };
-    return this.storage.updatePrompt(id, updated);
+    const result = await this.storage.updatePrompt(id, version, updated);
+    await this.invalidatePromptCache(id);
+    return result;
   }
 
-  public async deletePrompt(id: string): Promise<void> {
-    await this.storage.deletePrompt(id);
+  /**
+   * Delete a specific version of a prompt, or all versions if version is omitted.
+   */
+  public async deletePrompt(id: string, version?: number): Promise<void> {
+    await this.storage.deletePrompt(id, version);
+    await this.invalidatePromptCache(id);
   }
 
-  public async getPrompt(id: string): Promise<Prompt | null> {
-    return this.storage.getPrompt(id);
+  /**
+   * List prompts (latest version only by default, or all versions if specified).
+   */
+  public async listPrompts(args: ListPromptsArgs, allVersions = false): Promise<Prompt[]> {
+    return this.storage.listPrompts(args, allVersions);
   }
 
-  public async listPrompts(args: ListPromptsArgs): Promise<Prompt[]> {
-    const prompts = await this.storage.listPrompts();
-
-    return prompts.filter(prompt => {
-      if (args.category && prompt.category !== args.category) {
-        return false;
-      }
-      if (args.tag && !prompt.tags?.includes(args.tag)) {
-        return false;
-      }
-      if (args.isTemplate !== undefined && prompt.isTemplate !== args.isTemplate) {
-        return false;
-      }
-      return true;
-    });
+  /**
+   * List all versions for a prompt ID.
+   */
+  public async listPromptVersions(id: string): Promise<number[]> {
+    return this.storage.listPromptVersions(id);
   }
 
+  /**
+   * Apply a template prompt by ID and version (latest if not specified).
+   */
   public async applyTemplate(
     id: string,
     variables: Record<string, any>,
+    version?: number,
   ): Promise<ApplyTemplateResult> {
-    const prompt = await this.getPrompt(id);
+    const prompt = await this.getPrompt(id, version);
     if (!prompt) {
-      throw new ValidationError(`Template prompt not found: ${id}`, []);
+      throw new ValidationError(`Template prompt not found: ${id} v${version ?? 'latest'}`, []);
     }
     if (!prompt.isTemplate) {
       throw new Error(`Prompt is not a template: ${id}`);
@@ -275,5 +319,53 @@ export class PromptService {
 
   public getStorage(): StorageAdapter {
     return this.storage;
+  }
+
+  /**
+   * Bulk create prompts. Returns an array of results (success or error per prompt).
+   */
+  public async createPromptsBulk(
+    argsArray: CreatePromptArgs[],
+  ): Promise<Array<{ success: boolean; id?: string; error?: string }>> {
+    const results: Array<{ success: boolean; id?: string; error?: string }> = [];
+    for (const args of argsArray) {
+      try {
+        const prompt = await this.createPrompt(args);
+        results.push({ success: true, id: prompt.id });
+      } catch (err: any) {
+        results.push({ success: false, error: err?.message || 'Unknown error' });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Bulk delete prompts. Returns an array of results (success or error per id).
+   */
+  public async deletePromptsBulk(
+    ids: string[],
+  ): Promise<Array<{ success: boolean; id: string; error?: string }>> {
+    const results: Array<{ success: boolean; id: string; error?: string }> = [];
+    for (const id of ids) {
+      try {
+        await this.deletePrompt(id);
+        results.push({ success: true, id });
+      } catch (err: any) {
+        results.push({ success: false, id, error: err?.message || 'Unknown error' });
+      }
+    }
+    return results;
+  }
+
+  /**
+   * Invalidate prompt and prompt list caches after mutation.
+   */
+  private async invalidatePromptCache(id?: string) {
+    const redis = getRedisClient();
+    if (!redis) return;
+    if (id) await redis.del(`prompt:${id}`);
+    // Invalidate all promptlist caches (wildcard)
+    const keys = await redis.keys('promptlist:*');
+    if (keys.length) await redis.del(...keys);
   }
 }

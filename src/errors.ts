@@ -50,4 +50,13 @@ export class ForbiddenError extends AppError {
   public constructor(message = 'You do not have permission to perform this action') {
     super(message, 403);
   }
+}
+
+/**
+ * Represents a duplicate resource error (HTTP 409).
+ */
+export class DuplicateError extends AppError {
+  public constructor(message: string) {
+    super(message, 409);
+  }
 } 

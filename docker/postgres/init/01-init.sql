@@ -39,6 +39,18 @@ CREATE TABLE IF NOT EXISTS mcp_prompts.template_variables (
     UNIQUE(prompt_id, name)
 );
 
+-- Create workflow_executions table for workflow state persistence
+CREATE TABLE IF NOT EXISTS mcp_prompts.workflow_executions (
+    id TEXT PRIMARY KEY,
+    workflow_id TEXT NOT NULL,
+    status TEXT NOT NULL,
+    context JSONB DEFAULT '{}'::jsonb,
+    current_step_id TEXT,
+    history JSONB DEFAULT '[]'::jsonb,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
 -- Create views
 CREATE OR REPLACE VIEW mcp_prompts.prompts_with_tags AS
     SELECT 
@@ -82,6 +94,7 @@ EXECUTE FUNCTION mcp_prompts.update_timestamp();
 CREATE INDEX IF NOT EXISTS idx_prompts_name ON mcp_prompts.prompts(name);
 CREATE INDEX IF NOT EXISTS idx_prompts_is_template ON mcp_prompts.prompts(is_template);
 CREATE INDEX IF NOT EXISTS idx_tags_name ON mcp_prompts.tags(name);
+CREATE INDEX IF NOT EXISTS idx_workflow_executions_workflow_id ON mcp_prompts.workflow_executions(workflow_id);
 
 -- Create a search function
 CREATE OR REPLACE FUNCTION mcp_prompts.search_prompts(search_text TEXT)
