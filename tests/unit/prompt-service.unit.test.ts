@@ -1,14 +1,14 @@
 import { MemoryAdapter } from '../../src/adapters.js';
-import { PromptServiceImpl } from '../../src/prompt-service';
+import { PromptService } from '../../src/prompt-service.js';
 
-describe.skip('PromptService', () => {
-  let service: PromptServiceImpl;
+describe('PromptService', () => {
+  let service: PromptService;
   let adapter: MemoryAdapter;
 
   beforeEach(async () => {
     adapter = new MemoryAdapter();
     await adapter.connect();
-    service = new PromptServiceImpl(adapter);
+    service = new PromptService(adapter);
   });
 
   it('should create and retrieve a prompt', async () => {
