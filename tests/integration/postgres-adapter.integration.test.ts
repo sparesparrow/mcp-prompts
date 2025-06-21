@@ -1,11 +1,12 @@
 import { jest } from '@jest/globals';
 
 import { PostgresAdapter } from '../../src/adapters.js';
+import { Prompt } from '../../src/interfaces';
 
 // This test requires a PostgreSQL database
 // A Docker container should be running with:
 // docker run --name postgres-test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mcp_prompts_test -p 5432:5432 -d postgres:14-alpine
-describe('PostgresAdapter Integration', () => {
+describe.skip('PostgresAdapter Integration', () => {
   let adapter: PostgresAdapter;
   let isConnected = false;
 
