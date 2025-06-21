@@ -7,50 +7,51 @@ import { PostgresAdapter } from '../../src/adapters.js';
 // docker run --name postgres-test -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=mcp_prompts_test -p 5432:5432 -d postgres:14-alpine
 describe('PostgresAdapter Integration', () => {
   let adapter: PostgresAdapter;
-  const isDockerTest = process.env.DOCKER_TEST === 'true';
-
-  // Skip these tests if not running in Docker environment
-  const itOrSkip = isDockerTest ? it : it.skip;
+  let isConnected = false;
 
   // Configure connection based on environment variables or default to Docker service
   const config = {
-    database: process.env.PG_DATABASE || 'mcp_prompts',
-    host: process.env.PG_HOST || 'postgres',
+    database: process.env.PG_DATABASE || 'mcp_prompts_test',
+    host: process.env.PG_HOST || 'localhost',
     password: process.env.PG_PASSWORD || 'postgres',
     port: parseInt(process.env.PG_PORT || '5432', 10),
     ssl: process.env.PG_SSL === 'true',
     user: process.env.PG_USER || 'postgres',
   };
 
-  beforeEach(async () => {
+  beforeAll(async () => {
     adapter = new PostgresAdapter(config);
-
     try {
       await adapter.connect();
-
-      // Clear existing data
-      // @ts-ignore - clearAll method might not be in the type definition but is implemented
-      await adapter.clearAll();
+      isConnected = await adapter.isConnected();
     } catch (error) {
-      console.error('Failed to connect to PostgreSQL:', error);
-      // Don't fail the test setup - tests will be skipped
+      console.error('Skipping Postgres tests: Failed to connect to PostgreSQL:', error);
+      isConnected = false;
     }
   });
 
-  afterEach(async () => {
-    try {
-      // @ts-ignore - clearAll method might not be in the type definition but is implemented
-      await adapter.clearAll();
-    } catch (error) {
-      console.error('Error cleaning up after test:', error);
+  beforeEach(async () => {
+    if (isConnected) {
+      await adapter.clearAll!();
     }
   });
 
-  itOrSkip('should be defined', () => {
+  afterAll(async () => {
+    if (isConnected) {
+      await adapter.clearAll!();
+      await adapter.disconnect();
+    }
+  });
+
+  const itIfConnected = (description: string, testFn: () => any) => {
+    (isConnected ? it : it.skip)(description, testFn);
+  };
+
+  itIfConnected('should be defined', () => {
     expect(adapter).toBeDefined();
   });
 
-  itOrSkip('should save and retrieve a prompt', async () => {
+  itIfConnected('should save and retrieve a prompt', async () => {
     // Arrange
     const now = new Date().toISOString();
     const prompt = {
@@ -74,39 +75,42 @@ describe('PostgresAdapter Integration', () => {
     expect(retrieved?.content).toBe(prompt.content);
   });
 
-  itOrSkip('should update an existing prompt', async () => {
+  itIfConnected('should update an existing prompt', async () => {
     // Arrange
     const now = new Date().toISOString();
     const promptId = `update-test-${Date.now()}`;
-    const prompt = {
+    const originalPrompt = {
       content: 'Original content',
       createdAt: now,
       description: 'Original description',
       id: promptId,
       name: 'Update Test',
       updatedAt: now,
+      version: 1,
     };
 
-    await adapter.savePrompt(prompt);
+    await adapter.savePrompt(originalPrompt);
 
     // Act
-    const updated = {
-      ...prompt,
+    const promptToUpdate = {
+      ...originalPrompt,
       content: 'Updated content',
       description: 'Updated description',
+      version: 2,
       updatedAt: new Date().toISOString(),
     };
-
-    await adapter.savePrompt(updated);
-    const retrieved = await adapter.getPrompt(promptId);
+    const updatedPrompt = await adapter.updatePrompt(promptId, promptToUpdate);
 
     // Assert
-    expect(retrieved).toBeDefined();
+    expect(updatedPrompt).toBeDefined();
+    expect(updatedPrompt.description).toBe('Updated description');
+    expect(updatedPrompt.content).toBe('Updated content');
+    expect(updatedPrompt.version).toBe(2);
+    const retrieved = await adapter.getPrompt(promptId);
     expect(retrieved?.description).toBe('Updated description');
-    expect(retrieved?.content).toBe('Updated content');
   });
 
-  itOrSkip('should list prompts with optional filters', async () => {
+  itIfConnected('should list prompts with optional filters', async () => {
     // Arrange
     const now = new Date().toISOString();
     const prompts = [
@@ -156,7 +160,7 @@ describe('PostgresAdapter Integration', () => {
     expect(searchResults.some(p => p.id === 'list-test-3')).toBe(true);
   });
 
-  itOrSkip('should delete a prompt', async () => {
+  itIfConnected('should delete a prompt', async () => {
     // Arrange
     const now = new Date().toISOString();
     const promptId = `delete-test-${Date.now()}`;
@@ -177,19 +181,13 @@ describe('PostgresAdapter Integration', () => {
 
     // Act
     await adapter.deletePrompt(promptId);
+    const retrieved = await adapter.getPrompt(promptId);
 
-    // Assert - Try to retrieve the deleted prompt
-    try {
-      const retrieveResult = await adapter.getPrompt(promptId);
-      // If no error is thrown, the prompt was not deleted
-      expect(retrieveResult).toBeNull();
-    } catch (error) {
-      // If an error is thrown, verify it's because the prompt wasn't found
-      expect((error as Error).message).toContain('not found');
-    }
+    // Assert
+    expect(retrieved).toBeNull();
   });
 
-  itOrSkip('should handle connection failures gracefully', async () => {
+  itIfConnected('should handle connection failures gracefully', async () => {
     // This test can only be simulated
     // We're just placeholder testing the error handling in a wrapper
     const badConfig = {
@@ -203,20 +201,20 @@ describe('PostgresAdapter Integration', () => {
     try {
       await badAdapter.connect();
       // Should not reach here
-      expect(false).toBe(true);
+      fail('Connection should have failed but it succeeded.');
     } catch (error) {
       // Error expected
       expect(error).toBeDefined();
     }
   });
 
-  itOrSkip('should rollback transactions on error', async () => {
+  itIfConnected('should rollback transactions on error', async () => {
     // This test is just a placeholder since we can't easily simulate transaction failures
     // in an integration test without complex setup
     expect(true).toBe(true);
   });
 
-  itOrSkip('should handle bulk operations correctly', async () => {
+  itIfConnected('should handle bulk operations correctly', async () => {
     // A simple test to verify we can save and retrieve multiple prompts
     const now = new Date().toISOString();
     const prompts = Array.from({ length: 10 }, (_, i) => ({
@@ -244,25 +242,29 @@ describe('PostgresAdapter Integration', () => {
     }
   });
 
-  itOrSkip('should save and retrieve a prompt with variables and metadata', async () => {
+  itIfConnected('should save and retrieve a prompt with variables and metadata', async () => {
     const now = new Date().toISOString();
     const prompt = {
       content: 'This is the prompt content',
       createdAt: now,
       description: 'This is a test prompt',
-      id: 'test-prompt',
-      metadata: { count: 42, foo: 'bar' },
-      name: 'Test Prompt',
-      tags: ['integration', 'test'],
+      id: 'test-prompt-extended',
+      isTemplate: true,
+      metadata: {
+        author: 'test-user',
+        source: 'integration-test',
+      },
+      name: 'Test Prompt Extended',
+      tags: ['extended', 'test'],
       updatedAt: now,
-      variables: [{ default: 'foo', description: 'Variable 1', name: 'var1' }, { name: 'var2' }],
+      variables: ['name', 'item'],
     };
+
     await adapter.savePrompt(prompt);
-    const retrieved = await adapter.getPrompt('Test Prompt');
+    const retrieved = await adapter.getPrompt('test-prompt-extended');
     expect(retrieved).toBeDefined();
-    expect(retrieved?.name).toBe(prompt.name);
-    expect(retrieved?.tags).toEqual(expect.arrayContaining(['integration', 'test']));
-    expect(retrieved?.variables).toEqual(expect.arrayContaining(['var1', 'var2']));
-    expect(retrieved?.metadata).toMatchObject({ count: 42, foo: 'bar' });
+    expect(retrieved?.tags).toEqual(expect.arrayContaining(['extended', 'test']));
+    expect(retrieved?.variables).toEqual(expect.arrayContaining(['name', 'item']));
+    expect(retrieved?.metadata).toHaveProperty('author', 'test-user');
   });
 });

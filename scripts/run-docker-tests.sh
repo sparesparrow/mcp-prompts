@@ -14,9 +14,10 @@ function show_help {
   echo "  --clean         Clean up containers, networks, and volumes after testing"
   echo "  --coverage      Generate and save test coverage reports"
   echo "  --watch         Watch for file changes and rerun tests (development mode)"
+  echo "  --env           Specify the test environment (e.g., postgres, pgai). Default: test."
   echo "  --help          Display this help message"
   echo ""
-  echo "Example: ./run-docker-tests.sh --integration --clean"
+  echo "Example: ./run-docker-tests.sh --integration --clean --env=postgres"
   exit 0
 }
 
@@ -28,6 +29,7 @@ RUN_HEALTH_CHECK=false
 CLEAN_UP=false
 COVERAGE=false
 WATCH_MODE=false
+ENVIRONMENT="test"
 
 # Parse arguments
 while [[ "$#" -gt 0 ]]; do
@@ -56,6 +58,9 @@ while [[ "$#" -gt 0 ]]; do
     --watch)
       WATCH_MODE=true
       ;;
+    --env=*)
+      ENVIRONMENT="${1#*=}"
+      ;;
     --help)
       show_help
       ;;
@@ -67,45 +72,93 @@ while [[ "$#" -gt 0 ]]; do
   shift
 done
 
+# --- Helper Functions ---
+
+function get_compose_files() {
+  local env=$1
+  local files="-f docker-compose.yml"
+  
+  case $env in
+    postgres)
+      files="$files -f docker/compose/docker-compose.postgres.yml"
+      ;;
+    pgai)
+      files="$files -f docker/compose/docker-compose.postgres.yml -f docker/compose/docker-compose.pgai.yml"
+      ;;
+    sse)
+      files="$files -f docker/compose/docker-compose.sse.yml"
+      ;;
+  esac
+
+  files="$files -f docker/compose/docker-compose.test.yml"
+  echo $files
+}
+
+function run_tests_for_env() {
+  local env=$1
+  echo "--- Running tests for environment: $env ---"
+  
+  local compose_files=$(get_compose_files $env)
+
+  if [ "$RUN_ALL" = true ] || [ "$RUN_UNIT" = true ]; then
+    run_unit_tests "$compose_files"
+  fi
+  if [ "$RUN_ALL" = true ] || [ "$RUN_INTEGRATION" = true ]; then
+    run_integration_tests "$compose_files"
+  fi
+  if [ "$RUN_ALL" = true ] || [ "$RUN_HEALTH_CHECK" = true ]; then
+    run_health_check_tests "$compose_files"
+  fi
+
+  if [ "$CLEAN_UP" = true ]; then
+    clean_up "$compose_files"
+  fi
+}
+
+# --- Test Execution Functions ---
+
 # Create results directory if it doesn't exist
 mkdir -p test-results
 
 # Run unit tests
 function run_unit_tests {
+  local compose_files=$1
   echo "Running unit tests in Docker..."
   
   if [ "$WATCH_MODE" = true ]; then
-    docker compose -f docker-compose.yml -f docker/docker-compose.test.yml run --rm mcp-unit-tests npm run test:unit -- --watch
+    docker compose $compose_files run --rm mcp-unit-tests npm run test:unit -- --watch
   else
     COMMAND="npm run test:unit"
     if [ "$COVERAGE" = true ]; then
-      COMMAND="$COMMAND -- --coverage --coverageDirectory=/app/test-results/coverage-unit"
+      COMMAND="$COMMAND -- --coverage --coverageDirectory=/app/test-results/coverage-unit-$ENVIRONMENT"
     fi
-    docker compose -f docker-compose.yml -f docker/docker-compose.test.yml run --rm mcp-unit-tests $COMMAND
+    docker compose $compose_files run --rm mcp-unit-tests $COMMAND
   fi
 }
 
 # Run integration tests
 function run_integration_tests {
+  local compose_files=$1
   echo "Running integration tests in Docker..."
   
   if [ "$WATCH_MODE" = true ]; then
-    docker compose -f docker-compose.yml -f docker/docker-compose.test.yml run --rm mcp-integration-tests npm run test:integration -- --watch
+    docker compose $compose_files run --rm mcp-integration-tests npm run test:integration -- --watch
   else
     COMMAND="npm run test:integration"
     if [ "$COVERAGE" = true ]; then
-      COMMAND="$COMMAND -- --coverage --coverageDirectory=/app/test-results/coverage-integration"
+      COMMAND="$COMMAND -- --coverage --coverageDirectory=/app/test-results/coverage-integration-$ENVIRONMENT"
     fi
-    docker compose -f docker-compose.yml -f docker/docker-compose.test.yml run --rm mcp-integration-tests $COMMAND
+    docker compose $compose_files run --rm mcp-integration-tests $COMMAND
   fi
 }
 
 # Run health check tests
 function run_health_check_tests {
+  local compose_files=$1
   echo "Running health check tests in Docker..."
   
-  docker compose -f docker-compose.yml -f docker/docker-compose.test.yml --profile health-check up --build -d
-  docker compose -f docker-compose.yml -f docker/docker-compose.test.yml --profile health-check logs -f mcp-health-check-tests
+  docker compose $compose_files --profile health-check up --build -d
+  docker compose $compose_files --profile health-check logs -f mcp-health-check-tests
   
   # Wait for test runner to complete
   echo "Waiting for tests to complete..."
@@ -116,7 +169,7 @@ function run_health_check_tests {
   if [ "$EXIT_CODE" != "0" ]; then
     echo "Health check tests failed with exit code $EXIT_CODE"
     if [ "$CLEAN_UP" = true ]; then
-      clean_up_health_check
+      clean_up "$compose_files" --profile health-check
     fi
     exit $EXIT_CODE
   fi
@@ -124,47 +177,27 @@ function run_health_check_tests {
   echo "Health check tests completed successfully"
   
   if [ "$CLEAN_UP" = true ]; then
-    clean_up_health_check
+    clean_up "$compose_files" --profile health-check
   fi
 }
 
-# Clean up Docker resources for regular tests
-function clean_up_regular {
+# Clean up Docker resources
+function clean_up {
+  local compose_files=$1
+  local extra_args=$2
   echo "Cleaning up Docker resources..."
-  docker compose -f docker-compose.yml -f docker/docker-compose.test.yml down -v
+  docker compose $compose_files $extra_args down -v
 }
 
-# Clean up Docker resources for health check tests
-function clean_up_health_check {
-  echo "Cleaning up health check Docker resources..."
-  docker compose -f docker-compose.yml -f docker/docker-compose.test.yml --profile health-check down -v
-}
+# --- Main Execution Logic ---
 
-# Run all tests
-function run_all_tests {
-  run_unit_tests
-  run_integration_tests
-  run_health_check_tests
-}
-
-# Execute requested test types
-if [ "$RUN_ALL" = true ]; then
-  run_all_tests
+if [ "$ENVIRONMENT" = "all" ]; then
+  ENVS_TO_RUN="test postgres pgai"
+  for env in $ENVS_TO_RUN; do
+    run_tests_for_env $env
+  done
 else
-  if [ "$RUN_UNIT" = true ]; then
-    run_unit_tests
-  fi
-  if [ "$RUN_INTEGRATION" = true ]; then
-    run_integration_tests
-  fi
-  if [ "$RUN_HEALTH_CHECK" = true ]; then
-    run_health_check_tests
-  fi
+    run_tests_for_env $ENVIRONMENT
 fi
 
-# Clean up if requested
-if [ "$CLEAN_UP" = true ] && [ "$RUN_HEALTH_CHECK" = false ]; then
-  clean_up_regular
-fi
-
-echo "All tests completed!" 
+echo "All specified tests completed!"

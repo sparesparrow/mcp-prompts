@@ -87,8 +87,23 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
+        val setApiKeyButton = Button(this).apply {
+            text = "Set API Key"
+            setOnClickListener {
+                if (!isBound) return@setOnClickListener
+                scope.launch(Dispatchers.IO) {
+                    // In a real app, get this from a secure source
+                    mcpService?.setApiKey("DUMMY_API_KEY_12345")
+                    scope.launch(Dispatchers.Main) {
+                        Toast.makeText(this@MainActivity, "API Key Set", Toast.LENGTH_SHORT).show()
+                    }
+                }
+            }
+        }
+
         layout.addView(listButton)
         layout.addView(getButton)
+        layout.addView(setApiKeyButton)
         setContentView(layout)
     }
 

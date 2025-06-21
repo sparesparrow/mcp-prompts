@@ -1,9 +1,11 @@
 import { exec } from 'child_process';
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import type { z } from 'zod';
 
+import type { StorageAdapter, WorkflowExecutionState } from './interfaces.js';
 import type { PromptService } from './prompt-service.js';
 import { workflowSchema } from './schemas.js';
 // If using Node <18, uncomment the following line:
@@ -49,10 +51,19 @@ export interface WorkflowService {
    * @param workflow The workflow to run
    * @returns Result of the workflow run
    */
-  runWorkflow(workflow: Workflow): Promise<RunWorkflowResult>;
+  runWorkflow(workflow: Workflow, initialContext?: WorkflowContext): Promise<RunWorkflowResult>;
+  resumeWorkflow(executionId: string): Promise<RunWorkflowResult>;
 }
 
 export class WorkflowServiceImpl implements WorkflowService {
+  private storageAdapter: StorageAdapter;
+  private promptService: PromptService;
+
+  public constructor(storageAdapter: StorageAdapter, promptService: PromptService) {
+    this.storageAdapter = storageAdapter;
+    this.promptService = promptService;
+  }
+
   public parseWorkflow(data: unknown): Workflow {
     const result = workflowSchema.safeParse(data);
     if (!result.success) {
@@ -73,50 +84,176 @@ export class WorkflowServiceImpl implements WorkflowService {
    */
   public async runWorkflowSteps(
     workflow: Workflow,
+    state: WorkflowExecutionState,
     stepRunners: Record<string, StepRunner>,
   ): Promise<RunWorkflowResult> {
-    const context: WorkflowContext = {};
-    const outputs: Record<string, unknown> = {};
+    const context: WorkflowContext = state.context;
+    let currentStepId: string | undefined = state.currentStepId;
 
-    for (const step of workflow.steps) {
-      const runner = stepRunners[step.type];
-      if (!runner) {
-        return {
-          message: `No StepRunner for step type: ${step.type}`,
-          outputs,
-          success: false,
-        };
+    while (currentStepId) {
+      const step = workflow.steps.find(s => s.id === currentStepId);
+      if (!step) {
+        state.status = 'failed';
+        state.updatedAt = new Date().toISOString();
+        await this.storageAdapter.saveWorkflowState(state);
+        return { message: `Step not found: ${currentStepId}`, success: false };
       }
-      const result = await runner.runStep(step, context);
-      if (!result.success) {
-        return {
-          message: `Step ${step.id} failed: ${result.error}`,
-          outputs,
-          success: false,
-        };
+
+      // Handle parallel steps
+      if (step.type === 'parallel') {
+        const parallelSteps = (step as any).steps as Workflow['steps'];
+        try {
+          const results = await Promise.all(
+            parallelSteps.map(subStep => this.runSingleStep(subStep, context, stepRunners)),
+          );
+
+          const failedStepResult = results.find(r => !r.success);
+          if (failedStepResult) {
+            if (step.onFailure) {
+              currentStepId = step.onFailure;
+            } else {
+              state.status = 'failed';
+              state.updatedAt = new Date().toISOString();
+              await this.storageAdapter.saveWorkflowState(state);
+              return { success: false, message: `Parallel step failed: ${failedStepResult.error}` };
+            }
+          } else {
+            results.forEach((result, index) => {
+              const subStep = parallelSteps[index];
+              if (result.success && 'output' in subStep && typeof subStep.output === 'string') {
+                context[subStep.output] = result.output;
+              }
+            });
+            currentStepId = step.onSuccess ?? this.findNextStep(workflow, currentStepId);
+          }
+        } catch (e) {
+          state.status = 'failed';
+          state.updatedAt = new Date().toISOString();
+          await this.storageAdapter.saveWorkflowState(state);
+          return { success: false, message: `Error in parallel step ${step.id}: ${e}` };
+        }
+      } else {
+        const result = await this.runSingleStep(step, context, stepRunners);
+        state.history.push({
+          stepId: step.id,
+          executedAt: new Date().toISOString(),
+          success: result.success,
+          output: result.output,
+          error: result.error,
+        });
+
+        if (result.success) {
+          currentStepId =
+            'onSuccess' in step && step.onSuccess
+              ? step.onSuccess
+              : this.findNextStep(workflow, currentStepId);
+        } else {
+          if ('errorPolicy' in step && step.errorPolicy === 'continue') {
+            currentStepId =
+              'onFailure' in step && step.onFailure
+                ? step.onFailure
+                : this.findNextStep(workflow, currentStepId);
+          } else {
+            state.status = 'failed';
+            state.updatedAt = new Date().toISOString();
+            state.currentStepId = currentStepId;
+            await this.storageAdapter.saveWorkflowState(state);
+            return { message: `Step ${step.id} failed: ${result.error}`, success: false };
+          }
+        }
       }
-      // Store output in context under the step's output key (if defined)
-      if ('output' in step && typeof step.output === 'string') {
-        context[step.output] = result.output;
-        outputs[step.output] = result.output;
-      }
+
+      state.currentStepId = currentStepId;
+      state.updatedAt = new Date().toISOString();
+      await this.storageAdapter.saveWorkflowState(state);
     }
-    return {
-      message: 'Workflow completed successfully',
-      outputs,
-      success: true,
-    };
+
+    state.status = 'completed';
+    state.updatedAt = new Date().toISOString();
+    await this.storageAdapter.saveWorkflowState(state);
+    return { message: 'Workflow completed successfully', outputs: state.context, success: true };
   }
 
-  public async runWorkflow(workflow: Workflow): Promise<RunWorkflowResult> {
-    // For MVP, require caller to provide stepRunners externally or use stubs
-    // Example usage:
-    // const result = await workflowService.runWorkflowSteps(workflow, { prompt: ..., shell: ..., http: ... });
-    return {
-      message: 'runWorkflow: Please use runWorkflowSteps with stepRunners (MVP)',
-      outputs: {},
-      success: false,
+  private async runSingleStep(
+    step: any,
+    context: WorkflowContext,
+    stepRunners: Record<string, StepRunner>,
+  ): Promise<StepResult> {
+    // 1. Evaluate condition
+    if (step.condition) {
+      try {
+        const conditionResult = new Function('context', `return ${step.condition}`)(context);
+        if (!conditionResult) {
+          return { success: true, output: null }; // Condition not met, but not a failure
+        }
+      } catch (e) {
+        return { success: false, error: `Condition evaluation failed for step ${step.id}: ${e}` };
+      }
+    }
+
+    // 2. Execute step
+    const runner = stepRunners[step.type];
+    if (!runner) {
+      return { success: false, error: `No runner for step type: ${step.type}` };
+    }
+
+    const result = await runner.runStep(step, context);
+
+    // 3. Update context if step was successful
+    if (result.success && 'output' in step && typeof step.output === 'string') {
+      context[step.output] = result.output;
+    }
+    
+    return result;
+  }
+
+  private findNextStep(workflow: Workflow, currentStepId: string): string | undefined {
+    const currentIndex = workflow.steps.findIndex(s => s.id === currentStepId);
+    return workflow.steps[currentIndex + 1]?.id;
+  }
+
+  public async runWorkflow(workflow: Workflow, initialContext: WorkflowContext = {}): Promise<RunWorkflowResult> {
+    const stepRunners: Record<string, StepRunner> = {
+      prompt: new PromptRunner(this.promptService),
+      shell: new ShellRunner(),
+      http: new HttpRunner(),
     };
+
+    const executionId = randomUUID();
+    const initialState: WorkflowExecutionState = {
+      executionId,
+      workflowId: workflow.id,
+      status: 'running',
+      context: { ...workflow.variables, ...initialContext },
+      currentStepId: workflow.steps[0]?.id,
+      history: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await this.storageAdapter.saveWorkflowState(initialState);
+    return this.runWorkflowSteps(workflow, initialState, stepRunners);
+  }
+
+  public async resumeWorkflow(executionId: string): Promise<RunWorkflowResult> {
+    const state = await this.storageAdapter.getWorkflowState(executionId);
+    if (!state) {
+      throw new Error(`Workflow execution not found: ${executionId}`);
+    }
+
+    if (state.status === 'completed' || state.status === 'failed') {
+      throw new Error(`Cannot resume a workflow that is already ${state.status}.`);
+    }
+
+    // This is a bit of a hack. We need the full workflow definition, which isn't stored in the state.
+    // A proper implementation would need a way to retrieve the workflow definition by its ID.
+    // For now, we'll assume the caller can provide it or we can fetch it somehow.
+    // Let's assume a `getWorkflowById` method exists on the storage adapter.
+    // const workflow = await this.storageAdapter.getWorkflow(state.workflowId);
+    // if (!workflow) {
+    //   throw new Error(`Workflow definition not found for ID: ${state.workflowId}`);
+    // }
+    throw new Error('Resuming workflows is not fully implemented yet.');
   }
 }
 

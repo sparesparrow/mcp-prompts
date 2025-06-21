@@ -1,0 +1,99 @@
+---
+description: Initialize npm workspaces structure and foundational monorepo architecture for mcp-prompts refactoring
+globs: 
+  - "package.json"
+  - "packages/**/*"
+  - ".npmrc"
+  - "pnpm-workspace.yaml"
+alwaysApply: false
+---
+
+# Workspace Setup & Initialization
+
+This rule contains all tasks needed to initialize the npm workspaces structure and prepare the foundational monorepo architecture for the mcp-prompts refactoring project.
+
+## Phase 0 Tasks
+
+### Task 1: Create Feature Branch
+- [ ] Create new branch `feature/monorepo-refactor`
+- [ ] Ensure all subsequent changes are made in this branch
+- [ ] Create backup branch `before-refactor` for safety
+
+### Task 2: Enable npm Workspaces
+- [ ] Modify root `package.json` to add workspaces configuration:
+  ```json
+  {
+    "workspaces": [
+      "packages/*"
+    ]
+  }
+  ```
+- [ ] Create `.npmrc` file in root with workspace configuration:
+  ```
+  workspaces=true
+  workspaces-experimental=true
+  ```
+- [ ] Create empty `pnpm-workspace.yaml` for future pnpm compatibility:
+  ```yaml
+  packages:
+    - 'packages/*'
+  ```
+
+### Task 3: Create Directory Structure
+- [ ] Create `packages/` directory in project root
+- [ ] Create `packages/mcp-prompts-catalog/` directory
+- [ ] Create `packages/mcp-prompts-contracts/` directory
+- [ ] Ensure directories are properly structured according to target architecture
+
+### Task 4: Initialize Package Directories
+- [ ] Run `npm init -y` in `packages/mcp-prompts-catalog/`
+- [ ] Run `npm init -y` in `packages/mcp-prompts-contracts/`
+- [ ] Update `packages/mcp-prompts-catalog/package.json`:
+  - Set name to `@sparesparrow/mcp-prompts-catalog`
+  - Set version to `0.1.0`
+  - Add appropriate description
+- [ ] Update `packages/mcp-prompts-contracts/package.json`:
+  - Set name to `@sparesparrow/mcp-prompts-contracts`
+  - Set version to `0.1.0`
+  - Add appropriate description
+
+### Task 5: Update Root Dependencies
+- [ ] Add workspace references to root `package.json`:
+  ```json
+  {
+    "dependencies": {
+      "@sparesparrow/mcp-prompts-catalog": "workspace:*"
+    },
+    "devDependencies": {
+      "@sparesparrow/mcp-prompts-contracts": "workspace:*"
+    }
+  }
+  ```
+- [ ] Run `npm install` from root to link packages
+- [ ] Verify workspace linking works correctly
+
+### Task 6: Validation and Testing
+- [ ] Run `npm list --workspaces` to verify workspace structure
+- [ ] Ensure all packages are properly linked
+- [ ] Test that workspace references resolve correctly
+- [ ] Create basic index files in each package for import testing
+
+## Success Criteria
+- [ ] All packages are properly initialized with correct names and versions
+- [ ] Workspace linking functions correctly
+- [ ] No dependency resolution errors
+- [ ] Clean git status with all changes committed to feature branch
+
+## Files to Create/Modify
+- `package.json` (root)
+- `.npmrc`
+- `pnpm-workspace.yaml`
+- `packages/mcp-prompts-catalog/package.json`
+- `packages/mcp-prompts-contracts/package.json`
+- `packages/mcp-prompts-catalog/index.js`
+- `packages/mcp-prompts-contracts/index.ts`
+
+## Reference Documentation
+- [npm workspaces documentation](https://docs.npmjs.com/cli/v7/using-npm/workspaces)
+- [Monorepo best practices](https://monorepo.tools/)
+- [Package.json workspace field](https://docs.npmjs.com/cli/v10/configuring-npm/package-json#workspaces)

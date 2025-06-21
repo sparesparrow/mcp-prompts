@@ -14,6 +14,10 @@ export default {
       },
     ],
   },
+  testMatch: [
+    "**/__tests__/**/*.[jt]s?(x)",
+    "**/?(*.)+(spec|test|unit|integration).[jt]s?(x)"
+  ],
   coverageDirectory: 'coverage',
   collectCoverageFrom: [
     'src/**/*.ts',
@@ -29,4 +33,5 @@ export default {
       statements: 80,
     },
   },
+  testPathIgnorePatterns: ['/node_modules/', '/dist/', '\\.d\\.ts$'],
 }; 

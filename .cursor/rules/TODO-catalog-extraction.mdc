@@ -1,0 +1,129 @@
+---
+description: Extract prompt catalog into separate reusable package for independent versioning and distribution
+globs:
+  - "packages/mcp-prompts-catalog/**/*"
+  - "src/adapters/file.ts"
+  - "src/index.ts"
+  - "bin/cli.ts"
+  - "prompts/**/*"
+  - "*.json"
+  - "*.jsonl"
+alwaysApply: false
+---
+
+# Catalog Extraction & Prompt Management
+
+This rule contains all tasks needed to extract the prompt catalog into a separate, reusable package that can be independently versioned and distributed.
+
+## Phase 1 Tasks
+
+### Task 1: Move Existing Prompts
+- [ ] Identify all existing prompt files (`.json`, `.jsonl`, `.md`)
+- [ ] Create category-based directory structure in `packages/mcp-prompts-catalog/prompts/`:
+  ```
+  packages/mcp-prompts-catalog/prompts/
+  ├── code-review/
+  ├── copywriting/
+  ├── system-design/
+  ├── documentation/
+  └── general/
+  ```
+- [ ] Move all existing prompt files to appropriate category directories
+- [ ] Maintain file naming conventions and metadata structure
+- [ ] Create category index files for easy discovery
+
+### Task 2: Implement Catalog Package Structure
+- [ ] Create main `packages/mcp-prompts-catalog/index.js` with exports:
+  ```javascript
+  const path = require('path');
+  
+  exports.getPromptsDir = () => path.join(__dirname, 'prompts');
+  exports.getCategories = () => { /* implementation */ };
+  exports.listPrompts = (category) => { /* implementation */ };
+  exports.loadPrompt = (name, category) => { /* implementation */ };
+  ```
+- [ ] Add package metadata and exports to `package.json`
+- [ ] Create TypeScript declaration file if needed
+- [ ] Add README specific to catalog package
+
+### Task 3: Refactor Core Server Prompt Loading
+- [ ] Modify `src/adapters/file.ts` to use catalog package:
+  ```typescript
+  import { getPromptsDir } from '@sparesparrow/mcp-prompts-catalog';
+  
+  // Update prompt loading logic to use catalog
+  ```
+- [ ] Update `src/index.ts` to import from catalog package
+- [ ] Use `require.resolve()` to find catalog package directory
+- [ ] Ensure backward compatibility with existing prompt storage
+
+### Task 4: Implement Catalog CLI Commands
+- [ ] Add new CLI commands to `bin/cli.ts`:
+  - `mcp-prompts catalog list` - List all available categories
+  - `mcp-prompts catalog install <category>` - Install specific category
+  - `mcp-prompts catalog install --all` - Install all categories  
+  - `mcp-prompts catalog update` - Update catalog to latest version
+- [ ] Implement category filtering and selective installation
+- [ ] Add progress indicators and user feedback
+- [ ] Handle catalog package installation if missing
+
+### Task 5: Validation and Schema
+- [ ] Create JSON schema for prompt validation in catalog
+- [ ] Implement Zod validation for prompt structure:
+  ```typescript
+  const PromptSchema = z.object({
+    name: z.string(),
+    description: z.string(),
+    content: z.string(),
+    variables: z.array(z.string()).optional(),
+    tags: z.array(z.string()).optional(),
+    category: z.string(),
+    version: z.string().optional()
+  });
+  ```
+- [ ] Add validation tests for all existing prompts
+- [ ] Create validation script to run during catalog build
+
+### Task 6: Update Dependencies and Imports
+- [ ] Update all imports in core server to use catalog package
+- [ ] Add catalog package as dependency in root `package.json`
+- [ ] Verify workspace linking works correctly
+- [ ] Update error handling for missing catalog scenarios
+
+### Task 7: Default Prompt Management
+- [ ] Implement default prompt seeding from catalog on first run
+- [ ] Add configuration option to disable automatic catalog loading
+- [ ] Create migration script for existing prompt data
+- [ ] Handle version conflicts between local and catalog prompts
+
+## Success Criteria
+- [ ] All prompts moved to catalog package with proper categorization
+- [ ] Core server successfully loads prompts from catalog package
+- [ ] CLI commands for catalog management work correctly
+- [ ] Validation passes for all prompt files
+- [ ] No breaking changes to existing API endpoints
+- [ ] Catalog can be published and consumed independently
+
+## Files to Create/Modify
+- `packages/mcp-prompts-catalog/index.js`
+- `packages/mcp-prompts-catalog/package.json`
+- `packages/mcp-prompts-catalog/README.md`
+- `packages/mcp-prompts-catalog/prompts/**/*.json`
+- `packages/mcp-prompts-catalog/schemas/prompt.schema.json`
+- `src/adapters/file.ts`
+- `src/index.ts`
+- `bin/cli.ts`
+- Migration script: `scripts/migrate-prompts.js`
+
+## Testing Requirements
+- [ ] Unit tests for catalog loading functionality
+- [ ] Integration tests for CLI commands
+- [ ] Validation tests for prompt schemas
+- [ ] E2E tests for prompt discovery and loading
+- [ ] Performance tests for large prompt catalogs
+
+## Reference Files
+- Review existing prompt files for structure patterns
+- Check current file adapter implementation
+- Analyze CLI command patterns for consistency
+- Study npm workspace dependency resolution

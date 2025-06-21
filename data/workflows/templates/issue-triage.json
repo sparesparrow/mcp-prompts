@@ -1,0 +1,40 @@
+{
+  "id": "issue-triage-assistant",
+  "name": "Issue Triage Assistant",
+  "description": "Analyzes a GitHub issue and suggests labels and priority.",
+  "variables": {
+    "githubToken": "",
+    "issueUrl": ""
+  },
+  "steps": [
+    {
+      "id": "extract-issue-info",
+      "type": "shell",
+      "command": "echo '{{issueUrl}}' | sed -E 's/https://github.com/([^/]+)/([^/]+)/issues/([0-9]+)/? /1/2/3/'",
+      "output": "issueInfo",
+      "onSuccess": "fetch-issue-details"
+    },
+    {
+      "id": "fetch-issue-details",
+      "type": "http",
+      "url": "https://api.github.com/repos/{{context.issueInfo.1}}/{{context.issueInfo.2}}/issues/{{context.issueInfo.3}}",
+      "method": "GET",
+      "headers": {
+        "Accept": "application/vnd.github.v3+json",
+        "Authorization": "Bearer {{githubToken}}"
+      },
+      "output": "issueDetails",
+      "onSuccess": "triage-issue"
+    },
+    {
+      "id": "triage-issue",
+      "type": "prompt",
+      "promptId": "project-analysis-assistant",
+      "input": {
+        "issueTitle": "{{context.issueDetails.title}}",
+        "issueBody": "{{context.issueDetails.body}}"
+      },
+      "output": "triageSuggestions"
+    }
+  ]
+} 

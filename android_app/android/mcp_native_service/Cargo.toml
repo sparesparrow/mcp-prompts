@@ -7,7 +7,12 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-binder = "0.6.0"
+binder = { version = "0.1.6", features = ["async_api"] }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+reqwest = { version = "0.11", features = ["json"] }
+tokio = { version = "1", features = ["full"] }
+anyhow = "1.0"
 # In a real project, we would also have a dependency on the mcp_core logic crate, e.g.:
 # mcp_core = { path = "../mcp_core" }
 

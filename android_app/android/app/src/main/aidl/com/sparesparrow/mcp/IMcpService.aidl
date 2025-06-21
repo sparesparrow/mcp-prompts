@@ -27,4 +27,6 @@ interface IMcpService {
      * @return A JSON string representing a list of prompts.
      */
     String listPrompts();
+
+    void setApiKey(String apiKey);
 } 

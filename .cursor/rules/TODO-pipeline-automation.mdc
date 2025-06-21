@@ -1,0 +1,292 @@
+---
+description: Automate build and release pipeline for monorepo structure with multi-package publishing and cross-platform testing
+globs:
+  - ".github/workflows/**/*"
+  - "Dockerfile"
+  - "docker-compose.yml"
+  - "scripts/**/*"
+  - "package.json"
+alwaysApply: false
+---
+
+# Pipeline Automation & Release Management
+
+This rule contains all tasks needed to automate the build and release pipeline for the new monorepo structure, including multi-package publishing, Docker optimization, and cross-platform testing.
+
+## Phase 3 Tasks
+
+### Task 1: Multi-Stage Dockerfile Optimization
+- [ ] Rewrite `Dockerfile` for multi-stage build optimized for monorepo:
+  ```dockerfile
+  # Builder stage
+  FROM node:20-alpine AS builder
+  WORKDIR /app
+  
+  # Copy package files for better caching
+  COPY package*.json ./
+  COPY packages/*/package.json ./packages/
+  
+  # Install all dependencies including workspaces
+  RUN npm ci --workspaces
+  
+  # Copy source and build
+  COPY . .
+  RUN npm run build
+  RUN npm run gen:openapi
+  
+  # Production stage
+  FROM node:20-alpine AS runner
+  RUN addgroup --system --gid 1001 nodejs
+  RUN adduser --system --uid 1001 nodejs
+  
+  WORKDIR /app
+  USER nodejs
+  
+  # Copy only production dependencies and built code
+  COPY --from=builder --chown=nodejs:nodejs /app/dist ./dist
+  COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+  COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
+  
+  HEALTHCHECK --interval=30s --timeout=10s --start-period=40s \
+    CMD curl -f http://localhost:3003/health || exit 1
+  
+  EXPOSE 3003
+  CMD ["node", "dist/index.js"]
+  ```
+- [ ] Optimize for minimal image size with proper layer caching
+- [ ] Add health check instruction for container orchestration
+- [ ] Use non-root user for security
+
+### Task 2: GitHub Actions Workflow Enhancement
+- [ ] Update `.github/workflows/ci.yml` for workspace support:
+  ```yaml
+  name: CI/CD Pipeline
+  
+  on:
+    push:
+      branches: [main, develop]
+    pull_request:
+      branches: [main]
+  
+  jobs:
+    test:
+      runs-on: ubuntu-latest
+      strategy:
+        matrix:
+          node-version: [18, 20, 22]
+      
+      steps:
+        - uses: actions/checkout@v4
+        
+        - name: Setup Node.js
+          uses: actions/setup-node@v4
+          with:
+            node-version: ${{ matrix.node-version }}
+            cache: 'npm'
+        
+        - name: Install dependencies
+          run: npm ci --workspaces
+        
+        - name: Generate OpenAPI spec
+          run: npm run gen:openapi
+        
+        - name: Run linting
+          run: npm run lint --workspaces
+        
+        - name: Run unit tests
+          run: npm test --workspaces
+        
+        - name: Run golden test suite
+          run: npm run test:golden
+          env:
+            BASE_URL: http://localhost:3003
+  ```
+- [ ] Add separate job for golden test suite execution
+- [ ] Include npm audit signatures for security validation
+- [ ] Add matrix testing for multiple Node.js versions
+
+### Task 3: Automated Version Management
+- [ ] Setup `changesets` for coordinated package versioning:
+  ```bash
+  npm install --save-dev @changesets/cli
+  npm install --save-dev @changesets/changelog-github
+  ```
+- [ ] Initialize changeset configuration:
+  ```json
+  {
+    "$schema": "https://unpkg.com/@changesets/config@2.0.0/schema.json",
+    "changelog": "@changesets/changelog-github",
+    "commit": false,
+    "linked": [],
+    "access": "public",
+    "baseBranch": "main",
+    "updateInternalDependencies": "patch",
+    "ignore": []
+  }
+  ```
+- [ ] Create release workflow with automated publishing:
+  ```yaml
+  name: Release
+  
+  on:
+    push:
+      branches: [main]
+  
+  jobs:
+    release:
+      runs-on: ubuntu-latest
+      steps:
+        - uses: actions/checkout@v4
+          with:
+            fetch-depth: 0
+        
+        - name: Create Release PR or Publish
+          uses: changesets/action@v1
+          with:
+            publish: npm run release
+          env:
+            GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+            NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+  ```
+
+### Task 4: Multi-Package Publishing Strategy
+- [ ] Configure package publishing order in `package.json`:
+  ```json
+  {
+    "scripts": {
+      "release": "npm run build --workspaces && changeset publish",
+      "version": "changeset version && npm install --package-lock-only"
+    }
+  }
+  ```
+- [ ] Ensure dependency order: catalog → contracts → main package
+- [ ] Add pre-publish validation scripts for each package
+- [ ] Configure npm registry settings for scoped packages
+
+### Task 5: Docker Multi-Architecture Build
+- [ ] Setup multi-platform Docker builds:
+  ```yaml
+  - name: Set up Docker Buildx
+    uses: docker/setup-buildx-action@v3
+  
+  - name: Build and push
+    uses: docker/build-push-action@v5
+    with:
+      platforms: linux/amd64,linux/arm64
+      push: true
+      tags: |
+        sparesparrow/mcp-prompts:latest
+        sparesparrow/mcp-prompts:${{ github.sha }}
+      cache-from: type=gha
+      cache-to: type=gha,mode=max
+  ```
+- [ ] Add Docker image vulnerability scanning
+- [ ] Configure automated Docker Hub publishing
+- [ ] Add image size optimization checks
+
+### Task 6: Artifact Management
+- [ ] Upload generated OpenAPI spec as build artifact:
+  ```yaml
+  - name: Upload OpenAPI Spec
+    uses: actions/upload-artifact@v4
+    with:
+      name: openapi-spec
+      path: packages/mcp-prompts-contracts/openapi.json
+  ```
+- [ ] Generate and upload coverage reports
+- [ ] Create downloadable release assets
+- [ ] Archive build logs and test results
+
+### Task 7: Quality Gates and Validation
+- [ ] Implement comprehensive quality checks:
+  ```yaml
+  quality:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check package sizes
+        run: |
+          for pkg in packages/*/; do
+            size=$(npm pack "$pkg" --dry-run 2>/dev/null | grep "package size" | grep -o "[0-9.]*[kMG]B")
+            echo "Package $pkg size: $size"
+            # Fail if over 25MB
+          done
+      
+      - name: Validate OpenAPI spec
+        run: npx swagger-parser validate packages/mcp-prompts-contracts/openapi.json
+      
+      - name: Check breaking changes
+        run: npx @apidevtools/swagger-diff old-spec.json new-spec.json --fail-on-incompatible
+  ```
+- [ ] Add security vulnerability scanning
+- [ ] Implement license compliance checking
+- [ ] Add dependency update automation
+
+### Task 8: Environment-Specific Deployments
+- [ ] Create staging deployment workflow
+- [ ] Add production deployment with manual approval
+- [ ] Configure environment-specific configurations
+- [ ] Add rollback procedures and health monitoring
+
+### Task 9: Performance and Load Testing
+- [ ] Add performance regression testing:
+  ```yaml
+  performance:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Run performance tests
+        run: |
+          npm run start:test &
+          sleep 10
+          npx autocannon http://localhost:3003/health -c 100 -d 30
+          npx k6 run tests/performance/load-test.js
+  ```
+- [ ] Monitor bundle size changes
+- [ ] Add API response time benchmarks
+- [ ] Create performance reports and trends
+
+## Success Criteria
+- [ ] CI/CD pipeline runs successfully for all workspace packages
+- [ ] Automated publishing works in correct dependency order
+- [ ] Docker images build successfully for multiple architectures
+- [ ] Golden test suite executes against built containers
+- [ ] OpenAPI spec validates and uploads as artifact
+- [ ] Security scans pass without critical vulnerabilities
+- [ ] Performance tests meet baseline requirements
+
+## Files to Create/Modify
+- `Dockerfile` (complete rewrite for multi-stage)
+- `.github/workflows/ci.yml`
+- `.github/workflows/release.yml`
+- `.github/workflows/docker.yml`
+- `.changeset/config.json`
+- `scripts/build.js`
+- `scripts/release.js`
+- `tests/performance/load-test.js`
+- `package.json` (scripts update)
+
+## Infrastructure Requirements
+- [ ] GitHub Secrets: NPM_TOKEN, DOCKER_HUB_TOKEN
+- [ ] Docker Hub repository configuration
+- [ ] npm registry access for scoped packages
+- [ ] Staging environment for deployment testing
+- [ ] Monitoring and alerting setup
+
+## Performance Targets
+- [ ] Docker image size < 200MB (compressed)
+- [ ] CI pipeline completion < 10 minutes
+- [ ] API response time < 100ms (95th percentile)
+- [ ] Package build time < 2 minutes per workspace
+- [ ] Memory usage < 512MB under normal load
+
+## Security Considerations
+- [ ] No secrets in build logs or artifacts
+- [ ] Vulnerability scanning in CI pipeline
+- [ ] Signed container images
+- [ ] Minimal attack surface in production images
+- [ ] Regular dependency updates and security patches
+
+## Reference Documentation
+- [GitHub Actions workflow syntax](https://docs.github.com/en/actions/using-workflows/workflow-syntax-for-github-actions)
+- [Changesets documentation](https://github.com/changesets/changesets)
+- [Docker multi-stage builds](https://docs.docker.com/develop/dev-best-practices/dockerfile_best-practices/)
+- [npm workspaces CI/CD patterns](https://docs.npmjs.com/cli/v7/using-npm/workspaces)

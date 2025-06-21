@@ -153,16 +153,19 @@ describe('HTTP Server', () => {
 
       expect(response.status).toBe(500);
       expect(response.body.error).toBe(true);
-      expect(response.body.code).toBe('INTERNAL_ERROR');
+      expect(response.body.code).toBe('INTERNAL_SERVER_ERROR');
     });
 
     it('should handle 404 for unknown routes', async () => {
       const apiKey = 'test-key';
-      const response = await request(server).get('/unknown').set('x-api-key', apiKey);
+      const response = await request(server).get('/unknown-route').set('x-api-key', apiKey);
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe(true);
-      expect(response.body.code).toBe('NOT_FOUND');
+      expect(response.body).toEqual({
+        code: 'NOT_FOUND',
+        error: true,
+        message: 'Resource not found',
+      });
     });
   });
 

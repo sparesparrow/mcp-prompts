@@ -1,17 +1,36 @@
 import { z } from 'zod';
 
 /**
- * Schemas for prompt-related API requests.
+ * Base schema for a prompt, containing all user-definable fields.
+ * Server-generated fields like id, createdAt, and updatedAt are excluded.
+ */
+const basePromptSchema = z.object({
+  name: z
+    .string()
+    .min(1, { message: 'Name cannot be empty' })
+    .transform(val => val.trim()),
+  description: z.string().optional(),
+  content: z.string().min(1, { message: 'Content cannot be empty' }),
+  isTemplate: z.boolean().optional().default(false),
+  variables: z.array(z.union([z.string(), z.object({})])).nullish(),
+  tags: z.array(z.string()).nullish(),
+  category: z.string().optional(),
+  metadata: z.record(z.unknown()).nullish(),
+});
+
+/**
+ * Schemas for prompt-related API requests, derived from a base schema
+ * to ensure consistency.
  */
 export const promptSchemas = {
-  add: z.object({
-    content: z.string(),
-    description: z.string().optional(),
-    isTemplate: z.boolean().optional(),
-    name: z.string(),
-    tags: z.array(z.string()).optional(),
-    variables: z.array(z.string()).optional(),
-  }),
+  /**
+   * Schema for creating a new prompt. All fields from the base schema are required.
+   */
+  create: basePromptSchema,
+  /**
+   * Schema for updating an existing prompt. All fields are optional.
+   */
+  update: basePromptSchema.partial(),
   applyTemplate: z.object({
     id: z.string(),
     variables: z.record(z.string()),
@@ -26,15 +45,6 @@ export const promptSchemas = {
     category: z.string().optional(),
     isTemplate: z.boolean().optional(),
     tags: z.array(z.string()).optional(),
-  }),
-  update: z.object({
-    content: z.string().optional(),
-    description: z.string().optional(),
-    id: z.string(),
-    isTemplate: z.boolean().optional(),
-    name: z.string().optional(),
-    tags: z.array(z.string()).optional(),
-    variables: z.array(z.string()).optional(),
   }),
 };
 
@@ -65,35 +75,69 @@ export const workflowStepSchema = z.discriminatedUnion('type', [
     condition: z.string().optional(),
     errorPolicy: z.string().optional(),
     id: z.string(),
-    input: z.record(z.any()),
-    output: z.string(),
+    input: z.record(z.string()),
+    output: z.string().min(1),
     promptId: z.string(),
     type: z.literal('prompt'),
+    onSuccess: z.string().optional(),
+    onFailure: z.string().optional(),
   }),
   z.object({
     command: z.string(),
     condition: z.string().optional(),
     errorPolicy: z.string().optional(),
     id: z.string(),
-    output: z.string(),
+    output: z.string().min(1),
     type: z.literal('shell'),
+    onSuccess: z.string().optional(),
+    onFailure: z.string().optional(),
   }),
   z.object({
-    body: z.any().optional(),
+    body: z.record(z.any()).optional(),
     condition: z.string().optional(),
     errorPolicy: z.string().optional(),
     id: z.string(),
     method: z.enum(['GET', 'POST', 'PUT', 'DELETE', 'PATCH']),
-    output: z.string(),
+    output: z.string().min(1),
     type: z.literal('http'),
-    url: z.string(),
+    url: z.string().url(),
+    onSuccess: z.string().optional(),
+    onFailure: z.string().optional(),
+  }),
+  z.object({
+    id: z.string(),
+    type: z.literal('parallel'),
+    steps: z.array(z.lazy(() => workflowStepSchema)),
+    onSuccess: z.string().optional(),
+    onFailure: z.string().optional(),
   }),
 ]);
 
 export const workflowSchema = z.object({
   id: z.string(),
   name: z.string(),
-  steps: z.array(workflowStepSchema),
-  variables: z.record(z.any()).optional(),
+  steps: z.array(workflowStepSchema).nonempty({
+    message: 'Workflow must have at least one step',
+  }),
+  variables: z.record(z.union([z.string(), z.number(), z.boolean(), z.null()])).optional(),
   version: z.number(),
+}).superRefine((workflow, ctx) => {
+  const stepIds = new Set(workflow.steps.map(s => s.id));
+
+  workflow.steps.forEach((step, index) => {
+    if (step.onSuccess && !stepIds.has(step.onSuccess)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid onSuccess ID: '${step.onSuccess}' does not exist in this workflow.`,
+        path: ['steps', index, 'onSuccess'],
+      });
+    }
+    if (step.onFailure && !stepIds.has(step.onFailure)) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: `Invalid onFailure ID: '${step.onFailure}' does not exist in this workflow.`,
+        path: ['steps', index, 'onFailure'],
+      });
+    }
+  });
 });

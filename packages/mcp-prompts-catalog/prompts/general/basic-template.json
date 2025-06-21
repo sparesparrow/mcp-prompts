@@ -1,0 +1,19 @@
+{
+  "id": "basic-template",
+  "name": "Basic Template",
+  "description": "A simple prompt template for testing integration with Claude Desktop",
+  "content": "You are assisting with {{task}}. Please provide a detailed response addressing the following aspects:\n\n1. **Overview**\n   - Summary of the {{task}}\n   - Key considerations\n\n2. **Implementation Details**\n   - Step-by-step guide\n   - Best practices\n\n3. **Example**\n   - A practical example of {{task}}\n\nAdditional context: {{context}}",
+  "isTemplate": true,
+  "variables": [
+    "task",
+    "context"
+  ],
+  "tags": [
+    "general",
+    "template",
+    "testing"
+  ],
+  "createdAt": "2025-03-16T18:48:00.000Z",
+  "updatedAt": "2025-03-16T18:48:00.000Z",
+  "version": 1
+}

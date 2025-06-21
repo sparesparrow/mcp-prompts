@@ -1,0 +1,39 @@
+{
+  "id": "code-review-summary",
+  "name": "Code Review Summarizer",
+  "description": "Summarizes a GitHub pull request.",
+  "variables": {
+    "githubToken": "",
+    "prUrl": ""
+  },
+  "steps": [
+    {
+      "id": "extract-pr-info",
+      "type": "shell",
+      "command": "echo '{{prUrl}}' | sed -E 's/https://github.com/([^/]+)/([^/]+)/pull/([0-9]+)/? /1/2/3/'",
+      "output": "prInfo",
+      "onSuccess": "fetch-pr-diff"
+    },
+    {
+      "id": "fetch-pr-diff",
+      "type": "http",
+      "url": "https://api.github.com/repos/{{context.prInfo.1}}/{{context.prInfo.2}}/pulls/{{context.prInfo.3}}",
+      "method": "GET",
+      "headers": {
+        "Accept": "application/vnd.github.v3.diff",
+        "Authorization": "Bearer {{githubToken}}"
+      },
+      "output": "prDiff",
+      "onSuccess": "summarize-diff"
+    },
+    {
+      "id": "summarize-diff",
+      "type": "prompt",
+      "promptId": "code-review-assistant",
+      "input": {
+        "diff": "{{context.prDiff}}"
+      },
+      "output": "summary"
+    }
+  ]
+} 

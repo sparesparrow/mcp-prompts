@@ -3,9 +3,9 @@
  * Contains all interface definitions for the MCP Prompts Server
  */
 
-import { z } from 'zod';
+import type { z } from 'zod';
 
-import { McpConfigSchema } from './config.js';
+import type { McpConfigSchema } from './config.js';
 
 export type McpConfig = z.infer<typeof McpConfigSchema>;
 
@@ -224,6 +224,29 @@ export interface StorageAdapter {
   getSequence(id: string): Promise<PromptSequence | null>;
   saveSequence(sequence: PromptSequence): Promise<PromptSequence>;
   deleteSequence(id: string): Promise<void>;
+  healthCheck?(): Promise<boolean>;
+
+  // Workflow State Management
+  saveWorkflowState(state: WorkflowExecutionState): Promise<void>;
+  getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null>;
+  listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]>;
+}
+
+export interface WorkflowExecutionState {
+  executionId: string;
+  workflowId: string;
+  status: 'running' | 'paused' | 'completed' | 'failed';
+  context: Record<string, any>;
+  currentStepId?: string;
+  history: Array<{
+    stepId: string;
+    executedAt: string;
+    success: boolean;
+    output?: any;
+    error?: string;
+  }>;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export type TemplateVariables = Record<string, string>;

@@ -5,19 +5,19 @@
 
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import pg from 'pg';
-import { v4 as uuidv4 } from 'uuid';
-import { glob } from 'glob';
-import paramCase from 'param-case';
-import { pino } from 'pino';
 
-import type {
-  ListPromptsOptions,
-  McpConfig,
-  Prompt,
-  PromptSequence,
-  StorageAdapter,
+import pg from 'pg';
+import type { pino } from 'pino';
+
+import {
+  type ListPromptsOptions,
+  type McpConfig,
+  type Prompt,
+  type PromptSequence,
+  type StorageAdapter,
+  type WorkflowExecutionState,
 } from './interfaces.js';
+import { ValidationError, validatePrompt } from './validation.js';
 
 export type { StorageAdapter };
 
@@ -28,23 +28,56 @@ export type { StorageAdapter };
 export class FileAdapter implements StorageAdapter {
   private promptsDir: string;
   private sequencesDir: string;
+  private workflowStatesDir: string;
   private connected = false;
   private prompts: Map<string, Prompt> = new Map();
+  private useCatalog: boolean;
+  private catalog: any;
 
-  public constructor(promptsDir: string) {
+  public constructor(promptsDir: string, useCatalog = false) {
     this.promptsDir = promptsDir;
     this.sequencesDir = path.join(promptsDir, 'sequences');
+    this.workflowStatesDir = path.join(promptsDir, 'workflow-states');
+    this.useCatalog = useCatalog;
   }
 
   public async connect(): Promise<void> {
     try {
-      await fs.mkdir(this.promptsDir, { recursive: true });
-      await fs.mkdir(this.sequencesDir, { recursive: true });
+      if (!this.useCatalog) {
+        await fs.mkdir(this.promptsDir, { recursive: true });
+        await fs.mkdir(this.sequencesDir, { recursive: true });
+        await fs.mkdir(this.workflowStatesDir, { recursive: true });
+        console.error(`File storage connected: ${this.promptsDir}`);
+
+        // Validate existing prompts on startup
+        const files = await fs.readdir(this.promptsDir);
+        for (const file of files) {
+          if (file.endsWith('.json')) {
+            const filePath = path.join(this.promptsDir, file);
+            try {
+              const content = await fs.readFile(filePath, 'utf-8');
+              const prompt = JSON.parse(content);
+              validatePrompt(prompt, true);
+            } catch (error: unknown) {
+              if (error instanceof ValidationError) {
+                console.warn(`Validation failed for ${file}: ${error.message}`);
+              } else {
+                console.error(`Error reading or parsing ${file}:`, error);
+              }
+            }
+          }
+        }
+      } else {
+        this.catalog = await import('@sparesparrow/mcp-prompts-catalog');
+        console.error('Catalog storage connected');
+      }
       this.connected = true;
-      console.error(`File storage connected: ${this.promptsDir}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error connecting to file storage:', error);
-      throw new Error(`Failed to connect to file storage: ${error.message}`);
+      if (error instanceof Error) {
+        throw new Error(`Failed to connect to file storage: ${error.message}`);
+      }
+      throw new Error(`Failed to connect to file storage`);
     }
   }
 
@@ -58,13 +91,21 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
+    validatePrompt(prompt, true);
+    const finalPath = path.join(this.promptsDir, `${prompt.id}.json`);
+    const tempPath = `${finalPath}.tmp`;
+
     try {
-      await fs.writeFile(
-        path.join(this.promptsDir, `${prompt.id}.json`),
-        JSON.stringify(prompt, null, 2),
-      );
+      await fs.writeFile(tempPath, JSON.stringify(prompt, null, 2));
+      await fs.rename(tempPath, finalPath);
       return prompt;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Clean up the temp file if it exists
+      try {
+        await fs.unlink(tempPath);
+      } catch (cleanupError: unknown) {
+        // Ignore errors on cleanup, the original error is more important
+      }
       console.error('Error saving prompt to file:', error);
       throw error;
     }
@@ -75,11 +116,43 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
+    if (this.useCatalog) {
+      // Search all categories for the prompt
+      const categories = this.catalog.getCategories();
+      for (const category of categories) {
+        const prompts = this.catalog.listPrompts(category);
+        if (prompts.includes(id)) {
+          const prompt = this.catalog.loadPrompt(id, category);
+          try {
+            validatePrompt(prompt, true);
+            return prompt;
+          } catch (error: unknown) {
+            if (error instanceof ValidationError) {
+              console.error(
+                `Validation error for catalog prompt ${id} in category ${category}:`,
+                error.message,
+              );
+            } else {
+              console.error(`Error loading catalog prompt ${id} in category ${category}:`, error);
+            }
+            return null;
+          }
+        }
+      }
+      return null;
+    }
+
     try {
       const content = await fs.readFile(path.join(this.promptsDir, `${id}.json`), 'utf-8');
-      return JSON.parse(content);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+      const prompt = JSON.parse(content);
+      validatePrompt(prompt, true);
+      return prompt;
+    } catch (error: unknown) {
+      if (error instanceof ValidationError) {
+        console.error(`Validation error for prompt ${id}:`, error.message);
+        return null;
+      }
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
       console.error(`Error getting prompt ${id} from file:`, error);
@@ -92,11 +165,23 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
+    validatePrompt(prompt, true);
+    const finalPath = path.join(this.promptsDir, `${id}.json`);
+    const tempPath = `${finalPath}.tmp`;
     try {
-      await fs.writeFile(path.join(this.promptsDir, `${id}.json`), JSON.stringify(prompt, null, 2));
-      return prompt;
-    } catch (error: any) {
-      console.error(`Error updating prompt ${id} in file:`, error);
+      const updatedPrompt = { ...prompt, id, updatedAt: new Date().toISOString() };
+      validatePrompt(updatedPrompt, true);
+      await fs.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
+      await fs.rename(tempPath, finalPath);
+      return updatedPrompt;
+    } catch (error: unknown) {
+      // Clean up the temp file if it exists
+      try {
+        await fs.unlink(tempPath);
+      } catch (cleanupError: unknown) {
+        // Ignore errors on cleanup, the original error is more important
+      }
+      console.error('Error updating prompt to file:', error);
       throw error;
     }
   }
@@ -105,14 +190,14 @@ export class FileAdapter implements StorageAdapter {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
+    const filePath = path.join(this.promptsDir, `${id}.json`);
     try {
-      await fs.unlink(path.join(this.promptsDir, `${id}.json`));
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
-        // no return value
+      await fs.unlink(filePath);
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        console.error(`Error deleting prompt ${id} from file:`, error);
+        throw error;
       }
-      console.error(`Error deleting prompt ${id} from file:`, error);
-      throw error;
     }
   }
 
@@ -124,8 +209,8 @@ export class FileAdapter implements StorageAdapter {
     try {
       const content = await fs.readFile(path.join(this.sequencesDir, `${id}.json`), 'utf-8');
       return JSON.parse(content);
-    } catch (error: any) {
-      if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
       console.error(`Error getting sequence ${id} from file:`, error);
@@ -138,13 +223,20 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
+    const finalPath = path.join(this.sequencesDir, `${sequence.id}.json`);
+    const tempPath = `${finalPath}.tmp`;
+
     try {
-      await fs.writeFile(
-        path.join(this.sequencesDir, `${sequence.id}.json`),
-        JSON.stringify(sequence, null, 2),
-      );
+      await fs.writeFile(tempPath, JSON.stringify(sequence, null, 2));
+      await fs.rename(tempPath, finalPath);
       return sequence;
-    } catch (error: any) {
+    } catch (error: unknown) {
+      // Clean up the temp file if it exists
+      try {
+        await fs.unlink(tempPath);
+      } catch (cleanupError: unknown) {
+        // Ignore errors on cleanup, the original error is more important
+      }
       console.error('Error saving sequence to file:', error);
       throw error;
     }
@@ -157,8 +249,8 @@ export class FileAdapter implements StorageAdapter {
 
     try {
       await fs.unlink(path.join(this.sequencesDir, `${id}.json`));
-    } catch (error: any) {
-      if (error.code !== 'ENOENT') {
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
         console.error(`Error deleting sequence ${id} from file:`, error);
         throw error;
       }
@@ -170,23 +262,51 @@ export class FileAdapter implements StorageAdapter {
       throw new Error('File storage not connected');
     }
 
+    if (this.useCatalog) {
+      const categories = this.catalog.getCategories();
+      const prompts: Prompt[] = [];
+      for (const category of categories) {
+        for (const name of this.catalog.listPrompts(category)) {
+          const prompt = this.catalog.loadPrompt(name, category);
+          try {
+            validatePrompt(prompt, true);
+            prompts.push(prompt);
+          } catch (error: unknown) {
+            if (error instanceof ValidationError) {
+              console.error(
+                `Validation error for catalog prompt ${name} in category ${category}:`,
+                error.message,
+              );
+            } else {
+              console.error(`Error loading catalog prompt ${name} in category ${category}:`, error);
+            }
+          }
+        }
+      }
+      return this.filterPrompts(prompts, options);
+    }
+
     try {
       const files = await fs.readdir(this.promptsDir);
       const prompts: Prompt[] = [];
-
       for (const file of files) {
         if (file.endsWith('.json')) {
           try {
             const content = await fs.readFile(path.join(this.promptsDir, file), 'utf-8');
-            prompts.push(JSON.parse(content));
-          } catch (error: any) {
-            console.error(`Error reading prompt file ${file}:`, error);
+            const prompt = JSON.parse(content);
+            validatePrompt(prompt, true);
+            prompts.push(prompt);
+          } catch (error: unknown) {
+            if (error instanceof ValidationError) {
+              console.error(`Validation error for prompt file ${file}:`, error.message);
+            } else {
+              console.error(`Error reading prompt file ${file}:`, error);
+            }
           }
         }
       }
-
       return this.filterPrompts(prompts, options);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error listing prompts from file:', error);
       throw error;
     }
@@ -226,8 +346,13 @@ export class FileAdapter implements StorageAdapter {
     return Array.from(this.prompts.values());
   }
 
-  public async isConnected(): Promise<boolean> {
-    return this.connected;
+  public async healthCheck(): Promise<boolean> {
+    try {
+      await fs.access(this.promptsDir);
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private generateId(name: string): string {
@@ -236,6 +361,50 @@ export class FileAdapter implements StorageAdapter {
       .toLowerCase()
       .replace(/[^a-z0-9]+/g, '-')
       .replace(/^-|-$/g, '');
+  }
+
+  public async isConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
+  public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
+    const filePath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
+    await fs.writeFile(filePath, JSON.stringify(state, null, 2));
+  }
+
+  public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
+    const filePath = path.join(this.workflowStatesDir, `${executionId}.json`);
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      return JSON.parse(content) as WorkflowExecutionState;
+    } catch (error: unknown) {
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        return null;
+      }
+      throw error;
+    }
+  }
+
+  public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
+    const states: WorkflowExecutionState[] = [];
+    try {
+      const files = await fs.readdir(this.workflowStatesDir);
+      for (const file of files) {
+        if (file.endsWith('.json')) {
+          const content = await fs.readFile(path.join(this.workflowStatesDir, file), 'utf-8');
+          const state = JSON.parse(content) as WorkflowExecutionState;
+          if (state.workflowId === workflowId) {
+            states.push(state);
+          }
+        }
+      }
+    } catch (error) {
+      // Ignore if directory doesn't exist
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
+        throw error;
+      }
+    }
+    return states;
   }
 }
 
@@ -246,11 +415,14 @@ export class FileAdapter implements StorageAdapter {
 export class MemoryAdapter implements StorageAdapter {
   private prompts: Map<string, Prompt> = new Map();
   private sequences: Map<string, PromptSequence> = new Map();
+  private workflowStates: Map<string, WorkflowExecutionState> = new Map();
   private connected = false;
 
   public async connect(): Promise<void> {
     this.connected = true;
     console.log('Memory storage connected');
+    this.prompts.clear();
+    this.sequences.clear();
   }
 
   public async disconnect(): Promise<void> {
@@ -264,6 +436,7 @@ export class MemoryAdapter implements StorageAdapter {
     if (!this.connected) {
       throw new Error('Memory storage not connected');
     }
+    validatePrompt(prompt, true);
     this.prompts.set(prompt.id, prompt);
     return prompt;
   }
@@ -301,6 +474,7 @@ export class MemoryAdapter implements StorageAdapter {
     if (!this.connected) {
       throw new Error('Memory storage not connected');
     }
+    validatePrompt(prompt, true);
     this.prompts.set(id, prompt);
     return prompt;
   }
@@ -358,12 +532,30 @@ export class MemoryAdapter implements StorageAdapter {
     return Array.from(this.prompts.values());
   }
 
+  public async healthCheck(): Promise<boolean> {
+    return this.connected;
+  }
+
   public async clearAll(): Promise<void> {
     if (!this.connected) {
       throw new Error('Memory storage not connected');
     }
     this.prompts.clear();
     this.sequences.clear();
+  }
+
+  public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
+    this.workflowStates.set(state.executionId, state);
+  }
+
+  public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
+    return this.workflowStates.get(executionId) || null;
+  }
+
+  public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
+    return Array.from(this.workflowStates.values()).filter(
+      state => state.workflowId === workflowId,
+    );
   }
 }
 
@@ -375,17 +567,37 @@ export class PostgresAdapter implements StorageAdapter {
   private pool: pg.Pool;
   private connected = false;
   private config: pg.PoolConfig;
+  private maxRetries = 5;
+  private retryDelay = 1000; // 1 second
 
   public constructor(config: pg.PoolConfig) {
-    this.config = config;
-    this.pool = new pg.Pool(config);
+    this.config = {
+      max: 20, // Increased pool size
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 10000, // 10-second timeout
+      ...config,
+    };
+    this.pool = new pg.Pool(this.config);
   }
 
   public async connect(): Promise<void> {
-    this.pool = new pg.Pool(this.config);
-    await this.pool.query('SELECT 1');
-      this.connected = true;
-    console.log('Postgres storage connected');
+    let retries = this.maxRetries;
+    while (retries > 0) {
+      try {
+        const client = await this.pool.connect();
+        this.connected = true;
+        console.error('Postgres storage connected');
+        client.release();
+        return;
+      } catch (error: unknown) {
+        console.error(`Error connecting to Postgres (retries left: ${retries - 1}):`, error);
+        retries--;
+        if (retries === 0) {
+          throw new Error('Failed to connect to Postgres after multiple retries.');
+        }
+        await new Promise(res => setTimeout(res, this.retryDelay));
+      }
+    }
   }
 
   public async disconnect(): Promise<void> {
@@ -417,9 +629,9 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   private async setPromptTags(promptId: number, tagNames: string[]): Promise<void> {
-      const tagIds = await this.getOrCreateTagIds(tagNames);
+    const tagIds = await this.getOrCreateTagIds(tagNames);
     await this.pool.query('DELETE FROM prompt_tags WHERE prompt_id = $1', [promptId]);
-      for (const tagId of tagIds) {
+    for (const tagId of tagIds) {
       await this.pool.query('INSERT INTO prompt_tags (prompt_id, tag_id) VALUES ($1, $2)', [
         promptId,
         tagId,
@@ -435,7 +647,7 @@ export class PostgresAdapter implements StorageAdapter {
     if (variables) {
       for (const variable of variables) {
         await this.pool.query('INSERT INTO template_variables (prompt_id, name) VALUES ($1, $2)', [
-        promptId,
+          promptId,
           variable,
         ]);
       }
@@ -474,14 +686,14 @@ export class PostgresAdapter implements StorageAdapter {
     try {
       await client.query('BEGIN');
 
-      const variableNames = this.extractVariableNames(prompt.variables as any);
+      const variableNames = this.extractVariableNames(prompt.variables);
       const res = await client.query(
         'INSERT INTO prompts (id, name, description, content, is_template, tags, variables, category, version, metadata) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id',
         [
           prompt.id,
-            prompt.name,
-            prompt.description,
-            prompt.content,
+          prompt.name,
+          prompt.description,
+          prompt.content,
           prompt.isTemplate,
           prompt.tags,
           variableNames,
@@ -545,22 +757,78 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   public async updatePrompt(idOrName: string, prompt: Prompt): Promise<Prompt> {
-    const promptId = isNaN(parseInt(idOrName))
-      ? await this.getPromptIdByName(idOrName)
-      : parseInt(idOrName, 10);
-    if (!promptId) {
-      throw new Error(`Prompt not found: ${idOrName}`);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+
+      const isNumericId = /^\d+$/.test(idOrName);
+      const result = await client.query(
+        `SELECT id FROM prompts WHERE ${isNumericId ? 'id = $1' : 'name = $1'}`,
+        [isNumericId ? parseInt(idOrName, 10) : idOrName],
+      );
+      const promptId = result.rows[0]?.id;
+
+      if (!promptId) {
+        throw new Error(`Prompt not found: ${idOrName}`);
+      }
+
+      const updateFields: Record<string, any> = {};
+      if (prompt.name) updateFields.name = prompt.name;
+      if (prompt.description) updateFields.description = prompt.description;
+      if (prompt.content) updateFields.content = prompt.content;
+      if (prompt.isTemplate !== undefined) updateFields.is_template = prompt.isTemplate;
+      if (prompt.category) updateFields.category = prompt.category;
+      if (prompt.metadata) updateFields.metadata = prompt.metadata;
+      if (prompt.version) updateFields.version = prompt.version;
+      updateFields.updated_at = new Date();
+
+      const fieldEntries = Object.entries(updateFields);
+      if (fieldEntries.length > 0) {
+        const setClause = fieldEntries.map(([key], i) => `${key} = $${i + 2}`).join(', ');
+        const values = fieldEntries.map(([, value]) => value);
+        await client.query(`UPDATE prompts SET ${setClause} WHERE id = $1`, [promptId, ...values]);
+      }
+
+      if (prompt.tags) {
+        await this.setPromptTags(promptId, prompt.tags);
+      }
+      if (prompt.variables) {
+        await this.setTemplateVariables(promptId, this.extractVariableNames(prompt.variables));
+      }
+
+      await client.query('COMMIT');
+
+      return this.getPromptById(promptId);
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
-    // Update logic here
-    return prompt;
   }
 
   public async deletePrompt(idOrName: string): Promise<void> {
-    const promptId = isNaN(parseInt(idOrName))
-      ? await this.getPromptIdByName(idOrName)
-      : parseInt(idOrName, 10);
-    if (promptId) {
-      await this.pool.query('DELETE FROM prompts WHERE id = $1', [promptId]);
+    const client = await this.pool.connect();
+    try {
+      await client.query('BEGIN');
+      const isNumericId = /^\d+$/.test(idOrName);
+      const result = await client.query(
+        `SELECT id FROM prompts WHERE ${isNumericId ? 'id = $1' : 'name = $1'}`,
+        [isNumericId ? parseInt(idOrName, 10) : idOrName],
+      );
+      const promptId = result.rows[0]?.id;
+
+      if (promptId) {
+        await client.query('DELETE FROM prompt_tags WHERE prompt_id = $1', [promptId]);
+        await client.query('DELETE FROM template_variables WHERE prompt_id = $1', [promptId]);
+        await client.query('DELETE FROM prompts WHERE id = $1', [promptId]);
+      }
+      await client.query('COMMIT');
+    } catch (e) {
+      await client.query('ROLLBACK');
+      throw e;
+    } finally {
+      client.release();
     }
   }
 
@@ -577,8 +845,8 @@ export class PostgresAdapter implements StorageAdapter {
 
     if (options?.isTemplate !== undefined) {
       whereClauses.push(`p.is_template = $${paramIndex++}`);
-        params.push(options.isTemplate);
-      }
+      params.push(options.isTemplate);
+    }
 
     if (options?.category) {
       whereClauses.push(`p.category = $${paramIndex++}`);
@@ -620,15 +888,100 @@ export class PostgresAdapter implements StorageAdapter {
     console.warn(`deleteSequence not implemented for PostgresAdapter, ID: ${id}`);
   }
 
+  public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
+    const {
+      executionId,
+      workflowId,
+      status,
+      context,
+      currentStepId,
+      history,
+      createdAt,
+      updatedAt,
+    } = state;
+    const query = `
+      INSERT INTO workflow_executions (id, workflow_id, status, context, current_step_id, history, created_at, updated_at)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      ON CONFLICT (id) DO UPDATE SET
+        status = EXCLUDED.status,
+        context = EXCLUDED.context,
+        current_step_id = EXCLUDED.current_step_id,
+        history = EXCLUDED.history,
+        updated_at = EXCLUDED.updated_at;
+    `;
+    await this.pool.query(query, [
+      executionId,
+      workflowId,
+      status,
+      context,
+      currentStepId,
+      JSON.stringify(history),
+      createdAt,
+      updatedAt,
+    ]);
+  }
+
+  public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
+    const res = await this.pool.query('SELECT * FROM workflow_executions WHERE id = $1', [
+      executionId,
+    ]);
+    if (res.rows.length === 0) {
+      return null;
+    }
+    const row = res.rows[0];
+    return {
+      executionId: row.id,
+      workflowId: row.workflow_id,
+      status: row.status,
+      context: row.context,
+      currentStepId: row.current_step_id,
+      history: row.history,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  public async listWorkflowStates(workflowId: string): Promise<WorkflowExecutionState[]> {
+    const res = await this.pool.query(
+      'SELECT * FROM workflow_executions WHERE workflow_id = $1 ORDER BY updated_at DESC',
+      [workflowId],
+    );
+    return res.rows.map(row => ({
+      executionId: row.id,
+      workflowId: row.workflow_id,
+      status: row.status,
+      context: row.context,
+      currentStepId: row.current_step_id,
+      history: row.history,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    }));
+  }
+
   public async clearAll(): Promise<void> {
     await this.pool.query(
       'TRUNCATE prompts, tags, prompt_tags, template_variables RESTART IDENTITY',
     );
   }
 
+  public async healthCheck(): Promise<boolean> {
+    try {
+      const client = await this.pool.connect();
+      try {
+        await client.query('SELECT 1');
+        return true;
+      } finally {
+        client.release();
+      }
+    } catch {
+      return false;
+    }
+  }
+
   public async getAllPrompts(): Promise<Prompt[]> {
-    const res = await this.pool.query('SELECT id FROM prompts');
-    return Promise.all(res.rows.map(row => this.getPromptById(row.id)));
+    const res = await this.pool.query('SELECT id FROM prompts ORDER BY updated_at DESC');
+    const prompts = await Promise.all(res.rows.map(row => this.getPromptById(row.id)));
+    return prompts;
   }
 }
 
@@ -645,6 +998,11 @@ export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageA
       logger.info(`Using file storage adapter with directory: ${config.storage.promptsDir}`);
       return new FileAdapter(config.storage.promptsDir);
     default:
-      throw new Error(`Unknown storage type: ${config.storage.type}`);
+      if (config.storage.type) {
+        throw new Error(`Unknown storage type: ${config.storage.type}`);
+      }
+      // Fallback to a default or handle the case where type is not specified
+      logger.warn('Storage type not specified, falling back to in-memory storage.');
+      return new MemoryAdapter();
   }
 }

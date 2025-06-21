@@ -77,4 +77,96 @@ describe('PromptService', () => {
       }),
     ).rejects.toThrow();
   });
+
+  describe('Conditional Templating', () => {
+    it('should handle a simple if block', async () => {
+      const prompt = await service.createPrompt({
+        name: 'if-test',
+        content: '{{#if show}}Welcome!{{/if}}',
+        isTemplate: true,
+      });
+      const result1 = await service.applyTemplate(prompt.id, { show: true });
+      expect(result1.content).toBe('Welcome!');
+      const result2 = await service.applyTemplate(prompt.id, { show: false });
+      expect(result2.content).toBe('');
+    });
+
+    it('should handle an if-else block', async () => {
+      const prompt = await service.createPrompt({
+        name: 'if-else-test',
+        content: '{{#if user}}Hello, {{user.name}}{{else}}Hello, guest{{/if}}',
+        isTemplate: true,
+      });
+      const result1 = await service.applyTemplate(prompt.id, { user: { name: 'Alice' } });
+      expect(result1.content).toBe('Hello, Alice');
+      const result2 = await service.applyTemplate(prompt.id, {});
+      expect(result2.content).toBe('Hello, guest');
+    });
+
+    it('should handle truthy and falsy values', async () => {
+      const prompt = await service.createPrompt({
+        name: 'truthy-falsy-test',
+        content:
+          '{{#if item}}Item exists.{{/if}}{{#if nonItem}}No item.{{/if}}{{#if count}}Has count.{{/if}}',
+        isTemplate: true,
+      });
+      const result = await service.applyTemplate(prompt.id, { item: 'thing', count: 1 });
+      expect(result.content).toBe('Item exists.Has count.');
+    });
+  });
+
+  describe('Template Helpers', () => {
+    it('should use toUpperCase helper', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-upper',
+        content: '{{toUpperCase "hello"}}',
+        isTemplate: true,
+      });
+      const result = await service.applyTemplate(prompt.id, {});
+      expect(result.content).toBe('HELLO');
+    });
+
+    it('should use toLowerCase helper', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-lower',
+        content: '{{toLowerCase "WORLD"}}',
+        isTemplate: true,
+      });
+      const result = await service.applyTemplate(prompt.id, {});
+      expect(result.content).toBe('world');
+    });
+
+    it('should use jsonStringify helper', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-json',
+        content: '{{{jsonStringify data}}}',
+        isTemplate: true,
+      });
+      const data = { a: 1, b: 'test' };
+      const result = await service.applyTemplate(prompt.id, { data });
+      expect(result.content).toBe(JSON.stringify(data, null, 2));
+    });
+
+    it('should use join helper', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-join',
+        content: '{{join items ", "}}',
+        isTemplate: true,
+      });
+      const result = await service.applyTemplate(prompt.id, { items: ['a', 'b', 'c'] });
+      expect(result.content).toBe('a, b, c');
+    });
+
+    it('should use eq helper for conditional logic', async () => {
+      const prompt = await service.createPrompt({
+        name: 'helper-eq',
+        content: '{{#if (eq status "active")}}User is active.{{else}}User is inactive.{{/if}}',
+        isTemplate: true,
+      });
+      const result1 = await service.applyTemplate(prompt.id, { status: 'active' });
+      expect(result1.content).toBe('User is active.');
+      const result2 = await service.applyTemplate(prompt.id, { status: 'pending' });
+      expect(result2.content).toBe('User is inactive.');
+    });
+  });
 });

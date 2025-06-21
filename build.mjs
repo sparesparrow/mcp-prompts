@@ -15,13 +15,14 @@ esbuild
     bundle: true,
     platform: 'node',
     target: 'node20',
-    format: 'esm',
+    format: 'cjs',
     outdir: 'dist',
+    outExtension: { '.js': '.cjs' },
     logLevel: 'info',
     external: ['pg-native'],
   })
   .then(() => {
-    exec('shx chmod +x dist/index.js dist/scripts/*.js', (error, stdout, stderr) => {
+    exec('shx chmod +x dist/index.cjs dist/scripts/*.cjs', (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         return;

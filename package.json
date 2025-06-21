@@ -2,14 +2,24 @@
   "name": "@sparesparrow/mcp-prompts",
   "version": "1.8.0",
   "description": "A standalone server for managing and serving prompts for the Model Context Protocol (MCP)",
-  "main": "dist/index.js",
+  "main": "dist/index.cjs",
   "type": "module",
   "bin": {
-    "mcp-prompts": "dist/src/index.js"
+    "mcp-prompts": "dist/index.cjs"
   },
   "files": [
-    "dist"
+    "dist",
+    "CHANGELOG.md",
+    "README.md"
   ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparesparrow/mcp-prompts.git"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme",
+  "bugs": {
+    "url": "https://github.com/sparesparrow/mcp-prompts/issues"
+  },
   "scripts": {
     "test": "npm run test:unit && npm run test:integration",
     "lint": "eslint 'src/**/*.ts' && prettier --check .",
@@ -20,8 +30,8 @@
     "clean": "rimraf dist",
     "start": "node dist/scripts/start-server.js",
     "dev": "ts-node --esm src/scripts/start-server.ts",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testRegex=\"(/__tests__/.*|(\\.|/)(unit))\\.(test|spec)\\.tsx?$\"",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testRegex=\"(/__tests__/.*|(\\.|/)(integration))\\.(test|spec)\\.tsx?$\" --forceExit",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --forceExit",
     "test:build": "npm run build && node dist/index.js --version",
     "test:inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "docker": "bash docker/scripts/docker-compose-manager.sh",
@@ -33,7 +43,8 @@
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
     "workflow:run:file": "ts-node src/scripts/workflow-cli.ts workflow run",
     "workflow:save:file": "ts-node src/scripts/workflow-cli.ts workflow save",
-    "workflow:run:id": "ts-node src/scripts/workflow-cli.ts workflow run"
+    "workflow:run:id": "ts-node src/scripts/workflow-cli.ts workflow run",
+    "docs:generate": "typedoc --ignoreCompilerErrors --out docs/api src/index.ts"
   },
   "keywords": [
     "mcp",
@@ -48,14 +59,18 @@
     "@modelcontextprotocol/sdk": "^1.13.0",
     "@modelcontextprotocol/server-postgres": "0.6.2",
     "@sparesparrow/mcp-prompts": "^1.2.42",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "axios": "^1.10.0",
     "cors": "^2.8.5",
     "eventsource": "^4.0.0",
     "express": "^4.21.2",
     "express-rate-limit": "^7.5.0",
     "helmet": "^8.1.0",
+    "handlebars": "^4.7.8",
     "node-fetch": "^2.7.0",
     "pg": "^8.16.2",
+    "proper-lockfile": "^4.1.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0",
@@ -68,12 +83,14 @@
     "@types/eventsource": "^1.1.15",
     "@types/express": "^5.0.3",
     "@types/glob": "^8.1.0",
+    "@types/handlebars": "^4.1.0",
     "@types/jest": "^30.0.0",
     "@types/json-schema": "^7.0.15",
     "@types/node-fetch": "^2.6.12",
     "@types/param-case": "^0.0.29",
     "@types/pg": "^8.15.4",
     "@types/pino": "^7.0.4",
+    "@types/proper-lockfile": "^4.1.4",
     "@types/supertest": "^6.0.3",
     "@types/swagger-jsdoc": "^6.0.4",
     "@types/swagger-ui-express": "^4.1.8",
@@ -94,8 +111,13 @@
     "rimraf": "^6.0.1",
     "shx": "^0.4.0",
     "supertest": "^7.1.1",
-    "ts-jest": "^29.4.0",
+    "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
-  }
+    "typedoc": "^0.28.5",
+    "typescript": "^5.4.5"
+  },
+  "workspaces": [
+    "packages/mcp-prompts-catalog",
+    "packages/mcp-prompts-contracts"
+  ]
 }

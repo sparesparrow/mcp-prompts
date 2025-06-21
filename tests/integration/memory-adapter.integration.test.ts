@@ -69,25 +69,26 @@ describe('MemoryAdapter Integration', () => {
       tags: ['test'],
       updatedAt: now,
       variables: [],
+      version: 1,
     };
 
     await adapter.savePrompt(testPrompt);
 
-    const updatedPrompt = {
+    const updatedPromptData = {
       ...testPrompt,
       content: 'Updated content',
       description: 'Updated description',
       tags: ['test', 'updated'],
       updatedAt: new Date().toISOString(),
+      version: 2,
     };
 
-    await adapter.savePrompt(updatedPrompt);
+    const updatedPrompt = await adapter.updatePrompt('test-prompt-2', updatedPromptData);
 
-    const retrievedPrompt = await adapter.getPrompt('test-prompt-2');
-
-    expect(retrievedPrompt?.description).toBe('Updated description');
-    expect(retrievedPrompt?.content).toBe('Updated content');
-    expect(retrievedPrompt?.tags).toEqual(['test', 'updated']);
+    expect(updatedPrompt?.description).toBe('Updated description');
+    expect(updatedPrompt?.content).toBe('Updated content');
+    expect(updatedPrompt?.tags).toEqual(['test', 'updated']);
+    expect(updatedPrompt?.version).toBe(2);
   });
 
   it('should list all prompts', async () => {
@@ -154,16 +155,9 @@ describe('MemoryAdapter Integration', () => {
 
     // Delete the prompt
     await adapter.deletePrompt('delete-test');
+    const retrieved = await adapter.getPrompt('delete-test');
 
-    // Verify it was deleted - either by returning null or by throwing an error
-    try {
-      const deletedPrompt = await adapter.getPrompt('delete-test');
-      // If it returns a result, it should be null
-      expect(deletedPrompt).toBeNull();
-    } catch (error) {
-      // Or if it throws an error, that's also acceptable
-      expect(error).toBeDefined();
-      expect((error as Error).message).toContain('not found');
-    }
+    // Verify it was deleted
+    expect(retrieved).toBeNull();
   });
 });

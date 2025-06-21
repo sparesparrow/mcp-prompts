@@ -1,0 +1,16 @@
+{
+  "name": "@sparesparrow/mcp-prompts-catalog",
+  "version": "0.1.0",
+  "description": "A curated collection of prompts and templates for the MCP ecosystem.",
+  "main": "index.js",
+  "types": "index.d.ts",
+  "license": "MIT",
+  "exports": {
+    ".": {
+      "require": "./index.js",
+      "import": "./index.js",
+      "types": "./index.d.ts"
+    },
+    "./package.json": "./package.json"
+  }
+} 

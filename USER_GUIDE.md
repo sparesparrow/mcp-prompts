@@ -268,6 +268,156 @@ services:
 
 # MCP-Prompts User Guide
 
+This guide will walk you through setting up the MCP-Prompts server, creating your first prompt and workflow, and integrating it with your tools.
+
+## 📚 Table of Contents
+- [🚀 First Steps: Your First Workflow](#-first-steps-your-first-workflow)
+  - [Step 1: Installation & Setup](#step-1-installation--setup)
+  - [Step 2: Creating Your First Prompt](#step-2-creating-your-first-prompt)
+  - [Step 3: Creating a Workflow](#step-3-creating-a-workflow)
+  - [Step 4: Running the Workflow](#step-4-running-the-workflow)
+- [🐳 Deployment Options](#-deployment-options)
+  - [Local Deployment (npx)](#local-deployment-npx)
+  - [Docker Deployment](#docker-deployment)
+  - [Docker Compose (with PostgreSQL)](#docker-compose-with-postgresql)
+- [🔑 API Key Authentication](#-api-key-authentication)
+- [🩺 Health Check & Troubleshooting](#-health-check--troubleshooting)
+- [🤖 Client Integration](#-client-integration)
+- [🛡️ Production Security Checklist](#-production-security-checklist)
+
+---
+
+## 🚀 First Steps: Your First Workflow
+
+This section will guide you through getting the server running and executing a complete workflow in just a few minutes.
+
+### Step 1: Installation & Setup
+
+The quickest way to get started is with `npx`, which runs the server without a permanent installation.
+
+```bash
+# Run the server with file-based storage
+npx -y @sparesparrow/mcp-prompts
+```
+
+You should see a confirmation that the server is running on `http://localhost:3003`. For other installation methods like Docker, see the [Deployment Options](#-deployment-options) section below.
+
+### Step 2: Creating Your First Prompt
+
+Now, let's create a simple "Hello, World!" prompt. Open a new terminal and use `curl` to send a `POST` request to the `/prompts` endpoint.
+
+```bash
+curl -X POST http://localhost:3003/prompts \
+-H "Content-Type: application/json" \
+-d '{
+  "id": "hello-world-prompt",
+  "name": "Hello World",
+  "content": "You are a helpful assistant. Please respond to the user by saying: {{greeting}}",
+  "isTemplate": true
+}'
+```
+
+You should receive a JSON response confirming the prompt was created.
+
+### Step 3: Creating a Workflow
+
+Next, let's create a workflow that uses this prompt. This workflow will have a single step that runs our "Hello, World!" prompt.
+
+```bash
+curl -X POST http://localhost:3003/workflows \
+-H "Content-Type: application/json" \
+-d '{
+    "id": "hello-workflow",
+    "name": "Hello Workflow",
+    "steps": [
+        {
+            "id": "step1",
+            "type": "prompt",
+            "promptId": "hello-world-prompt",
+            "input": {
+                "greeting": "Hello from your first workflow!"
+            },
+            "output": "final_greeting"
+        }
+    ]
+}'
+```
+This defines a workflow that will execute `hello-world-prompt` and pass "Hello from your first workflow!" as the `greeting` variable.
+
+### Step 4: Running the Workflow
+
+Finally, let's run the workflow. We do this by sending a `POST` request to the `/workflows/run/:id` endpoint.
+
+```bash
+curl -X POST http://localhost:3003/workflows/run/hello-workflow
+```
+
+You should get a result similar to this, showing the final output from your prompt:
+
+```json
+{
+  "success": true,
+  "outputs": {
+    "final_greeting": "You are a helpful assistant. Please respond to the user by saying: Hello from your first workflow!"
+  },
+  "executionId": "some-unique-id"
+}
+```
+
+Congratulations! You have successfully set up the server, created a prompt and a workflow, and executed it.
+
+---
+
+## 🐳 Deployment Options
+
+### Local Deployment (npx)
+```bash
+# Easiest: npx (no install needed)
+npx -y @sparesparrow/mcp-prompts
+```
+
+### Docker Deployment
+```bash
+docker run -d --name mcp-prompts \
+  -p 3003:3003 \
+  -e HTTP_SERVER=true \
+  -e STORAGE_TYPE=file \
+  -v $(pwd)/data:/app/data \
+  sparesparrow/mcp-prompts:latest
+```
+
+### Docker Compose (with PostgreSQL)
+See `docker-compose.yml` in the repository for a full example with PostgreSQL.
+
+---
+
+## 🔑 API Key Authentication
+- For production, set the `API_KEYS` environment variable (e.g., `API_KEYS=key1,key2`).
+- If set, all API requests (except `/health`) must include an `x-api-key` header.
+  ```bash
+  curl -H "x-api-key: yourkey" http://localhost:3003/prompts
+  ```
+
+---
+
+## 🩺 Health Check & Troubleshooting
+- **Health Check:** `curl http://localhost:3003/health`
+- **Logs:** Logs are printed to `stdout`. For Docker, use `docker logs mcp-prompts`.
+
+---
+
+## 🤖 Client Integration
+See the client integration guides in the `docs` folder for step-by-step instructions for tools like LM Studio, Cursor, and LibreChat.
+
+---
+
+## 🛡️ Production Security Checklist
+- [ ] Set strong, unique `API_KEYS`.
+- [ ] Use a reverse proxy (Nginx, Caddy) to provide HTTPS.
+- [ ] Use a persistent storage option (Postgres or Docker volumes).
+- [ ] Regularly back up your data.
+- [ ] Monitor server logs and health.
+
 ## Contributing Screenshots
 We welcome contributions of screenshots to improve this guide! Please:
 - Save images in PNG format.

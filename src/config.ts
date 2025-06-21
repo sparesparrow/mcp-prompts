@@ -106,7 +106,7 @@ export type EnvVars = z.infer<typeof EnvSchema>;
 
 export const McpConfigSchema = EnvSchema.extend({
   storage: z.object({
-    type: z.enum(['file', 'postgres', 'memory']),
+    type: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']),
     promptsDir: z.string(),
     host: z.string().optional(),
     port: z.number().optional(),

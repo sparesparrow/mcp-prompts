@@ -58,4 +58,59 @@ describe('FileAdapter Integration', () => {
   it('should connect successfully', async () => {
     await expect(adapter.connect()).resolves.not.toThrow();
   });
+
+  it('should save and retrieve a prompt', async () => {
+    await adapter.connect();
+    const prompt = {
+      id: 'test',
+      name: 'Test',
+      content: 'Test content',
+      createdAt: 'date',
+      updatedAt: 'date',
+    };
+    await adapter.savePrompt(prompt);
+    const retrieved = await adapter.getPrompt('test');
+    expect(retrieved).toEqual(prompt);
+  });
+
+  it('should update an existing prompt', async () => {
+    await adapter.connect();
+    const originalPrompt = {
+      id: 'update-test',
+      name: 'Update Test',
+      content: 'Original',
+      createdAt: 'date',
+      updatedAt: 'date',
+      version: 1,
+    };
+    await adapter.savePrompt(originalPrompt);
+    const updatedData = {
+      ...originalPrompt,
+      content: 'Updated',
+      version: 2,
+      updatedAt: 'new-date',
+    };
+    const updatedPrompt = await adapter.updatePrompt('update-test', updatedData);
+    expect(updatedPrompt.content).toBe('Updated');
+    expect(updatedPrompt.version).toBe(2);
+    const retrieved = await adapter.getPrompt('update-test');
+    expect(retrieved?.content).toBe('Updated');
+  });
+
+  it('should delete a prompt', async () => {
+    await adapter.connect();
+    const prompt = {
+      id: 'delete-test',
+      name: 'Delete Test',
+      content: 'Delete me',
+      createdAt: 'date',
+      updatedAt: 'date',
+    };
+    await adapter.savePrompt(prompt);
+    let retrieved = await adapter.getPrompt('delete-test');
+    expect(retrieved).toBeDefined();
+    await adapter.deletePrompt('delete-test');
+    retrieved = await adapter.getPrompt('delete-test');
+    expect(retrieved).toBeNull();
+  });
 });
