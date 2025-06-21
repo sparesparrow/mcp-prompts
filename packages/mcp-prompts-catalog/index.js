@@ -25,8 +25,18 @@ function listPrompts(category) {
 
 function loadPrompt(name, category) {
   const file = path.join(promptsDir, category, name + '.json');
-  if (!fs.existsSync(file)) throw new Error(`Prompt not found: ${category}/${name}`);
-  return require(file);
+  try {
+    if (!fs.existsSync(file)) return null;
+    const data = fs.readFileSync(file, 'utf8');
+    return JSON.parse(data);
+  } catch (error) {
+    if (error.code === 'ENOENT') return null;
+    if (error instanceof SyntaxError) {
+      console.error(`Invalid JSON in prompt file: ${file}`);
+      return null;
+    }
+    throw error;
+  }
 }
 
 module.exports = {
