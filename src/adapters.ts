@@ -122,19 +122,40 @@ export class FileAdapter implements StorageAdapter {
       for (const category of categories) {
         const prompts = this.catalog.listPrompts(category);
         if (prompts.includes(id)) {
-          const prompt = this.catalog.loadPrompt(id, category);
+          let prompt;
+          try {
+            prompt = this.catalog.loadPrompt(id, category);
+          } catch (error) {
+            // Node.js best practice: treat ENOENT (file not found) as operational, not fatal
+            // https://nodejs.org/api/errors.html
+            if (error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+              return null;
+            }
+            // For any other error, log and return null
+            console.error(`Error loading catalog prompt ${id} in category ${category}:`, error);
+            return null;
+          }
+          if (
+            !prompt ||
+            typeof prompt !== 'object' ||
+            !('id' in prompt) ||
+            !('name' in prompt) ||
+            !('content' in prompt)
+          ) {
+            return null;
+          }
           try {
             validatePrompt(prompt, true);
             return prompt;
           } catch (error: unknown) {
-            if (error instanceof ValidationError) {
-              console.error(
-                `Validation error for catalog prompt ${id} in category ${category}:`,
-                error.message,
-              );
-            } else {
-              console.error(`Error loading catalog prompt ${id} in category ${category}:`, error);
+            if (
+              error instanceof ValidationError ||
+              (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT')
+            ) {
+              // Validation error or file not found: treat as not found
+              return null;
             }
+            console.error(`Error validating catalog prompt ${id} in category ${category}:`, error);
             return null;
           }
         }
@@ -879,18 +900,51 @@ export class PostgresAdapter implements StorageAdapter {
     return this.connected;
   }
 
+  /**
+   * Expects a 'sequences' table with columns:
+   * id (text, primary key), name (text), description (text), prompt_ids (text[]), created_at (timestamp), updated_at (timestamp), metadata (jsonb)
+   */
   public async getSequence(id: string): Promise<PromptSequence | null> {
-    console.warn(`getSequence not implemented for PostgresAdapter, ID: ${id}`);
-    return null;
+    const res = await this.pool.query('SELECT * FROM sequences WHERE id = $1', [id]);
+    if (res.rows.length === 0) return null;
+    const row = res.rows[0];
+    return {
+      id: row.id,
+      name: row.name,
+      description: row.description,
+      promptIds: row.prompt_ids,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      metadata: row.metadata,
+    };
   }
 
   public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    console.warn('saveSequence not implemented for PostgresAdapter');
-    return sequence;
+    const now = new Date();
+    await this.pool.query(
+      `INSERT INTO sequences (id, name, description, prompt_ids, created_at, updated_at, metadata)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       ON CONFLICT (id) DO UPDATE SET
+         name = EXCLUDED.name,
+         description = EXCLUDED.description,
+         prompt_ids = EXCLUDED.prompt_ids,
+         updated_at = EXCLUDED.updated_at,
+         metadata = EXCLUDED.metadata`,
+      [
+        sequence.id,
+        sequence.name,
+        sequence.description,
+        sequence.promptIds,
+        sequence.createdAt ?? now,
+        now,
+        sequence.metadata ?? {},
+      ],
+    );
+    return this.getSequence(sequence.id) as Promise<PromptSequence>;
   }
 
   public async deleteSequence(id: string): Promise<void> {
-    console.warn(`deleteSequence not implemented for PostgresAdapter, ID: ${id}`);
+    await this.pool.query('DELETE FROM sequences WHERE id = $1', [id]);
   }
 
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
