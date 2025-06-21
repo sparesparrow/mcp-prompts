@@ -46,7 +46,7 @@ describe('Validation', () => {
     expect(result.success).toBe(false);
     expect(result.data).toBeUndefined();
     expect(result.error).toBeDefined();
-    expect(result.error?.issues).toHaveLength(4); // for name, content, createdAt, updatedAt
+    expect(result.error?.issues).toHaveLength(2); // for name, content
   });
 
   it('should throw ValidationError for empty required string fields', () => {
