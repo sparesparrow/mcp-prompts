@@ -14,7 +14,7 @@ import { ValidationError } from './validation.js';
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
   toUpperCase: (str: string) => str.toUpperCase(),
   toLowerCase: (str: string) => str.toLowerCase(),
-  jsonStringify: (obj: any, indent = 2) => JSON.stringify(obj, null, indent),
+  jsonStringify: (obj: any) => JSON.stringify(obj, null, 2),
   join: (arr: any[], sep = ', ') => arr.join(sep),
   eq: (a: any, b: any) => a === b,
 };
