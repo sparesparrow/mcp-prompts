@@ -103,11 +103,17 @@ describe('HTTP Server Integration', () => {
     const deleteRes = await request(baseUrl)
       .delete(`/prompts/${id}`)
       .set('x-api-key', 'test-key');
-    expect(deleteRes.status).toBe(204);
+    expect(deleteRes.status).toBe(200);
+    expect(deleteRes.body.success).toBe(true);
+    expect(deleteRes.body.id).toBe(id);
+    expect(deleteRes.body.message).toBe('Prompt deleted.');
     const getRes = await request(baseUrl)
       .get(`/prompts/${id}`)
       .set('x-api-key', 'test-key');
     expect(getRes.status).toBe(404);
+    expect(getRes.body.success).toBe(false);
+    expect(getRes.body.error.code).toBe('NOT_FOUND');
+    expect(getRes.body.error.message).toBe('Prompt not found.');
   });
 
   it('should return 404 for unknown route', async () => {

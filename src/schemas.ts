@@ -5,17 +5,19 @@ import { z } from 'zod';
  * Server-generated fields like id, createdAt, and updatedAt are excluded.
  */
 const basePromptSchema = z.object({
+  content: z.string()
+    .trim()
+    .min(1, { message: 'Content cannot be empty or whitespace' }),
+  description: z.string().optional(),
   name: z
     .string()
-    .min(1, { message: 'Name cannot be empty' })
-    .transform(val => val.trim()),
-  description: z.string().optional(),
-  content: z.string().min(1, { message: 'Content cannot be empty' }),
+    .trim()
+    .min(1, { message: 'Name cannot be empty' }),
   isTemplate: z.boolean().optional().default(false),
-  variables: z.array(z.union([z.string(), z.object({})])).nullish(),
-  tags: z.array(z.string()).nullish(),
   category: z.string().optional(),
   metadata: z.record(z.unknown()).nullish(),
+  tags: z.array(z.string()).nullish(),
+  variables: z.array(z.union([z.string(), z.object({})])).nullish(),
 });
 
 /**

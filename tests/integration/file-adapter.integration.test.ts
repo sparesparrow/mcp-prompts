@@ -6,6 +6,7 @@ import { FileAdapter } from '../../src/adapters.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TEST_PROMPTS_DIR = path.join(__dirname, '../../test-prompts');
+const testPromptFile = path.join(TEST_PROMPTS_DIR, 'delete-test.json');
 
 /**
  *
@@ -42,12 +43,26 @@ describe('FileAdapter Integration', () => {
     }
     fs.mkdirSync(TEST_PROMPTS_DIR, { recursive: true });
     adapter = new FileAdapter(TEST_PROMPTS_DIR);
+
+    // Clean up before test
+    if (fs.existsSync(testPromptFile)) {
+      fs.unlinkSync(testPromptFile);
+      console.log('[DEBUG] Deleted test prompt file before test:', testPromptFile);
+    }
   });
 
   afterAll(() => {
     // Clean up after all tests
     if (fs.existsSync(TEST_PROMPTS_DIR)) {
       removeDirRecursive(TEST_PROMPTS_DIR);
+    }
+  });
+
+  afterEach(() => {
+    // Clean up after test
+    if (fs.existsSync(testPromptFile)) {
+      fs.unlinkSync(testPromptFile);
+      console.log('[DEBUG] Deleted test prompt file after test:', testPromptFile);
     }
   });
 
@@ -107,9 +122,16 @@ describe('FileAdapter Integration', () => {
       updatedAt: 'date',
     };
     await adapter.savePrompt(prompt);
+    console.log('[DEBUG] Saved prompt:', testPromptFile, 'Exists:', fs.existsSync(testPromptFile));
     let retrieved = await adapter.getPrompt('delete-test');
     expect(retrieved).toBeDefined();
     await adapter.deletePrompt('delete-test');
+    console.log(
+      '[DEBUG] Deleted prompt:',
+      testPromptFile,
+      'Exists:',
+      fs.existsSync(testPromptFile)
+    );
     retrieved = await adapter.getPrompt('delete-test');
     expect(retrieved).toBeNull();
   });

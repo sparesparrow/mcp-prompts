@@ -108,10 +108,11 @@ describe('HTTP Server', () => {
       const response = await request(server).post('/prompts').set('x-api-key', apiKey).send({});
 
       expect(response.status).toBe(400);
-      expect(response.body.error).toBe(true);
-      expect(response.body.message).toBe('Invalid prompt data');
-      expect(Array.isArray(response.body.details)).toBe(true);
-      expect(response.body.details.length).toBeGreaterThan(0);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('VALIDATION_ERROR');
+      expect(response.body.error.message).toBe('Invalid prompt data');
+      expect(Array.isArray(response.body.error.details)).toBe(true);
+      expect(response.body.error.details.length).toBeGreaterThan(0);
     });
 
     it('should get a prompt', async () => {
@@ -140,7 +141,9 @@ describe('HTTP Server', () => {
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(404);
-      expect(response.body.error).toBe(true);
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('NOT_FOUND');
+      expect(response.body.error.message).toBe('Prompt not found.');
     });
   });
 
@@ -152,8 +155,9 @@ describe('HTTP Server', () => {
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
 
       expect(response.status).toBe(500);
-      expect(response.body.error).toBe(true);
-      expect(response.body.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.success).toBe(false);
+      expect(response.body.error.code).toBe('INTERNAL_SERVER_ERROR');
+      expect(response.body.error.message).toBe('Database error');
     });
 
     it('should handle 404 for unknown routes', async () => {
@@ -162,9 +166,11 @@ describe('HTTP Server', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
-        code: 'NOT_FOUND',
-        error: true,
-        message: 'Resource not found',
+        success: false,
+        error: {
+          code: 'NOT_FOUND',
+          message: 'Resource not found',
+        },
       });
     });
   });
@@ -174,9 +180,11 @@ describe('HTTP Server', () => {
     const res = await request(server).get('/unknown-route').set('x-api-key', apiKey);
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
-      code: 'NOT_FOUND',
-      error: true,
-      message: 'Resource not found',
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Resource not found',
+      },
     });
   });
 });
