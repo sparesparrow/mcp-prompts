@@ -39,7 +39,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 - [x] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
 - [ ] **Fix HTTP Server error handling unit tests** (`src/__tests__/http-server.test.ts`)
 - [x] **Fix Validation unit tests** (`tests/unit/validation.unit.test.ts`)
-- [ ] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)
+- [x] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)
 - [ ] **Fix PromptService template helpers unit tests** (`tests/unit/prompt-service.unit.test.ts`)
 
 #### 3. Migration Preparation

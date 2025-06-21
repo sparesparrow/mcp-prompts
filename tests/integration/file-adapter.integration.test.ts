@@ -1,6 +1,8 @@
 import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import fsp from 'node:fs/promises';
+import os from 'node:os';
 
 import { FileAdapter } from '../../src/adapters.js';
 import { Prompt } from '../../src/interfaces';
@@ -30,7 +32,7 @@ function removeDirRecursive(dirPath: string) {
   }
 }
 
-describe.skip('FileAdapter Integration', () => {
+describe('FileAdapter Integration', () => {
   beforeAll(() => {
     // Create a unique directory for this test run
     if (!fs.existsSync(TEST_DIR_BASE)) {
@@ -95,9 +97,15 @@ describe.skip('FileAdapter Integration', () => {
     expect(updatedPrompt).toBeDefined();
     expect(updatedPrompt.content).toBe('Updated content');
 
-    const retrieved = await adapter.getPrompt(savedPrompt.id, savedPrompt.version);
+    const retrieved = await adapter.getPrompt(savedPrompt.id, updatedPrompt.version);
     expect(retrieved).toBeDefined();
     expect(retrieved?.content).toBe('Updated content');
+    expect(retrieved?.version).toBe(2);
+
+    const originalRetrieved = await adapter.getPrompt(savedPrompt.id, savedPrompt.version);
+    expect(originalRetrieved).toBeDefined();
+    expect(originalRetrieved?.content).toBe('Initial content');
+    expect(originalRetrieved?.version).toBe(1);
   });
 
   it('should list all prompts (versioned)', async () => {
@@ -116,14 +124,20 @@ describe.skip('FileAdapter Integration', () => {
     expect(all.some(p => p.id === savedPrompts[1].id)).toBe(true);
   });
 
-  it('should delete a prompt (versioned)', async () => {
+  it('should delete all versions of a prompt', async () => {
     const promptData = {
       name: 'Delete Test',
       content: 'To be deleted',
     };
-    const savedPrompt = await adapter.savePrompt(promptData);
-    await adapter.deletePrompt(savedPrompt.id, savedPrompt.version);
-    const retrieved = await adapter.getPrompt(savedPrompt.id, savedPrompt.version);
-    expect(retrieved).toBeNull();
+    // Save two versions
+    const savedPrompt1 = await adapter.savePrompt(promptData);
+    const savedPrompt2 = await adapter.updatePrompt(savedPrompt1.id, savedPrompt1.version, { content: 'v2' });
+
+    // Delete the whole prompt (all versions)
+    await adapter.deletePrompt(savedPrompt1.id);
+
+    // Verify no versions are left
+    const versions = await adapter.listPromptVersions(savedPrompt1.id);
+    expect(versions).toEqual([]);
   });
 });
