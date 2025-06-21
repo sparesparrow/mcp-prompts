@@ -34,8 +34,8 @@ beforeAll(async () => {
   const workflowService = new WorkflowService(adapter, promptService);
   server = await startHttpServer(
     null,
-    { host: '127.0.0.1', port: 0 },
-    { promptService, sequenceService, workflowService },
+    { host: '122.0.0.1', port: 0 },
+    { promptService, sequenceService, workflowService, storageAdapters: [adapter] },
   );
   const address = server.address();
   baseUrl = `http://127.0.0.1:${address.port}`;
