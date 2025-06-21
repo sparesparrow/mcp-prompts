@@ -194,10 +194,15 @@ export class FileAdapter implements StorageAdapter {
     try {
       await fs.unlink(filePath);
     } catch (error: unknown) {
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
-        console.error(`Error deleting prompt ${id} from file:`, error);
-        throw error;
+      // Best practice: treat ENOENT (file not found) as a successful delete (idempotent)
+      // See: https://medium.com/@agadallh5/the-definitive-guide-to-resolving-the-enoent-error-across-platforms-and-tools-e81aad131103
+      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+        // Optionally log for debugging
+        // console.warn(`Prompt file ${filePath} does not exist, nothing to delete.`);
+        return;
       }
+      console.error(`Error deleting prompt ${id} from file:`, error);
+      throw error;
     }
   }
 
