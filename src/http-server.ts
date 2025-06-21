@@ -191,8 +191,29 @@ export async function startHttpServer(
   });
 
   // Health check endpoint
-  app.get('/health', (req, res) => {
-    res.json({ status: 'ok' });
+  app.get('/health', async (req, res) => {
+    try {
+      const storage = services.promptService.getStorage();
+      const healthy = await storage.healthCheck?.();
+      if (!healthy) {
+        res.status(503).json({
+          status: 'error',
+          storage: 'unhealthy',
+        });
+        return;
+      }
+      res.json({
+        status: 'ok',
+        version: process.env.npm_package_version || 'dev',
+        storage: 'healthy',
+      });
+    } catch (err) {
+      res.status(503).json({
+        status: 'error',
+        storage: 'unhealthy',
+        message: err instanceof Error ? err.message : String(err),
+      });
+    }
   });
 
   // Add API key authentication middleware
@@ -222,10 +243,17 @@ export async function startHttpServer(
     '/prompts',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        // Zod validation
         const parseResult = promptSchemas.create.safeParse(req.body);
         if (!parseResult.success) {
-          res.status(400).json({ error: true, message: 'Invalid prompt data', details: parseResult.error.errors });
+          res.status(400)
+            .json({
+              success: false,
+              error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid prompt data',
+                details: parseResult.error.errors,
+              },
+            });
           return;
         }
         const { name, content, isTemplate, description, variables, tags, category, createdAt, updatedAt, version } = parseResult.data;
@@ -241,13 +269,31 @@ export async function startHttpServer(
           updatedAt,
           version,
         });
-        res.status(201).json(prompt);
+        res.status(201).json({
+          success: true,
+          id: prompt.id,
+          name: prompt.name,
+          content: prompt.content,
+          isTemplate: prompt.isTemplate,
+          description: prompt.description,
+          variables: prompt.variables,
+          tags: prompt.tags,
+          category: prompt.category,
+          createdAt: prompt.createdAt,
+          updatedAt: prompt.updatedAt,
+          version: prompt.version,
+        });
       } catch (err: any) {
-        if (err && typeof err === 'object' && 'details' in err) {
-          res.status(400).json({ error: true, message: err.message, details: err.details });
-        } else {
-          next(err);
-        }
+        res.status(400)
+          .json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: err.message,
+              details: err.details,
+            },
+          });
+        return;
       }
     },
   );
@@ -279,10 +325,30 @@ export async function startHttpServer(
       try {
         const prompt = await services.promptService.getPrompt(req.params.id);
         if (!prompt) {
-          res.status(404).json({ error: true, message: 'Prompt not found.' });
+          res.status(404)
+            .json({
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: 'Prompt not found.',
+              },
+            });
           return;
         }
-        res.json(prompt);
+        res.json({
+          success: true,
+          id: prompt.id,
+          name: prompt.name,
+          content: prompt.content,
+          isTemplate: prompt.isTemplate,
+          description: prompt.description,
+          variables: prompt.variables,
+          tags: prompt.tags,
+          category: prompt.category,
+          createdAt: prompt.createdAt,
+          updatedAt: prompt.updatedAt,
+          version: prompt.version,
+        });
       } catch (err) {
         next(err);
       }
@@ -320,18 +386,57 @@ export async function startHttpServer(
     '/prompts/:id',
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
-        const updated = await services.promptService.updatePrompt(req.params.id, req.body);
-        if (!updated) {
-          res.status(404).json({ error: true, message: 'Prompt not found.' });
+        // Validate update payload
+        const parseResult = promptSchemas.update.safeParse(req.body);
+        if (!parseResult.success) {
+          res.status(400)
+            .json({
+              success: false,
+              error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid prompt update data',
+                details: parseResult.error.errors,
+              },
+            });
           return;
         }
-        res.json(updated);
-      } catch (err: any) {
-        if (err && typeof err === 'object' && 'details' in err) {
-          res.status(400).json({ error: true, message: err.message, details: err.details });
-        } else {
-          next(err);
+        const updated = await services.promptService.updatePrompt(req.params.id, parseResult.data);
+        if (!updated) {
+          res.status(404)
+            .json({
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: 'Prompt not found.',
+              },
+            });
+          return;
         }
+        res.json({
+          success: true,
+          id: updated.id,
+          name: updated.name,
+          content: updated.content,
+          isTemplate: updated.isTemplate,
+          description: updated.description,
+          variables: updated.variables,
+          tags: updated.tags,
+          category: updated.category,
+          createdAt: updated.createdAt,
+          updatedAt: updated.updatedAt,
+          version: updated.version,
+        });
+      } catch (err: any) {
+        res.status(400)
+          .json({
+            success: false,
+            error: {
+              code: 'VALIDATION_ERROR',
+              message: err.message,
+              details: err.details,
+            },
+          });
+        return;
       }
     },
   );
@@ -358,9 +463,9 @@ export async function startHttpServer(
     async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       try {
         await services.promptService.deletePrompt(req.params.id);
-        res.status(204).end();
+        res.json({ success: true, id: req.params.id, message: 'Prompt deleted.' });
       } catch (err) {
-        res.status(404).json({ error: true, message: 'Prompt not found.' });
+        res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found.' } });
       }
     },
   );
@@ -426,11 +531,25 @@ export async function startHttpServer(
       try {
         const workflow = req.body;
         if (!services.workflowService.validateWorkflow(workflow)) {
-          res.status(400).json({ error: true, message: 'Invalid workflow definition.' });
+          res.status(400)
+            .json({
+              success: false,
+              error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Invalid workflow definition.',
+              },
+            });
           return;
         }
         if (!workflow.id || typeof workflow.id !== 'string') {
-          res.status(400).json({ error: true, message: 'Workflow must have a string id.' });
+          res.status(400)
+            .json({
+              success: false,
+              error: {
+                code: 'VALIDATION_ERROR',
+                message: 'Workflow must have a string id.',
+              },
+            });
           return;
         }
         saveWorkflowToFile(workflow);
@@ -452,7 +571,14 @@ export async function startHttpServer(
       try {
         const workflow = loadWorkflowFromFile(req.params.id);
         if (!workflow) {
-          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          res.status(404)
+            .json({
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: 'Workflow not found.',
+              },
+            });
           return;
         }
         res.json(workflow);
@@ -473,17 +599,28 @@ export async function startHttpServer(
       const userId = (req.headers['x-user-id'] as string) || 'anonymous';
       const workflowId = req.params.id;
       if (!checkWorkflowRateLimit(userId)) {
-        res.status(429).json({
-          error: true,
-          message: 'Too many concurrent workflows. Please wait and try again.',
-        });
+        res.status(429)
+          .json({
+            success: false,
+            error: {
+              code: 'RATE_LIMIT',
+              message: 'Too many concurrent workflows. Please wait and try again.',
+            },
+          });
         return;
       }
       let result;
       try {
         const workflow = loadWorkflowFromFile(workflowId);
         if (!workflow) {
-          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          res.status(404)
+            .json({
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: 'Workflow not found.',
+              },
+            });
           return;
         }
         // Audit: workflow start
@@ -545,11 +682,22 @@ export async function startHttpServer(
       try {
         const file = path.join(WORKFLOW_DIR, `${req.params.id}.json`);
         if (!fs.existsSync(file)) {
-          res.status(404).json({ error: true, message: 'Workflow not found.' });
+          res.status(404)
+            .json({
+              success: false,
+              error: {
+                code: 'NOT_FOUND',
+                message: 'Workflow not found.',
+              },
+            });
           return;
         }
         fs.unlinkSync(file);
-        res.json({ id: req.params.id, message: 'Workflow deleted.', success: true });
+        res.json({
+          success: true,
+          id: req.params.id,
+          message: 'Workflow deleted.',
+        });
       } catch (err) {
         next(err);
       }
@@ -564,25 +712,53 @@ export async function startHttpServer(
   // Add this after all other routes, before the error handler
   app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-  // Global error handler middleware
+  // Global 404 handler middleware
   app.use((req: express.Request, res: express.Response) => {
     res.status(404).json({
-      code: 'NOT_FOUND',
-      error: true,
-      message: 'Resource not found',
+      success: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Resource not found',
+      },
     });
   });
 
   // Global error handler middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    const status = typeof err.status === 'number' ? err.status : 500;
-    const code = typeof err.code === 'string' ? err.code : 'INTERNAL_ERROR';
-    const details = err.details || undefined;
+    // Handle Zod validation errors and custom ValidationError
+    if (err?.name === 'ValidationError' || err?.name === 'ZodError') {
+      res.status(400).json({
+        success: false,
+        error: {
+          code: err.code || 'VALIDATION_ERROR',
+          message: err.message,
+          details: err.issues || err.details,
+        },
+      });
+      return;
+    }
+    let status = 500;
+    let code = 'INTERNAL_SERVER_ERROR';
+    let details = err.details || undefined;
+    if (err && typeof err === 'object') {
+      if (typeof err.statusCode === 'number') {
+        status = err.statusCode;
+      } else if (typeof err.status === 'number') {
+        status = err.status;
+      }
+      if (typeof err.code === 'string') {
+        code = err.code;
+      } else if (status !== 500) {
+        code = (err.name || 'ERROR').toUpperCase();
+      }
+    }
     res.status(status).json({
-      code,
-      details,
-      error: true,
-      message: err instanceof Error ? err.message : String(err),
+      success: false,
+      error: {
+        code,
+        message: err.message || 'Internal server error',
+        details,
+      },
     });
   });
 

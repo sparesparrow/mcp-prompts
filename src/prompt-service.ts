@@ -48,13 +48,67 @@ export class PromptService {
   }
 
   public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
+    const id = args.name.toLowerCase().replace(/\s+/g, '-');
+    // Check for duplicate prompt ID
+    const existing = await this.storage.getPrompt(id);
+    if (existing) {
+      throw new ValidationError(`Prompt with id '${id}' already exists.`, []);
+    }
     const prompt: Prompt = {
-      id: args.name.toLowerCase().replace(/\s+/g, '-'),
+      id,
       ...args,
       createdAt: args.createdAt ?? new Date().toISOString(),
       updatedAt: args.updatedAt ?? new Date().toISOString(),
       version: args.version ?? 1,
     };
+
+    // Template variable validation
+    if (args.isTemplate && args.variables && args.content) {
+      // Extract variables from template content
+      const variablePattern = /{{\s*([\w.]+)\s*}}/g;
+      const foundVars = new Set<string>();
+      let match;
+      while ((match = variablePattern.exec(args.content)) !== null) {
+        foundVars.add(match[1]);
+      }
+      const declaredVars = Array.isArray(args.variables)
+        ? args.variables.map(v =>
+            typeof v === 'string'
+              ? v
+              : typeof v === 'object' && v !== null && 'name' in v
+                ? (v as { name: string }).name
+                : '',
+          )
+        : [];
+      const missingInDeclared = Array.from(foundVars).filter(v => !declaredVars.includes(v));
+      const extraInDeclared = declaredVars.filter(v => !foundVars.has(v));
+      if (missingInDeclared.length > 0 || extraInDeclared.length > 0) {
+        throw new ValidationError(
+          `Template variable mismatch: missing in declared: [${missingInDeclared.join(', ')}], extra in declared: [${extraInDeclared.join(', ')}]`,
+          [
+            ...(missingInDeclared.length > 0
+              ? [
+                  {
+                    code: 'custom' as const,
+                    path: ['variables'] as (string | number)[],
+                    message: `Missing variables: ${missingInDeclared.join(', ')}`,
+                  },
+                ]
+              : []),
+            ...(extraInDeclared.length > 0
+              ? [
+                  {
+                    code: 'custom' as const,
+                    path: ['variables'] as (string | number)[],
+                    message: `Extra variables: ${extraInDeclared.join(', ')}`,
+                  },
+                ]
+              : []),
+          ].flat(),
+        );
+      }
+    }
+
     return this.storage.savePrompt(prompt);
   }
 
@@ -217,5 +271,9 @@ export class PromptService {
   // Alias for interface compatibility
   public async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
     return this.createPrompt(data as any);
+  }
+
+  public getStorage(): StorageAdapter {
+    return this.storage;
   }
 }

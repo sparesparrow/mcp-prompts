@@ -131,10 +131,12 @@ export class FileAdapter implements StorageAdapter {
             if (error && typeof error === 'object' && (error as NodeJS.ErrnoException).code === 'ENOENT') {
               return null;
             }
-            // For any other error, log and return null
+            // For other errors, log and return null
             console.error(`Error loading catalog prompt ${id} in category ${category}:`, error);
             return null;
           }
+          if (!prompt) return null;
+          // Only now check properties and validate
           if (
             !prompt ||
             typeof prompt !== 'object' ||
@@ -144,6 +146,7 @@ export class FileAdapter implements StorageAdapter {
           ) {
             return null;
           }
+          console.debug('[FileAdapter.getPrompt] About to validate prompt:', prompt);
           try {
             validatePrompt(prompt, true);
             return prompt;
@@ -155,7 +158,7 @@ export class FileAdapter implements StorageAdapter {
               // Validation error or file not found: treat as not found
               return null;
             }
-            console.error(`Error validating catalog prompt ${id} in category ${category}:`, error);
+            console.error(`Error loading catalog prompt ${id} in category ${category}:`, error);
             return null;
           }
         }
