@@ -1,3 +1,4 @@
+import { fail } from 'assert';
 import { mock } from 'jest-mock-extended';
 import type { StorageAdapter } from '../../src/interfaces.js';
 import { PromptService } from '../../src/prompt-service.js';
@@ -125,7 +126,12 @@ describe('PromptService', () => {
       isTemplate: false,
       name: '', // invalid
     };
-    await expect(service.createPrompt(invalidPromptData)).rejects.toThrow(AppError);
+    try {
+      await service.createPrompt(invalidPromptData);
+      fail('Expected createPrompt to throw an AppError');
+    } catch (e: unknown) {
+      expect(e).toBeInstanceOf(AppError);
+    }
   });
 
   describe('Conditional Templating', () => {
@@ -194,7 +200,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const result = await service.applyTemplate('helper-upper', {});
       expect(result.content).toBe('HELLO');
     });
@@ -209,7 +215,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const result = await service.applyTemplate('helper-lower', {});
       expect(result.content).toBe('world');
     });
@@ -224,7 +230,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const data = { a: 1, b: 'test' };
       const result = await service.applyTemplate('helper-json', { data });
       expect(result.content).toBe(JSON.stringify(data, null, 2));
@@ -240,7 +246,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const error = new Error('test error');
       const result = await service.applyTemplate('helper-json-error', { data: error });
       const parsed = JSON.parse(result.content);
@@ -259,7 +265,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const result = await service.applyTemplate('helper-join', { items: ['a', 'b', 'c'] });
       expect(result.content).toBe('a, b, c');
     });
@@ -274,7 +280,7 @@ describe('PromptService', () => {
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
-      mockAdapter.getPrompt.mockResolvedValueOnce(prompt);
+      mockAdapter.getPrompt.mockResolvedValue(prompt);
       const result1 = await service.applyTemplate('helper-eq', { status: 'active' });
       expect(result1.content).toBe('User is active.');
       const result2 = await service.applyTemplate('helper-eq', { status: 'pending' });

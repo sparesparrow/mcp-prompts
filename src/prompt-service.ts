@@ -8,7 +8,8 @@ import Handlebars from 'handlebars';
 import type { StorageAdapter } from './interfaces.js';
 import type { ApplyTemplateResult, Prompt } from './interfaces.js';
 import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
-import { defaultPrompts, promptSchemas } from './prompts.js';
+import * as Prompts from './prompts.js';
+import { promptSchemas } from './schemas.js';
 import { DuplicateError, AppError } from './errors.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
 import { config } from './config.js';
@@ -44,7 +45,7 @@ export class PromptService {
     const existingPrompts = await this.listPrompts({});
     if (existingPrompts.length === 0) {
       await Promise.all(
-        Object.values(defaultPrompts).map(prompt => this.createPrompt(prompt as CreatePromptArgs)),
+        Object.values(Prompts.defaultPrompts).map(prompt => this.createPrompt(prompt as CreatePromptArgs)),
       );
     }
   }

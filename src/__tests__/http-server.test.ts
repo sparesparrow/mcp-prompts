@@ -110,7 +110,7 @@ describe('HTTP Server', () => {
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
-      expect(response.body.error.message).toBe('Invalid prompt data');
+      expect(response.body.error.message).toBe('Invalid input data.');
       expect(Array.isArray(response.body.error.details)).toBe(true);
       expect(response.body.error.details.length).toBeGreaterThan(0);
     });
