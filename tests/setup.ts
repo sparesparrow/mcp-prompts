@@ -28,6 +28,8 @@ export function closeServer(server: any): Promise<void> {
       resolve();
     }, 500);
 
+    server.keepAliveTimeout = 1;
+
     server.close((err: any) => {
       clearTimeout(timeout);
       if (err) {
