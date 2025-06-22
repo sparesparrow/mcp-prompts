@@ -76,7 +76,7 @@ export class PromptService {
       throw new DuplicateError(`Prompt with id '${id}' and version '${version}' already exists.`);
     }
     const prompt: Prompt = {
-      ...parseResult.data,
+      ...(parseResult.data as any),
       id,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -160,7 +160,7 @@ export class PromptService {
       throw new NotFoundError(`Prompt not found: ${id} v${version}`);
     }
     const updated: Prompt = {
-      ...existing,
+      ...(existing as any),
       ...args,
       id,
       // Preserve version
@@ -218,7 +218,7 @@ export class PromptService {
       throw new NotFoundError(`Template prompt not found: ${id} v${version ?? 'latest'}`);
     }
     if (!prompt.isTemplate) {
-      throw new AppError(`Prompt is not a template: ${id}`, 400, 'BAD_REQUEST');
+      throw new AppError(`Prompt is not a template: ${id}`, 400);
     }
 
     const content = this.processTemplate(prompt.content, variables);

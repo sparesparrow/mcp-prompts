@@ -9,6 +9,7 @@ import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
 import type { SequenceService } from '../../src/sequence-service.js';
 import { WorkflowServiceImpl as WorkflowService } from '../../src/workflow-service.js';
+import { closeRedisClient } from '../../src/utils.js';
 import { closeServer } from '../setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -56,6 +57,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeServer(server);
+  await closeRedisClient();
   await new Promise(resolve => setTimeout(resolve, 100));
 });
 

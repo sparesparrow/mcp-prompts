@@ -143,7 +143,7 @@ export class FileAdapter implements StorageAdapter {
       id,
       version: newVersion,
       ...parsedData,
-      variables: parsedData.variables ?? undefined,
+      variables: parsedData.variables as any ?? undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -221,7 +221,7 @@ export class FileAdapter implements StorageAdapter {
       ...updatedData,
       id,
       version,
-      variables: updatedData.variables ?? existingPrompt.variables,
+      variables: updatedData.variables as any ?? existingPrompt.variables,
       updatedAt: new Date().toISOString(),
     };
 
@@ -882,7 +882,7 @@ export class PostgresAdapter implements StorageAdapter {
         await this.setPromptTags(promptId, updatesToApply.tags);
       }
       if (updatesToApply.variables) {
-        await this.setTemplateVariables(promptId, this.extractVariableNames(updatesToApply.variables));
+        await this.setTemplateVariables(promptId, this.extractVariableNames(updatesToApply.variables as any));
       }
 
       await client.query('COMMIT');
