@@ -1,0 +1,49 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Debugging and Refreshing Context
+
+Use this guide to diagnose and resolve issues like bugs, test failures, or unexpected behavior.
+
+---
+
+### Previous Problem Areas
+
+When debugging, pay special attention to these files, which have been sources of issues in the past:
+- **Adapters**: The `PostgresAdapter` and `FileAdapter` in [src/adapters.ts](mdc:src/adapters.ts) have had significant bugs. Always verify their logic.
+- **Schemas**: There have been conflicts between [src/schemas.ts](mdc:src/schemas.ts) and the legacy `src/prompts.ts`. Ensure you are using the correct, consolidated schemas from `src/schemas.ts`.
+- **Integration Tests**: [tests/integration/http-server.integration.test.ts](mdc:tests/integration/http-server.integration.test.ts) has contained incorrect test logic. Validate test data, HTTP methods, and state management.
+- **Workflows**: The workflow implementation in [src/workflow-service.ts](mdc:src/workflow-service.ts) has had bugs.
+- **Test Setup**: The `closeServer` function in `tests/setup.ts` caused open handles. Be mindful of test setup and teardown.
+
+---
+
+### Systematic Diagnosis and Resolution
+
+1.  **Collect Precise Context**:
+    *   Gather all relevant details: error messages, logs, stack traces, and observed behaviors.
+    *   Run the test suite with `npm test` to see if the issue is covered by existing tests.
+    *   Pinpoint affected files using `grep_search` for exact terms or `file_search`.
+
+2.  **Investigate Root Causes**:
+    *   List at least three plausible causes, spanning code logic, dependencies, or configuration.
+    *   Validate each hypothesis by inspecting code, especially in the "Previous Problem Areas" listed above.
+    *   A common issue is Jest detecting open handles. Use `npx jest --detectOpenHandles` to help diagnose these.
+
+3.  **Reuse Existing Patterns**:
+    *   Search the codebase for prior fixes or similar issues already addressed.
+    *   Identify reusable utilities or error-handling strategies that align with project conventions.
+
+4.  **Analyze Impact**:
+    *   Trace all affected dependencies to assess the issue's scope.
+    *   Determine if it's a localized bug or a symptom of a broader design flaw.
+
+5.  **Propose Targeted Fixes**:
+    *   Suggest specific, minimal changes. Provide file paths, line numbers, and code snippets.
+    *   Justify each fix with clear reasoning, linking it to stability, reusability, or system alignment.
+
+6.  **Validate and Monitor**:
+    *   Outline test cases—normal, edge, and failure scenarios—to verify the fix.
+    *   Recommend validation methods: new or updated unit/integration tests are preferred.

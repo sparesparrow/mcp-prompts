@@ -4,15 +4,19 @@
  */
 
 import Handlebars from 'handlebars';
+import { z } from 'zod';
 
 import { config } from './config.js';
-import { AppError, DuplicateError } from './errors.js';
-import type { StorageAdapter } from './interfaces.js';
-import type { ApplyTemplateResult, Prompt } from './interfaces.js';
-import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
+import { AppError, DuplicateError, NotFoundError, ValidationError } from './errors.js';
+import type { StorageAdapter, ApplyTemplateResult, Prompt, CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './interfaces.js';
 import * as Prompts from './prompts.js';
 import { promptSchemas } from './schemas.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
+
+// Derive types from the single source of truth
+type CreatePromptArgs = z.infer<typeof promptSchemas.create>;
+type UpdatePromptArgs = z.infer<typeof promptSchemas.update>;
+type ListPromptsArgs = z.infer<typeof promptSchemas.list>;
 
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
   eq: (a: any, b: any) => a === b,
@@ -59,13 +63,13 @@ export class PromptService {
   public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
     const parseResult = promptSchemas.create.safeParse(args);
     if (!parseResult.success) {
-      throw new AppError('Invalid prompt data', 400, 'VALIDATION_ERROR', parseResult.error.issues);
+      throw new ValidationError('Invalid prompt data', parseResult.error.issues);
     }
 
-    const { name, version: inputVersion } = parseResult.data;
+    const { name } = parseResult.data;
 
     const id = name.toLowerCase().replace(/\s+/g, '-');
-    const version = inputVersion ?? 1;
+    const version = 1;
     // Check for duplicate prompt ID/version
     const existing = await this.storage.getPrompt(id, version);
     if (existing) {
@@ -73,9 +77,9 @@ export class PromptService {
     }
     const prompt: Prompt = {
       ...parseResult.data,
-      createdAt: args.createdAt ?? new Date().toISOString(),
       id,
-      updatedAt: args.updatedAt ?? new Date().toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
       version,
     };
 
@@ -100,10 +104,8 @@ export class PromptService {
       const missingInDeclared = Array.from(foundVars).filter(v => !declaredVars.includes(v));
       const extraInDeclared = declaredVars.filter(v => !foundVars.has(v));
       if (missingInDeclared.length > 0 || extraInDeclared.length > 0) {
-        throw new AppError(
+        throw new ValidationError(
           `Template variable mismatch: missing in declared: [${missingInDeclared.join(', ')}], extra in declared: [${extraInDeclared.join(', ')}]`,
-          400,
-          'VALIDATION_ERROR',
           [
             ...(missingInDeclared.length > 0
               ? [
@@ -155,7 +157,7 @@ export class PromptService {
   ): Promise<Prompt> {
     const existing = await this.storage.getPrompt(id, version);
     if (!existing) {
-      throw new AppError(`Prompt not found: ${id} v${version}`, 404, 'NOT_FOUND');
+      throw new NotFoundError(`Prompt not found: ${id} v${version}`);
     }
     const updated: Prompt = {
       ...existing,
@@ -173,12 +175,14 @@ export class PromptService {
 
   /**
    * Delete a specific version of a prompt, or all versions if version is omitted.
-   * @param id
-   * @param version
+   * Returns true if a deletion occurred, false otherwise.
    */
-  public async deletePrompt(id: string, version?: number): Promise<void> {
-    await this.storage.deletePrompt(id, version);
-    await this.invalidatePromptCache(id);
+  public async deletePrompt(id: string, version?: number): Promise<boolean> {
+    const deleted = await this.storage.deletePrompt(id, version);
+    if (deleted) {
+      await this.invalidatePromptCache(id);
+    }
+    return deleted;
   }
 
   /**
@@ -211,14 +215,10 @@ export class PromptService {
   ): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id, version);
     if (!prompt) {
-      throw new AppError(
-        `Template prompt not found: ${id} v${version ?? 'latest'}`,
-        404,
-        'NOT_FOUND',
-      );
+      throw new NotFoundError(`Template prompt not found: ${id} v${version ?? 'latest'}`);
     }
     if (!prompt.isTemplate) {
-      throw new Error(`Prompt is not a template: ${id}`);
+      throw new AppError(`Prompt is not a template: ${id}`, 400, 'BAD_REQUEST');
     }
 
     const content = this.processTemplate(prompt.content, variables);
@@ -363,8 +363,12 @@ export class PromptService {
     const results: Array<{ success: boolean; id: string; error?: string }> = [];
     for (const id of ids) {
       try {
-        await this.deletePrompt(id);
-        results.push({ id, success: true });
+        const deleted = await this.deletePrompt(id);
+        if (deleted) {
+          results.push({ success: true, id });
+        } else {
+          results.push({ success: false, id, error: 'Prompt not found' });
+        }
       } catch (err: any) {
         results.push({ error: err?.message || 'Unknown error', id, success: false });
       }

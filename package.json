@@ -22,7 +22,7 @@
   },
   "scripts": {
     "test": "npm run test:unit && npm run test:integration",
-    "lint": "eslint src/**/*.ts && prettier --check .",
+    "lint": "eslint \"src/**/*.ts\" && prettier --check .",
     "validate:prompts": "ts-node src/scripts/validate-prompts.ts",
     "build": "node build.mjs",
     "prepare": "npm run build",
@@ -30,8 +30,8 @@
     "clean": "rimraf dist",
     "start": "node dist/scripts/start-server.js",
     "dev": "ts-node --esm src/scripts/start-server.ts",
-    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern='tests/unit|src/__tests__' --detectOpenHandles --forceExit",
-    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern='tests/integration' --forceExit --detectOpenHandles",
+    "test:unit": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=\"tests/unit|src/__tests__\" --detectOpenHandles --forceExit",
+    "test:integration": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=\"tests/integration\" --runInBand --forceExit --detectOpenHandles",
     "test:build": "npm run build && node dist/index.js --version",
     "test:inspector": "npx @modelcontextprotocol/inspector node dist/index.js",
     "docker": "bash docker/scripts/docker-compose-manager.sh",
@@ -89,6 +89,7 @@
     "@types/json-schema": "^7.0.15",
     "@types/node-fetch": "^2.6.12",
     "@types/param-case": "^0.0.29",
+    "pino-pretty": "10.2.0",
     "@types/pg": "^8.15.4",
     "@types/pino": "^7.0.4",
     "@types/proper-lockfile": "^4.1.4",
@@ -122,4 +123,4 @@
     "packages/mcp-prompts-catalog",
     "packages/mcp-prompts-contracts"
   ]
-}
+} 

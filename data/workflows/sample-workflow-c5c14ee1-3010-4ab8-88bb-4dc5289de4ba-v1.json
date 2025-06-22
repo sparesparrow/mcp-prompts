@@ -1,0 +1,16 @@
+{
+  "id": "sample-workflow-c5c14ee1-3010-4ab8-88bb-4dc5289de4ba",
+  "name": "Sample Workflow",
+  "version": 1,
+  "steps": [
+    {
+      "id": "step1",
+      "type": "prompt",
+      "promptId": "test-prompt",
+      "input": {
+        "input": "{{context.input}}"
+      },
+      "output": "step1_output"
+    }
+  ]
+}

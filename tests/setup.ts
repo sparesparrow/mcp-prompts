@@ -20,22 +20,22 @@ afterAll(async () => {
 export function closeServer(server: any): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!server || !server.close) {
-      resolve();
-      return;
+      return resolve();
     }
 
+    const timeout = setTimeout(() => {
+      console.warn('Server close timed out. Forcing resolution.');
+      resolve();
+    }, 500);
+
     server.close((err: any) => {
+      clearTimeout(timeout);
       if (err) {
         reject(err);
       } else {
         resolve();
       }
     });
-
-    // Fallback timeout
-    setTimeout(() => {
-      resolve();
-    }, 5000);
   });
 }
 

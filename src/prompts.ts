@@ -1,55 +1,5 @@
 import { z } from 'zod';
 
-// Define prompt argument schemas
-const createPromptArgsSchema = z.object({
-  category: z.string().optional().describe('Primary category for the prompt'),
-  content: z.string().describe('The actual prompt content/template'),
-  createdAt: z.string().optional().describe('Date when the prompt was created (ISO string)'),
-  description: z.string().optional().describe('Description of what the prompt does'),
-  isTemplate: z.boolean().optional().default(false).describe('Whether this is a template prompt'),
-  metadata: z.record(z.any()).optional().describe('Additional metadata for the prompt'),
-  name: z.string().describe('Name of the prompt'),
-  tags: z.array(z.string()).optional().describe('Tags to categorize the prompt'),
-  updatedAt: z.string().optional().describe('Date when the prompt was last updated (ISO string)'),
-  variables: z.array(z.string()).optional().describe('Variables that can be used in the template'),
-  version: z.number().optional().describe('Version number, incremented on updates'),
-});
-
-const updatePromptArgsSchema = createPromptArgsSchema.partial().extend({
-  id: z.string().describe('ID of the prompt to update'),
-});
-
-const deletePromptArgsSchema = z.object({
-  id: z.string().describe('ID of the prompt to delete'),
-});
-
-const listPromptsArgsSchema = z.object({
-  category: z.string().optional().describe('Filter prompts by category'),
-  isTemplate: z.boolean().optional().describe('Filter for template/non-template prompts'),
-  tag: z.string().optional().describe('Filter prompts by tag'),
-});
-
-// Bulk create: array of createPromptArgsSchema
-const bulkCreatePromptsArgsSchema = z.array(createPromptArgsSchema);
-// Bulk delete: array of string IDs
-const bulkDeletePromptsArgsSchema = z.object({ ids: z.array(z.string().min(1)) });
-
-// Export schemas for use in server registration
-export const promptSchemas = {
-  bulkCreate: bulkCreatePromptsArgsSchema,
-  bulkDelete: bulkDeletePromptsArgsSchema,
-  create: createPromptArgsSchema,
-  delete: deletePromptArgsSchema,
-  list: listPromptsArgsSchema,
-  update: updatePromptArgsSchema,
-};
-
-// Export types derived from schemas
-export type CreatePromptArgs = z.infer<typeof createPromptArgsSchema>;
-export type UpdatePromptArgs = z.infer<typeof updatePromptArgsSchema>;
-export type DeletePromptArgs = z.infer<typeof deletePromptArgsSchema>;
-export type ListPromptsArgs = z.infer<typeof listPromptsArgsSchema>;
-
 // Define some example prompts
 export const defaultPrompts = {
   'bug-report': {

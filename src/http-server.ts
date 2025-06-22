@@ -1,22 +1,20 @@
-import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
-import cors from 'cors';
-import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
-import rateLimit from 'express-rate-limit';
 import fs from 'fs';
-import helmet from 'helmet';
-import type http from 'http';
 import path from 'path';
+import http from 'http';
+import helmet from 'helmet';
+import cors from 'cors';
+import rateLimit from 'express-rate-limit';
 import swaggerJSDoc from 'swagger-jsdoc';
 import swaggerUi from 'swagger-ui-express';
 import { z } from 'zod';
+import type { Server } from '@modelcontextprotocol/sdk/server/index.js';
+import type { Request, Response, NextFunction } from 'express';
 
-import { AppError, HttpErrorCode } from './errors.js';
-import type { StorageAdapter } from './interfaces.js';
 import type { PromptService } from './prompt-service.js';
-import { promptSchemas } from './prompts.js';
 import type { SequenceService } from './sequence-service.js';
 import type { WorkflowService } from './workflow-service.js';
+import { AppError, HttpErrorCode } from './errors.js';
 import {
   auditLogWorkflowEvent,
   getWorkflowRateLimiter,
@@ -25,6 +23,8 @@ import {
   releaseWorkflowSlot,
   ShellRunner,
 } from './workflow-service.js';
+import { promptSchemas } from './schemas.js';
+import { StorageAdapter } from './interfaces.js';
 
 const catchAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -49,29 +49,18 @@ export interface ServerServices {
   sequenceService: SequenceService;
   workflowService: WorkflowService;
   storageAdapters: StorageAdapter[];
+  elevenLabsService?: any;
 }
 
 const WORKFLOW_DIR = path.resolve(process.cwd(), 'data', 'workflows');
-/**
- *
- */
 function ensureWorkflowDir() {
   if (!fs.existsSync(WORKFLOW_DIR)) fs.mkdirSync(WORKFLOW_DIR, { recursive: true });
 }
 
-/**
- *
- * @param id
- * @param version
- */
 function getWorkflowFileName(id: string, version: number) {
   return path.join(WORKFLOW_DIR, `${id}-v${version}.json`);
 }
 
-/**
- *
- * @param workflow
- */
 function saveWorkflowToFile(workflow: any) {
   ensureWorkflowDir();
   if (typeof workflow.id !== 'string' || typeof workflow.version !== 'number') {
@@ -83,11 +72,6 @@ function saveWorkflowToFile(workflow: any) {
   );
 }
 
-/**
- *
- * @param id
- * @param version
- */
 function loadWorkflowFromFile(id: string, version?: number) {
   ensureWorkflowDir();
   if (version !== undefined) {
@@ -96,8 +80,7 @@ function loadWorkflowFromFile(id: string, version?: number) {
     return JSON.parse(fs.readFileSync(file, 'utf8'));
   }
   // If no version specified, get the latest version
-  const files = fs
-    .readdirSync(WORKFLOW_DIR)
+  const files = fs.readdirSync(WORKFLOW_DIR)
     .filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
   if (files.length === 0) return null;
   // Find the highest version
@@ -110,14 +93,9 @@ function loadWorkflowFromFile(id: string, version?: number) {
   return JSON.parse(fs.readFileSync(file, 'utf8'));
 }
 
-/**
- *
- * @param id
- */
 function getAllWorkflowVersions(id: string) {
   ensureWorkflowDir();
-  const files = fs
-    .readdirSync(WORKFLOW_DIR)
+  const files = fs.readdirSync(WORKFLOW_DIR)
     .filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
   return files
     .map(f => {
@@ -128,10 +106,6 @@ function getAllWorkflowVersions(id: string) {
     .sort((a, b) => (a as number) - (b as number));
 }
 
-/**
- *
- * @param latestOnly
- */
 function getAllWorkflows(latestOnly = true) {
   ensureWorkflowDir();
   const files = fs.readdirSync(WORKFLOW_DIR).filter(f => f.endsWith('.json'));
@@ -142,7 +116,7 @@ function getAllWorkflows(latestOnly = true) {
     const id = match[1];
     const version = parseInt(match[2], 10);
     if (!workflowsById[id]) workflowsById[id] = [];
-    workflowsById[id].push({ file: f, version });
+    workflowsById[id].push({ version, file: f });
   });
   const result: any[] = [];
   Object.entries(workflowsById).forEach(([id, versions]) => {
@@ -160,38 +134,38 @@ function getAllWorkflows(latestOnly = true) {
 }
 
 const swaggerDefinition = {
+  openapi: '3.0.0',
+  info: {
+    title: 'MCP-Prompts API',
+    version: '1.0.0',
+    description: 'API documentation for MCP-Prompts server',
+  },
+  servers: [{ url: 'http://localhost:3003', description: 'Local server' }],
   components: {
     schemas: {
       Prompt: {
+        type: 'object',
         properties: {
-          content: { type: 'string' },
-          description: { type: 'string' },
-          category: { type: 'string' },
           id: { type: 'string' },
-          createdAt: { format: 'date-time', type: 'string' },
-          isTemplate: { type: 'boolean' },
           name: { type: 'string' },
-          tags: { items: { type: 'string' }, type: 'array' },
-          updatedAt: { format: 'date-time', type: 'string' },
-          variables: { additionalProperties: true, type: 'object' },
+          content: { type: 'string' },
+          isTemplate: { type: 'boolean' },
+          description: { type: 'string' },
+          variables: { type: 'object', additionalProperties: true },
+          tags: { type: 'array', items: { type: 'string' } },
+          category: { type: 'string' },
+          createdAt: { type: 'string', format: 'date-time' },
+          updatedAt: { type: 'string', format: 'date-time' },
           version: { type: 'integer' },
         },
-        type: 'object',
       },
     },
   },
-  info: {
-    description: 'API documentation for MCP-Prompts server',
-    title: 'MCP-Prompts API',
-    version: '1.0.0',
-  },
-  openapi: '3.0.0',
-  servers: [{ description: 'Local server', url: 'http://localhost:3003' }],
 };
 
 const swaggerOptions = {
-  apis: ['src/http-server.ts'],
-  swaggerDefinition, // Use static path to avoid __filename ReferenceError
+  swaggerDefinition,
+  apis: ['src/http-server.ts'], // Use static path to avoid __filename ReferenceError
 };
 const swaggerSpec = swaggerJSDoc(swaggerOptions);
 
@@ -199,9 +173,6 @@ const swaggerSpec = swaggerJSDoc(swaggerOptions);
  * API key authentication middleware
  * Reads valid API keys from process.env.API_KEYS (comma-separated)
  * Skips /health and /api-docs endpoints
- * @param req
- * @param res
- * @param next
  */
 function apiKeyAuth(req: express.Request, res: express.Response, next: express.NextFunction) {
   const openPaths = ['/health', '/api-docs'];
@@ -300,25 +271,25 @@ export async function startHttpServer(
 
       if (!allHealthy) {
         return res.status(503).json({
+          status: 'error',
+          storage: 'unhealthy',
           details: services.storageAdapters.map((adapter, i) => ({
             adapter: adapter.constructor.name,
             healthy: results[i],
           })),
-          status: 'error',
-          storage: 'unhealthy',
         });
       }
 
       res.json({
         status: 'ok',
-        storage: 'healthy',
         version: process.env.npm_package_version || 'dev',
+        storage: 'healthy',
       });
     } catch (err) {
       res.status(503).json({
-        message: err instanceof Error ? err.message : String(err),
         status: 'error',
         storage: 'unhealthy',
+        message: err instanceof Error ? err.message : String(err),
       });
     }
   });
@@ -402,50 +373,36 @@ export async function startHttpServer(
       // This is a comment to help the apply model.
       // Parse and validate query params
       const querySchema = z.object({
-        category: z.string().optional(),
-        isTemplate: z
-          .string()
-          .optional()
-          .transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
-        limit: z
-          .string()
-          .optional()
-          .transform(v => (v ? parseInt(v, 10) : 20)),
-        offset: z
-          .string()
-          .optional()
-          .transform(v => (v ? parseInt(v, 10) : 0)),
-        order: z.enum(['asc', 'desc']).optional(),
-        search: z.string().optional(),
+        offset: z.string().optional().transform(v => (v ? parseInt(v, 10) : 0)),
+        limit: z.string().optional().transform(v => (v ? parseInt(v, 10) : 20)),
         sort: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
+        order: z.enum(['asc', 'desc']).optional(),
+        category: z.string().optional(),
         tags: z.string().optional(),
+        isTemplate: z.string().optional().transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
+        search: z.string().optional(),
       });
       const parseResult = querySchema.safeParse(req.query);
       if (!parseResult.success) {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            details: parseResult.error.errors,
             message: 'Invalid query parameters',
+            details: parseResult.error.errors,
           },
-          success: false,
         });
         return;
       }
       const { offset, limit, sort, order, category, tags, isTemplate, search } = parseResult.data;
-      const options: any = { category, isTemplate, limit, offset, order, search, sort };
+      const options: any = { offset, limit, sort, order, category, isTemplate, search };
       if (tags) {
-        options.tags = tags
-          .split(',')
-          .map((t: string) => t.trim())
-          .filter(Boolean);
+        options.tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
       }
       const prompts = await services.promptService.listPrompts(options);
       // For total count, fetch without pagination
-      const total = (
-        await services.promptService.listPrompts({ ...options, limit: undefined, offset: 0 })
-      ).length;
-      res.json({ limit, offset, prompts, total });
+      const total = (await services.promptService.listPrompts({ ...options, offset: 0, limit: undefined })).length;
+      res.json({ prompts, total, offset, limit });
     }),
   );
 
@@ -463,7 +420,7 @@ export async function startHttpServer(
       }
       const prompt = parseResult.data;
       const created = await services.promptService.createPrompt(prompt);
-      return res.status(201).json({ prompt: created, success: true });
+      return res.status(201).json({ success: true, prompt: created });
     }),
   );
 
@@ -478,11 +435,9 @@ export async function startHttpServer(
       const version = req.query.version ? Number(req.query.version) : undefined;
       const prompt = await services.promptService.getPrompt(id, version);
       if (!prompt) {
-        return res
-          .status(404)
-          .json({ error: { code: 'NOT_FOUND', message: 'Prompt not found' }, success: false });
+        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found' } });
       }
-      return res.status(200).json({ prompt, success: true });
+      return res.status(200).json({ success: true, prompt });
     }),
   );
 
@@ -516,17 +471,14 @@ export async function startHttpServer(
    *             schema:
    *               $ref: '#/components/schemas/Prompt'
    */
-  app.put(
-    '/prompts/:id/:version',
-    catchAsync(async (req, res, next) => {
-      const prompt = await services.promptService.updatePrompt(
-        req.params.id,
-        parseInt(req.params.version, 10),
-        req.body,
-      );
-      res.json({ prompt });
-    }),
-  );
+  app.put('/prompts/:id/:version', catchAsync(async (req, res, next) => {
+    const prompt = await services.promptService.updatePrompt(
+      req.params.id,
+      parseInt(req.params.version, 10),
+      req.body,
+    );
+    res.json({ prompt });
+  }));
 
   /**
    * @openapi
@@ -548,13 +500,10 @@ export async function startHttpServer(
    *       204:
    *         description: Prompt deleted successfully
    */
-  app.delete(
-    '/prompts/:id/:version',
-    catchAsync(async (req, res, next) => {
-      await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
-      res.status(204).send();
-    }),
-  );
+  app.delete('/prompts/:id/:version', catchAsync(async (req, res, next) => {
+    await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
+    res.status(204).send();
+  }));
 
   /**
    * GET /prompts/:id/versions
@@ -564,7 +513,7 @@ export async function startHttpServer(
     '/prompts/:id/versions',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const versions = await services.promptService.listPromptVersions(req.params.id);
-      res.json({ id: req.params.id, success: true, versions });
+      res.json({ success: true, id: req.params.id, versions });
     }),
   );
 
@@ -601,19 +550,17 @@ export async function startHttpServer(
   app.post(
     '/prompts/bulk',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const parseResult = promptSchemas.bulkCreate.safeParse(req.body);
-      if (!parseResult.success) {
-        res.status(400).json({
+      // The schema validation is too strict. The service layer will handle per-item validation.
+      if (!Array.isArray(req.body)) {
+        return res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            details: parseResult.error.errors,
-            message: 'Invalid bulk prompt data',
+            message: 'Request body must be an array of prompt objects.',
           },
-          success: false,
         });
-        return;
       }
-      const results = await services.promptService.createPromptsBulk(parseResult.data);
+      const results = await services.promptService.createPromptsBulk(req.body);
       res.status(200).json(results);
     }),
   );
@@ -654,15 +601,17 @@ export async function startHttpServer(
   app.delete(
     '/prompts/bulk',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      console.log('BULK DELETE BODY:', JSON.stringify(req.body, null, 2));
       const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
+      console.log('PARSE RESULT:', JSON.stringify(parseResult, null, 2));
       if (!parseResult.success) {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
-            details: parseResult.error.errors,
             message: 'Invalid bulk delete data',
+            details: parseResult.error.errors,
           },
-          success: false,
         });
         return;
       }
@@ -718,21 +667,21 @@ export async function startHttpServer(
       const workflow = req.body;
       if (!services.workflowService.validateWorkflow(workflow)) {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Invalid workflow definition.',
           },
-          success: false,
         });
         return;
       }
       if (!workflow.id || typeof workflow.id !== 'string') {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Workflow must have a string id.',
           },
-          success: false,
         });
         return;
       }
@@ -747,20 +696,20 @@ export async function startHttpServer(
       // Check if this version already exists
       if (loadWorkflowFromFile(workflow.id, version)) {
         res.status(409).json({
+          success: false,
           error: {
             code: 'CONFLICT',
             message: `Workflow version ${version} already exists for id ${workflow.id}`,
           },
-          success: false,
         });
         return;
       }
       saveWorkflowToFile(workflow);
       res.status(201).json({
         id: workflow.id,
+        version,
         message: 'Workflow version saved.',
         success: true,
-        version,
       });
     }),
   );
@@ -776,11 +725,11 @@ export async function startHttpServer(
       const workflow = loadWorkflowFromFile(req.params.id);
       if (!workflow) {
         res.status(404).json({
+          success: false,
           error: {
             code: 'NOT_FOUND',
             message: 'Workflow not found.',
           },
-          success: false,
         });
         return;
       }
@@ -799,18 +748,18 @@ export async function startHttpServer(
       const versions = getAllWorkflowVersions(req.params.id);
       if (!versions.length) {
         res.status(404).json({
+          success: false,
           error: {
             code: 'NOT_FOUND',
             message: 'No versions found for workflow.',
           },
-          success: false,
         });
         return;
       }
       // Optionally, include createdAt for each version
       const result = versions.map(v => {
         const wf = loadWorkflowFromFile(req.params.id, v);
-        return { createdAt: wf?.createdAt, version: v };
+        return { version: v, createdAt: wf?.createdAt };
       });
       res.json(result);
     }),
@@ -827,22 +776,22 @@ export async function startHttpServer(
       const version = parseInt(req.params.version, 10);
       if (isNaN(version)) {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Version must be a number.',
           },
-          success: false,
         });
         return;
       }
       const workflow = loadWorkflowFromFile(req.params.id, version);
       if (!workflow) {
         res.status(404).json({
+          success: false,
           error: {
             code: 'NOT_FOUND',
             message: 'Workflow version not found.',
           },
-          success: false,
         });
         return;
       }
@@ -861,31 +810,31 @@ export async function startHttpServer(
       const version = parseInt(req.params.version, 10);
       if (isNaN(version)) {
         res.status(400).json({
+          success: false,
           error: {
             code: 'VALIDATION_ERROR',
             message: 'Version must be a number.',
           },
-          success: false,
         });
         return;
       }
       const file = getWorkflowFileName(req.params.id, version);
       if (!fs.existsSync(file)) {
         res.status(404).json({
+          success: false,
           error: {
             code: 'NOT_FOUND',
             message: 'Workflow version not found.',
           },
-          success: false,
         });
         return;
       }
       fs.unlinkSync(file);
       res.json({
-        id: req.params.id,
-        message: 'Workflow version deleted.',
         success: true,
+        id: req.params.id,
         version,
+        message: 'Workflow version deleted.',
       });
     }),
   );
@@ -919,22 +868,22 @@ export async function startHttpServer(
         version = parseInt(versionParam as string, 10);
         if (isNaN(version)) {
           res.status(400).json({
+            success: false,
             error: {
               code: 'VALIDATION_ERROR',
               message: 'Version must be a number.',
             },
-            success: false,
           });
           return;
         }
       }
       if (!checkWorkflowRateLimit(userId)) {
         res.status(429).json({
+          success: false,
           error: {
             code: 'RATE_LIMIT',
             message: 'Too many concurrent workflows. Please wait and try again.',
           },
-          success: false,
         });
         return;
       }
@@ -943,27 +892,18 @@ export async function startHttpServer(
         const workflow = loadWorkflowFromFile(workflowId, version);
         if (!workflow) {
           res.status(404).json({
+            success: false,
             error: {
               code: 'NOT_FOUND',
               message: 'Workflow not found.',
             },
-            success: false,
           });
           return;
         }
         // Audit: workflow start
         auditLogWorkflowEvent({ details: { workflow }, eventType: 'start', userId, workflowId });
-        // Prepare step runners
-        const promptRunner = new PromptRunner(services.promptService);
-        const shellRunner = new ShellRunner();
-        const httpRunner = new HttpRunner();
-        const stepRunners = {
-          http: httpRunner,
-          prompt: promptRunner,
-          shell: shellRunner,
-        };
         // Run the workflow
-        result = await (services.workflowService as any).runWorkflowSteps(workflow, stepRunners);
+        result = await services.workflowService.runWorkflow(workflow, req.body.context || {});
         // Audit: workflow end
         auditLogWorkflowEvent({ details: { result }, eventType: 'end', userId, workflowId });
         res.status(result.success ? 200 : 400).json(result);
@@ -1048,11 +988,11 @@ export async function startHttpServer(
   // Global 404 handler middleware
   app.use((req: express.Request, res: express.Response) => {
     res.status(404).json({
+      success: false,
       error: {
         code: HttpErrorCode.NOT_FOUND,
         message: 'Resource not found',
       },
-      success: false,
     });
   });
 
@@ -1067,19 +1007,19 @@ export async function startHttpServer(
         response.details = (err as any).details;
       }
       return res.status(err.statusCode).json({
-        error: response,
         success: false,
+        error: response,
       });
     }
 
     if (err instanceof z.ZodError) {
       return res.status(400).json({
+        success: false,
         error: {
           code: HttpErrorCode.VALIDATION_ERROR,
-          details: err.issues,
           message: 'Invalid input data.',
+          details: err.issues,
         },
-        success: false,
       });
     }
 
@@ -1088,11 +1028,11 @@ export async function startHttpServer(
     console.error('UNHANDLED_ERROR:', err);
 
     res.status(500).json({
+      success: false,
       error: {
         code: HttpErrorCode.INTERNAL_SERVER_ERROR,
         message: 'An unexpected internal server error occurred.',
       },
-      success: false,
     });
   });
 

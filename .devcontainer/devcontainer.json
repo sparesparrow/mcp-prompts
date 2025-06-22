@@ -1,9 +1,11 @@
 {
   "name": "MCP Prompts Server",
-  "build": {
-    "dockerfile": "../docker/Dockerfile",
-    "context": ".."
-  },
+  "dockerComposeFile": [
+    "../docker-compose.yml"
+  ],
+  "service": "app",
+  "workspaceFolder": "/workspace",
+  "shutdownAction": "stopCompose",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -19,7 +21,10 @@
       }
     }
   },
-  "forwardPorts": [3000],
+  "forwardPorts": [
+    3000,
+    5432
+  ],
   "postCreateCommand": "npm install",
   "remoteUser": "node"
 }
