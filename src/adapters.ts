@@ -165,19 +165,17 @@ export class FileAdapter implements StorageAdapter {
       throw new Error(`Prompt with id ${id} and version ${version} not found`);
     }
 
-    const newVersion = (await this.listPromptVersions(id)).reduce((max, v) => Math.max(max, v), 0) + 1;
-
     const updatedData = promptSchemas.update.parse(prompt);
 
     const updatedPrompt: Prompt = {
       ...existingPrompt,
       ...updatedData,
       id,
-      version: newVersion,
+      version,
       updatedAt: new Date().toISOString(),
     };
 
-    const finalPath = this.getPromptFileName(id, newVersion);
+    const finalPath = this.getPromptFileName(id, version);
     const tempPath = `${finalPath}.tmp`;
     try {
       await fsp.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
@@ -732,23 +730,22 @@ export class PostgresAdapter implements StorageAdapter {
       throw new Error(`Prompt with id ${id} and version ${version} not found`);
     }
 
-    // Merge the existing prompt with the update payload
-    const updatedPromptData = {
+    const updatedData = promptSchemas.update.parse(prompt);
+
+    const updatedPrompt: Prompt = {
       ...existingPrompt,
-      ...prompt,
-      version: existingPrompt.version, // Ensure version isn't changed by partial update
+      ...updatedData,
+      id,
+      version,
       updatedAt: new Date().toISOString(),
     };
-
-    // Validate the final, merged object against the full schema
-    validatePrompt(updatedPromptData, 'full', true);
 
     const finalPath = this.getPromptFileName(id, version);
     const tempPath = `${finalPath}.tmp`;
     try {
-      await fsp.writeFile(tempPath, JSON.stringify(updatedPromptData, null, 2));
+      await fsp.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
       await fsp.rename(tempPath, finalPath);
-      return updatedPromptData;
+      return updatedPrompt;
     } catch (error: unknown) {
       try {
         await fsp.unlink(tempPath);
