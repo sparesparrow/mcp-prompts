@@ -1,0 +1,85 @@
+# Multi-stage build for MCP Prompts Suite
+FROM node:18-alpine AS node-base
+RUN apk add --no-cache git
+
+# Rust stage
+FROM rust:1.70-alpine AS rust-builder
+RUN apk add --no-cache musl-dev
+WORKDIR /app/rust
+COPY mcp-prompts-rs/ .
+RUN cargo build --release
+
+# TypeScript stage
+FROM node:18-alpine AS ts-builder
+WORKDIR /app/ts
+COPY mcp-prompts-ts/ .
+RUN npm ci && npm run build
+
+# Collection stage
+FROM node:18-alpine AS collection-builder
+WORKDIR /app/collection
+COPY mcp-prompts-collection/ .
+RUN npm ci && npm run build
+
+# Contracts stage
+FROM node:18-alpine AS contracts-builder
+WORKDIR /app/contracts
+COPY mcp-prompts-contracts/ .
+RUN npm ci && npm run build
+
+# PostgreSQL stage
+FROM node:18-alpine AS pg-builder
+WORKDIR /app/pg
+COPY mcp-prompts-pg/ .
+RUN npm ci && npm run build
+
+# Final stage
+FROM node:18-alpine AS suite
+RUN apk add --no-cache postgresql-client
+
+# Create app directory
+WORKDIR /app
+
+# Copy built artifacts
+COPY --from=rust-builder /app/rust/target/release/mcp-prompts-rs /usr/local/bin/
+COPY --from=ts-builder /app/ts/dist ./ts/dist
+COPY --from=collection-builder /app/collection/dist ./collection/dist
+COPY --from=contracts-builder /app/contracts/dist ./contracts/dist
+COPY --from=pg-builder /app/pg/dist ./pg/dist
+
+# Copy source files for development
+COPY --from=ts-builder /app/ts/src ./ts/src
+COPY --from=collection-builder /app/collection/src ./collection/src
+COPY --from=contracts-builder /app/contracts/src ./contracts/src
+COPY --from=pg-builder /app/pg/src ./pg/src
+
+# Copy configuration files
+COPY --from=ts-builder /app/ts/package*.json ./ts/
+COPY --from=collection-builder /app/collection/package*.json ./collection/
+COPY --from=contracts-builder /app/contracts/package*.json ./contracts/
+COPY --from=pg-builder /app/pg/package*.json ./pg/
+
+# Copy documentation
+COPY --from=ts-builder /app/ts/README.md ./ts/
+COPY --from=collection-builder /app/collection/README.md ./collection/
+COPY --from=contracts-builder /app/contracts/README.md ./contracts/
+COPY --from=pg-builder /app/pg/README.md ./pg/
+
+# Create entrypoint script
+RUN echo '#!/bin/sh\n\
+echo "MCP Prompts Suite"\n\
+echo "================="\n\
+echo "Available implementations:"\n\
+echo "  - TypeScript: node ts/dist/index.js"\n\
+echo "  - Rust: mcp-prompts-rs"\n\
+echo "  - Collection: node collection/dist/index.js"\n\
+echo "  - Contracts: node contracts/dist/index.js"\n\
+echo "  - PostgreSQL: node pg/dist/index.js"\n\
+echo ""\n\
+echo "Usage:"\n\
+echo "  docker run --rm sparesparrow/mcp-prompts-suite:latest mcp-prompts-rs --help"\n\
+echo "  docker run --rm sparesparrow/mcp-prompts-suite:latest node ts/dist/index.js --help"\n\
+' > /usr/local/bin/suite-help && chmod +x /usr/local/bin/suite-help
+
+# Set default command
+CMD ["suite-help"] 
