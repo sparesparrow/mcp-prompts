@@ -4,14 +4,14 @@ import { z } from 'zod';
 const createPromptArgsSchema = z.object({
   category: z.string().optional().describe('Primary category for the prompt'),
   content: z.string().describe('The actual prompt content/template'),
+  createdAt: z.string().optional().describe('Date when the prompt was created (ISO string)'),
   description: z.string().optional().describe('Description of what the prompt does'),
   isTemplate: z.boolean().optional().default(false).describe('Whether this is a template prompt'),
   metadata: z.record(z.any()).optional().describe('Additional metadata for the prompt'),
   name: z.string().describe('Name of the prompt'),
   tags: z.array(z.string()).optional().describe('Tags to categorize the prompt'),
-  variables: z.array(z.string()).optional().describe('Variables that can be used in the template'),
-  createdAt: z.string().optional().describe('Date when the prompt was created (ISO string)'),
   updatedAt: z.string().optional().describe('Date when the prompt was last updated (ISO string)'),
+  variables: z.array(z.string()).optional().describe('Variables that can be used in the template'),
   version: z.number().optional().describe('Version number, incremented on updates'),
 });
 
@@ -36,12 +36,12 @@ const bulkDeletePromptsArgsSchema = z.object({ ids: z.array(z.string().min(1)) }
 
 // Export schemas for use in server registration
 export const promptSchemas = {
+  bulkCreate: bulkCreatePromptsArgsSchema,
+  bulkDelete: bulkDeletePromptsArgsSchema,
   create: createPromptArgsSchema,
   delete: deletePromptArgsSchema,
   list: listPromptsArgsSchema,
   update: updatePromptArgsSchema,
-  bulkCreate: bulkCreatePromptsArgsSchema,
-  bulkDelete: bulkDeletePromptsArgsSchema,
 };
 
 // Export types derived from schemas

@@ -44,7 +44,7 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeServer(server);
-  
+
   await new Promise(resolve => setTimeout(resolve, 100));
 });
 
@@ -148,10 +148,7 @@ describe('HTTP Server Integration', () => {
   it('should return 400 for missing required fields', async () => {
     const cases = [{}, { name: 'No Content' }, { content: 'No Name' }, { name: '', content: '' }];
     for (const body of cases) {
-      const res = await request(baseUrl)
-        .post('/prompts')
-        .set('x-api-key', 'test-key')
-        .send(body);
+      const res = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send(body);
       expect(res.status).toBe(400);
     }
   });
@@ -163,10 +160,7 @@ describe('HTTP Server Integration', () => {
       { name: 'Bad updatedAt', content: 'test', updatedAt: false },
     ];
     for (const body of cases) {
-      const res = await request(baseUrl)
-        .post('/prompts')
-        .set('x-api-key', 'test-key')
-        .send(body);
+      const res = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send(body);
       expect(res.status).toBe(400);
     }
   });
@@ -184,29 +178,20 @@ describe('HTTP Server Integration', () => {
       name: 'Dup HTTP',
       content: 'Dup content',
     };
-    const res1 = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send(prompt);
+    const res1 = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send(prompt);
     expect(res1.status).toBe(201);
-    const res2 = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send(prompt);
+    const res2 = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send(prompt);
     expect(res2.status).toBe(409);
     expect(res2.body.error.message).toMatch(/already exists/);
   });
 
   it('should return 400 for template variable mismatches', async () => {
-    let res = await request(baseUrl)
-      .post('/prompts')
-      .set('x-api-key', 'test-key')
-      .send({
-        name: 'VarMismatch1',
-        content: 'Hello {{foo}}',
-        isTemplate: true,
-        variables: [],
-      });
+    let res = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send({
+      name: 'VarMismatch1',
+      content: 'Hello {{foo}}',
+      isTemplate: true,
+      variables: [],
+    });
     expect(res.status).toBe(400);
     res = await request(baseUrl)
       .post('/prompts')
@@ -264,7 +249,9 @@ describe('Prompt List (GET /prompts)', () => {
   });
 
   it('should sort by name ascending', async () => {
-    const res = await request(baseUrl).get('/prompts?sort=name&order=asc').set('x-api-key', 'test-key');
+    const res = await request(baseUrl)
+      .get('/prompts?sort=name&order=asc')
+      .set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     const names = res.body.prompts.map((p: any) => p.name);
     const sorted = [...names].sort();
@@ -281,7 +268,9 @@ describe('Prompt List (GET /prompts)', () => {
   });
 
   it('should filter by category', async () => {
-    const res = await request(baseUrl).get('/prompts?category=general').set('x-api-key', 'test-key');
+    const res = await request(baseUrl)
+      .get('/prompts?category=general')
+      .set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     expect(res.body.prompts.length).toBe(2);
     for (const prompt of res.body.prompts) {
@@ -296,9 +285,7 @@ describe('Prompt List (GET /prompts)', () => {
       isTemplate: true,
       version: 1,
     });
-    const res = await request(baseUrl)
-      .get('/prompts?isTemplate=true')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?isTemplate=true').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     expect(res.body.prompts.length).toBe(1);
     expect(res.body.prompts[0].isTemplate).toBe(true);
@@ -422,14 +409,12 @@ describe('Workflow Engine Integration', () => {
 
     const workflowServiceWithRateLimit = new WorkflowService(adapter, promptService);
 
-    const runPromise = workflowServiceWithRateLimit.runWorkflow(
-      sampleWorkflow.id,
-      { userId: 'ratelimit-test' },
-    );
-    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(
-      sampleWorkflow.id,
-      { userId: 'ratelimit-test' },
-    );
+    const runPromise = workflowServiceWithRateLimit.runWorkflow(sampleWorkflow.id, {
+      userId: 'ratelimit-test',
+    });
+    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(sampleWorkflow.id, {
+      userId: 'ratelimit-test',
+    });
     await expect(Promise.all([runPromise, runPromise2])).rejects.toThrow(/Rate limit exceeded/);
   });
 });
@@ -449,5 +434,5 @@ function makePromptPayload(overrides: Partial<Record<string, any>> = {}) {
 }
 
 function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise(resolve => setTimeout(resolve, ms));
 }

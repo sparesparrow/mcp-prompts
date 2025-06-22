@@ -9,56 +9,55 @@
  * with HTTP_SERVER=true and PORT=3003.
  */
 describe('Docker Health Check Integration', () => {
-    const HEALTH_CHECK_URL = process.env.HEALTH_CHECK_URL || 'http://localhost:3003/health';
-    // Skip the test if we're not in the right environment
-    const runTest = process.env.TEST_DOCKER_HEALTH === 'true';
-    // Helper function to fetch health status
-    async function fetchHealthStatus() {
-        try {
-            const response = await fetch(HEALTH_CHECK_URL);
-            return {
-                status: response.status,
-                data: await response.json()
-            };
-        }
-        catch (error) {
-            console.error('Error fetching health status:', error);
-            return {
-                status: 500,
-                data: { error: error.message || 'Unknown error' }
-            };
-        }
+  const HEALTH_CHECK_URL = process.env.HEALTH_CHECK_URL || 'http://localhost:3003/health';
+  // Skip the test if we're not in the right environment
+  const runTest = process.env.TEST_DOCKER_HEALTH === 'true';
+  // Helper function to fetch health status
+  async function fetchHealthStatus() {
+    try {
+      const response = await fetch(HEALTH_CHECK_URL);
+      return {
+        status: response.status,
+        data: await response.json(),
+      };
+    } catch (error) {
+      console.error('Error fetching health status:', error);
+      return {
+        status: 500,
+        data: { error: error.message || 'Unknown error' },
+      };
     }
-    it('health check endpoint should return 200 status', async () => {
-        if (!runTest) {
-            console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
-            return;
-        }
-        const { status, data } = await fetchHealthStatus();
-        expect(status).toBe(200);
-        expect(data).toHaveProperty('status');
-        expect(data.status).toBe('ok');
-    });
-    it('health check endpoint should include storage status', async () => {
-        if (!runTest) {
-            console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
-            return;
-        }
-        const { status, data } = await fetchHealthStatus();
-        expect(status).toBe(200);
-        expect(data).toHaveProperty('storage');
-        expect(data.storage).toHaveProperty('connected');
-        expect(data.storage.connected).toBe(true);
-    });
-    it('health check endpoint should include version information', async () => {
-        if (!runTest) {
-            console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
-            return;
-        }
-        const { status, data } = await fetchHealthStatus();
-        expect(status).toBe(200);
-        expect(data).toHaveProperty('version');
-        expect(data.version).toBeTruthy();
-    });
+  }
+  it('health check endpoint should return 200 status', async () => {
+    if (!runTest) {
+      console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
+      return;
+    }
+    const { status, data } = await fetchHealthStatus();
+    expect(status).toBe(200);
+    expect(data).toHaveProperty('status');
+    expect(data.status).toBe('ok');
+  });
+  it('health check endpoint should include storage status', async () => {
+    if (!runTest) {
+      console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
+      return;
+    }
+    const { status, data } = await fetchHealthStatus();
+    expect(status).toBe(200);
+    expect(data).toHaveProperty('storage');
+    expect(data.storage).toHaveProperty('connected');
+    expect(data.storage.connected).toBe(true);
+  });
+  it('health check endpoint should include version information', async () => {
+    if (!runTest) {
+      console.log('Skipping Docker health check test. Set TEST_DOCKER_HEALTH=true to run it.');
+      return;
+    }
+    const { status, data } = await fetchHealthStatus();
+    expect(status).toBe(200);
+    expect(data).toHaveProperty('version');
+    expect(data.version).toBeTruthy();
+  });
 });
 export {};

@@ -11,6 +11,7 @@
 ---
 
 ## Table of Contents
+
 - [Why This Project?](#why-this-project)
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
@@ -61,11 +62,13 @@ npx -y @sparesparrow/mcp-prompts@1.2.22
 ```
 
 ### 2. Run with Docker
+
 For production deployment with persistent storage:
 
 > ⚠️ **Note:** The Docker images currently have a build issue and may not work properly. We recommend using the NPX method or building from source until this is resolved.
 
 **File storage:**
+
 ```bash
 # Unix/Linux/macOS
 docker run -d --name mcp-server \
@@ -81,6 +84,7 @@ docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data ghcr.io/spar
 ```
 
 **Postgres storage:**
+
 ```bash
 # Unix/Linux/macOS
 docker run -d --name mcp-server \
@@ -119,20 +123,24 @@ docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data mcp-prompt
 **Common Problems:**
 
 1. **"docker: invalid reference format"**
+
    - Ensure Docker Desktop is running
    - Use the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
    - Check that the image exists: `docker images | grep mcp-prompts`
 
 2. **"Cannot connect to the Docker daemon"**
+
    - Start Docker Desktop
    - On Windows, ensure WSL2 is properly configured
 
 3. **"Unknown file extension '.ts'" error**
+
    - This indicates a Docker build issue where TypeScript files aren't compiled
    - **Solution:** Use the NPX method instead: `npx -y @sparesparrow/mcp-prompts`
    - Or build from source using the instructions above
 
 4. **Volume mounting issues on Windows**
+
    - Use forward slashes: `/app/data` not `\app\data`
    - Use `${PWD}` in PowerShell or `%cd%` in Command Prompt
 
@@ -142,6 +150,7 @@ docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data mcp-prompt
    - Or use a different port: `-p 3004:3003`
 
 ### 3. Verify It's Running
+
 Check that the server is running and accessible:
 
 ```bash
@@ -149,6 +158,7 @@ curl http://localhost:3003/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok",
@@ -161,12 +171,12 @@ Expected response:
 
 ## 🏛️ Core Concepts and Data Structure
 
-| Entity    | Attributes                              | Description                                      |
-|-----------|-----------------------------------------|--------------------------------------------------|
-| Prompt    | name, content, tags, version, metadata  | The basic unit containing the template text.      |
-| Category  | name, description, parent_category      | Used for hierarchical organization of prompts.    |
-| Template  | variables, validation_rules             | A special type of prompt with dynamic parts.      |
-| User      | username, role                          | An account with assigned permissions.             |
+| Entity   | Attributes                             | Description                                    |
+| -------- | -------------------------------------- | ---------------------------------------------- |
+| Prompt   | name, content, tags, version, metadata | The basic unit containing the template text.   |
+| Category | name, description, parent_category     | Used for hierarchical organization of prompts. |
+| Template | variables, validation_rules            | A special type of prompt with dynamic parts.   |
+| User     | username, role                         | An account with assigned permissions.          |
 
 ---
 
@@ -174,11 +184,11 @@ Expected response:
 
 The project is designed as a modern monorepo with separate packages, which facilitates maintenance and scaling.
 
-| Component  | Description                                      | Technology                        |
-|------------|--------------------------------------------------|-----------------------------------|
-| core       | Main application logic, API, and storage mgmt.    | Node.js, Express, TypeScript      |
-| catalog    | A distributable package with default prompts.     | NPM                               |
-| contracts  | Shared TypeScript types and OpenAPI specs.        | OpenAPI, JSON Schema              |
+| Component | Description                                    | Technology                   |
+| --------- | ---------------------------------------------- | ---------------------------- |
+| core      | Main application logic, API, and storage mgmt. | Node.js, Express, TypeScript |
+| catalog   | A distributable package with default prompts.  | NPM                          |
+| contracts | Shared TypeScript types and OpenAPI specs.     | OpenAPI, JSON Schema         |
 
 📊 **[Track our detailed progress on the GitHub Project Board](../../projects/1)**
 
@@ -191,6 +201,7 @@ We welcome community contributions! Whether it's code, documentation, a bug repo
 Please read our **[Contributor Guide](CONTRIBUTING.md)** to find everything you need.
 
 ### ✨ Our Contributors
+
 Thank you to all the wonderful people who have contributed to this project!
 
 [![Contributors](https://contrib.rocks/image?repo=sparesparrow/mcp-prompts)](https://github.com/sparesparrow/mcp-prompts/graphs/contributors)

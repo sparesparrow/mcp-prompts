@@ -5,9 +5,9 @@ import type { Server } from 'node:http';
 import { EventSource } from 'eventsource';
 import express from 'express';
 
+import { closeEventSource, closeServer } from '../../tests/setup.js';
 import { getSseManager, resetSseManager, SseManager } from '../sse.js';
 import * as sseModule from '../sse.js';
-import { closeServer, closeEventSource } from '../../tests/setup.js';
 
 interface SseOptions {
   enableCompression?: boolean;
@@ -84,22 +84,22 @@ describe('SseManager', () => {
 
   afterAll(async () => {
     console.log('[SSE TEST] afterAll: Closing all EventSources and server');
-    
+
     // Zavřeme všechny EventSource spojení
     for (let i = 0; i < eventSources.length; i++) {
       console.log(`[SSE TEST] Closing EventSource #${i}`);
       await closeEventSource(eventSources[i]);
     }
     eventSources.length = 0;
-    
+
     // Zavřeme server
     if (server) {
       await closeServer(server);
     }
-    
+
     // Reset SSE manager - to zavře všechny intervaly
     resetSseManager();
-    
+
     // Počkáme na dokončení všech operací
     await new Promise(resolve => setTimeout(resolve, 200));
   });

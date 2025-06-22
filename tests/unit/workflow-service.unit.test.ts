@@ -100,10 +100,9 @@ describe('WorkflowService (Stateless)', () => {
     expect(mockStatelessShellRunner.runStep).toHaveBeenCalledTimes(1);
     expect(result.outputs).toEqual(expect.objectContaining({ out1: 'output1', out2: 'output2' }));
   });
-  
+
   // ... other stateless tests ...
 });
-
 
 describe('WorkflowService (Stateful)', () => {
   let service: WorkflowServiceImpl;
@@ -128,16 +127,18 @@ describe('WorkflowService (Stateful)', () => {
     };
 
     const result = await service.runWorkflow(workflow);
-    
+
     expect(result.success).toBe(true);
     expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(4); // Initial, after step1, after step2, final
-    
+
     // Check final state saved
     const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[3][0] as any;
-    expect(lastCall).toEqual(expect.objectContaining({
-      status: 'completed',
-      workflowId: 'stateful-workflow',
-    }));
+    expect(lastCall).toEqual(
+      expect.objectContaining({
+        status: 'completed',
+        workflowId: 'stateful-workflow',
+      }),
+    );
   });
 
   it('should handle parallel steps and save state', async () => {
@@ -156,16 +157,16 @@ describe('WorkflowService (Stateful)', () => {
         },
       ],
     };
-    
+
     const result = await service.runWorkflow(workflow);
 
     expect(result.success).toBe(true);
     // Note: The number of saves is now threads + completion
-    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(
-      workflow.threads + 1,
-    );
-    
-    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[workflow.threads][0] as any;
+    expect(mockStorageAdapter.saveWorkflowState).toHaveBeenCalledTimes(workflow.threads + 1);
+
+    const lastCall = (mockStorageAdapter.saveWorkflowState as jest.Mock).mock.calls[
+      workflow.threads
+    ][0] as any;
     expect(lastCall.status).toBe('completed');
   });
-}); 
+});

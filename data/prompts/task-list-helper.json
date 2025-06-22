@@ -4,13 +4,8 @@
   "description": "A basic prompt to help organize and prioritize tasks",
   "content": "Please create a prioritized task list based on the following requirements:\n\n{{requirements}}",
   "isTemplate": true,
-  "variables": [
-    "requirements"
-  ],
-  "tags": [
-    "productivity",
-    "planning"
-  ],
+  "variables": ["requirements"],
+  "tags": ["productivity", "planning"],
   "createdAt": "2025-06-19T02:12:57.096Z",
   "updatedAt": "2025-06-19T02:12:57.096Z",
   "version": 1

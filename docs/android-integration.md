@@ -5,17 +5,19 @@ This guide provides instructions for mobile developers on how to integrate and u
 ## 🎯 Purpose of the Native Library
 
 The native library, written in Rust, serves as a bridge between your Kotlin/Java Android code and the MCP-Prompts server. It handles:
--   Efficiently making API requests to the server.
--   Parsing JSON responses.
--   Providing a simple, asynchronous API to your Android code via JNI.
+
+- Efficiently making API requests to the server.
+- Parsing JSON responses.
+- Providing a simple, asynchronous API to your Android code via JNI.
 
 Using the native library is recommended for performance and for keeping API logic consistent across platforms.
 
 ## 🏗️ Project Structure
 
 The key components for Android integration are located in the `android_app` directory:
--   `android/app`: The main Android application module.
--   `android/mcp_native_service`: The Rust crate containing the native service logic.
+
+- `android/app`: The main Android application module.
+- `android/mcp_native_service`: The Rust crate containing the native service logic.
 
 ## 🛠️ How to Call Rust from Kotlin
 
@@ -30,6 +32,7 @@ Communication between Kotlin and Rust is achieved through the Java Native Interf
 Here is a simplified example of how a prompt is fetched from the native library.
 
 **Rust (`lib.rs`):**
+
 ```rust
 #[no_mangle]
 pub extern "C" fn Java_com_sparesparrow_mcp_McpService_getPrompt(
@@ -44,6 +47,7 @@ pub extern "C" fn Java_com_sparesparrow_mcp_McpService_getPrompt(
 ```
 
 **Kotlin (`McpService.kt`):**
+
 ```kotlin
 class McpService : Service() {
     // ... other service code ...
@@ -113,4 +117,4 @@ class McpService : Service() {
 
 The Android project is configured to automatically compile the Rust code and include it in the final APK using the `org.mozilla.rust-android-gradle.rust-android` Gradle plugin.
 
-To build the app, simply use the standard Android Studio build process or run `./gradlew assembleDebug` from the `android_app/android` directory (once `gradlew` is available). The Gradle plugin will handle invoking `cargo` to build the native library for the target architectures. 
+To build the app, simply use the standard Android Studio build process or run `./gradlew assembleDebug` from the `android_app/android` directory (once `gradlew` is available). The Gradle plugin will handle invoking `cargo` to build the native library for the target architectures.

@@ -21,15 +21,9 @@
     "filter_options",
     "additional_interfaces"
   ],
-  "tags": [
-    "development",
-    "typescript",
-    "interfaces",
-    "consolidation",
-    "template"
-  ],
+  "tags": ["development", "typescript", "interfaces", "consolidation", "template"],
   "category": "development",
   "createdAt": "2024-08-08T15:45:00.000Z",
   "updatedAt": "2024-08-08T15:45:00.000Z",
   "version": 1
-} 
+}

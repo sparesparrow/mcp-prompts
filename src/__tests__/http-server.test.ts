@@ -3,13 +3,13 @@ import type { DeepMockProxy } from 'jest-mock-extended';
 import { mock } from 'jest-mock-extended';
 import request from 'supertest';
 
-import { startHttpServer, errorHandler, HttpErrorCode } from '../http-server';
+import { closeServer } from '../../tests/setup.js';
+import { AppError } from '../errors.js';
+import { errorHandler, HttpErrorCode, startHttpServer } from '../http-server';
 import type { Prompt } from '../interfaces.js';
 import type { PromptService } from '../prompt-service.js';
 import type { SequenceService } from '../sequence-service.js';
 import type { WorkflowService } from '../workflow-service.js';
-import { closeServer } from '../../tests/setup.js';
-import { AppError } from '../errors.js';
 
 describe.skip('HTTP Server', () => {
   let server: Server;
@@ -33,7 +33,7 @@ describe.skip('HTTP Server', () => {
         port: 0,
         ssePath: '/events',
       },
-      { promptService, sequenceService, workflowService, storageAdapters: [] },
+      { promptService, sequenceService, storageAdapters: [], workflowService },
     );
   });
 
@@ -81,14 +81,14 @@ describe.skip('HTTP Server', () => {
       // NOTE: The API requires id, version, createdAt, and updatedAt fields for prompt creation.
       const now = new Date().toISOString();
       const prompt = {
-        id: 'test-prompt',
         content: 'Hello, {{name}}!',
+        createdAt: now,
+        id: 'test-prompt',
         isTemplate: true,
         name: 'Test Prompt',
+        updatedAt: now,
         variables: ['name'],
         version: 1,
-        createdAt: now,
-        updatedAt: now,
       };
 
       promptService.createPrompt.mockResolvedValue({ ...prompt });
@@ -98,8 +98,8 @@ describe.skip('HTTP Server', () => {
 
       expect(response.status).toBe(201);
       expect(response.body).toMatchObject({
-        success: true,
         prompt,
+        success: true,
       });
     });
 
@@ -132,8 +132,8 @@ describe.skip('HTTP Server', () => {
 
       expect(response.status).toBe(200);
       expect(response.body).toMatchObject({
-        success: true,
         prompt,
+        success: true,
       });
     });
 
@@ -152,7 +152,9 @@ describe.skip('HTTP Server', () => {
 
   describe('Error Handling', () => {
     it('should handle internal server errors', async () => {
-      promptService.getPrompt.mockRejectedValue(new AppError('Database error', 500, 'INTERNAL_SERVER_ERROR'));
+      promptService.getPrompt.mockRejectedValue(
+        new AppError('Database error', 500, 'INTERNAL_SERVER_ERROR'),
+      );
 
       const apiKey = 'test-key';
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
@@ -169,11 +171,11 @@ describe.skip('HTTP Server', () => {
 
       expect(response.status).toBe(404);
       expect(response.body).toEqual({
-        success: false,
         error: {
           code: 'NOT_FOUND',
           message: 'Resource not found',
         },
+        success: false,
       });
     });
   });
@@ -183,11 +185,11 @@ describe.skip('HTTP Server', () => {
     const res = await request(server).get('/unknown-route').set('x-api-key', apiKey);
     expect(res.status).toBe(404);
     expect(res.body).toEqual({
-      success: false,
       error: {
         code: 'NOT_FOUND',
         message: 'Resource not found',
       },
+      success: false,
     });
   });
 });

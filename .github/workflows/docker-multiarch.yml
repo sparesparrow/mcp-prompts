@@ -79,4 +79,4 @@ jobs:
       - name: Cleanup
         if: always()
         run: |
-          docker rm -f mcp-prompts-test || true 
+          docker rm -f mcp-prompts-test || true

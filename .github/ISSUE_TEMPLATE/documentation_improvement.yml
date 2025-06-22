@@ -7,21 +7,21 @@ body:
     attributes:
       label: Affected documentation
       description: Which documentation file(s) or section(s) does this relate to?
-      placeholder: "e.g. README.md, docs/02-configuration.md, User Guide section on Docker"
+      placeholder: 'e.g. README.md, docs/02-configuration.md, User Guide section on Docker'
   - type: textarea
     id: issue-description
     attributes:
       label: Describe the issue or suggestion
       description: What is unclear, missing, or could be improved? Please be specific.
-      placeholder: "The installation steps are missing a note about ..."
+      placeholder: 'The installation steps are missing a note about ...'
   - type: textarea
     id: proposed-change
     attributes:
       label: Proposed change or addition
       description: If you have a suggestion for how to improve the documentation, please describe it here.
-      placeholder: "Add a step to ... or clarify ..."
+      placeholder: 'Add a step to ... or clarify ...'
   - type: textarea
     id: context
     attributes:
       label: Additional context
-      description: Add any other context, links, or screenshots that might help clarify the issue or suggestion. 
+      description: Add any other context, links, or screenshots that might help clarify the issue or suggestion.

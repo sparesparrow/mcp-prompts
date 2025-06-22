@@ -14,16 +14,19 @@ import { PromptService } from './prompt-service.js';
 import { SequenceServiceImpl } from './sequence-service.js';
 import { WorkflowServiceImpl } from './workflow-service.js';
 
+/**
+ *
+ */
 async function main() {
   const env = loadConfig();
   const logger = pino({
     level: env.LOG_LEVEL || 'info',
     ...(process.env.NODE_ENV !== 'production' && {
       transport: {
-        target: 'pino-pretty',
         options: {
           colorize: true,
         },
+        target: 'pino-pretty',
       },
     }),
   });
@@ -31,15 +34,15 @@ async function main() {
   const config = {
     ...env,
     storage: {
-      type: env.STORAGE_TYPE,
-      promptsDir: env.PROMPTS_DIR,
-      host: env.POSTGRES_HOST,
-      port: env.POSTGRES_PORT,
-      user: env.POSTGRES_USER,
-      password: env.POSTGRES_PASSWORD,
       database: env.POSTGRES_DATABASE,
+      host: env.POSTGRES_HOST,
       maxConnections: env.POSTGRES_MAX_CONNECTIONS,
+      password: env.POSTGRES_PASSWORD,
+      port: env.POSTGRES_PORT,
+      promptsDir: env.PROMPTS_DIR,
       ssl: env.POSTGRES_SSL,
+      type: env.STORAGE_TYPE,
+      user: env.POSTGRES_USER,
     },
   };
 
@@ -51,9 +54,9 @@ async function main() {
   const workflowService = new WorkflowServiceImpl();
   const elevenLabsService = new ElevenLabsService({
     apiKey: env.ELEVENLABS_API_KEY || '',
-    voiceId: env.ELEVENLABS_VOICE_ID,
-    model: env.ELEVENLABS_MODEL_ID,
     cacheDir: env.ELEVENLABS_CACHE_DIR,
+    model: env.ELEVENLABS_MODEL_ID,
+    voiceId: env.ELEVENLABS_VOICE_ID,
   });
 
   const mcpServer = new McpServer({
@@ -64,18 +67,18 @@ async function main() {
   await startHttpServer(
     mcpServer,
     {
-      port: env.PORT,
-      host: env.HOST,
       corsOrigin: env.CORS_ORIGIN,
       enableSSE: env.ENABLE_SSE,
+      host: env.HOST,
+      port: env.PORT,
       ssePath: env.SSE_PATH,
     },
     {
+      elevenLabsService,
       promptService,
       sequenceService,
-      workflowService,
       storageAdapters: [storageAdapter],
-      elevenLabsService,
+      workflowService,
     },
   );
 
@@ -84,13 +87,22 @@ async function main() {
     return { structuredContent: prompts };
   });
 
-  mcpServer.tool('get_prompt', 'Get a specific prompt by ID', z.object({ id: z.string() }), z.object({}), async (args: { id: string }) => {
-    const prompt = await promptService.getPrompt(args.id);
-    return { structuredContent: prompt };
-  });
+  mcpServer.tool(
+    'get_prompt',
+    'Get a specific prompt by ID',
+    z.object({ id: z.string() }),
+    z.object({}),
+    async (args: { id: string }) => {
+      const prompt = await promptService.getPrompt(args.id);
+      return { structuredContent: prompt };
+    },
+  );
 
   logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
 
+  /**
+   *
+   */
   async function shutdown() {
     logger.info('Shutting down MCP Prompts server...');
     await mcpServer.close();

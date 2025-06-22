@@ -15,4 +15,4 @@ const require = createRequire(import.meta.url);
 
 // Use require to load the CommonJS module
 const entryPoint = join(__dirname, 'dist', 'index.js');
-require(entryPoint); 
+require(entryPoint);

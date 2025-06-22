@@ -6,9 +6,10 @@
 import fs from 'fs';
 import * as fsp from 'fs/promises';
 import path from 'path';
-
 import pg from 'pg';
 import type { pino } from 'pino';
+import lockfile from 'proper-lockfile';
+import { z } from 'zod';
 
 import {
   type ListPromptsOptions,
@@ -18,10 +19,13 @@ import {
   type StorageAdapter,
   type WorkflowExecutionState,
 } from './interfaces.js';
-import { z } from 'zod';
 import { promptSchemas, workflowSchema } from './schemas.js';
-import lockfile from 'proper-lockfile';
 
+/**
+ *
+ * @param config
+ * @param logger
+ */
 export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
   const { storage } = config;
 
@@ -35,13 +39,13 @@ export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageA
     case 'postgres':
       logger.info(`Using postgres storage adapter with host: ${storage.host}`);
       return new PostgresAdapter({
-        host: storage.host,
-        port: storage.port,
-        user: storage.user,
-        password: storage.password,
         database: storage.database,
+        host: storage.host,
         max: storage.maxConnections,
+        password: storage.password,
+        port: storage.port,
         ssl: storage.ssl,
+        user: storage.user,
       });
     default:
       throw new Error(`Unknown storage adapter type: ${storage.type}`);
@@ -122,7 +126,9 @@ export class FileAdapter implements StorageAdapter {
     return name.toLowerCase().replace(/\s+/g, '-');
   }
 
-  public async savePrompt(promptData: Omit<Prompt, 'id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
+  public async savePrompt(
+    promptData: Omit<Prompt, 'id' | 'version' | 'createdAt' | 'updatedAt'>,
+  ): Promise<Prompt> {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
@@ -187,7 +193,9 @@ export class FileAdapter implements StorageAdapter {
 
   public async listPromptVersions(id: string): Promise<number[]> {
     if (!this.connected) throw new Error('File storage not connected');
-    const files = (await fsp.readdir(this.promptsDir)).filter(f => f.startsWith(`${id}-v`) && f.endsWith('.json'));
+    const files = (await fsp.readdir(this.promptsDir)).filter(
+      f => f.startsWith(`${id}-v`) && f.endsWith('.json'),
+    );
     return files
       .map(f => {
         const match = f.match(/-v(\d+)\.json$/);
@@ -211,8 +219,8 @@ export class FileAdapter implements StorageAdapter {
       ...existingPrompt,
       ...updatedData,
       id,
-      version,
       updatedAt: new Date().toISOString(),
+      version,
     };
 
     const finalPath = this.getPromptFileName(id, version);
@@ -374,7 +382,10 @@ export class FileAdapter implements StorageAdapter {
 
   public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
     try {
-      const content = await fsp.readFile(path.join(this.workflowStatesDir, `${executionId}.json`), 'utf-8');
+      const content = await fsp.readFile(
+        path.join(this.workflowStatesDir, `${executionId}.json`),
+        'utf-8',
+      );
       const state: WorkflowExecutionState = JSON.parse(content);
       workflowSchema.parse(state);
       return state;
@@ -483,7 +494,10 @@ export class MemoryAdapter implements StorageAdapter {
     if (!allVersions) {
       const latestVersions = new Map<string, Prompt>();
       for (const p of all) {
-        if (!latestVersions.has(p.id) || (latestVersions.get(p.id)?.version ?? 0) < (p.version ?? 0)) {
+        if (
+          !latestVersions.has(p.id) ||
+          (latestVersions.get(p.id)?.version ?? 0) < (p.version ?? 0)
+        ) {
           latestVersions.set(p.id, p);
         }
       }
@@ -524,7 +538,11 @@ export class MemoryAdapter implements StorageAdapter {
     return promptData;
   }
 
-  public async updatePrompt(id: string, version: number, promptData: Partial<Prompt>): Promise<Prompt> {
+  public async updatePrompt(
+    id: string,
+    version: number,
+    promptData: Partial<Prompt>,
+  ): Promise<Prompt> {
     const existing = await this.getPrompt(id, version);
     if (!existing) {
       throw new Error(`Prompt with id ${id} and version ${version} not found`);
@@ -537,8 +555,8 @@ export class MemoryAdapter implements StorageAdapter {
       ...existing,
       ...promptData,
       id,
-      version: newVersion,
       updatedAt: new Date().toISOString(),
+      version: newVersion,
     };
 
     const promptVersions = this.prompts.get(id);
@@ -615,9 +633,10 @@ export class PostgresAdapter implements StorageAdapter {
 
   public constructor(config: pg.PoolConfig) {
     this.config = {
-      max: 20, // Increased pool size
+      connectionTimeoutMillis: 10000,
+      // Increased pool size
       idleTimeoutMillis: 30000,
-      connectionTimeoutMillis: 10000, // 10-second timeout
+      max: 20, // 10-second timeout
       ...config,
     };
     this.pool = new pg.Pool(this.config);
@@ -813,8 +832,8 @@ export class PostgresAdapter implements StorageAdapter {
       ...existingPrompt,
       ...updatedData,
       id,
-      version,
       updatedAt: new Date().toISOString(),
+      version,
     };
 
     const finalPath = this.getPromptFileName(id, version);

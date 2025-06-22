@@ -10,9 +10,11 @@ Two critical issues have been identified that prevent users from running the MCP
 ## 🔍 Issue #1: Docker Build Problem
 
 ### Problem Description
+
 The Docker images for MCP Prompts are not working properly due to a build issue where TypeScript files are not being compiled to JavaScript before being included in the image.
 
 ### Error Details
+
 ```
 TypeError: Unknown file extension ".ts" for /app/src/index.ts
     at Object.getFileProtocolModuleFormat [as file:] (node:internal/modules/esm/get_format:189:9)
@@ -24,6 +26,7 @@ TypeError: Unknown file extension ".ts" for /app/src/index.ts
 ```
 
 ### Root Cause
+
 - Build process is not properly compiling TypeScript files to JavaScript
 - Docker images contain source `.ts` files instead of compiled `.js` files
 - Node.js runtime cannot execute TypeScript files directly
@@ -31,9 +34,11 @@ TypeError: Unknown file extension ".ts" for /app/src/index.ts
 ## 🔍 Issue #2: NPX Runtime Error
 
 ### Problem Description
+
 Even the recommended NPX method is failing with a runtime error, making the server unusable for all users.
 
 ### Error Details
+
 ```
 Starting MCP Prompts Server v1.2.38
 Config: {"name":"mcp-prompts","version":"1.2.38",...}
@@ -45,6 +50,7 @@ Error starting server: TypeError: server.resource is not a function
 ```
 
 ### Root Cause
+
 - MCP SDK version compatibility issue
 - `server.resource` method doesn't exist in the current SDK version
 - This affects the core MCP server functionality
@@ -52,6 +58,7 @@ Error starting server: TypeError: server.resource is not a function
 ## 🛠️ Immediate Solutions Implemented
 
 ### Documentation Updates (PR: #fix/docker-documentation)
+
 - ✅ Updated README.md with cross-platform Docker commands
 - ✅ Added Windows PowerShell and Command Prompt examples
 - ✅ Added comprehensive troubleshooting section
@@ -61,18 +68,21 @@ Error starting server: TypeError: server.resource is not a function
 ## 🚨 Required Fixes (High Priority)
 
 ### 1. Fix NPX Runtime Error (CRITICAL)
+
 - **Priority**: URGENT - This affects ALL users
 - **Action**: Update MCP SDK version or fix method calls
 - **Location**: `src/index.ts` line 153
 - **Impact**: Server completely unusable
 
 ### 2. Fix Docker Build Process (HIGH)
+
 - **Priority**: HIGH - Docker deployment broken
 - **Action**: Fix TypeScript compilation in Dockerfile
 - **Location**: Docker build pipeline
 - **Impact**: Docker deployment unusable
 
 ### 3. Update Dependencies (MEDIUM)
+
 - **Priority**: MEDIUM - Prevent future issues
 - **Action**: Review and update all dependencies
 - **Location**: `package.json`
@@ -81,12 +91,14 @@ Error starting server: TypeError: server.resource is not a function
 ## 📋 Testing Checklist
 
 ### NPX Method
+
 - [ ] Server starts without `server.resource` error
 - [ ] Health endpoint responds correctly
 - [ ] All storage adapters work
 - [ ] MCP protocol functions properly
 
 ### Docker Method
+
 - [ ] Docker image builds successfully
 - [ ] Container starts without TypeScript errors
 - [ ] Health endpoint responds correctly
@@ -101,12 +113,14 @@ Error starting server: TypeError: server.resource is not a function
 ## 📝 Technical Details
 
 ### Affected Files
+
 - `src/index.ts` - MCP server initialization
 - `Dockerfile` - Docker build process
 - `package.json` - Dependencies
 - `README.md` - Documentation (already fixed)
 
 ### Environment
+
 - **OS**: Windows 10/11, Linux, macOS
 - **Node.js**: 20+
 - **Docker**: All versions
@@ -115,11 +129,13 @@ Error starting server: TypeError: server.resource is not a function
 ## 🎯 Impact Assessment
 
 ### User Impact
+
 - **Severity**: CRITICAL - No working deployment method
 - **Scope**: ALL users affected
 - **Workaround**: None currently available
 
 ### Business Impact
+
 - **Reputation**: Negative impact on project credibility
 - **Adoption**: Prevents new users from trying the project
 - **Support**: Increased support requests
@@ -127,16 +143,19 @@ Error starting server: TypeError: server.resource is not a function
 ## 📅 Timeline
 
 ### Immediate (This Week)
+
 1. Fix NPX runtime error
 2. Test and verify NPX method works
 3. Update documentation
 
 ### Short Term (Next Week)
+
 1. Fix Docker build process
 2. Test Docker deployment
 3. Update CI/CD pipeline
 
 ### Medium Term (Next Month)
+
 1. Add comprehensive testing
 2. Improve error handling
 3. Add monitoring and logging
@@ -147,4 +166,4 @@ Error starting server: TypeError: server.resource is not a function
 **Labels**: `bug`, `critical`, `docker`, `npx`, `high-priority`, `blocker`  
 **Assignees**: @sparesparrow  
 **Milestone**: v1.9.0  
-**Priority**: Critical 
+**Priority**: Critical

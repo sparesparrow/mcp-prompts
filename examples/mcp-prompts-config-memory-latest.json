@@ -2,14 +2,11 @@
   "mcpServers": {
     "mcp-prompts": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@sparesparrow/mcp-prompts"
-      ],
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "STORAGE_TYPE": "memory",
         "LOG_LEVEL": "debug"
       }
     }
   }
-} 
+}

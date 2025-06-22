@@ -14,17 +14,9 @@ export default {
       },
     ],
   },
-  testMatch: [
-    "**/__tests__/**/*.ts?(x)",
-    "**/?(*.)+(spec|test|unit|integration).ts?(x)"
-  ],
+  testMatch: ['**/__tests__/**/*.ts?(x)', '**/?(*.)+(spec|test|unit|integration).ts?(x)'],
   coverageDirectory: 'coverage',
-  collectCoverageFrom: [
-    'src/**/*.ts',
-    '!src/**/*.d.ts',
-    '!src/**/*.test.ts',
-    '!src/index.ts',
-  ],
+  collectCoverageFrom: ['src/**/*.ts', '!src/**/*.d.ts', '!src/**/*.test.ts', '!src/index.ts'],
   coverageThreshold: {
     global: {
       branches: 80,
@@ -38,4 +30,4 @@ export default {
   testTimeout: 30000,
   maxWorkers: 1,
   forceExit: true,
-}; 
+};

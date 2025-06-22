@@ -5,21 +5,21 @@
 
 import Handlebars from 'handlebars';
 
+import { config } from './config.js';
+import { AppError, DuplicateError } from './errors.js';
 import type { StorageAdapter } from './interfaces.js';
 import type { ApplyTemplateResult, Prompt } from './interfaces.js';
 import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
 import * as Prompts from './prompts.js';
 import { promptSchemas } from './schemas.js';
-import { DuplicateError, AppError } from './errors.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
-import { config } from './config.js';
 
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
-  toUpperCase: (str: string) => str.toUpperCase(),
-  toLowerCase: (str: string) => str.toLowerCase(),
-  jsonStringify: (obj: any) => JSON.stringify(obj, jsonFriendlyErrorReplacer, 2),
-  join: (arr: any[], sep = ', ') => arr.join(sep),
   eq: (a: any, b: any) => a === b,
+  join: (arr: any[], sep = ', ') => arr.join(sep),
+  jsonStringify: (obj: any) => JSON.stringify(obj, jsonFriendlyErrorReplacer, 2),
+  toLowerCase: (str: string) => str.toLowerCase(),
+  toUpperCase: (str: string) => str.toUpperCase(),
 };
 
 export class PromptService {
@@ -45,23 +45,21 @@ export class PromptService {
     const existingPrompts = await this.listPrompts({});
     if (existingPrompts.length === 0) {
       await Promise.all(
-        Object.values(Prompts.defaultPrompts).map(prompt => this.createPrompt(prompt as CreatePromptArgs)),
+        Object.values(Prompts.defaultPrompts).map(prompt =>
+          this.createPrompt(prompt as CreatePromptArgs),
+        ),
       );
     }
   }
 
   /**
    * Create a new prompt (version 1 or specified version). Throws if (id, version) exists.
+   * @param args
    */
   public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
     const parseResult = promptSchemas.create.safeParse(args);
     if (!parseResult.success) {
-      throw new AppError(
-        'Invalid prompt data',
-        400,
-        'VALIDATION_ERROR',
-        parseResult.error.issues,
-      );
+      throw new AppError('Invalid prompt data', 400, 'VALIDATION_ERROR', parseResult.error.issues);
     }
 
     const { name, version: inputVersion } = parseResult.data;
@@ -75,8 +73,8 @@ export class PromptService {
     }
     const prompt: Prompt = {
       ...parseResult.data,
-      id,
       createdAt: args.createdAt ?? new Date().toISOString(),
+      id,
       updatedAt: args.updatedAt ?? new Date().toISOString(),
       version,
     };
@@ -111,8 +109,8 @@ export class PromptService {
               ? [
                   {
                     code: 'custom' as const,
-                    path: ['variables'] as (string | number)[],
                     message: `Missing variables: ${missingInDeclared.join(', ')}`,
+                    path: ['variables'] as (string | number)[],
                   },
                 ]
               : []),
@@ -120,8 +118,8 @@ export class PromptService {
               ? [
                   {
                     code: 'custom' as const,
-                    path: ['variables'] as (string | number)[],
                     message: `Extra variables: ${extraInDeclared.join(', ')}`,
+                    path: ['variables'] as (string | number)[],
                   },
                 ]
               : []),
@@ -137,6 +135,8 @@ export class PromptService {
 
   /**
    * Get a prompt by ID and version (latest if not specified).
+   * @param id
+   * @param version
    */
   public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
     return this.storage.getPrompt(id, version);
@@ -144,6 +144,9 @@ export class PromptService {
 
   /**
    * Update a specific version of a prompt. Throws if not found.
+   * @param id
+   * @param version
+   * @param args
    */
   public async updatePrompt(
     id: string,
@@ -157,9 +160,11 @@ export class PromptService {
     const updated: Prompt = {
       ...existing,
       ...args,
-      id, // Preserve original ID
-      version, // Preserve version
+      id,
+      // Preserve version
       updatedAt: new Date().toISOString(),
+      // Preserve original ID
+      version,
     };
     const result = await this.storage.updatePrompt(id, version, updated);
     await this.invalidatePromptCache(id);
@@ -168,6 +173,8 @@ export class PromptService {
 
   /**
    * Delete a specific version of a prompt, or all versions if version is omitted.
+   * @param id
+   * @param version
    */
   public async deletePrompt(id: string, version?: number): Promise<void> {
     await this.storage.deletePrompt(id, version);
@@ -176,6 +183,8 @@ export class PromptService {
 
   /**
    * List prompts (latest version only by default, or all versions if specified).
+   * @param args
+   * @param allVersions
    */
   public async listPrompts(args: ListPromptsArgs, allVersions = false): Promise<Prompt[]> {
     return this.storage.listPrompts(args, allVersions);
@@ -183,6 +192,7 @@ export class PromptService {
 
   /**
    * List all versions for a prompt ID.
+   * @param id
    */
   public async listPromptVersions(id: string): Promise<number[]> {
     return this.storage.listPromptVersions(id);
@@ -190,6 +200,9 @@ export class PromptService {
 
   /**
    * Apply a template prompt by ID and version (latest if not specified).
+   * @param id
+   * @param variables
+   * @param version
    */
   public async applyTemplate(
     id: string,
@@ -198,7 +211,11 @@ export class PromptService {
   ): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id, version);
     if (!prompt) {
-      throw new AppError(`Template prompt not found: ${id} v${version ?? 'latest'}`, 404, 'NOT_FOUND');
+      throw new AppError(
+        `Template prompt not found: ${id} v${version ?? 'latest'}`,
+        404,
+        'NOT_FOUND',
+      );
     }
     if (!prompt.isTemplate) {
       throw new Error(`Prompt is not a template: ${id}`);
@@ -319,6 +336,7 @@ export class PromptService {
 
   /**
    * Bulk create prompts. Returns an array of results (success or error per prompt).
+   * @param argsArray
    */
   public async createPromptsBulk(
     argsArray: CreatePromptArgs[],
@@ -327,9 +345,9 @@ export class PromptService {
     for (const args of argsArray) {
       try {
         const prompt = await this.createPrompt(args);
-        results.push({ success: true, id: prompt.id });
+        results.push({ id: prompt.id, success: true });
       } catch (err: any) {
-        results.push({ success: false, error: err?.message || 'Unknown error' });
+        results.push({ error: err?.message || 'Unknown error', success: false });
       }
     }
     return results;
@@ -337,6 +355,7 @@ export class PromptService {
 
   /**
    * Bulk delete prompts. Returns an array of results (success or error per id).
+   * @param ids
    */
   public async deletePromptsBulk(
     ids: string[],
@@ -345,9 +364,9 @@ export class PromptService {
     for (const id of ids) {
       try {
         await this.deletePrompt(id);
-        results.push({ success: true, id });
+        results.push({ id, success: true });
       } catch (err: any) {
-        results.push({ success: false, id, error: err?.message || 'Unknown error' });
+        results.push({ error: err?.message || 'Unknown error', id, success: false });
       }
     }
     return results;
@@ -355,6 +374,7 @@ export class PromptService {
 
   /**
    * Invalidate prompt and prompt list caches after mutation.
+   * @param id
    */
   private async invalidatePromptCache(id?: string) {
     const redis = getRedisClient();

@@ -75,4 +75,4 @@ export class DuplicateError extends AppError {
   public constructor(message: string) {
     super(message, 409, HttpErrorCode.CONFLICT);
   }
-} 
+}

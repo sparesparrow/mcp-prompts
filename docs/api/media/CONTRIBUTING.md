@@ -14,16 +14,16 @@ There are many ways to contribute, from writing tutorials or blog posts, improvi
 
 ### Reporting Bugs
 
--   Use the **"Bug report"** issue template.
--   Include clear steps to reproduce the issue.
--   Describe the expected behavior and what happened instead.
--   Provide details about your environment (OS, Node.js version, Docker version, etc.).
+- Use the **"Bug report"** issue template.
+- Include clear steps to reproduce the issue.
+- Describe the expected behavior and what happened instead.
+- Provide details about your environment (OS, Node.js version, Docker version, etc.).
 
 ### Suggesting Enhancements
 
--   Use the **"Feature request"** issue template.
--   Explain the problem you're trying to solve and the desired outcome.
--   Provide as much detail and context as possible.
+- Use the **"Feature request"** issue template.
+- Explain the problem you're trying to solve and the desired outcome.
+- Provide as much detail and context as possible.
 
 ### Your First Code Contribution
 
@@ -112,14 +112,17 @@ When you're ready to submit your changes, please follow these steps:
 We will review your PR as soon as possible. Thank you for your contribution!
 
 ## Using Issue Templates
+
 - Please use the provided templates for bug reports and feature requests. This helps us triage and resolve issues faster.
 
 ## Security
+
 - Please report vulnerabilities privately via [SECURITY.md](./SECURITY.md).
 
 ## Pull Requests
+
 - Fork the repo and create a feature branch.
 - Run `npm install` and `npm test` to ensure all tests pass.
 - Submit a pull request with a clear description.
 
-Thank you for helping improve MCP-Prompts! 
+Thank you for helping improve MCP-Prompts!

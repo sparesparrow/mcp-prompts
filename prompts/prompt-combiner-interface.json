@@ -11,15 +11,9 @@
     "additional_config_properties",
     "additional_specializations"
   ],
-  "tags": [
-    "development",
-    "interfaces",
-    "prompt-engineering",
-    "workflows",
-    "integration"
-  ],
+  "tags": ["development", "interfaces", "prompt-engineering", "workflows", "integration"],
   "category": "architecture",
   "createdAt": "2024-08-08T17:00:00.000Z",
   "updatedAt": "2024-08-08T17:00:00.000Z",
   "version": 1
-} 
+}

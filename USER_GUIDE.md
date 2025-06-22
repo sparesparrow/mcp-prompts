@@ -1,6 +1,7 @@
 # MCP-Prompts Deployment & Usage Guide
 
 ## Prerequisites
+
 - **Node.js** (v18+ recommended) for local/server installs
 - **Docker** (for containerized deployment)
 - **Ports:** Default HTTP port is `3003`
@@ -10,16 +11,18 @@
 ---
 
 ## 🚀 Quick Start Table
-| Method         | Command/Config                                                                                 |
-|---------------|-----------------------------------------------------------------------------------------------|
-| Local (npx)   | `npx -y @sparesparrow/mcp-prompts`                                                            |
-| Local (Node)  | `git clone ... && npm install && npm run build && node build/index.js`                        |
-| Docker        | `docker run -d -p 3003:3003 -e HTTP_SERVER=true -e STORAGE_TYPE=file -v $(pwd)/data:/app/data sparesparrow/mcp-prompts:latest` |
-| Docker Compose| See below for example (Postgres or file)                                                       |
+
+| Method         | Command/Config                                                                                                                 |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Local (npx)    | `npx -y @sparesparrow/mcp-prompts`                                                                                             |
+| Local (Node)   | `git clone ... && npm install && npm run build && node build/index.js`                                                         |
+| Docker         | `docker run -d -p 3003:3003 -e HTTP_SERVER=true -e STORAGE_TYPE=file -v $(pwd)/data:/app/data sparesparrow/mcp-prompts:latest` |
+| Docker Compose | See below for example (Postgres or file)                                                                                       |
 
 ---
 
 ## 🖥️ Local Deployment (npx/Node.js)
+
 ```bash
 # Easiest: npx (no install needed)
 npx -y @sparesparrow/mcp-prompts
@@ -32,6 +35,7 @@ npx -y @sparesparrow/mcp-prompts
 ```
 
 ### Environment Variables
+
 - `HTTP_SERVER=true` (enable HTTP API)
 - `PORT=3003` (change port if needed)
 - `STORAGE_TYPE=file|postgres` (choose storage backend)
@@ -42,6 +46,7 @@ npx -y @sparesparrow/mcp-prompts
 ---
 
 ## 🐳 Docker Deployment
+
 ```bash
 docker run -d --name mcp-prompts \
   -p 3003:3003 \
@@ -50,24 +55,26 @@ docker run -d --name mcp-prompts \
   -v $(pwd)/data:/app/data \
   sparesparrow/mcp-prompts:latest
 ```
+
 - For persistent storage, always map a host directory to `/app/data`.
 - For production, set `API_KEYS` and review CORS/rate limiting settings.
 
 ---
 
 ## 🐳 Docker Compose Example (PostgreSQL)
+
 ```yaml
-version: "3"
+version: '3'
 services:
   prompts:
     image: sparesparrow/mcp-prompts:latest
     environment:
-      HTTP_SERVER: "true"
-      STORAGE_TYPE: "postgres"
-      POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
-      API_KEYS: "your-production-key"
-    ports: [ "3003:3003" ]
-    depends_on: [ db ]
+      HTTP_SERVER: 'true'
+      STORAGE_TYPE: 'postgres'
+      POSTGRES_CONNECTION_STRING: 'postgresql://postgres:password@db:5432/mcp_prompts'
+      API_KEYS: 'your-production-key'
+    ports: ['3003:3003']
+    depends_on: [db]
     volumes:
       - ./data:/app/data
   db:
@@ -82,6 +89,7 @@ services:
 ---
 
 ## 🔑 API Key Authentication
+
 - Set `API_KEYS` env variable (comma-separated for multiple keys)
 - All API requests (except `/health` and `/api-docs`) require `x-api-key` header
 - **Example (curl):**
@@ -96,6 +104,7 @@ services:
 ---
 
 ## 🩺 Health Check & Troubleshooting
+
 - Check server health:
   ```bash
   curl http://localhost:3003/health
@@ -104,18 +113,20 @@ services:
 - Logs are printed to stdout (Docker: `docker logs mcp-prompts`)
 
 ### Common Problems & Solutions
-| Problem                  | Solution                                                                 |
-|--------------------------|--------------------------------------------------------------------------|
-| Port already in use      | Change `PORT` env variable or stop conflicting service                    |
-| Storage errors           | Check volume mapping or Postgres connection string                        |
-| Auth errors (401/403)    | Ensure correct `x-api-key` header and value                              |
-| Data not persistent      | Map a host directory to `/app/data` in Docker or use Postgres            |
-| API docs not loading     | Ensure server is running and visit `/api-docs`                           |
-| SSE not working          | Set `ENABLE_SSE=true` and check `/events` endpoint                       |
+
+| Problem               | Solution                                                      |
+| --------------------- | ------------------------------------------------------------- |
+| Port already in use   | Change `PORT` env variable or stop conflicting service        |
+| Storage errors        | Check volume mapping or Postgres connection string            |
+| Auth errors (401/403) | Ensure correct `x-api-key` header and value                   |
+| Data not persistent   | Map a host directory to `/app/data` in Docker or use Postgres |
+| API docs not loading  | Ensure server is running and visit `/api-docs`                |
+| SSE not working       | Set `ENABLE_SSE=true` and check `/events` endpoint            |
 
 ---
 
 ## 🛡️ Production Security Checklist
+
 - [ ] Set strong, unique `API_KEYS` (never use default or public keys)
 - [ ] Restrict allowed origins with CORS settings
 - [ ] Enable and tune rate limiting (see README for env vars)
@@ -128,6 +139,7 @@ services:
 ---
 
 ## ⬆️ How to Upgrade Safely
+
 1. **Backup your data** (data directory or Postgres DB)
 2. **Pull the latest image or update npm package**
    - Docker: `docker pull sparesparrow/mcp-prompts:latest`
@@ -139,27 +151,32 @@ services:
 ---
 
 ## Using with Clients
+
 - **LM Studio, Cursor IDE, LibreChat, Tasker, Android:**
   - Add MCP-Prompts server URL in client settings
   - If API key is set, configure client to send `x-api-key`
   - See client-specific instructions in this guide
 
 ## API & Swagger/OpenAPI
+
 - Interactive API docs: [http://localhost:3003/api-docs](http://localhost:3003/api-docs)
 - Explore endpoints, schemas, and try requests in browser
 - All endpoints (except `/health` and `/api-docs`) require API key if set
 
 ## Server-Sent Events (SSE)
+
 - Enable with `ENABLE_SSE=true` (optional)
 - Default endpoint: `/events`
 - See docs/06-mcp-integration.md for usage
 
 ## Storage Configuration
+
 - **File:** Default, stores prompts/workflows in `/app/data` (map to host for persistence)
 - **Postgres:** Set `STORAGE_TYPE=postgres` and provide `POSTGRES_CONNECTION_STRING`
 - **MDC (Cursor Rules):** See advanced docs
 
 ## Support & Resources
+
 - [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
 - [Official MCP Docs](https://github.com/modelcontextprotocol)
 - See full user and API guides below for advanced usage
@@ -169,8 +186,10 @@ services:
 ## 🌐 Advanced Deployment Scenarios
 
 ### Reverse Proxy (HTTPS, Domain Routing)
+
 - **Recommended for production:** Use Nginx, Caddy, or Traefik to provide HTTPS and custom domain.
 - **Example (Nginx):**
+
   ```nginx
   server {
     listen 443 ssl;
@@ -187,6 +206,7 @@ services:
     }
   }
   ```
+
 - **Caddy (auto HTTPS):**
   ```caddyfile
   prompts.example.com {
@@ -196,11 +216,13 @@ services:
 - **Tip:** Always restrict direct access to port 3003 in production (firewall, security group).
 
 ### Cloud/VPS Deployment
+
 - Open only necessary ports (e.g., 443 for HTTPS, 3003 for local testing).
 - Use Docker or systemd for process management.
 - Set environment variables securely (never commit secrets).
 
 ### Multi-Instance/High Availability
+
 - Use Docker Compose or Kubernetes for scaling.
 - Use a shared Postgres database for prompt/workflow storage.
 - Place a load balancer (e.g., Nginx, Traefik) in front of multiple MCP-Prompts instances.
@@ -211,6 +233,7 @@ services:
 ## 🤖 Client Integration: Step-by-Step
 
 ### LM Studio
+
 1. **Open LM Studio → Settings → Custom Servers**
 2. **Add server:**
    - Name: `MCP Prompts`
@@ -222,6 +245,7 @@ services:
    - Not loading: Check network, firewall, and server logs.
 
 ### Cursor IDE
+
 1. **Open Cursor IDE → Settings → AI → Prompt Management**
 2. **Add resource server:**
    - URL: `https://your-domain.com/prompts` or `http://localhost:3003/prompts`
@@ -232,6 +256,7 @@ services:
    - Not loading: Check URL and server status.
 
 ### LibreChat
+
 1. **Open LibreChat → Settings → Backend Resources**
 2. **Add resource:**
    - Resource URL: `https://your-domain.com/prompts` or `http://localhost:3003/prompts`
@@ -242,6 +267,7 @@ services:
    - Not loading: Check URL and server status.
 
 ### Tasker (Android)
+
 1. **Create HTTP Request action:**
    - Method: GET
    - URL: `http://<server>:3003/prompts`
@@ -254,6 +280,7 @@ services:
 ---
 
 ## 🖼️ Visual Aids & Screenshots
+
 - **[ARCHITECTURE DIAGRAM PLACEHOLDER]**
   - (Contributors: add a diagram showing client(s) → reverse proxy → MCP-Prompts → storage)
 - **[NETWORK FLOW DIAGRAM PLACEHOLDER]**
@@ -271,6 +298,7 @@ services:
 This guide will walk you through setting up the MCP-Prompts server, creating your first prompt and workflow, and integrating it with your tools.
 
 ## 📚 Table of Contents
+
 - [🚀 First Steps: Your First Workflow](#-first-steps-your-first-workflow)
   - [Step 1: Installation & Setup](#step-1-installation--setup)
   - [Step 2: Creating Your First Prompt](#step-2-creating-your-first-prompt)
@@ -342,6 +370,7 @@ curl -X POST http://localhost:3003/workflows \
     ]
 }'
 ```
+
 This defines a workflow that will execute `hello-world-prompt` and pass "Hello from your first workflow!" as the `greeting` variable.
 
 ### Step 4: Running the Workflow
@@ -371,12 +400,14 @@ Congratulations! You have successfully set up the server, created a prompt and a
 ## 🐳 Deployment Options
 
 ### Local Deployment (npx)
+
 ```bash
 # Easiest: npx (no install needed)
 npx -y @sparesparrow/mcp-prompts
 ```
 
 ### Docker Deployment
+
 ```bash
 docker run -d --name mcp-prompts \
   -p 3003:3003 \
@@ -387,11 +418,13 @@ docker run -d --name mcp-prompts \
 ```
 
 ### Docker Compose (with PostgreSQL)
+
 See `docker-compose.yml` in the repository for a full example with PostgreSQL.
 
 ---
 
 ## 🔑 API Key Authentication
+
 - For production, set the `API_KEYS` environment variable (e.g., `API_KEYS=key1,key2`).
 - If set, all API requests (except `/health`) must include an `x-api-key` header.
   ```bash
@@ -401,17 +434,20 @@ See `docker-compose.yml` in the repository for a full example with PostgreSQL.
 ---
 
 ## 🩺 Health Check & Troubleshooting
+
 - **Health Check:** `curl http://localhost:3003/health`
 - **Logs:** Logs are printed to `stdout`. For Docker, use `docker logs mcp-prompts`.
 
 ---
 
 ## 🤖 Client Integration
+
 See the client integration guides in the `docs` folder for step-by-step instructions for tools like LM Studio, Cursor, and LibreChat.
 
 ---
 
 ## 🛡️ Production Security Checklist
+
 - [ ] Set strong, unique `API_KEYS`.
 - [ ] Use a reverse proxy (Nginx, Caddy) to provide HTTPS.
 - [ ] Use a persistent storage option (Postgres or Docker volumes).
@@ -419,24 +455,30 @@ See the client integration guides in the `docs` folder for step-by-step instruct
 - [ ] Monitor server logs and health.
 
 ## Contributing Screenshots
+
 We welcome contributions of screenshots to improve this guide! Please:
+
 - Save images in PNG format.
 - Name files descriptively (e.g., `lm-studio-server-config.png`).
 - Place them in the `images/` directory at the project root.
 - Submit a pull request with your screenshot and update the relevant Markdown image link.
 
 ## Introduction
+
 MCP-Prompts is a lightweight, extensible server for managing prompts and templates in the Model Context Protocol (MCP) ecosystem. This guide will help you set up, configure, and use MCP-Prompts with a variety of clients, including LM Studio, LibreChat, Tasker, Android, Cursor IDE, and Claude Desktop.
 
 **Intended Audience:**
+
 - Developers, prompt engineers, and advanced users who want to manage and version prompts for LLM workflows.
 
 **Prerequisites:**
+
 - Node.js (for local setup)
 - Docker (for containerized setup)
 - Basic familiarity with command-line tools
 
 ## Table of Contents
+
 1. [Getting Started](#getting-started)
 2. [Supported Clients Setup](#supported-clients-setup)
    - [LM Studio](#lm-studio)
@@ -452,12 +494,14 @@ MCP-Prompts is a lightweight, extensible server for managing prompts and templat
 ## Getting Started
 
 ### Local Setup (npx)
+
 ```bash
 npx -y @sparesparrow/mcp-prompts
 curl http://localhost:3003/health
 ```
 
 ### Docker Setup
+
 ```bash
 docker run -d --name mcp-prompts \
   -p 3003:3003 \
@@ -468,17 +512,18 @@ docker run -d --name mcp-prompts \
 ```
 
 ### Docker Compose (PostgreSQL)
+
 ```yaml
-version: "3"
+version: '3'
 services:
   prompts:
     image: sparesparrow/mcp-prompts:latest
     environment:
-      HTTP_SERVER: "true"
-      STORAGE_TYPE: "postgres"
-      POSTGRES_CONNECTION_STRING: "postgresql://postgres:password@db:5432/mcp_prompts"
-    ports: [ "3003:3003" ]
-    depends_on: [ db ]
+      HTTP_SERVER: 'true'
+      STORAGE_TYPE: 'postgres'
+      POSTGRES_CONNECTION_STRING: 'postgresql://postgres:password@db:5432/mcp_prompts'
+    ports: ['3003:3003']
+    depends_on: [db]
   db:
     image: postgres:14
     environment:
@@ -489,6 +534,7 @@ services:
 ## Supported Clients Setup
 
 ### LM Studio
+
 - Add MCP-Prompts as a custom server in LM Studio settings.
 - Example config:
   ```json
@@ -502,6 +548,7 @@ services:
 ### LM Studio: Step-by-Step Setup
 
 1. **Start MCP-Prompts Server**
+
    - Open a terminal and run:
      ```bash
      npx -y @sparesparrow/mcp-prompts
@@ -513,6 +560,7 @@ services:
    - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
+
    - In your browser or terminal, check:
      ```bash
      curl http://localhost:3003/health
@@ -521,6 +569,7 @@ services:
    - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure LM Studio**
+
    - Open LM Studio and go to **Settings** → **Custom Servers**.
    - Click **Add Server** and enter:
      - **Name:** `MCP Prompts`
@@ -534,11 +583,11 @@ services:
 
 #### Troubleshooting LM Studio Integration
 
-| Issue                        | Solution                                                                 |
-|------------------------------|--------------------------------------------------------------------------|
-| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
-| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and LM Studio.|
-| Prompts not showing up       | Check server logs for errors; verify correct URL in LM Studio settings.  |
+| Issue                    | Solution                                                                  |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Cannot connect to server | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`.  |
+| Port 3003 already in use | Stop other services or change the port in both MCP-Prompts and LM Studio. |
+| Prompts not showing up   | Check server logs for errors; verify correct URL in LM Studio settings.   |
 
 #### Quick Reference Checklist
 
@@ -548,6 +597,7 @@ services:
 - [ ] Prompts visible in LM Studio
 
 ### LibreChat
+
 - Add MCP-Prompts as a backend resource.
 - Example config:
   ```json
@@ -560,6 +610,7 @@ services:
 ### LibreChat: Step-by-Step Setup
 
 1. **Start MCP-Prompts Server**
+
    - Open a terminal and run:
      ```bash
      npx -y @sparesparrow/mcp-prompts
@@ -571,6 +622,7 @@ services:
    - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
+
    - In your browser or terminal, check:
      ```bash
      curl http://localhost:3003/health
@@ -579,6 +631,7 @@ services:
    - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure LibreChat**
+
    - Open LibreChat and go to **Settings** → **Backend Resources**.
    - Click **Add Resource** and enter:
      - **Resource URL:** `http://localhost:3003/prompts`
@@ -591,11 +644,11 @@ services:
 
 #### Troubleshooting LibreChat Integration
 
-| Issue                        | Solution                                                                 |
-|------------------------------|--------------------------------------------------------------------------|
-| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
-| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and LibreChat.|
-| Prompts not showing up       | Check server logs for errors; verify correct URL in LibreChat settings.  |
+| Issue                    | Solution                                                                  |
+| ------------------------ | ------------------------------------------------------------------------- |
+| Cannot connect to server | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`.  |
+| Port 3003 already in use | Stop other services or change the port in both MCP-Prompts and LibreChat. |
+| Prompts not showing up   | Check server logs for errors; verify correct URL in LibreChat settings.   |
 
 #### Quick Reference Checklist
 
@@ -607,6 +660,7 @@ services:
 ### Tasker (Android): Step-by-Step Setup
 
 1. **Start MCP-Prompts Server**
+
    - Open a terminal and run:
      ```bash
      npx -y @sparesparrow/mcp-prompts
@@ -618,6 +672,7 @@ services:
    - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
+
    - In your browser or terminal, check:
      ```bash
      curl http://localhost:3003/health
@@ -626,6 +681,7 @@ services:
    - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Tasker HTTP Request**
+
    - Open Tasker on your Android device.
    - Create a new **Profile** (e.g., "Fetch MCP Prompt").
    - Add a **Task** with an **HTTP Request** action:
@@ -642,12 +698,12 @@ services:
 
 #### Troubleshooting Tasker Integration
 
-| Issue                        | Solution                                                                 |
-|------------------------------|--------------------------------------------------------------------------|
-| Cannot connect to server     | Ensure MCP-Prompts is running and accessible from your Android device.   |
-| Network unreachable          | Make sure your Android device and server are on the same Wi-Fi network.  |
-| Prompts not showing up       | Check server logs for errors; verify correct URL and port in Tasker.     |
-| HTTP Request action missing  | Update Tasker to the latest version; see [Tasker User Guide](https://tasker.joaoapps.com/userguide/en/) for help. |
+| Issue                       | Solution                                                                                                          |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| Cannot connect to server    | Ensure MCP-Prompts is running and accessible from your Android device.                                            |
+| Network unreachable         | Make sure your Android device and server are on the same Wi-Fi network.                                           |
+| Prompts not showing up      | Check server logs for errors; verify correct URL and port in Tasker.                                              |
+| HTTP Request action missing | Update Tasker to the latest version; see [Tasker User Guide](https://tasker.joaoapps.com/userguide/en/) for help. |
 
 #### Quick Reference Checklist
 
@@ -671,6 +727,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 ### Cursor IDE: Step-by-Step Setup
 
 1. **Start MCP-Prompts Server**
+
    - Open a terminal and run:
      ```bash
      npx -y @sparesparrow/mcp-prompts
@@ -682,6 +739,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
    - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
+
    - In your browser or terminal, check:
      ```bash
      curl http://localhost:3003/health
@@ -690,6 +748,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
    - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Cursor IDE**
+
    - Open Cursor IDE and go to **Settings** → **AI** → **Prompt Management**.
    - Find the field for **Custom MCP server URL** (or similar).
    - Enter your server address:
@@ -705,11 +764,11 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 
 #### Troubleshooting Cursor IDE Integration
 
-| Issue                        | Solution                                                                 |
-|------------------------------|--------------------------------------------------------------------------|
-| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
-| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and Cursor IDE.|
-| Prompts not showing up       | Check server logs for errors; verify correct URL in Cursor IDE settings.  |
+| Issue                    | Solution                                                                   |
+| ------------------------ | -------------------------------------------------------------------------- |
+| Cannot connect to server | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`.   |
+| Port 3003 already in use | Stop other services or change the port in both MCP-Prompts and Cursor IDE. |
+| Prompts not showing up   | Check server logs for errors; verify correct URL in Cursor IDE settings.   |
 
 #### Quick Reference Checklist
 
@@ -721,6 +780,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 ### Claude Desktop: Step-by-Step Setup
 
 1. **Start MCP-Prompts Server**
+
    - Open a terminal and run:
      ```bash
      npx -y @sparesparrow/mcp-prompts
@@ -732,6 +792,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
    - ![Terminal running MCP-Prompts](images/terminal-mcp-prompts.png) (Screenshot needed! Please contribute.)
 
 2. **Verify Server is Running**
+
    - In your browser or terminal, check:
      ```bash
      curl http://localhost:3003/health
@@ -740,6 +801,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
    - ![Health check output](images/health-check-output.png) (Screenshot needed! Please contribute.)
 
 3. **Configure Claude Desktop**
+
    - Open Claude Desktop and go to **Settings** → **Developer** → **Edit Config**.
    - This opens (or creates) `claude_desktop_config.json`.
    - Add or update the MCP server section, for example:
@@ -761,11 +823,11 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 
 #### Troubleshooting Claude Desktop Integration
 
-| Issue                        | Solution                                                                 |
-|------------------------------|--------------------------------------------------------------------------|
-| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`. |
-| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and Claude Desktop.|
-| Prompts/tools not showing up | Check server logs for errors; verify correct config in Claude Desktop.    |
+| Issue                        | Solution                                                                       |
+| ---------------------------- | ------------------------------------------------------------------------------ |
+| Cannot connect to server     | Ensure MCP-Prompts is running and accessible at `http://localhost:3003`.       |
+| Port 3003 already in use     | Stop other services or change the port in both MCP-Prompts and Claude Desktop. |
+| Prompts/tools not showing up | Check server logs for errors; verify correct config in Claude Desktop.         |
 
 #### Quick Reference Checklist
 
@@ -775,6 +837,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 - [ ] Prompts/tools visible in Claude Desktop
 
 ## Features and Functions
+
 - Pluggable storage: file, Postgres, MDC (Cursor Rules)
 - Versioned prompt management
 - HTTP/SSE API endpoints
@@ -783,12 +846,14 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 - JSON schema validation
 
 ## Advanced Usage Examples
+
 - Creating and applying prompt templates
 - Using the MDC (Cursor Rules) adapter
 - Multi-step workflow examples
 - Exporting/importing prompts
 
 ## Troubleshooting & FAQ
+
 - Common errors and solutions
 - How to check server health
 - How to reset storage
@@ -796,6 +861,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 - How to report issues
 
 ## Contact & Support
+
 - [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
 - [Official MCP Documentation](https://github.com/modelcontextprotocol)
 - Community resources and Discord (if available)
@@ -903,27 +969,34 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 > **Note:** Detailed instructions for these integrations are coming soon. Below is a preview of planned features and use cases.
 
 ### 1. Tasker (Android)
+
 - Automate prompt sending and response handling via HTTP requests to MCP-Prompts server.
 - Trigger prompts from Android events (e.g. notifications, location, app actions).
 - Use Tasker actions to process responses (e.g. show notification, speak via TTS, copy to clipboard).
 
 ### 2. Anthropic API Key for HTTP Requests
+
 - Configure Tasker or other HTTP clients to call MCP-Prompts server with your Anthropic API key for LLM completions.
 - Securely store and use your API key in Tasker variables.
 
 ### 3. Text-to-Speech (TTS)
+
 - Use Tasker to read out prompt responses using Android TTS engine.
 
 ### 4. Clipboard Integration
+
 - Automatically copy prompt responses to clipboard for quick sharing or pasting.
 
 ### 5. Android Share Menu
+
 - Share prompt results directly from MCP-Prompts to other apps via Android's share intent.
 
 ### 6. Android Digital Assistant
+
 - Integrate MCP-Prompts with Google Assistant or other digital assistants for voice-driven workflows.
 
 ### 7. AIDL (Android Interface Definition Language)
+
 - Advanced: Expose MCP-Prompts as a service accessible via AIDL for deep Android app integration.
 
 > **Stay tuned!** Full guides, Tasker profiles, and example scripts will be added here soon.
@@ -931,6 +1004,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 ## Using MCP-Prompts with LM Studio and Other MCP Clients
 
 ### 1. LM Studio
+
 - **Setup:**
   - Ensure MCP-Prompts server is running (see Quickstart above).
   - In LM Studio, go to the settings or integrations section.
@@ -943,6 +1017,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
   - Results will be shown in the chat or output area.
 
 ### 2. LibreChat
+
 - **Setup:**
   - Start the MCP-Prompts server.
   - In LibreChat, open the integrations or plugin settings.
@@ -953,6 +1028,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
   - Use the GUI to select, fill, and submit prompts.
 
 ### 3. Other MCP Clients (General Instructions)
+
 - **Setup:**
   - Start MCP-Prompts server and ensure it is accessible from the client machine.
   - In your MCP client (e.g., browser extension, desktop app, web app), look for an option to add or configure an MCP server.
@@ -968,6 +1044,7 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
 ## 🛠️ Advanced Usage & API Examples
 
 ### Common API Calls (with curl)
+
 - **List prompts:**
   ```bash
   curl -H "x-api-key: yourkey" http://localhost:3003/prompts
@@ -998,12 +1075,14 @@ See [examples/android-fetch-prompt.sh](./examples/android-fetch-prompt.sh) for a
   ```
 
 ### Using HTTPie (alternative to curl)
+
 ```bash
 http GET :3003/prompts x-api-key:yourkey
 http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
 ```
 
 ### Using Postman
+
 - Set the request URL and method as above.
 - Add `x-api-key` header with your key.
 - For POST/PUT, set body to raw JSON.
@@ -1011,6 +1090,7 @@ http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
 ---
 
 ### Workflows & Templates
+
 - **Templates** allow variables in prompt content, e.g.:
   ```json
   {
@@ -1029,6 +1109,7 @@ http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
 ---
 
 ### Server-Sent Events (SSE) Example
+
 - **Enable SSE:** Set `ENABLE_SSE=true` and connect to `/events`.
 - **Sample JS client:**
   ```js
@@ -1041,16 +1122,17 @@ http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
 ---
 
 ## 🧩 Troubleshooting & FAQ (Advanced)
-| Problem                        | Solution/Tip                                                                 |
-|--------------------------------|------------------------------------------------------------------------------|
-| CORS error in browser          | Set allowed origins via CORS env vars (see README); use HTTPS in production   |
-| Rate limit exceeded (429)      | Increase limits via env vars or slow down requests                           |
-| Postgres migration needed      | Export prompts to file, import to new DB; see migration utility (if available)|
-| File permission denied         | Ensure Docker volume/host dir is writable by container user                  |
-| Logs unclear                   | Increase log level (if supported); check for stack traces and error codes     |
-| SSE not receiving events       | Check network/firewall, ensure SSE enabled, use correct endpoint             |
-| API key works in curl, not client | Check for header typos, client proxying, or CORS issues                  |
-| Workflow not running           | Check workflow definition, logs, and API docs for required fields            |
+
+| Problem                           | Solution/Tip                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------ |
+| CORS error in browser             | Set allowed origins via CORS env vars (see README); use HTTPS in production    |
+| Rate limit exceeded (429)         | Increase limits via env vars or slow down requests                             |
+| Postgres migration needed         | Export prompts to file, import to new DB; see migration utility (if available) |
+| File permission denied            | Ensure Docker volume/host dir is writable by container user                    |
+| Logs unclear                      | Increase log level (if supported); check for stack traces and error codes      |
+| SSE not receiving events          | Check network/firewall, ensure SSE enabled, use correct endpoint               |
+| API key works in curl, not client | Check for header typos, client proxying, or CORS issues                        |
+| Workflow not running              | Check workflow definition, logs, and API docs for required fields              |
 
 ---
 
@@ -1059,6 +1141,7 @@ http POST :3003/prompts x-api-key:yourkey id=my2 name=Test2 content='Hi!'
 We welcome contributions to MCP-Prompts documentation and code!
 
 ### Documentation
+
 - **Screenshots:** Add PNGs to the `images/` directory and update Markdown links.
 - **Diagrams:** Add architecture or network diagrams (SVG/PNG) to `images/` and reference in the guide.
 - **Translations:** Help keep the Czech and English guides in sync, or add new languages.
@@ -1066,16 +1149,19 @@ We welcome contributions to MCP-Prompts documentation and code!
 - **How to contribute:** Fork the repo, make your changes, and submit a pull request (PR).
 
 ### Code
+
 - **Fork and branch:** Fork the repo and create a feature branch.
 - **Code style:** Follow the code style and linting rules (see README and `.eslintrc.js`).
 - **Tests:** Add or update tests for new features or bugfixes.
 - **Pull requests:** Submit PRs with a clear description and reference related issues if applicable.
 
 ### Questions & Feature Requests
+
 - **GitHub Issues:** [https://github.com/sparesparrow/mcp-prompts/issues](https://github.com/sparesparrow/mcp-prompts/issues)
 - **Discussions:** Use GitHub Discussions or open an issue for questions, ideas, or feedback.
 
 ### Syncing Guides
+
 - If you update the English guide, please update the Czech guide (and vice versa) to keep them aligned.
 
 ---
@@ -1106,4 +1192,4 @@ We welcome contributions to MCP-Prompts documentation and code!
 
 ---
 
-_Last updated: [YYYY-MM-DD]_ 
+_Last updated: [YYYY-MM-DD]_

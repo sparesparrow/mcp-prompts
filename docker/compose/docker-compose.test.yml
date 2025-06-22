@@ -30,14 +30,14 @@ services:
       - mcp-prompts-test-data:/app/data
       - mcp-prompts-test-results:/app/test-results
     ports:
-      - "9323:9323"  # Test reporting port
+      - '9323:9323' # Test reporting port
     command: npm run test
     healthcheck:
-      test: ["CMD", "node", "-e", "process.exit(0)"]  # Simple healthcheck for test container
+      test: ['CMD', 'node', '-e', 'process.exit(0)'] # Simple healthcheck for test container
       interval: 10s
       timeout: 3s
       retries: 3
-    restart: "no"  # Do not restart test containers automatically
+    restart: 'no' # Do not restart test containers automatically
     networks:
       - mcp-network
     profiles:
@@ -56,12 +56,12 @@ services:
       - mcp-prompts-postgres-test-data:/var/lib/postgresql/data
       - ../../docker/postgres/init:/docker-entrypoint-initdb.d
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U mcp_test"]
+      test: ['CMD-SHELL', 'pg_isready -U mcp_test']
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 10s
-    restart: "no"  # Do not restart test database automatically
+    restart: 'no' # Do not restart test database automatically
     networks:
       - mcp-network
 
@@ -92,34 +92,3 @@ test-runner:
       condition: service_healthy
   profiles:
     - health-check
-
-name: mcp-prompts-test
-
-services:
-  mcp-prompts:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.testing
-    environment:
-      - NODE_ENV=test
-      - STORAGE_TYPE=memory
-      - TEST_MODE=true
-    command: npm run test
-    profiles:
-      - test
-      - health-check
-
-  mcp-prompts-health:
-    build:
-      context: .
-      dockerfile: docker/Dockerfile.testing
-    environment:
-      - NODE_ENV=test
-      - TEST_MODE=true
-      - TEST_DOCKER_HEALTH=true
-    command: npm run test:integration
-    depends_on:
-      mcp-prompts:
-        condition: service_healthy
-    profiles:
-      - health-check 

@@ -13,7 +13,12 @@ npm install @sparesparrow/mcp-prompts-catalog
 You can import or require prompts and catalog utilities from this package in your MCP-compatible projects:
 
 ```js
-const { getPromptsDir, getCategories, listPrompts, loadPrompt } = require('@sparesparrow/mcp-prompts-catalog');
+const {
+  getPromptsDir,
+  getCategories,
+  listPrompts,
+  loadPrompt,
+} = require('@sparesparrow/mcp-prompts-catalog');
 
 console.log(getPromptsDir()); // Absolute path to the prompts directory
 console.log(getCategories()); // [ 'general', 'code-review', ... ]
@@ -65,4 +70,4 @@ Contributions are welcome! Please see the main repository's [CONTRIBUTING.md](..
 
 ## License
 
-MIT 
+MIT

@@ -31,4 +31,4 @@ describe('SequenceService', () => {
   it('should throw for invalid ID', async () => {
     await expect(service.getSequenceWithPrompts('')).rejects.toThrow();
   });
-}); 
+});

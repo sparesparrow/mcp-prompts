@@ -4,12 +4,12 @@ on:
   workflow_call:
     inputs:
       node-version:
-        description: "Node.js version to use"
+        description: 'Node.js version to use'
         required: false
         default: '20.x'
         type: string
       run-integration:
-        description: "Run integration tests"
+        description: 'Run integration tests'
         required: false
         default: 'true'
         type: string
@@ -81,4 +81,4 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: coverage-report
-          path: coverage/ 
+          path: coverage/

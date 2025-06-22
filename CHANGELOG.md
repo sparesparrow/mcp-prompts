@@ -5,6 +5,7 @@ All notable changes to this project will be documented in this file.
 ## [1.8.0] - 2025-06-21
 
 ### Added
+
 - **Stateful Workflows**: The workflow engine is now stateful, saving execution state after each step. This allows for long-running workflows to be paused and resumed.
 - **Parallel Step Execution**: Workflows now support a `parallel` step type, allowing multiple sub-steps to be executed concurrently for improved performance.
 - **Android Native Service (Rust)**: Implemented a high-performance native service in Rust for the Android application, handling API communication asynchronously.
@@ -15,12 +16,14 @@ All notable changes to this project will be documented in this file.
 - **TypeDoc Generation**: Added `typedoc` and a `docs:generate` script to automatically generate API documentation from source code.
 
 ### Changed
+
 - **Refactored `WorkflowService`**: The `WorkflowService` was significantly refactored to support stateful execution and dependency injection.
 - **Improved `CONTRIBUTING.md`**: The contributing guide was expanded with detailed instructions for setting up the development environment, running tests, and submitting pull requests.
 
 ## [0.7.0] - 2025-03-15
 
 ### Added
+
 - Server-Sent Events (SSE) support for real-time updates
 - New Docker Compose configuration for running with SSE support
 - Script to configure Claude desktop to use MCP-Prompts with SSE support
@@ -35,8 +38,9 @@ All notable changes to this project will be documented in this file.
 - Updated multi-server integration documentation
 
 ### Changed
+
 - Enhanced HTTP server implementation with SSE functionality
 - Updated ServerConfig interface to include SSE-related properties
 - Improved Docker Compose file to include both standard and SSE services
 - Reorganized README.md with more detailed integration diagrams
-- Updated prompt format documentation with resources integration 
+- Updated prompt format documentation with resources integration

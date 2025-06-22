@@ -16,25 +16,12 @@
     "custom_example_description",
     "custom_example_code"
   ],
-  "tags": [
-    "mcp",
-    "resources",
-    "integration",
-    "advanced",
-    "multi-server",
-    "template"
-  ],
+  "tags": ["mcp", "resources", "integration", "advanced", "multi-server", "template"],
   "createdAt": "2025-03-15T16:00:00.000Z",
   "updatedAt": "2025-03-15T16:00:00.000Z",
   "version": 1,
   "metadata": {
-    "recommended_servers": [
-      "github",
-      "filesystem",
-      "postgres",
-      "memory",
-      "prompts"
-    ],
+    "recommended_servers": ["github", "filesystem", "postgres", "memory", "prompts"],
     "example_variables": {
       "integration_task": "building a comprehensive project analysis tool",
       "custom_server": "TimeSeries",

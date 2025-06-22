@@ -124,7 +124,7 @@ jobs:
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version-file: "src/${{ matrix.package }}/.python-version"
+          python-version-file: 'src/${{ matrix.package }}/.python-version'
 
       - name: Install dependencies
         working-directory: src/${{ matrix.package }}
