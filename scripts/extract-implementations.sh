@@ -16,7 +16,6 @@ mkdir -p "$TS_DIR"
 TS_DIRS_TO_MOVE=(
   "src"
   "tests"
-  "scripts"
   "data"
   "docker"
 )
@@ -29,6 +28,24 @@ for dir in "${TS_DIRS_TO_MOVE[@]}"; do
     echo "Warning: Directory $dir not found, skipping."
   fi
 done
+
+# Handle scripts directory separately to avoid moving the running script
+echo "Moving non-migration scripts from scripts/..."
+if [ -d "scripts" ]; then
+    mkdir -p "$TS_DIR/scripts"
+    for item in scripts/*; do
+        case "$(basename "$item")" in
+            extract-*.sh)
+                echo "Skipping migration script: $item"
+                ;;
+            *)
+                if [ -e "$item" ]; then
+                    git mv "$item" "$TS_DIR/scripts/"
+                fi
+                ;;
+        esac
+    done
+fi
 
 # Root files to move
 TS_FILES_TO_MOVE=(

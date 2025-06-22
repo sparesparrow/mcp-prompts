@@ -99,9 +99,9 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-ts`
 
-- [ ] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
-  - [ ] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
-  - [ ] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
+- [x] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
+  - [x] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
+  - [x] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
 - [ ] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
 - [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-collection`.
 - [ ] **CI/CD Pipeline:**
@@ -112,8 +112,8 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-rs`
 
-- [ ] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
-  - [ ] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
+- [x] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
+  - [x] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
 - [ ] **Update Dependencies:** Add `mcp-prompts-collection` as a Cargo dependency.
 - [ ] **CI/CD Pipeline:**
   - [ ] Configure a Cargo build and test pipeline, including `clippy` and `rustfmt` checks.
