@@ -11,4 +11,4 @@ git show HEAD~1:README.md | less
 Alternatively browse the file on GitHub:
 <https://github.com/sparesparrow/mcp-prompts/blob/main/README.md>
 
-Feel free to open an issue if something important is missing from the new docs. 
+Feel free to open an issue if something important is missing from the new docs.

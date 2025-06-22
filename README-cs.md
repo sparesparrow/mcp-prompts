@@ -99,6 +99,7 @@ Neváhejte navrhnout další úkoly nebo založit issue na cokoli, co najdete!
 MCP server může poskytovat tzv. **tools** – akce, které lze volat z klienta (IDE, Claude Desktop, API, LLM). Tools umožňují například vytvářet prompty, analyzovat data, nebo volat externí API.
 
 ### 1. Základní princip
+
 - Každý tool má unikátní jméno, popis a schéma vstupních parametrů (JSON Schema).
 - Tools lze vypsat pomocí požadavku `tools/list` nebo v GUI klienta (např. v Cursor IDE nebo Claude Desktop).
 - Tool se volá pomocí požadavku `tools/call` s parametry podle schématu.
@@ -106,6 +107,7 @@ MCP server může poskytovat tzv. **tools** – akce, které lze volat z klienta
 ### 2. Příklad: Volání toolu přes API
 
 Například tool pro aplikaci šablony promptu může mít definici:
+
 ```json
 {
   "name": "apply_template",
@@ -122,6 +124,7 @@ Například tool pro aplikaci šablony promptu může mít definici:
 ```
 
 Volání přes HTTP API (POST):
+
 ```bash
 curl -X POST http://localhost:3003/api/v1/tools/call \
   -H 'Content-Type: application/json' \
@@ -135,18 +138,21 @@ curl -X POST http://localhost:3003/api/v1/tools/call \
 ```
 
 ### 3. Použití v GUI (Cursor IDE, Claude Desktop)
+
 - V GUI najděte sekci "Tools" nebo "Akce".
 - Vyberte tool podle názvu a popisu.
 - Zadejte požadované parametry (např. ID promptu, hodnoty proměnných).
 - Výsledek se zobrazí v chatu nebo editoru.
 
 ### 4. Best practices a bezpečnost
+
 - **Vždy ověřujte, jaké tools server nabízí** (`tools/list`).
 - **Pečlivě zadávejte parametry** – validace probíhá podle schématu.
 - **Nespouštějte destruktivní tools bez ověření** (např. mazání souborů, zápis do databáze).
 - **Sledujte logy a výstupy** – chybové stavy jsou vraceny v poli `content` s příznakem `isError`.
 
 ### 5. Další informace
+
 - Kompletní popis a příklady najdete v oficiální dokumentaci MCP: [MCP Tools – modelcontextprotocol.io/docs/concepts/tools](https://modelcontextprotocol.io/docs/concepts/tools)
 - Pro pokročilé scénáře (např. dynamické přidávání tools, anotace, bezpečnost) viz sekce "Best practices" a "Security considerations" v dokumentaci.
 
@@ -177,4 +183,4 @@ Tento repozitář obsahuje správce promptů a workflow pro Model Context Protoc
 ## Další informace
 
 - Legacy utility a příkladové soubory byly přesunuty do složek `legacy/` a `examples/`.
-- Pro detailní informace viz README v jednotlivých složkách. 
+- Pro detailní informace viz README v jednotlivých složkách.

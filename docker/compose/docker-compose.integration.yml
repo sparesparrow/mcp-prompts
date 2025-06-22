@@ -25,7 +25,7 @@ services:
     container_name: mcp-memory
     command: sh -c "npm install -g @modelcontextprotocol/server-memory && npx -y @modelcontextprotocol/server-memory"
     ports:
-      - "3020:3000"
+      - '3020:3000'
     restart: unless-stopped
     networks:
       - mcp-network
@@ -38,7 +38,7 @@ services:
     volumes:
       - mcp-filesystem-data:/data
     ports:
-      - "3021:3000"
+      - '3021:3000'
     restart: unless-stopped
     networks:
       - mcp-network
@@ -51,7 +51,7 @@ services:
     environment:
       - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN:-your_token_here}
     ports:
-      - "3022:3000"
+      - '3022:3000'
     restart: unless-stopped
     networks:
       - mcp-network
@@ -62,7 +62,7 @@ services:
     container_name: mcp-sequential-thinking
     command: sh -c "npm install -g @modelcontextprotocol/server-sequential-thinking && npx -y @modelcontextprotocol/server-sequential-thinking"
     ports:
-      - "3023:3000"
+      - '3023:3000'
     restart: unless-stopped
     networks:
       - mcp-network
@@ -80,7 +80,7 @@ services:
     volumes:
       - mcp-elevenlabs-data:/data
     ports:
-      - "3024:3000"
+      - '3024:3000'
     restart: unless-stopped
     networks:
       - mcp-network
@@ -93,4 +93,4 @@ volumes:
 
 networks:
   mcp-network:
-    driver: bridge 
+    driver: bridge

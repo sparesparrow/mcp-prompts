@@ -15,7 +15,7 @@
 Stop scattering prompts across code, Slack, and documents. This server solves real problems that developers and teams face when working with LLMs:
 
 - **🏢 Centralize Team Prompts**: Manage all prompts in one place with consistent API and versioning
-- **🔄 A/B Test & Optimize**: Programmatically test different prompt versions to find the most effective ones  
+- **🔄 A/B Test & Optimize**: Programmatically test different prompt versions to find the most effective ones
 - **🏗️ Build Complex AI Agents**: Chain prompts from multiple MCP servers (@prompts, @filesystem, @github) for sophisticated workflows
 - **🔐 Secure Prompt Access**: Full control over who can read and modify your valuable prompts
 - **📊 Track Performance**: Monitor which templates achieve the best results
@@ -23,7 +23,7 @@ Stop scattering prompts across code, Slack, and documents. This server solves re
 ## ✨ Key Features
 
 - **🗄️ Flexible Storage**: File-based, in-memory, PostgreSQL, and MDC format support
-- **🔧 Dynamic Templates**: Use `{{variables}}` for dynamic content generation  
+- **🔧 Dynamic Templates**: Use `{{variables}}` for dynamic content generation
 - **🌐 Ecosystem Ready**: Seamless integration with @filesystem, @github, and orchestrators
 - **📡 Versioned API**: Stable and predictable REST API for all operations
 - **🏥 Health Monitoring**: Built-in `/health` endpoint for container orchestration
@@ -34,6 +34,7 @@ Stop scattering prompts across code, Slack, and documents. This server solves re
 > ⚠️ **Requirements**: Node.js 20+ and npm 10+ (for npm workspaces support)
 
 ### NPX (Recommended)
+
 Run the server without permanent installation:
 
 ```bash
@@ -41,6 +42,7 @@ npx -y @sparesparrow/mcp-prompts
 ```
 
 ### Docker
+
 For containerized environments with persistent storage:
 
 ```bash
@@ -51,6 +53,7 @@ docker run -d --name mcp-server \
 ```
 
 ### Docker Compose
+
 Create `docker-compose.yml`:
 
 ```yaml
@@ -58,13 +61,13 @@ services:
   prompts:
     image: sparesparrow/mcp-prompts:latest
     ports:
-      - "3003:3003"
+      - '3003:3003'
     volumes:
       - ./data:/app/data
     environment:
       - NODE_ENV=production
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost:3003/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -74,6 +77,7 @@ services:
 Run with: `docker compose up -d`
 
 ### Verify Installation
+
 Check if the server is running:
 
 ```bash
@@ -81,6 +85,7 @@ curl http://localhost:3003/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok",
@@ -92,6 +97,7 @@ Expected response:
 ## 📖 Usage Examples
 
 ### REST API
+
 ```bash
 # List all prompts
 curl http://localhost:3003/prompts
@@ -115,6 +121,7 @@ curl -X POST http://localhost:3003/prompts/my-prompt/apply \
 ```
 
 ### TypeScript Integration
+
 ```typescript
 import { MCPClient } from '@sparesparrow/mcp-prompts-client'; // Future package
 
@@ -123,7 +130,7 @@ const client = new MCPClient('http://localhost:3003');
 // Get prompt with applied variables
 const prompt = await client.applyTemplate('code-review', {
   language: 'TypeScript',
-  context: 'security review'
+  context: 'security review',
 });
 
 console.log(prompt);
@@ -131,6 +138,7 @@ console.log(prompt);
 ```
 
 ### Claude Desktop Integration
+
 Add to your `claude_desktop_config.json`:
 
 ```json
@@ -148,48 +156,52 @@ Add to your `claude_desktop_config.json`:
 
 The server can be configured using environment variables:
 
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `STORAGE_TYPE` | Storage type: 'file', 'postgres', or 'mdc' | `file` |
-| `PROMPTS_DIR` | Directory for storing prompts | `~/mcp/data/prompts` |
-| `PORT` | Port for HTTP server | `3003` |
-| `LOG_LEVEL` | Logging level | `info` |
-| `HTTP_SERVER` | Enable HTTP server | `false` |
+| Variable       | Description                                | Default              |
+| -------------- | ------------------------------------------ | -------------------- |
+| `STORAGE_TYPE` | Storage type: 'file', 'postgres', or 'mdc' | `file`               |
+| `PROMPTS_DIR`  | Directory for storing prompts              | `~/mcp/data/prompts` |
+| `PORT`         | Port for HTTP server                       | `3003`               |
+| `LOG_LEVEL`    | Logging level                              | `info`               |
+| `HTTP_SERVER`  | Enable HTTP server                         | `false`              |
 
 <details>
 <summary>📚 <strong>Complete Configuration Guide</strong></summary>
 
 ### PostgreSQL Setup
+
 ```bash
 export STORAGE_TYPE=postgres
 export POSTGRES_CONNECTION_STRING="postgresql://user:pass@localhost:5432/mcp_prompts"
 ```
 
 ### File Storage Setup
+
 ```bash
 export STORAGE_TYPE=file
 export PROMPTS_DIR=/path/to/prompts
 ```
 
 ### MDC Format Setup (Cursor Rules)
+
 ```bash
 export STORAGE_TYPE=mdc
 export MDC_RULES_DIR=./.cursor/rules
 ```
 
 For detailed configuration options, see our [Configuration Guide](docs/configuration.md).
+
 </details>
 
 ## 🏗️ Architecture & Roadmap
 
 The project is undergoing strategic refactoring to a modular **"Core + Catalog + Contracts"** architecture using npm workspaces. This design improves maintainability and enables easier contributions.
 
-| Phase | Status | Description |
-|-------|--------|-------------|
-| Phase 0 | 🟡 In Progress | Workspace Initialization |
-| Phase 1 | 📋 Planned | Prompt Catalog Separation (`mcp-prompts-catalog`) |
-| Phase 2 | 📋 Planned | Shared Contracts Creation (`mcp-prompts-contracts`) |
-| Phase 3 | 📋 Planned | Build & Release Pipeline Automation |
+| Phase   | Status         | Description                                         |
+| ------- | -------------- | --------------------------------------------------- |
+| Phase 0 | 🟡 In Progress | Workspace Initialization                            |
+| Phase 1 | 📋 Planned     | Prompt Catalog Separation (`mcp-prompts-catalog`)   |
+| Phase 2 | 📋 Planned     | Shared Contracts Creation (`mcp-prompts-contracts`) |
+| Phase 3 | 📋 Planned     | Build & Release Pipeline Automation                 |
 
 📊 **[Track our detailed progress on GitHub Project Board](../../projects/1)**
 
@@ -204,6 +216,7 @@ Our refactoring tasks are organized into specific, actionable Cursor rules that 
 - **[@TODO-documentation-update.mdc](.cursor/rules/TODO-documentation-update.mdc)** - Finalize documentation and cleanup
 
 To work on specific tasks, simply reference them in your Cursor agent:
+
 ```
 @TODO-workspace-setup.mdc proceed implementing and elaborating the TODOs and tasks
 ```
@@ -224,20 +237,21 @@ Seamlessly integrate with other MCP servers using standardized URI patterns:
 ```
 
 ### Multi-Server Setup
+
 ```yaml
 # docker-compose.yml for full MCP stack
 services:
   prompts:
     image: sparesparrow/mcp-prompts:latest
-    ports: ["3003:3003"]
-  
+    ports: ['3003:3003']
+
   filesystem:
     image: modelcontextprotocol/filesystem:latest
-    ports: ["3004:3004"]
-    
+    ports: ['3004:3004']
+
   github:
     image: modelcontextprotocol/github:latest
-    ports: ["3005:3005"]
+    ports: ['3005:3005']
 ```
 
 ## 🤝 Contributing
@@ -245,8 +259,9 @@ services:
 We welcome contributions from the community! Whether it's code, documentation, bug reports, or new ideas – your help is appreciated.
 
 Please read our **[Contributing Guide](CONTRIBUTING.md)** for:
+
 - Local development setup
-- "Contracts-first" development philosophy  
+- "Contracts-first" development philosophy
 - Testing and linting procedures
 - Commit message and PR guidelines
 
@@ -280,7 +295,8 @@ This project is licensed under the [MIT License](LICENSE).
 - 💬 **Discussions**: [GitHub Discussions](../../discussions)
 - 📧 **Commercial support**: [Sparrow AI & Tech](mailto:support@sparrowai.tech)
 - 🌟 **Star us on GitHub** if this project helped you!
-proceed
+  proceed
+
 ---
 
 <div align="center">

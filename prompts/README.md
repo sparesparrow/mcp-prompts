@@ -52,6 +52,7 @@ The MCP Integration prompts are designed to work with multiple MCP servers simul
 ```
 
 This would generate a comprehensive prompt that guides Claude through using:
+
 - GitHub MCP server to analyze repository code
 - Memory MCP server to retain findings
 - Prompt Manager to apply specialized security review templates
@@ -184,11 +185,13 @@ Resource-enabled prompts are templates that include references to external resou
 ### Resource URI Syntax
 
 Resource URIs follow this pattern:
+
 ```
 @resource://<server-type>/<resource-type>/<resource-identifier>
 ```
 
 For example:
+
 - `@resource://filesystem/path/to/file.txt` - References a file in the filesystem
 - `@resource://github/repo/owner/repo-name` - References a GitHub repository
 - `@resource://postgres/schema/database-name` - References a PostgreSQL database schema
@@ -205,23 +208,23 @@ To use a resource-enabled prompt:
 ```javascript
 // Example: Using the Project Analysis Assistant
 const result = await mcpClient.applyTemplate({
-  id: "project-analysis-assistant",
+  id: 'project-analysis-assistant',
   variables: {
-    language: "JavaScript",
-    project_path: "projects/my-project",
-    specific_focus: "API design patterns"
-  }
+    language: 'JavaScript',
+    project_path: 'projects/my-project',
+    specific_focus: 'API design patterns',
+  },
 });
 ```
 
 ### Required MCP Servers by Template
 
-| Template                   | Required MCP Servers                                      |
-|----------------------------|-----------------------------------------------------------|
-| Project Analysis Assistant | filesystem                                                |
-| Repository Explorer        | github                                                    |
-| Database Query Assistant   | postgres                                                  |
-| Multi-Resource Context     | filesystem, github, postgres, puppeteer                   |
+| Template                   | Required MCP Servers                    |
+| -------------------------- | --------------------------------------- |
+| Project Analysis Assistant | filesystem                              |
+| Repository Explorer        | github                                  |
+| Database Query Assistant   | postgres                                |
+| Multi-Resource Context     | filesystem, github, postgres, puppeteer |
 
 ## Implementing Resources/List
 
@@ -265,20 +268,20 @@ The Multi-Resource Context template demonstrates how to combine multiple resourc
 
 ```javascript
 const result = await mcpClient.applyTemplate({
-  id: "multi-resource-context",
+  id: 'multi-resource-context',
   variables: {
-    project_path: "projects/my-api",
-    owner: "my-org",
-    repo_name: "api-service",
-    database_name: "api_db",
-    web_url: "https://api-docs.example.com",
-    project_type: "REST API service",
-    project_name: "Customer API",
-    filesystem_focus: "Focus on the src/controllers directory",
-    github_focus: "Look at recent pull requests related to authentication",
-    database_focus: "Examine the customer table relationships",
-    web_focus: "Compare implementation with the public API docs"
-  }
+    project_path: 'projects/my-api',
+    owner: 'my-org',
+    repo_name: 'api-service',
+    database_name: 'api_db',
+    web_url: 'https://api-docs.example.com',
+    project_type: 'REST API service',
+    project_name: 'Customer API',
+    filesystem_focus: 'Focus on the src/controllers directory',
+    github_focus: 'Look at recent pull requests related to authentication',
+    database_focus: 'Examine the customer table relationships',
+    web_focus: 'Compare implementation with the public API docs',
+  },
 });
 ```
 
@@ -288,7 +291,7 @@ Many templates use conditional logic to include resources only when needed:
 
 ```handlebars
 {{#if specific_file_path}}
-Focus specifically on: @resource://github/file/{{owner}}/{{repo_name}}/{{specific_file_path}}
+  Focus specifically on: @resource://github/file/{{owner}}/{{repo_name}}/{{specific_file_path}}
 {{/if}}
 ```
 
@@ -340,4 +343,4 @@ To contribute new templates to this collection:
 2. Ensure your template includes appropriate metadata and tags
 3. Add clear documentation about required resources
 4. Test with various resource configurations
-5. Update this README with information about your template 
+5. Update this README with information about your template

@@ -99,11 +99,13 @@ LOG_LEVEL=info
 ## Using with Claude Desktop
 
 1. Start the MCP Prompts server:
+
    ```bash
    ./docker/scripts/docker-compose-manager.sh up
    ```
 
 2. Configure Claude Desktop to use MCP Prompts:
+
    - Open Claude Desktop settings
    - Go to "MCP Servers"
    - Add a new server with:
@@ -114,4 +116,4 @@ LOG_LEVEL=info
 
 ## Next Steps
 
-For more detailed information about Docker deployment options, please refer to the comprehensive [Docker documentation](./README.md). 
+For more detailed information about Docker deployment options, please refer to the comprehensive [Docker documentation](./README.md).

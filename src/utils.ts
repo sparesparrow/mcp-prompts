@@ -1,4 +1,5 @@
 import Redis from 'ioredis';
+
 import { config } from './config';
 
 let redisClient: Redis | null = null;
@@ -10,11 +11,11 @@ export function getRedisClient(): Redis | null {
   if (!config.redis || !config.redis.host) return null;
   if (!redisClient) {
     redisClient = new Redis({
-      host: config.redis.host,
-      port: config.redis.port,
-      password: config.redis.password,
       db: config.redis.db,
+      host: config.redis.host,
       lazyConnect: true,
+      password: config.redis.password,
+      port: config.redis.port,
     });
     redisClient.on('error', (err: Error) => {
       console.error('[Redis] Connection error:', err);
@@ -49,8 +50,8 @@ export function applyTemplate(content: string, variables: Record<string, string>
 export function jsonFriendlyErrorReplacer(_key: string, value: unknown) {
   if (value instanceof Error) {
     return {
-      name: value.name,
       message: value.message,
+      name: value.name,
       stack: value.stack,
     };
   }

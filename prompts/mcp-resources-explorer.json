@@ -11,24 +11,12 @@
     "additional_resource_servers",
     "custom_guidelines"
   ],
-  "tags": [
-    "mcp-resources",
-    "resource-integration",
-    "template",
-    "discovery"
-  ],
+  "tags": ["mcp-resources", "resource-integration", "template", "discovery"],
   "createdAt": "2025-03-15T14:00:00.000Z",
   "updatedAt": "2025-03-15T14:00:00.000Z",
   "version": 1,
   "metadata": {
-    "resource_capabilities": [
-      "list",
-      "get",
-      "search",
-      "query",
-      "aggregate",
-      "transform"
-    ],
+    "resource_capabilities": ["list", "get", "search", "query", "aggregate", "transform"],
     "example_variables": {
       "resource_context": "A project with source code on GitHub, configuration in local files, and data in a PostgreSQL database",
       "exploration_task": "Map the relationships between database tables, code repositories, and configuration files to create a comprehensive system overview",
@@ -36,10 +24,6 @@
       "additional_resource_servers": "brave-search: Access web resources for documentation and best practices",
       "custom_guidelines": "Focus on identifying security-related configurations and data handling patterns across all resources"
     },
-    "recommended_tools": [
-      "resources/list",
-      "resources/get",
-      "resources/search"
-    ]
+    "recommended_tools": ["resources/list", "resources/get", "resources/search"]
   }
-} 
+}

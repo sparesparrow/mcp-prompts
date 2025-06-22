@@ -7,16 +7,16 @@
  */
 
 import { randomUUID } from 'node:crypto';
-import { EventEmitter } from 'events';
 import type { IncomingMessage, Server as HttpServer, ServerResponse } from 'node:http';
 import { promisify } from 'node:util';
 import { brotliCompress, deflate, gzip } from 'node:zlib';
-import { pino } from 'pino';
 
-import { Transport } from '@modelcontextprotocol/sdk/shared/transport';
 import type { Server as MCPServer } from '@modelcontextprotocol/sdk/server';
 import type { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
+import { Transport } from '@modelcontextprotocol/sdk/shared/transport';
+import { EventEmitter } from 'events';
 import { Express, Request, Response } from 'express';
+import { pino } from 'pino';
 
 import { ServerConfig } from './interfaces.js';
 

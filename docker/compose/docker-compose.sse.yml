@@ -26,10 +26,10 @@ services:
     volumes:
       - mcp-prompts-data:/app/data
     ports:
-      - "3003:3000"  # HTTP API
-      - "3010:3010"  # Port for SSE transport
+      - '3003:3000' # HTTP API
+      - '3010:3010' # Port for SSE transport
     healthcheck:
-      test: ["CMD", "/app/scripts/health_check.sh", "localhost", "3000"]
+      test: ['CMD', '/app/scripts/health_check.sh', 'localhost', '3000']
     restart: unless-stopped
     networks:
       - mcp-network
@@ -42,9 +42,9 @@ services:
     volumes:
       - ../nginx/sse.conf:/etc/nginx/conf.d/default.conf
     ports:
-      - "3011:80"
+      - '3011:80'
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      test: ['CMD', 'curl', '-f', 'http://localhost/health']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -57,4 +57,4 @@ services:
 
 networks:
   mcp-network:
-    driver: bridge 
+    driver: bridge

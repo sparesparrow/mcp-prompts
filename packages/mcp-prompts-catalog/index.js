@@ -10,7 +10,9 @@ function getPromptsDir() {
 }
 
 function getCategories() {
-  return fs.readdirSync(promptsDir).filter(f => fs.statSync(path.join(promptsDir, f)).isDirectory());
+  return fs
+    .readdirSync(promptsDir)
+    .filter(f => fs.statSync(path.join(promptsDir, f)).isDirectory());
 }
 
 function listPrompts(category) {
@@ -20,7 +22,10 @@ function listPrompts(category) {
     return JSON.parse(fs.readFileSync(indexFile, 'utf8')).map(f => path.basename(f, '.json'));
   }
   if (!fs.existsSync(catDir)) return [];
-  return fs.readdirSync(catDir).filter(f => f.endsWith('.json') && f !== 'index.json').map(f => path.basename(f, '.json'));
+  return fs
+    .readdirSync(catDir)
+    .filter(f => f.endsWith('.json') && f !== 'index.json')
+    .map(f => path.basename(f, '.json'));
 }
 
 function loadPrompt(name, category) {
@@ -43,5 +48,5 @@ module.exports = {
   getPromptsDir,
   getCategories,
   listPrompts,
-  loadPrompt
-}; 
+  loadPrompt,
+};

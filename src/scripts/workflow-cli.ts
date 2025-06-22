@@ -66,7 +66,7 @@ async function main() {
     try {
       const content = await fs.readFile(filePath, 'utf8');
       const workflow = JSON.parse(content);
-      const body = { workflow, initialContext: vars };
+      const body = { initialContext: vars, workflow };
       const res = await fetch(`${API_URL}/api/v1/workflows/run`, {
         body: JSON.stringify(body),
         headers: { 'Content-Type': 'application/json' },
@@ -167,6 +167,9 @@ function printUsage() {
   `);
 }
 
+/**
+ *
+ */
 function printCatalogUsage() {
   console.log(`Usage:
   mcp-prompts catalog list                # List all categories

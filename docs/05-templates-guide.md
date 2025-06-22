@@ -64,6 +64,7 @@ You can chain prompts by referencing outputs as variables in subsequent steps. E
    ```
 
 **Workflow:**
+
 - Apply `summarize` with your input text.
 - Take the output, use as `summary` variable for `questions`.
 
@@ -78,6 +79,7 @@ Use the following context: [resource](mcp://resource-id)
 ## Exporting to Multiple Formats
 
 Prompts and templates can be exported as:
+
 - MDC (Cursor Rules)
 - PGAI (Postgres/JSON)
 - Plain text
@@ -86,4 +88,4 @@ See the CLI or API for export commands.
 
 ---
 
-> For more advanced workflow and chaining, see the [examples/](../examples/) directory and integration guides. 
+> For more advanced workflow and chaining, see the [examples/](../examples/) directory and integration guides.

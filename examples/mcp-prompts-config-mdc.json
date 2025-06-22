@@ -2,10 +2,7 @@
   "mcpServers": {
     "mcp-prompts": {
       "command": "npx",
-      "args": [
-        "-y",
-        "@sparesparrow/mcp-prompts@1.2.22"
-      ],
+      "args": ["-y", "@sparesparrow/mcp-prompts@1.2.22"],
       "env": {
         "STORAGE_TYPE": "mdc",
         "MDC_DIR": "/home/sparrow/mcp/data/prompts-mdc",
@@ -13,4 +10,4 @@
       }
     }
   }
-} 
+}

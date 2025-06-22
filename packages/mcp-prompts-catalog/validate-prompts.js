@@ -35,4 +35,4 @@ if (hasError) {
   process.exit(1);
 } else {
   console.log('All prompts are valid!');
-} 
+}

@@ -101,28 +101,30 @@ export const EnvSchema = z.object({
 
   VERSION: z.string().default('1.0.0'),
 
-  redis: z.object({
-    host: z.string().optional(),
-    port: z.coerce.number().optional(),
-    password: z.string().optional(),
-    db: z.coerce.number().optional(),
-    ttl: z.coerce.number().optional(),
-  }).optional(),
+  redis: z
+    .object({
+      db: z.coerce.number().optional(),
+      host: z.string().optional(),
+      password: z.string().optional(),
+      port: z.coerce.number().optional(),
+      ttl: z.coerce.number().optional(),
+    })
+    .optional(),
 });
 
 export type EnvVars = z.infer<typeof EnvSchema>;
 
 export const McpConfigSchema = EnvSchema.extend({
   storage: z.object({
-    type: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']),
-    promptsDir: z.string(),
-    host: z.string().optional(),
-    port: z.number().optional(),
-    user: z.string().optional(),
-    password: z.string().optional(),
     database: z.string().optional(),
+    host: z.string().optional(),
     maxConnections: z.number().optional(),
+    password: z.string().optional(),
+    port: z.number().optional(),
+    promptsDir: z.string(),
     ssl: z.boolean().optional(),
+    type: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']),
+    user: z.string().optional(),
   }),
 });
 

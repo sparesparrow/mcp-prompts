@@ -1,68 +1,60 @@
 # Multi-stage production Dockerfile for MCP Prompts
 # This file is used to build the production image
 
-# Stage 1: Dependencies
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package*.json ./
-# Disable prepare script temporarily to prevent build during install
-RUN npm pkg delete scripts.prepare && \
-    npm ci --only=production && \
-    npm i --save-dev @types/node @types/pg typescript ts-node shx
-
-# Stage 2: Builder
+# Stage 1: Build the application
 FROM node:20-alpine AS builder
 WORKDIR /app
-# Copy dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/package*.json ./
-# Copy source code
-COPY tsconfig.json ./
-COPY src ./src
 
-# Build the application
-RUN npm install -g typescript && \
-    npm run build || echo "Build failed but continuing for Docker testing"
+# Copy all source code and package files
+COPY . .
 
-# Stage 3: Runtime
-FROM node:20-alpine AS runtime
+# Install all dependencies (including devDependencies for building)
+RUN npm ci
+
+# Build the TypeScript project
+RUN npm run build
+
+# ---
+
+# Stage 2: Create the production image
+FROM node:20-alpine AS prod
 WORKDIR /app
 
-# Install utilities
-RUN apk --no-cache add curl wget bash
+# Only copy package.json and package-lock.json to leverage Docker cache
+COPY package*.json ./
 
-# Create data directories
-RUN mkdir -p /app/data/prompts /app/data/backups /app/data/rules && \
-    chmod -R 755 /app/data
+# Install only production dependencies
+RUN npm ci --only=production --ignore-scripts
 
-# Copy health check script
+# Copy the compiled code from the builder stage
+COPY --from=builder /app/dist ./dist
+
+# Copy other necessary assets
 COPY docker/health-check.sh /health-check.sh
 RUN chmod +x /health-check.sh
 
-# Copy package files and source code for now, since build may fail
-COPY --from=deps /app/package*.json ./
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/tsconfig.json ./
-
 # Environment variables
 ENV NODE_ENV=production \
-    PORT=3000 \
+    PORT=3003 \
     HOST=0.0.0.0 \
     STORAGE_TYPE=file \
-    PROMPTS_DIR=/app/data/prompts \
+    PROMPTS_DIR=/app/data \
     BACKUPS_DIR=/app/data/backups \
     LOG_LEVEL=info \
     HTTP_SERVER=true
 
-# Health check
-HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 CMD /health-check.sh
+# Create data directory
+RUN mkdir -p /app/data && \
+    chown -R node:node /app/data
 
 # Set non-root user
 USER node
 
-# Default ports
-EXPOSE 3000-3005
+# Expose the port
+EXPOSE 3003
 
-# Default command
-CMD ["node", "-r", "ts-node/register", "src/index.ts"] 
+# Health check
+HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 CMD /health-check.sh
+
+# Run the compiled application
+CMD ["node", "dist/index.cjs"] 

@@ -28,4 +28,4 @@
       "postgres/table/{{database_name}}/{{specific_table}}"
     ]
   }
-} 
+}

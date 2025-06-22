@@ -11,6 +11,7 @@
 ---
 
 ## Table of Contents
+
 - [Why This Project?](#why-this-project)
 - [Key Features](#key-features)
 - [Quick Start](#quick-start)
@@ -51,34 +52,105 @@ Most teams working with AI struggle with chaos: prompts are stored in code, shar
 > ⚠️ **Requirements:** Node.js 20+ and npm 10+ (due to npm workspaces support).
 
 ### 1. Run with NPX
+
+> 🚨 **Critical Alert:** The latest version of `@sparesparrow/mcp-prompts` has a critical runtime error. Please use version `1.2.22` for a stable experience until this is resolved.
+
 Run the server without a permanent installation with a single command:
 
 ```bash
-npx -y @sparesparrow/mcp-prompts
+npx -y @sparesparrow/mcp-prompts@1.2.22
 ```
 
 ### 2. Run with Docker
+
 For production deployment with persistent storage:
 
+> ⚠️ **Note:** The Docker images currently have a build issue and may not work properly. We recommend using the NPX method or building from source until this is resolved.
+
 **File storage:**
+
 ```bash
+# Unix/Linux/macOS
 docker run -d --name mcp-server \
   -p 3003:3003 \
   -v $(pwd)/data:/app/data \
-  sparesparrow/mcp-prompts:latest
+  ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows PowerShell
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows Command Prompt
+docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
 ```
 
 **Postgres storage:**
+
 ```bash
+# Unix/Linux/macOS
 docker run -d --name mcp-server \
   -p 3003:3003 \
   -v $(pwd)/data:/app/data \
   -e "STORAGE_TYPE=postgres" \
   -e "POSTGRES_URL=your_connection_string" \
-  sparesparrow/mcp-prompts:latest
+  ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows PowerShell
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows Command Prompt
+docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
 ```
 
+**Alternative: Build from source**
+If the Docker images don't work, you can build your own:
+
+```bash
+# Clone the repository
+git clone https://github.com/sparesparrow/mcp-prompts.git
+cd mcp-prompts
+
+# Build the Docker image
+docker build -t mcp-prompts:local .
+
+# Run the local image
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data mcp-prompts:local
+```
+
+**Note:** If you encounter "invalid reference format" errors, ensure Docker Desktop is running and try using the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
+
+### Troubleshooting Docker Issues
+
+**Common Problems:**
+
+1. **"docker: invalid reference format"**
+
+   - Ensure Docker Desktop is running
+   - Use the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
+   - Check that the image exists: `docker images | grep mcp-prompts`
+
+2. **"Cannot connect to the Docker daemon"**
+
+   - Start Docker Desktop
+   - On Windows, ensure WSL2 is properly configured
+
+3. **"Unknown file extension '.ts'" error**
+
+   - This indicates a Docker build issue where TypeScript files aren't compiled
+   - **Solution:** Use the NPX method instead: `npx -y @sparesparrow/mcp-prompts`
+   - Or build from source using the instructions above
+
+4. **Volume mounting issues on Windows**
+
+   - Use forward slashes: `/app/data` not `\app\data`
+   - Use `${PWD}` in PowerShell or `%cd%` in Command Prompt
+
+5. **Port already in use**
+   - Stop existing container: `docker stop mcp-server`
+   - Remove container: `docker rm mcp-server`
+   - Or use a different port: `-p 3004:3003`
+
 ### 3. Verify It's Running
+
 Check that the server is running and accessible:
 
 ```bash
@@ -86,6 +158,7 @@ curl http://localhost:3003/health
 ```
 
 Expected response:
+
 ```json
 {
   "status": "ok",
@@ -98,12 +171,12 @@ Expected response:
 
 ## 🏛️ Core Concepts and Data Structure
 
-| Entity    | Attributes                              | Description                                      |
-|-----------|-----------------------------------------|--------------------------------------------------|
-| Prompt    | name, content, tags, version, metadata  | The basic unit containing the template text.      |
-| Category  | name, description, parent_category      | Used for hierarchical organization of prompts.    |
-| Template  | variables, validation_rules             | A special type of prompt with dynamic parts.      |
-| User      | username, role                          | An account with assigned permissions.             |
+| Entity   | Attributes                             | Description                                    |
+| -------- | -------------------------------------- | ---------------------------------------------- |
+| Prompt   | name, content, tags, version, metadata | The basic unit containing the template text.   |
+| Category | name, description, parent_category     | Used for hierarchical organization of prompts. |
+| Template | variables, validation_rules            | A special type of prompt with dynamic parts.   |
+| User     | username, role                         | An account with assigned permissions.          |
 
 ---
 
@@ -111,11 +184,11 @@ Expected response:
 
 The project is designed as a modern monorepo with separate packages, which facilitates maintenance and scaling.
 
-| Component  | Description                                      | Technology                        |
-|------------|--------------------------------------------------|-----------------------------------|
-| core       | Main application logic, API, and storage mgmt.    | Node.js, Express, TypeScript      |
-| catalog    | A distributable package with default prompts.     | NPM                               |
-| contracts  | Shared TypeScript types and OpenAPI specs.        | OpenAPI, JSON Schema              |
+| Component | Description                                    | Technology                   |
+| --------- | ---------------------------------------------- | ---------------------------- |
+| core      | Main application logic, API, and storage mgmt. | Node.js, Express, TypeScript |
+| catalog   | A distributable package with default prompts.  | NPM                          |
+| contracts | Shared TypeScript types and OpenAPI specs.     | OpenAPI, JSON Schema         |
 
 📊 **[Track our detailed progress on the GitHub Project Board](../../projects/1)**
 
@@ -128,6 +201,7 @@ We welcome community contributions! Whether it's code, documentation, a bug repo
 Please read our **[Contributor Guide](CONTRIBUTING.md)** to find everything you need.
 
 ### ✨ Our Contributors
+
 Thank you to all the wonderful people who have contributed to this project!
 
 [![Contributors](https://contrib.rocks/image?repo=sparesparrow/mcp-prompts)](https://github.com/sparesparrow/mcp-prompts/graphs/contributors)

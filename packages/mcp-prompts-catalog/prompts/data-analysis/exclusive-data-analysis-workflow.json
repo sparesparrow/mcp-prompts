@@ -3,13 +3,16 @@
   "name": "Exclusive: Data Analysis ➜ PostgreSQL ➜ Web Visualization",
   "description": "Workflow: Provede analýzu dat, získá data z PostgreSQL MCP serveru a vytvoří vizualizaci přes web MCP server.",
   "content": "# Data Analysis ➜ PostgreSQL ➜ Web Visualization\n\n1. Získej data z PostgreSQL MCP serveru pomocí dotazu: {{sql_query}}.\n2. Proveď analýzu získaných dat a shrň hlavní poznatky.\n3. Vytvoř vizualizaci výsledků pomocí webového MCP serveru (např. graf na @web://vizualizace).\n\n## MCP odkazy\n- PostgreSQL: @postgres://{{db_name}}/{{table_name}}\n- Web vizualizace: @web://vizualizace\n\n## Postup\n- Nejprve proveď SQL dotaz a získej data.\n- Proveď analýzu a shrnutí.\n- Předej data webovému serveru pro vizualizaci.\n\n{{additional_instructions}}",
-  "variables": [
-    "sql_query",
-    "db_name",
-    "table_name",
-    "additional_instructions"
+  "variables": ["sql_query", "db_name", "table_name", "additional_instructions"],
+  "tags": [
+    "exclusive",
+    "workflow",
+    "data-analysis",
+    "postgresql",
+    "web",
+    "visualization",
+    "multi-server"
   ],
-  "tags": ["exclusive", "workflow", "data-analysis", "postgresql", "web", "visualization", "multi-server"],
   "examples": [
     {
       "name": "Quick demo",
@@ -26,4 +29,4 @@
     "author": "MCP-Prompts Team",
     "category": "exclusive-workflow"
   }
-} 
+}

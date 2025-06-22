@@ -173,16 +173,19 @@ graph TD
 The project uses multiple Docker Compose configurations for different purposes:
 
 ### Base Configuration (`docker-compose.base.yml`)
+
 - Provides the base configuration for the MCP-Prompts server
 - Used as a foundation for all other configurations
 
 ### Development Environment (`docker-compose.development.yml`)
+
 - Includes a development server with live reloading
 - Uses a separate PostgreSQL database on port 5442
 - Exposes port 3004 for web access
 - Enables Node.js inspector on port 9229
 
 ### Integration Testing (`docker-compose.integration.yml`)
+
 - Sets up multiple MCP server instances:
   - File-based server on port 3005
   - Memory-based server on port 3010
@@ -190,18 +193,22 @@ The project uses multiple Docker Compose configurations for different purposes:
 - Configures persistent volume for file data
 
 ### PostgreSQL Support (`docker-compose.postgres.yml`)
+
 - Adds PostgreSQL database for production use
 - Includes Adminer for database management
 
 ### Test Environment (`docker-compose.test.yml`)
+
 - Configures unit and integration test environments
 - Uses a separate test PostgreSQL database
 - Doesn't expose external ports
 
 ### PGAI Support (`docker-compose.pgai.yml`)
+
 - Configures AI-assisted PostgreSQL environment
 
 ### Server-Sent Events Support (`docker-compose.sse.yml`)
+
 - Configures Server-Sent Events support for MCP Prompts
 
 ## Testing Docker Configurations
@@ -228,6 +235,7 @@ docker network prune
 ## Volumes
 
 The following volumes are used:
+
 - `mcp-prompts-data`: For file-based prompt storage
 - `mcp-prompts-postgres-data`: For PostgreSQL data persistence
 - `mcp-prompts-postgres-test-data`: For test database data
@@ -266,8 +274,8 @@ docker push sparesparrow/mcp-prompts:x.y.z
 3. Use appropriate restart policies based on the environment
 4. Separate development, testing, and production configurations
 5. Use environment variables for configuration
-6. Follow the principle of least privilege for container security 
+6. Follow the principle of least privilege for container security
 7. Never run containers as root in production
 8. Always pin specific versions for dependencies
 9. Use multi-stage builds for production images
-10. Include proper cleanup mechanisms for development and test environments 
+10. Include proper cleanup mechanisms for development and test environments

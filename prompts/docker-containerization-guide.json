@@ -63,16 +63,9 @@
     "test_network_name",
     "implementation_notes"
   ],
-  "tags": [
-    "development",
-    "docker",
-    "containerization",
-    "devops",
-    "deployment",
-    "template"
-  ],
+  "tags": ["development", "docker", "containerization", "devops", "deployment", "template"],
   "category": "devops",
   "createdAt": "2024-08-08T16:00:00.000Z",
   "updatedAt": "2024-08-08T16:00:00.000Z",
   "version": 1
-} 
+}

@@ -159,7 +159,9 @@ describe.skip('FileAdapter Integration Tests', () => {
     };
     // Save two versions
     const savedPrompt1 = await adapter.savePrompt(promptData);
-    const savedPrompt2 = await adapter.updatePrompt(savedPrompt1.id, savedPrompt1.version, { content: 'v2' });
+    const savedPrompt2 = await adapter.updatePrompt(savedPrompt1.id, savedPrompt1.version, {
+      content: 'v2',
+    });
 
     // Delete the whole prompt (all versions)
     await adapter.deletePrompt(savedPrompt1.id);

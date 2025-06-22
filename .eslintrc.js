@@ -10,13 +10,7 @@ module.exports = {
     'plugin:jsdoc/recommended',
     'prettier',
   ],
-  plugins: [
-    '@typescript-eslint',
-    'prettier',
-    'simple-import-sort',
-    'sort-keys-fix',
-    'jsdoc',
-  ],
+  plugins: ['@typescript-eslint', 'prettier', 'simple-import-sort', 'sort-keys-fix', 'jsdoc'],
   rules: {
     'prettier/prettier': 'error',
     'simple-import-sort/imports': 'error',
@@ -24,10 +18,13 @@ module.exports = {
     'sort-keys-fix/sort-keys-fix': 'warn',
     'import/prefer-default-export': 'off',
     '@typescript-eslint/explicit-function-return-type': 'off',
-    '@typescript-eslint/no-unused-vars': ['warn', { 
-      argsIgnorePattern: '^_',
-      varsIgnorePattern: '^_',
-    }],
+    '@typescript-eslint/no-unused-vars': [
+      'warn',
+      {
+        argsIgnorePattern: '^_',
+        varsIgnorePattern: '^_',
+      },
+    ],
     '@typescript-eslint/consistent-type-definitions': ['error', 'interface'],
     '@typescript-eslint/naming-convention': [
       'warn',
@@ -63,10 +60,7 @@ module.exports = {
         format: ['PascalCase'],
       },
     ],
-    '@typescript-eslint/explicit-member-accessibility': [
-      'error',
-      { accessibility: 'explicit' }
-    ],
+    '@typescript-eslint/explicit-member-accessibility': ['error', { accessibility: 'explicit' }],
     '@typescript-eslint/no-explicit-any': 'warn',
     'object-curly-newline': 'off', // Let prettier handle this
   },
@@ -75,4 +69,4 @@ module.exports = {
       mode: 'typescript',
     },
   },
-}; 
+};

@@ -27,13 +27,7 @@
   "updatedAt": "2025-03-15T12:00:00.000Z",
   "version": 1,
   "metadata": {
-    "recommended_servers": [
-      "filesystem",
-      "postgres",
-      "memory",
-      "sequential-thinking",
-      "github"
-    ],
+    "recommended_servers": ["filesystem", "postgres", "memory", "sequential-thinking", "github"],
     "example_variables": {
       "data_type": "time series",
       "data_source": "PostgreSQL database with sensor readings and JSON log files",
@@ -44,4 +38,4 @@
       "additional_guidelines": "Focus particularly on correlations between temperature spikes and subsequent power consumption anomalies. The stakeholders are especially interested in predictive maintenance opportunities."
     }
   }
-} 
+}

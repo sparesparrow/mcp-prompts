@@ -13,12 +13,14 @@ This section documents the HTTP API endpoints and error handling for MCP-Prompts
 - **Description:** Returns a simple status object to verify the server is running.
 
 #### Example Request
+
 ```http
 GET /health HTTP/1.1
 Host: localhost:3003
 ```
 
 #### Example Response
+
 ```json
 {
   "status": "ok",
@@ -52,12 +54,14 @@ If the storage backend does not support pooling metrics, `pool` will be omitted 
   - `id` (string, required): The unique sequence ID.
 
 #### Example Request
+
 ```http
 GET /api/v1/sequence/my-sequence-id HTTP/1.1
 Host: localhost:3003
 ```
 
 #### Example Success Response
+
 ```json
 {
   "id": "my-sequence-id",
@@ -89,6 +93,7 @@ Host: localhost:3003
 ```
 
 #### Example Error Response
+
 ```json
 {
   "error": true,
@@ -97,6 +102,7 @@ Host: localhost:3003
   "details": { "id": "my-sequence-id" }
 }
 ```
+
 - **Status Codes:**
   - `200 OK` on success
   - `404 Not Found` if the sequence does not exist
@@ -113,6 +119,7 @@ Host: localhost:3003
   - `Accept: text/event-stream`
 
 #### Example Request
+
 ```http
 GET /events HTTP/1.1
 Host: localhost:3003
@@ -120,6 +127,7 @@ Accept: text/event-stream
 ```
 
 #### Example Response (SSE stream)
+
 ```
 event: connected
 data: {}
@@ -131,6 +139,7 @@ event: test
 data: {"timestamp":"2024-06-01T12:00:05.000Z","message":"Hello from SSE server!","clients":["client_1"]}
 
 ```
+
 - **Notes:**
   - The connection remains open; events are sent as they occur.
   - Heartbeat events are sent every 30 seconds to keep the connection alive.
@@ -176,9 +185,11 @@ For more details, see the [README](../README.md#faq--troubleshooting) and endpoi
 ## Types
 
 ### Prompt
+
 See [src/interfaces.ts](../src/interfaces.ts) for the full definition.
 
 Key fields:
+
 - `id` (string): Unique prompt ID
 - `name` (string): Human-readable name
 - `description` (string, optional): Description
@@ -193,9 +204,11 @@ Key fields:
 - `metadata` (object, optional): Extra info
 
 ### Sequence
+
 See [src/interfaces.ts](../src/interfaces.ts) for the full definition.
 
 Key fields:
+
 - `id` (string): Unique sequence ID
 - `name` (string): Name
 - `description` (string, optional): Description
@@ -208,6 +221,7 @@ Key fields:
 ---
 
 ## See Also
+
 - [How to document API endpoints (idratherbewriting.com)](https://idratherbewriting.com/learnapidoc/docendpoints.html)
 - [Postman: API documentation best practices](https://www.postman.com/api-platform/api-documentation/)
 - [MCP-Prompts README](../README.md)
@@ -215,6 +229,7 @@ Key fields:
 ### Prompt Creation (POST /prompts)
 
 > **Note:** The API currently requires the following fields in the request body for prompt creation:
+>
 > - `id` (string)
 > - `name` (string)
 > - `content` (string)
@@ -222,4 +237,4 @@ Key fields:
 > - `createdAt` (string, ISO date)
 > - `updatedAt` (string, ISO date)
 >
-> These must be provided by the client. This requirement may be relaxed in the future to allow the server to generate these fields automatically for better API usability. 
+> These must be provided by the client. This requirement may be relaxed in the future to allow the server to generate these fields automatically for better API usability.

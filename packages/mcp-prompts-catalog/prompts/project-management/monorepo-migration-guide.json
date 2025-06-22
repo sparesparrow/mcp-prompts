@@ -14,16 +14,9 @@
     "workflow_name",
     "technical_considerations"
   ],
-  "tags": [
-    "development",
-    "monorepo",
-    "typescript",
-    "docker",
-    "ci-cd",
-    "migration"
-  ],
+  "tags": ["development", "monorepo", "typescript", "docker", "ci-cd", "migration"],
   "category": "development",
   "createdAt": "2024-08-08T15:30:00.000Z",
   "updatedAt": "2024-08-08T15:30:00.000Z",
   "version": 1
-} 
+}

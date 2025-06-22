@@ -11,12 +11,7 @@
     "additional_servers",
     "additional_guidelines"
   ],
-  "tags": [
-    "mcp-integration",
-    "multi-server",
-    "template",
-    "advanced"
-  ],
+  "tags": ["mcp-integration", "multi-server", "template", "advanced"],
   "createdAt": "2025-03-15T12:00:00.000Z",
   "updatedAt": "2025-03-15T12:00:00.000Z",
   "version": 1,
@@ -37,4 +32,4 @@
       "additional_guidelines": "Prioritize high-impact, low-effort optimizations that can be implemented quickly"
     }
   }
-} 
+}

@@ -17,7 +17,7 @@ jobs:
   test:
     name: Run Tests
     runs-on: ubuntu-latest
-    
+
     services:
       postgres:
         image: postgres:14
@@ -32,23 +32,23 @@ jobs:
           --health-interval 10s
           --health-timeout 5s
           --health-retries 5
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           cache: 'npm'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Run unit tests
         run: npm run test:unit
-      
+
       - name: Run integration tests
         run: npm run test:integration
         env:
@@ -58,10 +58,10 @@ jobs:
           PG_USER: postgres
           PG_PASSWORD: postgres
           PG_SSL: false
-      
+
       - name: Run build test
         run: npm run test:build
-      
+
       - name: Upload test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -73,17 +73,17 @@ jobs:
     name: Docker Tests
     runs-on: ubuntu-latest
     needs: test
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      
+
       - name: Run Docker tests
         run: npm run test:docker
-      
+
       - name: Upload Docker test results
         uses: actions/upload-artifact@v4
         if: always()
@@ -96,25 +96,25 @@ jobs:
     runs-on: ubuntu-latest
     needs: [test, docker-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
-      
+
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org'
-      
+
       - name: Install dependencies
         run: npm ci
-      
+
       - name: Build package
         run: npm run build
-      
+
       - name: Determine version bump
         id: bump
         run: |
@@ -126,21 +126,21 @@ jobs:
           else
             echo "VERSION_TYPE=patch" >> $GITHUB_OUTPUT
           fi
-      
+
       - name: Publish to npm
         run: npx --no-install ./scripts/release.sh --version ${{ steps.bump.outputs.VERSION_TYPE }} --publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v2
-      
+
       - name: Login to Docker Hub
         uses: docker/login-action@v2
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
-      
+
       - name: Build and push Docker image
         uses: docker/build-push-action@v4
         with:

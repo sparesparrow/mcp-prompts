@@ -11,9 +11,9 @@
  * with appropriate mocks for SDK, HTTP server, and file system.
  */
 describe('MCP Prompts Server Entry Point', () => {
-    it('should have tests implemented in the future', () => {
-        // This is a placeholder test
-        expect(true).toBe(true);
-    });
+  it('should have tests implemented in the future', () => {
+    // This is a placeholder test
+    expect(true).toBe(true);
+  });
 });
 export {};
