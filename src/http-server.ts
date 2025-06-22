@@ -980,6 +980,15 @@ export async function startHttpServer(
   // Global error handler middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
     console.error(err);
+    if (err instanceof z.ZodError) {
+      return res.status(400).json({
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid input data.',
+          details: err.errors,
+        },
+      });
+    }
     if (err instanceof AppError) {
       return res.status(err.statusCode).json({
         error: {
