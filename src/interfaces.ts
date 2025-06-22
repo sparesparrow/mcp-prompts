@@ -227,7 +227,7 @@ export interface StorageAdapter {
   /**
    * Delete a specific version of a prompt. If version is omitted, deletes all versions.
    */
-  deletePrompt(id: string, version?: number): Promise<void>;
+  deletePrompt(id: string, version?: number): Promise<boolean>;
   /**
    * List prompts (latest version only by default).
    */
@@ -279,7 +279,7 @@ export interface PromptService {
   addPrompt(data: Partial<Prompt>): Promise<Prompt>;
   updatePrompt(id: string, version: number, data: Partial<Prompt>): Promise<Prompt>;
   listPrompts(options?: ListPromptsOptions, allVersions?: boolean): Promise<Prompt[]>;
-  deletePrompt(id: string, version?: number): Promise<void>;
+  deletePrompt(id: string, version?: number): Promise<boolean>;
   listPromptVersions(id: string): Promise<number[]>;
   applyTemplate(
     id: string,

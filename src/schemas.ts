@@ -88,11 +88,21 @@ export const promptSchemas = {
     isTemplate: z.boolean().optional(),
     tags: z.array(z.string()).optional(),
   }),
+
   /**
    * Schema for updating an existing prompt. All fields are optional.
    */
   update: createPromptSchema.partial(),
+
+  bulkCreate: z.array(createPromptSchema),
+
+  bulkDelete: z.object({ ids: z.array(z.string().min(1)) }),
 };
+
+export type CreatePromptArgs = z.infer<typeof promptSchemas.create>;
+export type UpdatePromptArgs = z.infer<typeof promptSchemas.update>;
+export type DeletePromptArgs = z.infer<typeof promptSchemas.delete>;
+export type ListPromptsArgs = z.infer<typeof promptSchemas.list>;
 
 /**
  * Zod schema for Workflow definitions (MVP).
