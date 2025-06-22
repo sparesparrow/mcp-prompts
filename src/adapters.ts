@@ -3,13 +3,13 @@
  * Contains all storage adapters in a single file
  */
 
-import fs from 'fs';
 import * as fsp from 'fs/promises';
+import fs from 'fs';
 import path from 'path';
 
-import pg from 'pg';
-import type { pino } from 'pino';
 import lockfile from 'proper-lockfile';
+import type { pino } from 'pino';
+import pg from 'pg';
 import { z } from 'zod';
 
 import {
@@ -143,7 +143,8 @@ export class FileAdapter implements StorageAdapter {
       id,
       version: newVersion,
       ...parsedData,
-      variables: parsedData.variables as any ?? undefined,
+      variables: (parsedData.variables as any) ?? undefined,
+      tags: parsedData.tags ?? undefined,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -221,7 +222,8 @@ export class FileAdapter implements StorageAdapter {
       ...updatedData,
       id,
       version,
-      variables: updatedData.variables as any ?? existingPrompt.variables,
+      variables: (updatedData.variables as any) ?? existingPrompt.variables,
+      tags: updatedData.tags ?? existingPrompt.tags,
       updatedAt: new Date().toISOString(),
     };
 
@@ -334,7 +336,10 @@ export class FileAdapter implements StorageAdapter {
     if (!allVersions) {
       const latestVersions = new Map<string, Prompt>();
       for (const p of prompts) {
-        if (!latestVersions.has(p.id) || (latestVersions.get(p.id)!.version ?? 0) < (p.version ?? 0)) {
+        if (
+          !latestVersions.has(p.id) ||
+          (latestVersions.get(p.id)!.version ?? 0) < (p.version ?? 0)
+        ) {
           latestVersions.set(p.id, p);
         }
       }
@@ -511,7 +516,10 @@ export class MemoryAdapter implements StorageAdapter {
     if (!allVersions) {
       const latestVersions = new Map<string, Prompt>();
       for (const p of all) {
-        if (!latestVersions.has(p.id) || (latestVersions.get(p.id)?.version ?? 0) < (p.version ?? 0)) {
+        if (
+          !latestVersions.has(p.id) ||
+          (latestVersions.get(p.id)?.version ?? 0) < (p.version ?? 0)
+        ) {
           latestVersions.set(p.id, p);
         }
       }
@@ -686,7 +694,9 @@ export class PostgresAdapter implements StorageAdapter {
       return [];
     }
 
-    const tags = await this.pool.query('SELECT id, name FROM tags WHERE name = ANY($1)', [tagNames]);
+    const tags = await this.pool.query('SELECT id, name FROM tags WHERE name = ANY($1)', [
+      tagNames,
+    ]);
     const existingTags = new Map(tags.rows.map(t => [t.name, t.id]));
     const newTags = tagNames.filter(name => !existingTags.has(name));
 
@@ -712,7 +722,10 @@ export class PostgresAdapter implements StorageAdapter {
     }
   }
 
-  private async setTemplateVariables(promptId: number, variables: string[] | undefined): Promise<void> {
+  private async setTemplateVariables(
+    promptId: number,
+    variables: string[] | undefined,
+  ): Promise<void> {
     await this.pool.query('DELETE FROM template_variables WHERE prompt_id = $1', [promptId]);
     if (variables) {
       for (const variable of variables) {
@@ -838,10 +851,10 @@ export class PostgresAdapter implements StorageAdapter {
     try {
       await client.query('BEGIN');
 
-      const promptResult = await client.query('SELECT id FROM prompts WHERE id = $1 AND version = $2', [
-        id,
-        version,
-      ]);
+      const promptResult = await client.query(
+        'SELECT id FROM prompts WHERE id = $1 AND version = $2',
+        [id, version],
+      );
 
       if (promptResult.rows.length === 0) {
         throw new Error(`Prompt with id ${id} and version ${version} not found`);
@@ -882,7 +895,10 @@ export class PostgresAdapter implements StorageAdapter {
         await this.setPromptTags(promptId, updatesToApply.tags);
       }
       if (updatesToApply.variables) {
-        await this.setTemplateVariables(promptId, this.extractVariableNames(updatesToApply.variables as any));
+        await this.setTemplateVariables(
+          promptId,
+          this.extractVariableNames(updatesToApply.variables as any),
+        );
       }
 
       await client.query('COMMIT');
@@ -1029,8 +1045,16 @@ export class PostgresAdapter implements StorageAdapter {
   }
 
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
-    const { executionId, workflowId, status, currentStepId, context, createdAt, updatedAt, history } =
-      state;
+    const {
+      executionId,
+      workflowId,
+      status,
+      currentStepId,
+      context,
+      createdAt,
+      updatedAt,
+      history,
+    } = state;
     await this.pool.query(
       `INSERT INTO workflow_executions (id, workflow_id, status, context, current_step_id, history, created_at, updated_at)
        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
