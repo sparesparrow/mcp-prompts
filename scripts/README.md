@@ -11,6 +11,42 @@ Tato složka obsahuje utility a pomocné skripty pro správu, build, testování
 | run-docker-tests.sh      | Spuštění testů v Dockeru                                                |                         |
 | run-tests.sh             | Spuštění všech testů                                                    |                         |
 | setup-claude-desktop.sh  | Nastavení prostředí pro Claude Desktop                                  |                         |
+| run-mcp-inspector-tests.sh | Spuštění MCP Inspector integration testů                              | Linux/macOS             |
+| run-mcp-inspector-tests.ps1 | Spuštění MCP Inspector integration testů                             | Windows PowerShell      |
+
+## MCP Inspector Testing
+
+Nové integration testy pro testování MCP-Prompts serveru pomocí MCP Inspector:
+
+### Spuštění testů
+
+**Linux/macOS:**
+```bash
+./scripts/run-mcp-inspector-tests.sh
+```
+
+**Windows PowerShell:**
+```powershell
+.\scripts\run-mcp-inspector-tests.ps1
+```
+
+### Konfigurace
+
+Testy jsou spouštěny pouze když je nastavena environment variable:
+```bash
+export TEST_MCP_INSPECTOR=true
+```
+
+### Co testují
+
+- Spuštění MCP Inspector procesu
+- Připojení k MCP-Prompts serveru
+- Testování MCP nástrojů (tools)
+- Testování MCP zdrojů (resources)
+- Správa promptů přes MCP rozhraní
+- Šablony a proměnné
+- Sekvence a workflow
+- Error handling
 
 ## Legacy/one-off utility
 Skripty `fix-esm.js`, `fix-prompt-json.js`, `fix_workflows.sh` byly přesunuty do složky `legacy/`.

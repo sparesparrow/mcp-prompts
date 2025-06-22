@@ -22,6 +22,32 @@ import { ValidationError, validatePrompt } from './validation.js';
 import { z } from 'zod';
 import { promptSchemas, workflowSchema } from './schemas.js';
 
+export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
+  const { storage } = config;
+
+  switch (storage.type) {
+    case 'file':
+      logger.info(`Using file storage adapter with directory: ${storage.promptsDir}`);
+      return new FileAdapter({ promptsDir: storage.promptsDir as string });
+    case 'memory':
+      logger.info('Using memory storage adapter');
+      return new MemoryAdapter();
+    case 'postgres':
+      logger.info(`Using postgres storage adapter with host: ${storage.host}`);
+      return new PostgresAdapter({
+        host: storage.host,
+        port: storage.port,
+        user: storage.user,
+        password: storage.password,
+        database: storage.database,
+        max: storage.maxConnections,
+        ssl: storage.ssl,
+      });
+    default:
+      throw new Error(`Unknown storage adapter type: ${storage.type}`);
+  }
+}
+
 export type { StorageAdapter };
 
 /**
