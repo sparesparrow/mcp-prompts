@@ -8,6 +8,7 @@ import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
 import type { SequenceService } from '../../src/sequence-service.js';
 import { WorkflowServiceImpl as WorkflowService } from '../../src/workflow-service.js';
+import { closeServer } from '../setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -34,7 +35,7 @@ beforeAll(async () => {
   const workflowService = new WorkflowService(adapter, promptService);
   server = await startHttpServer(
     null,
-    { host: '122.0.0.1', port: 0 },
+    { host: '127.0.0.1', port: 0 },
     { promptService, sequenceService, workflowService, storageAdapters: [adapter] },
   );
   const address = server.address();
@@ -42,7 +43,9 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (server && server.close) await server.close();
+  await closeServer(server);
+  
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 describe('HTTP Server Integration', () => {

@@ -8,9 +8,8 @@ import Handlebars from 'handlebars';
 import type { StorageAdapter } from './interfaces.js';
 import type { ApplyTemplateResult, Prompt } from './interfaces.js';
 import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
-import { defaultPrompts } from './prompts.js';
-import { ValidationError } from './validation.js';
-import { DuplicateError } from './errors.js';
+import { defaultPrompts, promptSchemas } from './prompts.js';
+import { DuplicateError, AppError } from './errors.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
 import { config } from './config.js';
 
@@ -54,50 +53,44 @@ export class PromptService {
    * Create a new prompt (version 1 or specified version). Throws if (id, version) exists.
    */
   public async createPrompt(args: CreatePromptArgs): Promise<Prompt> {
-    // Validate required fields
-    if (!args.name || typeof args.name !== 'string' || !args.name.trim()) {
-      throw new ValidationError('Prompt name is required and cannot be empty or whitespace.');
+    const parseResult = promptSchemas.create.safeParse(args);
+    if (!parseResult.success) {
+      throw new AppError(
+        'Invalid prompt data',
+        400,
+        'VALIDATION_ERROR',
+        parseResult.error.issues,
+      );
     }
-    if (!args.content || typeof args.content !== 'string' || !args.content.trim()) {
-      throw new ValidationError('Prompt content is required and cannot be empty or whitespace.');
-    }
-    if (args.version !== undefined && typeof args.version !== 'number') {
-      throw new ValidationError('Prompt version must be a number.');
-    }
-    if (args.createdAt !== undefined && typeof args.createdAt !== 'string') {
-      throw new ValidationError('createdAt must be an ISO string.');
-    }
-    if (args.updatedAt !== undefined && typeof args.updatedAt !== 'string') {
-      throw new ValidationError('updatedAt must be an ISO string.');
-    }
-    const id = args.name.toLowerCase().replace(/\s+/g, '-');
-    const version = args.version ?? 1;
+
+    const { name, version: inputVersion } = parseResult.data;
+
+    const id = name.toLowerCase().replace(/\s+/g, '-');
+    const version = inputVersion ?? 1;
     // Check for duplicate prompt ID/version
     const existing = await this.storage.getPrompt(id, version);
     if (existing) {
-      throw new DuplicateError(
-        `Prompt with id '${id}' and version '${version}' already exists.`
-      );
+      throw new DuplicateError(`Prompt with id '${id}' and version '${version}' already exists.`);
     }
     const prompt: Prompt = {
+      ...parseResult.data,
       id,
-      ...args,
       createdAt: args.createdAt ?? new Date().toISOString(),
       updatedAt: args.updatedAt ?? new Date().toISOString(),
       version,
     };
 
     // Template variable validation
-    if (args.isTemplate && args.variables && args.content) {
+    if (prompt.isTemplate && prompt.variables && prompt.content) {
       // Extract variables from template content
       const variablePattern = /{{\s*([\w.]+)\s*}}/g;
       const foundVars = new Set<string>();
       let match;
-      while ((match = variablePattern.exec(args.content)) !== null) {
+      while ((match = variablePattern.exec(prompt.content)) !== null) {
         foundVars.add(match[1]);
       }
-      const declaredVars = Array.isArray(args.variables)
-        ? args.variables.map(v =>
+      const declaredVars = Array.isArray(prompt.variables)
+        ? prompt.variables.map(v =>
             typeof v === 'string'
               ? v
               : typeof v === 'object' && v !== null && 'name' in v
@@ -108,8 +101,10 @@ export class PromptService {
       const missingInDeclared = Array.from(foundVars).filter(v => !declaredVars.includes(v));
       const extraInDeclared = declaredVars.filter(v => !foundVars.has(v));
       if (missingInDeclared.length > 0 || extraInDeclared.length > 0) {
-        throw new ValidationError(
+        throw new AppError(
           `Template variable mismatch: missing in declared: [${missingInDeclared.join(', ')}], extra in declared: [${extraInDeclared.join(', ')}]`,
+          400,
+          'VALIDATION_ERROR',
           [
             ...(missingInDeclared.length > 0
               ? [
@@ -156,7 +151,7 @@ export class PromptService {
   ): Promise<Prompt> {
     const existing = await this.storage.getPrompt(id, version);
     if (!existing) {
-      throw new ValidationError(`Prompt not found: ${id} v${version}`, []);
+      throw new AppError(`Prompt not found: ${id} v${version}`, 404, 'NOT_FOUND');
     }
     const updated: Prompt = {
       ...existing,
@@ -202,7 +197,7 @@ export class PromptService {
   ): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id, version);
     if (!prompt) {
-      throw new ValidationError(`Template prompt not found: ${id} v${version ?? 'latest'}`, []);
+      throw new AppError(`Template prompt not found: ${id} v${version ?? 'latest'}`, 404, 'NOT_FOUND');
     }
     if (!prompt.isTemplate) {
       throw new Error(`Prompt is not a template: ${id}`);

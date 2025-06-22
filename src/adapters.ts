@@ -18,11 +18,20 @@ import {
   type StorageAdapter,
   type WorkflowExecutionState,
 } from './interfaces.js';
-import { ValidationError, validatePrompt } from './validation.js';
 import { z } from 'zod';
 import { promptSchemas, workflowSchema } from './schemas.js';
 
 export type { StorageAdapter };
+
+export class ValidationError extends Error {
+  public issues: z.ZodIssue[];
+
+  public constructor(message: string, issues: z.ZodIssue[]) {
+    super(message);
+    this.name = 'ValidationError';
+    this.issues = issues;
+  }
+}
 
 /**
  * FileAdapter Implementation
@@ -53,10 +62,10 @@ export class FileAdapter implements StorageAdapter {
           const filePath = path.join(this.promptsDir, file);
           try {
             const content = await fsp.readFile(filePath, 'utf-8');
-            const prompt = JSON.parse(content);
-            validatePrompt(prompt, 'full', true);
+            const data = JSON.parse(content);
+            promptSchemas.full.parse(data);
           } catch (error: unknown) {
-            if (error instanceof ValidationError) {
+            if (error instanceof z.ZodError) {
               console.warn(`Validation failed for ${file}: ${error.message}`);
             } else {
               console.error(`Error reading or parsing ${file}:`, error);
@@ -104,8 +113,6 @@ export class FileAdapter implements StorageAdapter {
       updatedAt: new Date().toISOString(),
     };
 
-    validatePrompt(promptWithDefaults, 'full', true);
-
     const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
     try {
@@ -135,10 +142,13 @@ export class FileAdapter implements StorageAdapter {
 
     try {
       const content = await fsp.readFile(this.getPromptFileName(id, versionToFetch), 'utf-8');
-      const prompt: Prompt = JSON.parse(content);
-      validatePrompt(prompt, 'full', true);
-      return prompt;
+      const data = JSON.parse(content);
+      const prompt = promptSchemas.full.parse(data);
+      return prompt as Prompt;
     } catch (error: unknown) {
+      if (error instanceof z.ZodError) {
+        throw new ValidationError(`Prompt validation failed for ${id}: ${error.message}`, error.issues);
+      }
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
       }
@@ -166,16 +176,17 @@ export class FileAdapter implements StorageAdapter {
       throw new Error(`Prompt with id ${id} and version ${version} not found`);
     }
 
-    const newVersion = existingPrompt.version + 1;
+    const newVersion = (await this.listPromptVersions(id)).reduce((max, v) => Math.max(max, v), 0) + 1;
+
+    const updatedData = promptSchemas.update.parse(prompt);
 
     const updatedPrompt: Prompt = {
       ...existingPrompt,
-      ...prompt,
+      ...updatedData,
+      id,
       version: newVersion,
       updatedAt: new Date().toISOString(),
     };
-
-    validatePrompt(updatedPrompt, 'full', true);
 
     const finalPath = this.getPromptFileName(id, newVersion);
     const tempPath = `${finalPath}.tmp`;
@@ -226,9 +237,13 @@ export class FileAdapter implements StorageAdapter {
     for (const file of promptFiles) {
       try {
         const content = await fsp.readFile(path.join(this.promptsDir, file), 'utf-8');
-        prompts.push(JSON.parse(content));
-      } catch {
-        // ignore malformed files
+        const data = JSON.parse(content);
+        prompts.push(promptSchemas.full.parse(data) as Prompt);
+      } catch (error: unknown) {
+        if (error instanceof z.ZodError) {
+          console.warn(`Skipping malformed prompt file ${file}: ${error.message}`);
+        }
+        // ignore malformed files for now
       }
     }
 
@@ -894,5 +909,6 @@ export class PostgresAdapter implements StorageAdapter {
       }
     }
     return states;
+ 
   }
 }
