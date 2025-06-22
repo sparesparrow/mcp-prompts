@@ -41,7 +41,6 @@
     "publish:major": "./scripts/publish.sh major",
     "release:patch": "./scripts/release.sh --version patch --publish",
     "test:coverage": "node --experimental-vm-modules node_modules/jest/bin/jest.js --coverage",
-    "type-check": "tsc --noEmit",
     "workflow:run:file": "ts-node src/scripts/workflow-cli.ts workflow run",
     "workflow:save:file": "ts-node src/scripts/workflow-cli.ts workflow save",
     "workflow:run:id": "ts-node src/scripts/workflow-cli.ts workflow run",
