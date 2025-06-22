@@ -74,6 +74,7 @@
     "proper-lockfile": "^4.1.2",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
+    "ulog": "^2.0.0-beta.19",
     "uuid": "^11.1.0",
     "ws": "^8.18.2",
     "zod": "^3.25.67"
@@ -90,7 +91,6 @@
     "@types/json-schema": "^7.0.15",
     "@types/node-fetch": "^2.6.12",
     "@types/param-case": "^0.0.29",
-    "pino-pretty": "10.2.0",
     "@types/pg": "^8.15.4",
     "@types/pino": "^7.0.4",
     "@types/proper-lockfile": "^4.1.4",
@@ -124,4 +124,4 @@
     "packages/mcp-prompts-catalog",
     "packages/mcp-prompts-contracts"
   ]
-} 
+}

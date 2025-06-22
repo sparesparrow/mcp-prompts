@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 console.log('Starting MCP Prompts Server...');
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
+// import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 // import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
 // import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
-import { pino } from 'pino';
+import ulog from 'ulog';
 import { z } from 'zod';
 
 import { adapterFactory } from './adapters.js';
@@ -30,17 +30,8 @@ const McpServer = class {
  */
 async function main() {
   const env = loadConfig();
-  const logger = pino({
-    level: env.LOG_LEVEL || 'info',
-    ...(process.env.NODE_ENV !== 'production' && {
-      transport: {
-        options: {
-          colorize: true,
-        },
-        target: 'pino-pretty',
-      },
-    }),
-  });
+  const logger = ulog;
+  logger.level = env.LOG_LEVEL || ulog.INFO;
 
   const config = {
     ...env,

@@ -8,7 +8,7 @@ import fs from 'fs';
 import path from 'path';
 
 import lockfile from 'proper-lockfile';
-import type { pino } from 'pino';
+import ulog from 'ulog';
 import pg from 'pg';
 import { z } from 'zod';
 
@@ -23,7 +23,7 @@ import {
 import { promptSchemas, workflowSchema } from './schemas.js';
 import { LockError } from './errors.js';
 
-export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
+export function adapterFactory(config: McpConfig, logger: ulog.Logger): StorageAdapter {
   const { storage } = config;
 
   switch (storage.type) {
