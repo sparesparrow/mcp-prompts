@@ -894,7 +894,8 @@ export async function startHttpServer(
         // Audit: workflow start
         auditLogWorkflowEvent({ details: { workflow }, eventType: 'start', userId, workflowId });
         // Run the workflow
-        result = await services.workflowService.runWorkflow(workflow, { userId });
+        const initialContext = { ...req.body, userId };
+        result = await services.workflowService.runWorkflow(workflow, initialContext);
         // Audit: workflow end
         auditLogWorkflowEvent({ details: { result }, eventType: 'end', userId, workflowId });
         res.status(result.success ? 200 : 400).json(result);

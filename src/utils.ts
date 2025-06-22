@@ -67,3 +67,11 @@ export function jsonFriendlyErrorReplacer(_key: string, value: unknown) {
   }
   return value;
 }
+
+export const templateHelpers = {
+  toUpperCase: (str: string) => str.toUpperCase(),
+  toLowerCase: (str: string) => str.toLowerCase(),
+  jsonStringify: (obj: any) => JSON.stringify(obj, jsonFriendlyErrorReplacer, 2),
+  join: (arr: any[], sep: string) => (Array.isArray(arr) ? arr.join(typeof sep === 'string' ? sep : ', ') : arr),
+  eq: (a: any, b: any) => a === b,
+};

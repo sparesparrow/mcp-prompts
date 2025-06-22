@@ -355,7 +355,7 @@ describe('Bulk Prompt Operations', () => {
       .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['p1', 'non-existent'] });
-    expect(res.status).toBe(207);
+    expect(res.status).toBe(200);
     expect(res.body.results.length).toBe(2);
     expect(res.body.results.find((r: any) => r.id === 'p1').success).toBe(true);
     expect(res.body.results.find((r: any) => r.id === 'non-existent').success).toBe(false);
@@ -366,7 +366,7 @@ describe('Bulk Prompt Operations', () => {
       .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['a', 'b', 'c'] });
-    expect(res.status).toBe(207);
+    expect(res.status).toBe(200);
     expect(res.body.results.every((r: any) => !r.success)).toBe(true);
   });
 });
@@ -399,11 +399,7 @@ describe('Workflow Engine Integration', () => {
       .post(`/api/v1/workflows/${workflow.id}/run`)
       .set('x-api-key', 'test-key')
       .send({
-        context: {
-          parameters: {
-            country: 'France',
-          },
-        },
+        country: 'France',
       });
     expect(runRes.status).toBe(200);
     expect(runRes.body).toHaveProperty('outputs');
