@@ -17,10 +17,15 @@ import { WorkflowServiceImpl } from './workflow-service.js';
 async function main() {
   const env = loadConfig();
   const logger = pino({
-    level: env.LOG_LEVEL,
-    transport: {
-      target: 'pino-pretty',
-    },
+    level: env.LOG_LEVEL || 'info',
+    ...(process.env.NODE_ENV !== 'production' && {
+      transport: {
+        target: 'pino-pretty',
+        options: {
+          colorize: true,
+        },
+      },
+    }),
   });
 
   const config = {
@@ -51,30 +56,28 @@ async function main() {
     cacheDir: env.ELEVENLABS_CACHE_DIR,
   });
 
-  if (env.HTTP_SERVER) {
-    await startHttpServer(
-      null,
-      {
-        port: env.PORT,
-        host: env.HOST,
-        corsOrigin: env.CORS_ORIGIN,
-        enableSSE: env.ENABLE_SSE,
-        ssePath: env.SSE_PATH,
-      },
-      {
-        promptService,
-        sequenceService,
-        workflowService,
-        storageAdapters: [storageAdapter],
-        elevenLabsService,
-      },
-    );
-  }
-
   const mcpServer = new McpServer({
     name: 'mcp-prompts',
     version: '1.3.0',
   });
+
+  await startHttpServer(
+    mcpServer,
+    {
+      port: env.PORT,
+      host: env.HOST,
+      corsOrigin: env.CORS_ORIGIN,
+      enableSSE: env.ENABLE_SSE,
+      ssePath: env.SSE_PATH,
+    },
+    {
+      promptService,
+      sequenceService,
+      workflowService,
+      storageAdapters: [storageAdapter],
+      elevenLabsService,
+    },
+  );
 
   mcpServer.tool('list_prompts', 'List available prompts', z.object({}), z.object({}), async () => {
     const prompts = await promptService.listPrompts({});
@@ -85,25 +88,6 @@ async function main() {
     const prompt = await promptService.getPrompt(args.id);
     return { structuredContent: prompt };
   });
-
-  const transports = [
-    new StreamableHTTPServerTransport({
-      port: env.PORT,
-      host: env.HOST,
-      server: mcpServer.server,
-    }),
-  ];
-
-  if (env.ENABLE_SSE) {
-    transports.push(
-      new SSEServerTransport({
-        path: env.SSE_PATH,
-        server: mcpServer.server,
-      }),
-    );
-  }
-
-  await mcpServer.connect(transports);
 
   logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
 
