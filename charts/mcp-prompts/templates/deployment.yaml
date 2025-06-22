@@ -16,7 +16,8 @@ spec:
         {{- toYaml . | nindent 8 }}
       {{- end }}
       labels:
-        {{- include "mcp-prompts.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/name: {{ include "mcp-prompts.name" . }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
     spec:
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:

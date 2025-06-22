@@ -1,5 +1,14 @@
 import { z } from 'zod';
 
+const templateVariableSchema = z.object({
+  name: z.string(),
+  description: z.string().optional(),
+  default: z.string().optional(),
+  required: z.boolean().optional(),
+  type: z.enum(['string', 'number', 'boolean', 'array', 'object']).optional(),
+  options: z.array(z.string()).optional(),
+});
+
 /**
  * Base schema for a prompt, containing all user-definable fields.
  * Server-generated fields like id, createdAt, and updatedAt are excluded.
@@ -31,7 +40,7 @@ const createPromptSchema = z
       .min(1, { message: 'Name cannot be empty or just whitespace.' })
       .max(100, { message: 'Name cannot be longer than 100 characters.' }),
     tags: z.array(z.string().min(1, { message: 'Tags cannot be empty strings.' })).nullish(),
-    variables: z.array(z.union([z.string(), z.object({})])).nullish(),
+    variables: z.array(z.union([z.string(), templateVariableSchema])).nullish(),
   })
   .strict();
 
