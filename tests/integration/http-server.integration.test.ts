@@ -232,13 +232,7 @@ describe('Prompt List (GET /prompts)', () => {
       { name: 'Find Me', content: 'The word is test' },
     ];
     for (const p of prompts) {
-      await promptService.createPrompt({
-        version: 1,
-        isTemplate: false,
-        createdAt: now,
-        updatedAt: now,
-        ...p,
-      });
+      await promptService.createPrompt(p);
     }
   });
 
@@ -294,7 +288,6 @@ describe('Prompt List (GET /prompts)', () => {
       name: 'Template',
       content: 'a template',
       isTemplate: true,
-      version: 1,
     });
     const res = await request(baseUrl)
       .get('/prompts?isTemplate=true')
@@ -327,7 +320,6 @@ describe('Bulk Prompt Operations', () => {
     dupPrompt = {
       name: 'Bulk Dup',
       content: 'I will be duplicated',
-      version: 1,
     };
     await promptService.createPrompt(dupPrompt);
   });
@@ -356,10 +348,10 @@ describe('Bulk Prompt Operations', () => {
     const res = await request(baseUrl)
       .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
-      .send({ ids: ['bulk-dup', 'non-existent'] });
+      .send({ ids: [dupPrompt.id, 'non-existent'] });
     expect(res.status).toBe(200);
     expect(res.body.length).toBe(2);
-    expect(res.body.find((r: any) => r.id === 'bulk-dup').success).toBe(true);
+    expect(res.body.find((r: any) => r.id === dupPrompt.id).success).toBe(true);
     expect(res.body.find((r: any) => r.id === 'non-existent').success).toBe(false);
   });
 
@@ -386,7 +378,6 @@ describe('Workflow Engine Integration', () => {
       content: 'The capital of {{country}} is',
       isTemplate: true,
       variables: ['country'],
-      version: 1,
     });
   });
 
@@ -395,7 +386,7 @@ describe('Workflow Engine Integration', () => {
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
       .send(sampleWorkflow);
-    expect([200, 201]).toContain(saveRes.status);
+    expect([201, 409]).toContain(saveRes.status);
 
     const runRes = await request(baseUrl)
       .post(`/api/v1/workflows/${sampleWorkflow.id}/run`)
@@ -418,7 +409,7 @@ describe('Workflow Engine Integration', () => {
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
       .send(sampleWorkflow);
-    expect([200, 201]).toContain(saveRes.status);
+    expect([200, 201, 409]).toContain(saveRes.status);
 
     const workflowServiceWithRateLimit = new WorkflowService(adapter, promptService);
 

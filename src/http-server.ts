@@ -599,8 +599,8 @@ export async function startHttpServer(
    *                   error:
    *                     type: string
    */
-  app.delete(
-    '/prompts/bulk',
+  app.post(
+    '/prompts/bulk-delete',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
       if (!parseResult.success) {
