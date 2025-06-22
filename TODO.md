@@ -50,16 +50,16 @@ This document serves as the master plan for the strategic migration of the MCP P
 - [x] **Simulate Repository Structure:** Create local directories to mirror the target multi-repo architecture before performing the full migration.
   - [x] Create directories: `mcp-prompts-ts`, `mcp-prompts-rs`, `mcp-prompts-aidl`, `mcp-prompts-collection`, `mcp-prompts-py`, `mcp-prompts-contracts`.
   - [x] Add placeholder `README.md` files to each directory to define its purpose.
-- [ ] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
-- [ ] **Prepare extraction scripts:**
-  - [ ] Create `scripts/extract-collection.sh` for prompt data.
-  - [ ] Create `scripts/extract-contracts.sh` for type definitions.
-  - [ ] Create `scripts/extract-implementations.sh` for each language.
+- [x] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
+- [x] **Prepare extraction scripts:**
+  - [x] Create `scripts/extract-collection.sh` for prompt data.
+  - [x] Create `scripts/extract-contracts.sh` for type definitions.
+  - [x] Create `scripts/extract-implementations.sh` for each language.
   - [ ] Add verification scripts to ensure history is preserved using `git-filter-repo`.
 - [ ] **Create final monorepo tag and documentation:**
   - [ ] Add tag `monorepo-final-v1.8.0` with comprehensive release notes.
-  - [ ] Update `README.md` with a migration notice and links to the new meta-repository.
-  - [ ] Create `MIGRATION.md` explaining the transition in detail.
+  - [x] Update `README.md` with a migration notice and links to the new meta-repository.
+  - [x] Create `MIGRATION.md` explaining the transition in detail.
 
 ---
 
