@@ -27,8 +27,7 @@ esbuild
     outdir: 'dist',
     outExtension: { '.js': '.mjs' },
     logLevel: 'info',
-    // Mark all dependencies as external
-    external,
+    external: ['pg-native', 'pino', 'pino-pretty'],
   })
   .then(() => {
     exec('shx chmod +x dist/index.mjs dist/scripts/*.mjs', (error, stdout, stderr) => {

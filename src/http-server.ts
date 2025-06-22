@@ -197,7 +197,7 @@ function apiKeyAuth(req: express.Request, res: express.Response, next: express.N
  * @param services
  */
 export async function startHttpServer(
-  server: Server | null = null,
+  server: any | null = null,
   config: HttpServerConfig,
   services: ServerServices,
 ): Promise<http.Server> {
