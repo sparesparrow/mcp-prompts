@@ -161,9 +161,11 @@ export class PromptService {
    * Delete a specific version of a prompt, or all versions if version is omitted.
    */
   public async deletePrompt(id: string, version?: number): Promise<boolean> {
-    await this.storage.deletePrompt(id, version);
-    await this.invalidatePromptCache(id);
-    return true;
+    const deleted = await this.storage.deletePrompt(id, version);
+    if (deleted) {
+      await this.invalidatePromptCache(id);
+    }
+    return deleted;
   }
 
   /**
@@ -402,8 +404,12 @@ export class PromptService {
     const results: Array<{ success: boolean; id: string; error?: string }> = [];
     for (const id of ids) {
       try {
-        await this.deletePrompt(id);
-        results.push({ success: true, id });
+        const deleted = await this.deletePrompt(id);
+        if (deleted) {
+          results.push({ success: true, id });
+        } else {
+          results.push({ success: false, id, error: 'Prompt not found' });
+        }
       } catch (err: any) {
         results.push({ success: false, id, error: err?.message || 'Unknown error' });
       }

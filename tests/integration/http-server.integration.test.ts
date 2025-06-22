@@ -355,7 +355,7 @@ describe('Bulk Prompt Operations', () => {
       .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['p1', 'non-existent'] });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(207);
     expect(res.body.results.length).toBe(2);
     expect(res.body.results.find((r: any) => r.id === 'p1').success).toBe(true);
     expect(res.body.results.find((r: any) => r.id === 'non-existent').success).toBe(false);
@@ -366,7 +366,7 @@ describe('Bulk Prompt Operations', () => {
       .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['a', 'b', 'c'] });
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(207);
     expect(res.body.results.every((r: any) => !r.success)).toBe(true);
   });
 });
@@ -388,7 +388,22 @@ describe('Workflow Engine Integration', () => {
   });
 
   it('should save and run a sample workflow', async () => {
-    const workflow = { ...sampleWorkflow, id: `workflow-${randomUUID()}` };
+    const workflow = {
+      id: `workflow-${randomUUID()}`,
+      name: 'Test Workflow',
+      version: 1,
+      steps: [
+        {
+          id: 'get-capital',
+          type: 'prompt',
+          promptId: 'test-prompt',
+          input: {
+            country: '{{context.country}}',
+          },
+          output: 'capital',
+        },
+      ],
+    };
     const saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
