@@ -333,21 +333,23 @@ describe('Bulk Prompt Operations', () => {
       { name: 'New 2', content: 'content', isTemplate: false }, // New
     ];
     const res = await request(baseUrl)
-      .post('/prompts/bulk')
+      .post('/prompts/bulk-create')
       .set('x-api-key', 'test-key')
-      .send(prompts);
+      .send({ prompts });
 
-    expect(res.status).toBe(200);
+    expect(res.status).toBe(207);
     expect(res.body.results).toHaveLength(4);
 
-    expect(res.body.results).toContainEqual(
-      expect.objectContaining({ success: false, error: expect.stringContaining('already exists') }),
+    const results = res.body.results;
+    expect(results.some((r: any) => r.success === false && r.error.includes('already exists'))).toBe(
+      true,
     );
-    expect(res.body.results).toContainEqual(
-      expect.objectContaining({ success: false, error: expect.stringContaining('Invalid prompt data') }),
-    );
-    expect(res.body.results).toContainEqual({ success: true, id: 'new-1' });
-    expect(res.body.results).toContainEqual({ success: true, id: 'new-2' });
+    expect(
+      results.some((r: any) => r.success === false && r.error.includes('Invalid prompt data')),
+    ).toBe(true);
+    expect(results.filter((r: any) => r.success === true).length).toBe(2);
+    expect(results).toContainEqual({ success: true, id: 'new-1' });
+    expect(results).toContainEqual({ success: true, id: 'new-2' });
   });
 
   it('should bulk delete prompts and return per-id results', async () => {
@@ -365,8 +367,8 @@ describe('Bulk Prompt Operations', () => {
 
     expect(res.status).toBe(207);
     expect(res.body.results).toHaveLength(2);
-    expect(res.body.results.find((r: any) => r.id === created[0].id).success).toBe(true);
-    expect(res.body.results.find((r: any) => r.id === 'non-existent').success).toBe(false);
+    expect(res.body.results.find((r: any) => r.id === created[0].id)?.success).toBe(true);
+    expect(res.body.results.find((r: any) => r.id === 'non-existent')?.success).toBe(false);
   });
 
   it('should return all errors for bulk delete with all non-existent IDs', async () => {

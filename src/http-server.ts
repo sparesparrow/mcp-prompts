@@ -477,7 +477,11 @@ export async function startHttpServer(
       parseInt(req.params.version, 10),
       req.body,
     );
-    res.json({ prompt });
+    if (prompt) {
+      res.status(200).json({ prompt });
+    } else {
+      res.status(404).json({ error: 'Prompt not found' });
+    }
   }));
 
   /**
@@ -552,10 +556,11 @@ export async function startHttpServer(
     catchAsync(async (req, res) => {
       const { prompts } = req.body;
       if (!Array.isArray(prompts)) {
-        throw new AppError('`prompts` must be an array', 400, HttpErrorCode.BAD_REQUEST);
+        throw new AppError('`prompts` must be an array', 400, 'VALIDATION_ERROR');
       }
       const results = await services.promptService.createPromptsBulk(prompts);
-      res.status(207).json({ results });
+      const hasErrors = results.some(r => !r.success);
+      res.status(hasErrors ? 207 : 201).json({ results });
     }),
   );
 
@@ -597,10 +602,11 @@ export async function startHttpServer(
     catchAsync(async (req, res) => {
       const { ids } = req.body;
       if (!Array.isArray(ids)) {
-        throw new AppError('`ids` must be an array of strings', 400, HttpErrorCode.BAD_REQUEST);
+        throw new AppError('`ids` must be an array of strings', 400, 'VALIDATION_ERROR');
       }
       const results = await services.promptService.deletePromptsBulk(ids);
-      res.status(207).json({ results });
+      const hasErrors = results.some(r => !r.success);
+      res.status(hasErrors ? 207 : 200).json({ results });
     }),
   );
 
@@ -973,40 +979,20 @@ export async function startHttpServer(
 
   // Global error handler middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(err);
     if (err instanceof AppError) {
-      const response: { code: string; message: string; details?: any } = {
-        code: err.code,
-        message: err.message,
-      };
-      if ((err as any).details) {
-        response.details = (err as any).details;
-      }
       return res.status(err.statusCode).json({
-        success: false,
-        error: response,
-      });
-    }
-
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
         error: {
-          code: HttpErrorCode.VALIDATION_ERROR,
-          message: 'Invalid input data.',
-          details: err.issues,
+          code: err.code,
+          message: err.message,
+          details: 'details' in err ? (err as any).details : undefined,
         },
       });
     }
-
-    // Log unexpected errors for debugging
-    // In production, use a structured logger like Pino or Winston
-    console.error('UNHANDLED_ERROR:', err);
-
-    res.status(500).json({
-      success: false,
+    return res.status(500).json({
       error: {
-        code: HttpErrorCode.INTERNAL_SERVER_ERROR,
-        message: 'An unexpected internal server error occurred.',
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected error occurred',
       },
     });
   });

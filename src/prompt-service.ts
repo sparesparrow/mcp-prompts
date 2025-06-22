@@ -17,6 +17,37 @@ import { config } from './config.js';
 import { templateHelpers } from './utils.js';
 import { ValidationError, NotFoundError } from './errors.js';
 
+function validateTemplateVariables(prompt: Pick<Prompt, 'content' | 'isTemplate' | 'variables'>) {
+  if (!prompt.isTemplate) {
+    if (prompt.variables && prompt.variables.length > 0) {
+      throw new ValidationError('Variables can only be defined for templates.', [
+        { path: ['variables'], message: 'Variables can only be defined for templates.' },
+      ]);
+    }
+    return;
+  }
+
+  const templateVariables = new Set(
+    (prompt.content.match(/{{(.*?)}}/g) || []).map(v => v.replace(/{{|}}/g, '').trim()),
+  );
+
+  const declaredVariables = new Set(prompt.variables?.map(v => (typeof v === 'string' ? v : v.name)));
+
+  if (templateVariables.size !== declaredVariables.size) {
+    throw new ValidationError(
+      'The variables in the template content and the variables field do not match.',
+    );
+  }
+
+  for (const v of Array.from(templateVariables)) {
+    if (!declaredVariables.has(v)) {
+      throw new ValidationError(
+        `Variable '${v}' is used in the template but not declared in the variables field.`,
+      );
+    }
+  }
+}
+
 export class PromptService {
   private storage: StorageAdapter;
   private promptCache = new Map<string, Prompt>();
@@ -58,7 +89,15 @@ export class PromptService {
     } catch (error: any) {
       throw new ValidationError(`Invalid prompt data: ${error.message}`, error.issues);
     }
+
+    validateTemplateVariables(args);
+
     const promptId = args.id ?? this.generateId(args.name);
+    const existingByName = await this.storage.getPrompt(promptId);
+    if (existingByName) {
+      throw new DuplicateError(`Prompt with name '${args.name}' already exists.`);
+    }
+
     const versions = await this.storage.listPromptVersions(promptId);
     const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
 
@@ -125,6 +164,8 @@ export class PromptService {
       version, // Keep the same version for update
       updatedAt: new Date().toISOString(), // Set new update date
     };
+
+    validateTemplateVariables(updatedPromptData);
 
     const result = await this.storage.updatePrompt(id, version, updatedPromptData);
     await this.invalidatePromptCache(id);
@@ -362,15 +403,16 @@ export class PromptService {
   public async createPromptsBulk(
     argsArray: CreatePromptParams[],
   ): Promise<Array<{ success: boolean; id?: string; error?: string }>> {
-    const results: Array<{ success: boolean; id?: string; error?: string }> = [];
-    for (const args of argsArray) {
-      try {
-        const prompt = await this.createPrompt(args);
-        results.push({ success: true, id: prompt.id });
-      } catch (err: any) {
-        results.push({ success: false, error: err?.message || 'Unknown error' });
-      }
-    }
+    const results = await Promise.all(
+      argsArray.map(async args => {
+        try {
+          const newPrompt = await this.createPrompt(args);
+          return { success: true, id: newPrompt.id };
+        } catch (e: any) {
+          return { success: false, id: args.name, error: e.message };
+        }
+      }),
+    );
     return results;
   }
 
@@ -380,19 +422,20 @@ export class PromptService {
   public async deletePromptsBulk(
     ids: string[],
   ): Promise<Array<{ success: boolean; id: string; error?: string }>> {
-    const results: Array<{ success: boolean; id: string; error?: string }> = [];
-    for (const id of ids) {
-      try {
-        const deleted = await this.deletePrompt(id);
-        if (deleted) {
-          results.push({ success: true, id });
-        } else {
-          results.push({ success: false, id, error: 'Prompt not found' });
+    const results = await Promise.all(
+      ids.map(async id => {
+        try {
+          const deleted = await this.deletePrompt(id);
+          if (deleted) {
+            return { success: true, id };
+          } else {
+            return { success: false, id, error: 'Prompt not found' };
+          }
+        } catch (e: any) {
+          return { success: false, id, error: e.message };
         }
-      } catch (err: any) {
-        results.push({ success: false, id, error: err?.message || 'Unknown error' });
-      }
-    }
+      }),
+    );
     return results;
   }
 
