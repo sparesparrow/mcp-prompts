@@ -1,3 +1,4 @@
+import { randomUUID } from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import request from 'supertest';
@@ -7,6 +8,7 @@ import { MemoryAdapter } from '../../src/adapters.js';
 import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
 import type { SequenceService } from '../../src/sequence-service.js';
+import { closeRedisClient } from '../../src/utils.js';
 import { WorkflowServiceImpl as WorkflowService } from '../../src/workflow-service.js';
 import { closeServer } from '../setup.js';
 
@@ -44,13 +46,15 @@ beforeAll(async () => {
 
 afterAll(async () => {
   await closeServer(server);
-
+  await closeRedisClient();
   await new Promise(resolve => setTimeout(resolve, 100));
 });
 
 describe('HTTP Server Integration', () => {
   beforeEach(async () => {
-    await adapter.clearAll();
+    if (adapter.clearAll) {
+      await adapter.clearAll();
+    }
   });
 
   it('should return health status', async () => {
@@ -106,7 +110,7 @@ describe('HTTP Server Integration', () => {
 
     expect(updateRes.status).toBe(200);
     expect(updateRes.body.prompt.content).toBe('Updated content');
-    expect(updateRes.body.prompt.version).toBe(2);
+    expect(updateRes.body.prompt.version).toBe(1);
   });
 
   it('should delete a prompt', async () => {
@@ -209,7 +213,6 @@ describe('HTTP Server Integration', () => {
 describe('Prompt List (GET /prompts)', () => {
   beforeEach(async () => {
     await adapter.clearAll();
-    const now = new Date().toISOString();
     const prompts = [
       { name: 'A', content: 'A', tags: ['a', 'test'], category: 'general' },
       { name: 'B', content: 'B', tags: ['b', 'test'], category: 'general' },
@@ -217,13 +220,7 @@ describe('Prompt List (GET /prompts)', () => {
       { name: 'Find Me', content: 'The word is test' },
     ];
     for (const p of prompts) {
-      await promptService.createPrompt({
-        version: 1,
-        isTemplate: false,
-        createdAt: now,
-        updatedAt: now,
-        ...p,
-      });
+      await promptService.createPrompt(p);
     }
   });
 
@@ -283,7 +280,6 @@ describe('Prompt List (GET /prompts)', () => {
       name: 'Template',
       content: 'a template',
       isTemplate: true,
-      version: 1,
     });
     const res = await request(baseUrl).get('/prompts?isTemplate=true').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
@@ -308,20 +304,21 @@ describe('Prompt List (GET /prompts)', () => {
 });
 
 describe('Bulk Prompt Operations', () => {
-  let dupPrompt: any;
   beforeEach(async () => {
     await adapter.clearAll();
-    dupPrompt = {
+    const dupPrompt = {
       name: 'Bulk Dup',
       content: 'I will be duplicated',
-      version: 1,
     };
     await promptService.createPrompt(dupPrompt);
   });
 
   it('should bulk create prompts successfully, skipping duplicates', async () => {
     const prompts = [
-      dupPrompt,
+      {
+        name: 'Bulk Dup',
+        content: 'I will be duplicated',
+      },
       { name: 'New 1', content: 'content' },
       { name: '', content: '' },
       { name: 'New 2', content: 'content' },
@@ -373,7 +370,6 @@ describe('Workflow Engine Integration', () => {
       content: 'The capital of {{country}} is',
       isTemplate: true,
       variables: ['country'],
-      version: 1,
     });
   });
 

@@ -1,6 +1,6 @@
-import Redis from 'ioredis';
+import { Redis } from 'ioredis';
 
-import { config } from './config';
+import { config } from './config.js';
 
 let redisClient: Redis | null = null;
 
@@ -22,6 +22,16 @@ export function getRedisClient(): Redis | null {
     });
   }
   return redisClient;
+}
+
+/**
+ * Closes the singleton Redis client connection.
+ */
+export async function closeRedisClient(): Promise<void> {
+  if (redisClient) {
+    await redisClient.quit();
+    redisClient = null;
+  }
 }
 
 /**

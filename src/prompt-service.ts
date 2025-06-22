@@ -4,15 +4,20 @@
  */
 
 import Handlebars from 'handlebars';
+import { z } from 'zod';
 
 import { config } from './config.js';
 import { AppError, DuplicateError } from './errors.js';
 import type { StorageAdapter } from './interfaces.js';
 import type { ApplyTemplateResult, Prompt } from './interfaces.js';
-import type { CreatePromptArgs, ListPromptsArgs, UpdatePromptArgs } from './prompts.js';
 import * as Prompts from './prompts.js';
 import { promptSchemas } from './schemas.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
+
+// Derive types from the single source of truth
+type CreatePromptArgs = z.infer<typeof promptSchemas.create>;
+type UpdatePromptArgs = z.infer<typeof promptSchemas.update>;
+type ListPromptsArgs = z.infer<typeof promptSchemas.list>;
 
 const templateHelpers: { [key: string]: (...args: any[]) => any } = {
   eq: (a: any, b: any) => a === b,

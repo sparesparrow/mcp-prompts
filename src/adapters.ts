@@ -349,29 +349,60 @@ export class MemoryAdapter implements StorageAdapter {
   }
 
   public async listPrompts(
-    options?: ListPromptsOptions,
+    options: ListPromptsOptions = {},
     allVersions = false,
   ): Promise<Prompt[]> {
-    let all: Prompt[] = Array.from(this.prompts.values()).flatMap(versions =>
+    let allPrompts: Prompt[] = Array.from(this.prompts.values()).flatMap(versions =>
       Array.from(versions.values()),
     );
 
-    if (options?.isTemplate !== undefined) {
-      all = all.filter(p => p.isTemplate === options.isTemplate);
+    // Filter
+    if (options.isTemplate !== undefined) {
+      allPrompts = allPrompts.filter(p => p.isTemplate === options.isTemplate);
+    }
+    if (options.category) {
+      allPrompts = allPrompts.filter(p => p.category === options.category);
+    }
+    if (options.tags && options.tags.length > 0) {
+      allPrompts = allPrompts.filter(p => options.tags?.every(tag => p.tags?.includes(tag)));
+    }
+    if (options.search) {
+      const search = options.search.toLowerCase();
+      allPrompts = allPrompts.filter(
+        p =>
+          p.name.toLowerCase().includes(search) ||
+          (p.description && p.description.toLowerCase().includes(search)) ||
+          p.content.toLowerCase().includes(search),
+      );
     }
 
+    // Handle versions
     if (!allVersions) {
       const latest = new Map<string, Prompt>();
-      for (const p of all) {
+      for (const p of allPrompts) {
         if (!latest.has(p.id) || (latest.get(p.id)!.version ?? 0) < (p.version ?? 0)) {
           latest.set(p.id, p);
         }
       }
-      all = Array.from(latest.values());
+      allPrompts = Array.from(latest.values());
     }
 
-    // sort and paginate as in FileAdapter
-    return all;
+    // Sort
+    if (options.sort) {
+      allPrompts.sort((a, b) => {
+        const fieldA = a[options.sort as keyof Prompt];
+        const fieldB = b[options.sort as keyof Prompt];
+        if (fieldA === undefined || fieldB === undefined) return 0;
+        if (fieldA < fieldB) return options.order === 'desc' ? 1 : -1;
+        if (fieldA > fieldB) return options.order === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+
+    // Paginate
+    const offset = options.offset ?? 0;
+    const limit = options.limit ?? allPrompts.length;
+    return allPrompts.slice(offset, offset + limit);
   }
 
   public async getSequence(id: string): Promise<PromptSequence | null> {
