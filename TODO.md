@@ -72,7 +72,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 - [x] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
   - [x] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
   - [x] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
-- [ ] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
+- [x] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
 - [ ] **Set up OpenAPI Generation:** Configure automatic generation of an OpenAPI specification from the Zod schemas.
 - [ ] **CI/CD Pipeline:**
   - [ ] Implement lint, test, and build pipeline.
@@ -102,7 +102,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 - [x] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
   - [x] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
   - [x] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
-- [ ] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
+- [x] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
 - [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-collection`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Implement a comprehensive test suite (unit, integration).

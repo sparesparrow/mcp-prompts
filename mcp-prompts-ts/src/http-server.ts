@@ -23,8 +23,6 @@ import {
   releaseWorkflowSlot,
   ShellRunner,
 } from './workflow-service.js';
-import { promptSchemas } from './schemas.js';
-import { StorageAdapter } from './interfaces.js';
 
 const catchAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -195,6 +193,7 @@ function apiKeyAuth(req: express.Request, res: express.Response, next: express.N
  * @param server
  * @param config
  * @param services
+ * @returns
  */
 export async function startHttpServer(
   server: any | null = null,
@@ -203,260 +202,40 @@ export async function startHttpServer(
 ): Promise<http.Server> {
   const app = express();
 
-  // Add security headers
-  app.use(
-    helmet({
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          imgSrc: ["'self'", 'data:', 'https:'],
-          scriptSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-        },
-      },
-      crossOriginEmbedderPolicy: true,
-      crossOriginOpenerPolicy: true,
-      crossOriginResourcePolicy: { policy: 'same-site' },
-      dnsPrefetchControl: true,
-      frameguard: true,
-      hidePoweredBy: true,
-      hsts: true,
-      noSniff: true,
-      referrerPolicy: { policy: 'same-origin' },
-    }),
-  );
-
-  // Add rate limiting
-  if (process.env.ENABLE_RATE_LIMIT !== 'false') {
-    const limiter = rateLimit({
-      legacyHeaders: false,
-      // 15 minutes
-      max: config.rateLimit?.max || 100,
-      // Limit each IP to 100 requests per windowMs
-      standardHeaders: true,
-
-      windowMs: config.rateLimit?.windowMs || 15 * 60 * 1000,
-    });
-    app.use(limiter);
+  // Middleware
+  app.use(helmet());
+  app.use(cors({ origin: config.corsOrigin || '*' }));
+  app.use(express.json());
+  if (config.rateLimit) {
+    app.use(rateLimit(config.rateLimit));
   }
+  app.use(apiKeyAuth); // Apply API key authentication to all routes
 
-  // Enable JSON body parsing with size limits
-  app.use(express.json({ limit: '1mb' }));
+  // Swagger docs
+  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
-  // Enable CORS with proper options
-  app.use(
-    cors({
-      allowedHeaders: ['Content-Type', 'Authorization'],
-      // 24 hours
-      credentials: true,
+  const { promptService, sequenceService, workflowService } = services;
 
-      maxAge: 86400,
+  // Routes
 
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      origin: config.corsOrigin || '*',
-    }),
-  );
+  /**
+   * @openapi
+   * /health:
+   *   get:
+   *     summary: Health check
+   *     responses:
+   *       200:
+   *         description: Server is healthy
+   */
+  app.get('/health', (_req, res) => res.status(200).send('OK'));
 
-  // Handle preflight requests
-  app.options('*', (req, res) => {
-    res.status(204).end();
-  });
-
-  // Health check endpoint
-  app.get('/health', async (req, res) => {
-    try {
-      const healthChecks = services.storageAdapters.map(adapter => adapter.healthCheck());
-      const results = await Promise.all(healthChecks);
-      const allHealthy = results.every(healthy => healthy);
-
-      if (!allHealthy) {
-        return res.status(503).json({
-          status: 'error',
-          storage: 'unhealthy',
-          details: services.storageAdapters.map((adapter, i) => ({
-            adapter: adapter.constructor.name,
-            healthy: results[i],
-          })),
-        });
-      }
-
-      res.json({
-        status: 'ok',
-        version: process.env.npm_package_version || 'dev',
-        storage: 'healthy',
-      });
-    } catch (err) {
-      res.status(503).json({
-        status: 'error',
-        storage: 'unhealthy',
-        message: err instanceof Error ? err.message : String(err),
-      });
-    }
-  });
-
-  // Add API key authentication middleware
-  app.use(apiKeyAuth);
+  // --- Prompts ---
 
   /**
    * @openapi
    * /prompts:
-   *   get:
-   *     summary: List prompts with pagination, sorting, and filtering
-   *     parameters:
-   *       - in: query
-   *         name: offset
-   *         schema:
-   *           type: integer
-   *           minimum: 0
-   *         description: Number of items to skip
-   *       - in: query
-   *         name: limit
-   *         schema:
-   *           type: integer
-   *           minimum: 1
-   *           maximum: 100
-   *         description: Maximum number of items to return
-   *       - in: query
-   *         name: sort
-   *         schema:
-   *           type: string
-   *           enum: [createdAt, updatedAt, name]
-   *         description: Field to sort by
-   *       - in: query
-   *         name: order
-   *         schema:
-   *           type: string
-   *           enum: [asc, desc]
-   *         description: Sort order
-   *       - in: query
-   *         name: category
-   *         schema:
-   *           type: string
-   *         description: Filter by category
-   *       - in: query
-   *         name: tags
-   *         schema:
-   *           type: string
-   *         description: Comma-separated list of tags (all must match)
-   *       - in: query
-   *         name: isTemplate
-   *         schema:
-   *           type: boolean
-   *         description: Filter for template/non-template prompts
-   *       - in: query
-   *         name: search
-   *         schema:
-   *           type: string
-   *         description: Search term for name, description, or content
-   *     responses:
-   *       200:
-   *         description: Paginated list of prompts
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 prompts:
-   *                   type: array
-   *                   items:
-   *                     $ref: '#/components/schemas/Prompt'
-   *                 total:
-   *                   type: integer
-   *                 offset:
-   *                   type: integer
-   *                 limit:
-   *                   type: integer
-   */
-  app.get(
-    '/prompts',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      // This is a comment to help the apply model.
-      // Parse and validate query params
-      const querySchema = z.object({
-        offset: z.string().optional().transform(v => (v ? parseInt(v, 10) : 0)),
-        limit: z.string().optional().transform(v => (v ? parseInt(v, 10) : 20)),
-        sort: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
-        order: z.enum(['asc', 'desc']).optional(),
-        category: z.string().optional(),
-        tags: z.string().optional(),
-        isTemplate: z.string().optional().transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
-        search: z.string().optional(),
-      });
-      const parseResult = querySchema.safeParse(req.query);
-      if (!parseResult.success) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid query parameters',
-            details: parseResult.error.errors,
-          },
-        });
-        return;
-      }
-      const { offset, limit, sort, order, category, tags, isTemplate, search } = parseResult.data;
-      const options: any = { offset, limit, sort, order, category, isTemplate, search };
-      if (tags) {
-        options.tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
-      }
-      const prompts = await services.promptService.listPrompts(options);
-      // For total count, fetch without pagination
-      const total = (await services.promptService.listPrompts({ ...options, offset: 0, limit: undefined })).length;
-      res.json({ prompts, total, offset, limit });
-    }),
-  );
-
-  /**
-   * POST /prompts
-   * Create a new prompt version. If version is not specified, auto-increment.
-   */
-  app.post(
-    '/prompts',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const parseResult = promptSchemas.create.safeParse(req.body);
-      if (!parseResult.success) {
-        // Forward validation error to the global handler
-        return next(new z.ZodError(parseResult.error.errors));
-      }
-      const prompt = parseResult.data;
-      const created = await services.promptService.createPrompt(prompt);
-      return res.status(201).json({ success: true, prompt: created });
-    }),
-  );
-
-  /**
-   * GET /prompts/:id
-   * Get a prompt by id and optional version.
-   */
-  app.get(
-    '/prompts/:id',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const id = req.params.id;
-      const version = req.query.version ? Number(req.query.version) : undefined;
-      const prompt = await services.promptService.getPrompt(id, version);
-      if (!prompt) {
-        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found' } });
-      }
-      return res.status(200).json({ success: true, prompt });
-    }),
-  );
-
-  /**
-   * @openapi
-   * /prompts/{id}/{version}:
-   *   put:
-   *     summary: Update an existing prompt
-   *     parameters:
-   *       - in: path
-   *         name: id
-   *         required: true
-   *         schema:
-   *           type: string
-   *       - in: path
-   *         name: version
-   *         required: true
-   *         schema:
-   *           type: integer
+   *   post:
+   *     summary: Create a new prompt
    *     requestBody:
    *       required: true
    *       content:
@@ -464,12 +243,8 @@ export async function startHttpServer(
    *           schema:
    *             $ref: '#/components/schemas/Prompt'
    *     responses:
-   *       200:
-   *         description: The updated prompt
-   *         content:
-   *           application/json:
-   *             schema:
-   *               $ref: '#/components/schemas/Prompt'
+   *       201:
+   *         description: Prompt created
    */
   app.put('/prompts/:id/:version', catchAsync(async (req, res, next) => {
     const prompt = await services.promptService.updatePrompt(
@@ -486,32 +261,73 @@ export async function startHttpServer(
 
   /**
    * @openapi
-   * /prompts/{id}/{version}:
-   *   delete:
-   *     summary: Delete a prompt
+   * /prompts:
+   *   get:
+   *     summary: List prompts
+   *     responses:
+   *       200:
+   *         description: A list of prompts
+   */
+  app.get(
+    '/prompts',
+    catchAsync(async (req, res) => {
+      const { tags, isTemplate, search, limit, offset } = promptSchemas.list.parse(req.query);
+      const prompts = await promptService.listPrompts({
+        tags: tags as string[],
+        isTemplate: isTemplate as boolean,
+        search: search as string,
+        limit: limit as number,
+        offset: offset as number,
+      });
+      res.status(200).json(prompts);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /prompts/{id}:
+   *   get:
+   *     summary: Get a prompt by ID
    *     parameters:
    *       - in: path
    *         name: id
    *         required: true
    *         schema:
    *           type: string
-   *       - in: path
-   *         name: version
-   *         required: true
-   *         schema:
-   *           type: integer
    *     responses:
-   *       204:
-   *         description: Prompt deleted successfully
+   *       200:
+   *         description: The prompt
+   *       404:
+   *         description: Prompt not found
    */
-  app.delete('/prompts/:id/:version', catchAsync(async (req, res, next) => {
-    await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
-    res.status(204).send();
-  }));
+  app.get(
+    '/prompts/:id',
+    catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const prompt = await promptService.getPrompt(id);
+      if (!prompt) {
+        throw new AppError('Prompt not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(prompt);
+    }),
+  );
 
   /**
-   * GET /prompts/:id/versions
-   * List all versions for a prompt ID
+   * @openapi
+   * /prompts/{id}/versions:
+   *  get:
+   *    summary: Get all versions of a prompt
+   *    parameters:
+   *      - in: path
+   *        name: id
+   *        required: true
+   *        schema:
+   *          type: string
+   *    responses:
+   *      200:
+   *        description: A list of versions
+   *      404:
+   *        description: Prompt not found
    */
   app.get(
     '/prompts/:id/versions',
@@ -614,307 +430,125 @@ export async function startHttpServer(
     '/api/v1/sequence/:id',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const { id } = req.params;
-      const result = await services.sequenceService.getSequenceWithPrompts(id);
-      res.json(result);
-    }),
-  );
-
-  // Add after other endpoints, before the 404 handler
-  app.post(
-    '/diagram',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const { promptIds } = req.body;
-      if (!Array.isArray(promptIds) || promptIds.length === 0) {
-        res.status(400).json({ error: true, message: 'promptIds must be a non-empty array.' });
-        return;
-      }
-      // Fetch prompt names for diagram nodes
-      const prompts = await Promise.all(
-        promptIds.map((id: string) => services.promptService.getPrompt(id)),
-      );
-      const nodes = prompts.map((p, i) => `P${i}[${p ? p.name : promptIds[i]}]`);
-      // Simple linear flow: P0 --> P1 --> P2 ...
-      let edges = '';
-      for (let i = 0; i < nodes.length - 1; i++) {
-        edges += `${nodes[i]} --> ${nodes[i + 1]}\n`;
-      }
-      const mermaid = `graph TD\n${nodes.join('\n')}\n${edges}`;
-      res.json({ mermaid });
-    }),
-  );
-
-  const checkWorkflowRateLimit = getWorkflowRateLimiter();
-
-  /**
-   * POST /api/v1/workflows
-   * Create a new workflow version. If version is not specified, auto-increment.
-   * Request body: { ...workflow }
-   * Response: { success, id, version, message }
-   */
-  app.post(
-    '/api/v1/workflows',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const workflow = req.body;
-      if (!services.workflowService.validateWorkflow(workflow)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid workflow definition.',
-          },
-        });
-        return;
-      }
-      if (!workflow.id || typeof workflow.id !== 'string') {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Workflow must have a string id.',
-          },
-        });
-        return;
-      }
-      // Determine version
-      let version = workflow.version;
-      if (typeof version !== 'number') {
-        // Auto-increment version
-        const versions = getAllWorkflowVersions(workflow.id);
-        version = versions.length > 0 ? Math.max(...versions) + 1 : 1;
-        workflow.version = version;
-      }
-      // Check if this version already exists
-      if (loadWorkflowFromFile(workflow.id, version)) {
-        res.status(409).json({
-          success: false,
-          error: {
-            code: 'CONFLICT',
-            message: `Workflow version ${version} already exists for id ${workflow.id}`,
-          },
-        });
-        return;
-      }
-      saveWorkflowToFile(workflow);
-      res.status(201).json({
-        id: workflow.id,
-        version,
-        message: 'Workflow version saved.',
-        success: true,
-      });
-    }),
-  );
-
-  /**
-   * GET /api/v1/workflows/:id
-   * Retrieve the latest version of a workflow by ID
-   * Response: { ...workflow } or 404
-   */
-  app.get(
-    '/api/v1/workflows/:id',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const workflow = loadWorkflowFromFile(req.params.id);
-      if (!workflow) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Workflow not found.',
-          },
-        });
-        return;
-      }
-      res.json(workflow);
-    }),
-  );
-
-  /**
-   * GET /api/v1/workflows/:id/versions
-   * List all versions for a workflow ID
-   * Response: [ { version, createdAt } ]
-   */
-  app.get(
-    '/api/v1/workflows/:id/versions',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const versions = getAllWorkflowVersions(req.params.id);
-      if (!versions.length) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'No versions found for workflow.',
-          },
-        });
-        return;
-      }
-      // Optionally, include createdAt for each version
-      const result = versions.map(v => {
-        const wf = loadWorkflowFromFile(req.params.id, v);
-        return { version: v, createdAt: wf?.createdAt };
-      });
-      res.json(result);
-    }),
-  );
-
-  /**
-   * GET /api/v1/workflows/:id/versions/:version
-   * Retrieve a specific version of a workflow
-   * Response: { ...workflow } or 404
-   */
-  app.get(
-    '/api/v1/workflows/:id/versions/:version',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const version = parseInt(req.params.version, 10);
-      if (isNaN(version)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Version must be a number.',
-          },
-        });
-        return;
-      }
-      const workflow = loadWorkflowFromFile(req.params.id, version);
-      if (!workflow) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Workflow version not found.',
-          },
-        });
-        return;
-      }
-      res.json(workflow);
-    }),
-  );
-
-  /**
-   * DELETE /api/v1/workflows/:id/versions/:version
-   * Delete a specific version of a workflow
-   * Response: { success, id, version, message }
-   */
-  app.delete(
-    '/api/v1/workflows/:id/versions/:version',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const version = parseInt(req.params.version, 10);
-      if (isNaN(version)) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Version must be a number.',
-          },
-        });
-        return;
-      }
-      const file = getWorkflowFileName(req.params.id, version);
-      if (!fs.existsSync(file)) {
-        res.status(404).json({
-          success: false,
-          error: {
-            code: 'NOT_FOUND',
-            message: 'Workflow version not found.',
-          },
-        });
-        return;
-      }
-      fs.unlinkSync(file);
-      res.json({
-        success: true,
-        id: req.params.id,
-        version,
-        message: 'Workflow version deleted.',
-      });
-    }),
-  );
-
-  /**
-   * GET /api/v1/workflows
-   * List all workflows (latest version only)
-   * Response: [ { ...workflow }, ... ]
-   */
-  app.get(
-    '/api/v1/workflows',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const workflows = getAllWorkflows(true); // latestOnly = true
-      res.json(workflows);
-    }),
-  );
-
-  /**
-   * POST /api/v1/workflows/:id/run
-   * Optionally accepts ?version= in query to run a specific version
-   * Response: { success, message, outputs } or 404
-   */
-  app.post(
-    '/api/v1/workflows/:id/run',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      const userId = (req.headers['x-user-id'] as string) || 'anonymous';
-      const workflowId = req.params.id;
-      const versionParam = req.query.version;
-      let version: number | undefined = undefined;
-      if (versionParam !== undefined) {
-        version = parseInt(versionParam as string, 10);
-        if (isNaN(version)) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Version must be a number.',
-            },
-          });
-          return;
-        }
-      }
-      let result;
-      try {
-        const workflow = loadWorkflowFromFile(workflowId, version);
-        if (!workflow) {
-          res.status(404).json({
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Workflow not found.',
-            },
-          });
-          return;
-        }
-        // Audit: workflow start
-        auditLogWorkflowEvent({ details: { workflow }, eventType: 'start', userId, workflowId });
-        // Run the workflow
-        const initialContext = { ...req.body, userId };
-        result = await services.workflowService.runWorkflow(workflow, initialContext);
-        // Audit: workflow end
-        auditLogWorkflowEvent({ details: { result }, eventType: 'end', userId, workflowId });
-        res.status(result.success ? 200 : 400).json(result);
-      } catch (err) {
-        // Audit: workflow error
-        auditLogWorkflowEvent({
-          details: { error: err instanceof Error ? err.message : String(err) },
-          eventType: 'error',
-          userId,
-          workflowId,
-        });
-        next(err);
-      } finally {
-        releaseWorkflowSlot(userId);
-      }
+      const versions = await promptService.listPromptVersions(id);
+      res.status(200).json(versions);
     }),
   );
 
   /**
    * @openapi
-   * /api/v1/workflows/{executionId}/resume:
+   * /prompts/{id}/{version}:
+   *  get:
+   *   summary: Get a specific version of a prompt
+   *   parameters:
+   *    - in: path
+   *      name: id
+   *      required: true
+   *      schema:
+   *       type: string
+   *    - in: path
+   *      name: version
+   *      required: true
+   *      schema:
+   *        type: integer
+   *   responses:
+   *    200:
+   *     description: The prompt
+   *    404:
+   *      description: Prompt not found
+   */
+  app.get(
+    '/prompts/:id/:version',
+    catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const version = parseInt(req.params.version, 10);
+      const prompt = await promptService.getPrompt(id, version);
+      if (!prompt) {
+        throw new AppError('Prompt not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(prompt);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /prompts/{id}/{version}:
+   *  put:
+   *    summary: Update a prompt
+   *    parameters:
+   *      - in: path
+   *        name: id
+   *        required: true
+   *        schema:
+   *          type: string
+   *      - in: path
+   *        name: version
+   *        required: true
+   *        schema:
+   *          type: integer
+   *    requestBody:
+   *      required: true
+   *      content:
+   *        application/json:
+   *          schema:
+   *            $ref: '#/components/schemas/Prompt'
+   *    responses:
+   *      200:
+   *        description: The updated prompt
+   *      404:
+   *        description: Prompt not found
+   */
+  app.put(
+    '/prompts/:id/:version',
+    catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const version = parseInt(req.params.version, 10);
+      const validatedData = promptSchemas.update.parse(req.body);
+      const prompt = await promptService.updatePrompt(id, version, validatedData);
+      res.status(200).json(prompt);
+    }),
+  );
+
+  /**
+   * @openapi
+   * /prompts/{id}/{version}:
+   *  delete:
+   *    summary: Delete a prompt
+   *    parameters:
+   *      - in: path
+   *        name: id
+   *        required: true
+   *        schema:
+   *          type: string
+   *      - in: path
+   *        name: version
+   *        required: false
+   *        schema:
+   *          type: integer
+   *    responses:
+   *      204:
+   *        description: Prompt deleted
+   *      404:
+   *        description: Prompt not found
+   */
+  app.delete(
+    '/prompts/:id/:version?',
+    catchAsync(async (req, res) => {
+      const { id } = req.params;
+      const version = req.params.version ? parseInt(req.params.version, 10) : undefined;
+      const success = await promptService.deletePrompt(id, version);
+      if (!success) {
+        throw new AppError('Prompt not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(204).send();
+    }),
+  );
+
+  /**
+   * @openapi
+   * /prompts/apply-template:
    *   post:
-   *     summary: Resume a paused workflow at a human-approval step
-   *     parameters:
-   *       - in: path
-   *         name: executionId
-   *         required: true
-   *         schema:
-   *           type: string
-   *         description: The workflow execution ID
+   *     summary: Apply a template
    *     requestBody:
    *       required: true
    *       content:
@@ -922,45 +556,184 @@ export async function startHttpServer(
    *           schema:
    *             type: object
    *             properties:
-   *               input:
-   *                 description: Input provided by the human
-   *                 type: any
+   *               id:
+   *                 type: string
+   *               variables:
+   *                 type: object
    *     responses:
    *       200:
-   *         description: Workflow resumed and result returned
-   *         content:
-   *           application/json:
-   *             schema:
-   *               type: object
-   *               properties:
-   *                 success:
-   *                   type: boolean
-   *                 message:
-   *                   type: string
-   *                 outputs:
-   *                   type: object
-   *                 paused:
-   *                   type: boolean
-   *                 prompt:
-   *                   type: string
-   *                 stepId:
-   *                   type: string
-   *                 executionId:
-   *                   type: string
+   *         description: The result of applying the template
    */
   app.post(
-    '/api/v1/workflows/:executionId/resume',
-    catchAsync(async (req, res, next) => {
-      const { executionId } = req.params;
-      const { input } = req.body;
-      const result = await services.workflowService.resumeWorkflow(executionId, input);
+    '/prompts/apply-template',
+    catchAsync(async (req, res) => {
+      const { id, variables } = promptSchemas.applyTemplate.parse(req.body);
+      const result = await promptService.applyTemplate(id, variables);
       res.status(200).json(result);
     }),
   );
 
-  // Set up SSE if enabled
-  if (config.enableSSE) {
-    // setupSSE(app, config.ssePath || '/events');
+  // --- Sequences ---
+
+  app.post(
+    '/sequences',
+    catchAsync(async (req, res) => {
+      // Assuming a schema for creating sequences exists
+      // const validatedData = sequenceSchemas.create.parse(req.body);
+      const sequence = await sequenceService.createSequence(req.body);
+      res.status(201).json(sequence);
+    }),
+  );
+
+  app.get(
+    '/sequences/:id',
+    catchAsync(async (req, res) => {
+      const sequence = await sequenceService.getSequence(req.params.id);
+      if (!sequence) {
+        throw new AppError('Sequence not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(sequence);
+    }),
+  );
+
+  app.post(
+    '/sequences/:id/execute',
+    catchAsync(async (req, res) => {
+      const result = await sequenceService.executeSequence(req.params.id, req.body.variables);
+      res.status(200).json(result);
+    }),
+  );
+
+  // --- Workflows ---
+
+  app.post(
+    '/workflows',
+    catchAsync(async (req, res) => {
+      // const validatedWorkflow = workflowService.validateWorkflow(req.body);
+      // const workflow = await workflowService.saveWorkflow(validatedWorkflow);
+      const workflow = req.body;
+      saveWorkflowToFile(workflow);
+      res.status(201).json(workflow);
+    }),
+  );
+
+  app.get(
+    '/workflows',
+    catchAsync(async (req, res) => {
+      const latestOnly = req.query.latestOnly !== 'false';
+      const workflows = getAllWorkflows(latestOnly);
+      res.status(200).json(workflows);
+    }),
+  );
+
+  app.get(
+    '/workflows/:id',
+    catchAsync(async (req, res) => {
+      const workflow = loadWorkflowFromFile(req.params.id);
+      if (!workflow) {
+        throw new AppError('Workflow not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(workflow);
+    }),
+  );
+
+  app.get(
+    '/workflows/:id/versions',
+    catchAsync(async (req, res) => {
+      const versions = getAllWorkflowVersions(req.params.id);
+      res.status(200).json(versions);
+    }),
+  );
+
+  app.get(
+    '/workflows/:id/:version',
+    catchAsync(async (req, res) => {
+      const version = parseInt(req.params.version, 10);
+      const workflow = loadWorkflowFromFile(req.params.id, version);
+      if (!workflow) {
+        throw new AppError('Workflow not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(workflow);
+    }),
+  );
+
+  app.post(
+    '/workflows/:id/execute',
+    getWorkflowRateLimiter(),
+    catchAsync(async (req, res, next) => {
+      const { id } = req.params;
+      const version = req.query.version ? parseInt(req.query.version as string, 10) : undefined;
+      const workflow = loadWorkflowFromFile(id, version);
+      if (!workflow) {
+        throw new AppError('Workflow not found', HttpErrorCode.NOT_FOUND);
+      }
+      const executionId = await workflowService.executeWorkflow(workflow, req.body.context);
+      res.status(202).json({
+        message: 'Workflow execution started',
+        executionId: executionId,
+        statusUrl: `/workflows/executions/${executionId}`,
+      });
+    }),
+  );
+
+  app.get(
+    '/workflows/executions/:executionId',
+    catchAsync(async (req, res) => {
+      const { executionId } = req.params;
+      const state = await workflowService.getWorkflowState(executionId);
+      if (!state) {
+        throw new AppError('Workflow execution not found', HttpErrorCode.NOT_FOUND);
+      }
+      res.status(200).json(state);
+    }),
+  );
+
+  app.post(
+    '/workflows/executions/:executionId/pause',
+    catchAsync(async (req, res) => {
+      await workflowService.pauseWorkflow(req.params.executionId);
+      res.status(200).json({ message: 'Workflow paused' });
+    }),
+  );
+
+  app.post(
+    '/workflows/executions/:executionId/resume',
+    catchAsync(async (req, res) => {
+      await workflowService.resumeWorkflow(req.params.executionId, req.body.context);
+      res.status(200).json({ message: 'Workflow resumed' });
+    }),
+  );
+
+  app.post(
+    '/workflows/executions/:executionId/cancel',
+    catchAsync(async (req, res) => {
+      await workflowService.cancelWorkflow(req.params.executionId);
+      res.status(200).json({ message: 'Workflow cancelled' });
+    }),
+  );
+
+  // --- ElevenLabs Audio Generation ---
+  if (services.elevenLabsService) {
+    app.post(
+      '/audio/generate',
+      catchAsync(async (req, res) => {
+        const { text, voiceId, modelId } = req.body;
+        if (!text) {
+          throw new AppError('Text is required for audio generation', HttpErrorCode.BAD_REQUEST);
+        }
+        const { audioData, metadata } = await services.elevenLabsService.generateAudio({
+          text,
+          voiceId,
+          modelId,
+        });
+        res.setHeader('Content-Type', 'audio/mpeg');
+        res.setHeader('Content-Disposition', 'attachment; filename="generated_audio.mp3"');
+        res.setHeader('X-Audio-Duration-Seconds', metadata.duration);
+        res.setHeader('X-Audio-Word-Count', metadata.wordCount);
+        res.setHeader('X-Audio-Character-Count', metadata.charCount);
+        res.status(200).send(audioData);
+      }),
+    );
   }
 
   // Add this after all other routes, before the error handler
@@ -1004,20 +777,5 @@ export async function startHttpServer(
         message: 'An unexpected error occurred',
       },
     });
-  });
-
-  // Start the server
-  return await new Promise<http.Server>((resolve, reject) => {
-    try {
-      const httpServer = app.listen(config.port, config.host, () => {
-        console.log(`HTTP server listening at http://${config.host}:${config.port}`);
-        resolve(httpServer);
-      });
-      httpServer.on('error', error => {
-        reject(error);
-      });
-    } catch (error) {
-      reject(error);
-    }
   });
 }

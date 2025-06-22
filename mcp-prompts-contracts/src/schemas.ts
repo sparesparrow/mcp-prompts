@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const templateVariableSchema = z.object({
+export const templateVariableSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   default: z.string().optional(),

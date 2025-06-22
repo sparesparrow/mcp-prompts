@@ -5,10 +5,7 @@
 
 import type { z } from 'zod';
 
-import type { McpConfigSchema } from './config.js';
 import { promptSchemas, templateVariableSchema } from './schemas.js';
-
-export type McpConfig = z.infer<typeof McpConfigSchema>;
 
 /**
  * Variable definition for templates
