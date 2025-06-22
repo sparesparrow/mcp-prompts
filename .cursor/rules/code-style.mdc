@@ -1,17 +1,10 @@
 ---
-description: 
-globs: 
+description: Guidelines for consistent code style and formatting in the MCP-Prompts project
+globs:
+  - "src/**/*.ts"
+  - "src/**/*.js"
 alwaysApply: false
 ---
----
-description: Guidelines for consistent code style and formatting in the MCP-Prompts project
-globs:
-  - "src/**/*.ts"
-  - "src/**/*.js"
-description: Guidelines for consistent code style and formatting in the MCP-Prompts project
-globs:
-  - "src/**/*.ts"
-  - "src/**/*.js"
 # Code Style and Formatting Guidelines
 
 This rule defines the coding standards and style guidelines for the MCP-Prompts project to ensure consistency, readability, and maintainability across the codebase.
