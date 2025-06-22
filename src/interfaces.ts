@@ -223,7 +223,7 @@ export interface StorageAdapter {
   /**
    * Update a specific version of a prompt. If version is omitted, updates the latest.
    */
-  updatePrompt(id: string, version: number, prompt: Prompt): Promise<Prompt>;
+  updatePrompt(id: string, version: number, prompt: Partial<Prompt>): Promise<Prompt>;
   /**
    * Delete a specific version of a prompt. If version is omitted, deletes all versions.
    */

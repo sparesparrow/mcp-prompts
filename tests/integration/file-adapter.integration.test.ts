@@ -6,8 +6,7 @@ import os from 'node:os';
 import { z } from 'zod';
 
 import { FileAdapter } from '../../src/adapters.js';
-import { Prompt } from '../../src/interfaces.js';
-import { IStorageAdapter, PromptSequence, Workflow } from '../../src/interfaces';
+import { Prompt, StorageAdapter, PromptSequence } from '../../src/interfaces.js';
 import { rmdir } from 'fs/promises';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -36,8 +35,8 @@ function removeDirRecursive(dirPath: string) {
 }
 
 describe.skip('FileAdapter Integration Tests', () => {
-  let adapter: IStorageAdapter;
-  const testDir = './test-prompts-file-adapter';
+  let adapter: StorageAdapter;
+  const testDirName = './test-prompts-file-adapter';
 
   beforeAll(() => {
     // Create a unique directory for this test run
@@ -73,8 +72,12 @@ describe.skip('FileAdapter Integration Tests', () => {
 
   it('should save and retrieve a prompt', async () => {
     const promptData = {
+      id: 'test',
+      version: 1,
       name: 'Test',
       content: 'Test content',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     const savedPrompt = await adapter.savePrompt(promptData);
     const retrieved = await adapter.getPrompt(savedPrompt.id, savedPrompt.version);
@@ -85,8 +88,12 @@ describe.skip('FileAdapter Integration Tests', () => {
 
   it('should update an existing prompt (versioned)', async () => {
     const promptData = {
+      id: 'update-test',
+      version: 1,
       name: 'Update Test',
       content: 'Initial content',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     const savedPrompt = await adapter.savePrompt(promptData);
 
@@ -95,11 +102,12 @@ describe.skip('FileAdapter Integration Tests', () => {
     };
     const updatedPrompt = await adapter.updatePrompt(
       savedPrompt.id,
-      savedPrompt.version,
+      savedPrompt.version as number,
       updates,
     );
     expect(updatedPrompt).toBeDefined();
     expect(updatedPrompt.content).toBe('Updated content');
+    expect(updatedPrompt.version).toBe(savedPrompt.version);
 
     const retrieved = await adapter.getPrompt(savedPrompt.id, updatedPrompt.version);
     expect(retrieved).toBeDefined();
@@ -114,13 +122,25 @@ describe.skip('FileAdapter Integration Tests', () => {
 
   it('should list all prompts (versioned)', async () => {
     const promptsData = [
-      { name: 'List 1', content: 'Prompt 1' },
-      { name: 'List 2', content: 'Prompt 2' },
+      {
+        id: 'list-1',
+        version: 1,
+        name: 'List 1',
+        content: 'Prompt 1',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
+      {
+        id: 'list-2',
+        version: 1,
+        name: 'List 2',
+        content: 'Prompt 2',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      },
     ];
 
-    const savedPrompts = await Promise.all(
-      promptsData.map(p => adapter.savePrompt(p)),
-    );
+    const savedPrompts = await Promise.all(promptsData.map(p => adapter.savePrompt(p)));
 
     const result = await adapter.listPrompts({}, true);
     expect(result.prompts.length).toBeGreaterThanOrEqual(2);
@@ -130,8 +150,12 @@ describe.skip('FileAdapter Integration Tests', () => {
 
   it('should delete all versions of a prompt', async () => {
     const promptData = {
+      id: 'delete-test',
+      version: 1,
       name: 'Delete Test',
       content: 'To be deleted',
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
     };
     // Save two versions
     const savedPrompt1 = await adapter.savePrompt(promptData);

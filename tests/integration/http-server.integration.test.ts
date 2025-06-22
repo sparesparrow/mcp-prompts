@@ -2,20 +2,18 @@ import fs from 'fs';
 import path from 'path';
 import request from 'supertest';
 import { fileURLToPath } from 'url';
-import express from 'express';
-import http from 'http';
-import { Server } from 'http';
 
 import { MemoryAdapter } from '../../src/adapters.js';
-import { startHttpServer, ServerServices } from '../../src/http-server.js';
+import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
 import type { SequenceService } from '../../src/sequence-service.js';
 import { WorkflowServiceImpl as WorkflowService } from '../../src/workflow-service.js';
+import { closeServer } from '../setup.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-let server: Server;
+let server: any;
 let baseUrl: string;
 let promptService: PromptService;
 let adapter: MemoryAdapter;
@@ -37,7 +35,6 @@ beforeAll(async () => {
   const workflowService = new WorkflowService(adapter, promptService);
   server = await startHttpServer(
     null,
-    // Using 127.0.0.1 to avoid EADDRNOTAVAIL errors in certain environments
     { host: '127.0.0.1', port: 0 },
     { promptService, sequenceService, workflowService, storageAdapters: [adapter] },
   );
@@ -46,11 +43,12 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  if (server && server.close) await server.close();
+  await closeServer(server);
+  
+  await new Promise(resolve => setTimeout(resolve, 100));
 });
 
-// Temporarily disabling these tests to unblock the pipeline
-describe.skip('HTTP Server Integration Tests', () => {
+describe('HTTP Server Integration', () => {
   beforeEach(async () => {
     await adapter.clearAll();
   });
@@ -223,7 +221,7 @@ describe.skip('HTTP Server Integration Tests', () => {
   });
 });
 
-describe.skip('Prompt List (GET /prompts)', () => {
+describe('Prompt List (GET /prompts)', () => {
   beforeEach(async () => {
     await adapter.clearAll();
     const now = new Date().toISOString();
@@ -322,7 +320,7 @@ describe.skip('Prompt List (GET /prompts)', () => {
   });
 });
 
-describe.skip('Bulk Prompt Operations', () => {
+describe('Bulk Prompt Operations', () => {
   let dupPrompt: any;
   beforeEach(async () => {
     await adapter.clearAll();
@@ -392,7 +390,7 @@ describe('Workflow Engine Integration', () => {
     });
   });
 
-  it.skip('should save and run a sample workflow', async () => {
+  it('should save and run a sample workflow', async () => {
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
@@ -415,7 +413,7 @@ describe('Workflow Engine Integration', () => {
     expect(runRes.body.state.outputs.capital).toMatch(/Paris/);
   });
 
-  it.skip('should enforce workflow rate limiting', async () => {
+  it('should enforce workflow rate limiting', async () => {
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
