@@ -15,9 +15,11 @@ import { SequenceServiceImpl } from './sequence-service.js';
 import { WorkflowServiceImpl } from './workflow-service.js';
 
 // Mock McpServer for compilation
+
 const McpServer = class {
   constructor(o: any) {}
   tool(t: any, d: any, i: any, o: any, h: any) {}
+  resource(t: any, d: any, i: any, o: any) {}
   async close() {}
 };
 
@@ -58,7 +60,7 @@ async function main() {
 
   const promptService = new PromptService(storageAdapter);
   const sequenceService = new SequenceServiceImpl(storageAdapter);
-  const workflowService = new WorkflowServiceImpl(promptService, sequenceService);
+  const workflowService = new WorkflowServiceImpl(storageAdapter, promptService);
   const elevenLabsService = new ElevenLabsService({
     apiKey: env.ELEVENLABS_API_KEY || '',
     cacheDir: env.ELEVENLABS_CACHE_DIR,
