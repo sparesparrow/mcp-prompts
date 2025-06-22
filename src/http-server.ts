@@ -519,7 +519,7 @@ export async function startHttpServer(
 
   /**
    * @openapi
-   * /prompts/bulk:
+   * /prompts/bulk-create:
    *   post:
    *     summary: Bulk create prompts
    *     requestBody:
@@ -531,7 +531,7 @@ export async function startHttpServer(
    *             items:
    *               $ref: '#/components/schemas/Prompt'
    *     responses:
-   *       200:
+   *       207:
    *         description: Array of results for each prompt
    *         content:
    *           application/json:
@@ -548,27 +548,21 @@ export async function startHttpServer(
    *                     type: string
    */
   app.post(
-    '/prompts/bulk',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      if (!Array.isArray(req.body)) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Request body must be an array of prompt objects.',
-          },
-        });
+    '/prompts/bulk-create',
+    catchAsync(async (req, res) => {
+      const { prompts } = req.body;
+      if (!Array.isArray(prompts)) {
+        throw new AppError('`prompts` must be an array', 400, HttpErrorCode.BAD_REQUEST);
       }
-      const results = await services.promptService.createPromptsBulk(req.body);
-      const hasErrors = results.some(r => !r.success);
-      res.status(hasErrors ? 207 : 201).json({ results });
+      const results = await services.promptService.createPromptsBulk(prompts);
+      res.status(207).json({ results });
     }),
   );
 
   /**
    * @openapi
-   * /prompts/bulk:
-   *   delete:
+   * /prompts/bulk-delete:
+   *   post:
    *     summary: Bulk delete prompts
    *     requestBody:
    *       required: true
@@ -582,7 +576,7 @@ export async function startHttpServer(
    *                 items:
    *                   type: string
    *     responses:
-   *       200:
+   *       207:
    *         description: Array of results for each ID
    *         content:
    *           application/json:
@@ -600,24 +594,13 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts/bulk-delete',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.log('BULK DELETE BODY:', JSON.stringify(req.body, null, 2));
-      const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
-      console.log('PARSE RESULT:', JSON.stringify(parseResult, null, 2));
-      if (!parseResult.success) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid bulk delete data',
-            details: parseResult.error.errors,
-          },
-        });
-        return;
+    catchAsync(async (req, res) => {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        throw new AppError('`ids` must be an array of strings', 400, HttpErrorCode.BAD_REQUEST);
       }
-      const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
-      const hasErrors = results.some(r => !r.success);
-      res.status(hasErrors ? 207 : 200).json({ results });
+      const results = await services.promptService.deletePromptsBulk(ids);
+      res.status(207).json({ results });
     }),
   );
 
