@@ -22,7 +22,7 @@
   },
   "scripts": {
     "test": "npm run test:unit && npm run test:integration",
-    "lint": "eslint 'src/**/*.ts' && prettier --check .",
+    "lint": "eslint src/**/*.ts && prettier --check .",
     "validate:prompts": "ts-node src/scripts/validate-prompts.ts",
     "build": "node build.mjs",
     "prepare": "npm run build",
