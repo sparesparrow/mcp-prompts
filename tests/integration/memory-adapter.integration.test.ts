@@ -1,5 +1,5 @@
-import { MemoryAdapter } from '../../src/adapters';
-import { Prompt } from '../../src/interfaces';
+import { MemoryAdapter } from '../../src/adapters.js';
+import { Prompt } from '../../src/interfaces.js';
 
 describe.skip('MemoryAdapter Integration', () => {
   let adapter: MemoryAdapter;
@@ -99,8 +99,8 @@ describe.skip('MemoryAdapter Integration', () => {
     }
     const all = await adapter.listPrompts({}, true);
     expect(all.length).toBeGreaterThanOrEqual(2);
-    expect(all.some(p => p.id === 'list-prompt-1')).toBe(true);
-    expect(all.some(p => p.id === 'list-prompt-2')).toBe(true);
+    expect(all.some((p: Prompt) => p.id === 'list-prompt-1')).toBe(true);
+    expect(all.some((p: Prompt) => p.id === 'list-prompt-2')).toBe(true);
   });
 
   it('should delete a prompt (versioned)', async () => {
@@ -118,5 +118,9 @@ describe.skip('MemoryAdapter Integration', () => {
     await adapter.deletePrompt('delete-prompt', 1);
     const retrieved = await adapter.getPrompt('delete-prompt', 1);
     expect(retrieved).toBeNull();
+  });
+
+  it('should filter prompts by template status', async () => {
+    // ... existing code ...
   });
 });

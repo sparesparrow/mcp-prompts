@@ -75,8 +75,8 @@ describe('PromptService', () => {
   });
 
   it('should delete a prompt', async () => {
-    const promptId = 'delete-test';
-    mockAdapter.deletePrompt.mockResolvedValue(undefined);
+    const promptId = 'test-prompt';
+    mockAdapter.deletePrompt.mockResolvedValue(true);
     mockAdapter.getPrompt.mockResolvedValue(null);
 
     await service.deletePrompt(promptId);

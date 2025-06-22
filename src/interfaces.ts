@@ -295,7 +295,7 @@ export interface CreatePromptParams {
   content: string;
   tags?: string[];
   isTemplate?: boolean;
-  variables?: string[];
+  variables?: string[] | TemplateVariable[];
   metadata?: Record<string, any>;
 }
 
@@ -306,7 +306,7 @@ export interface UpdatePromptParams {
   content?: string;
   tags?: string[];
   isTemplate?: boolean;
-  variables?: string[];
+  variables?: string[] | TemplateVariable[];
   metadata?: Record<string, any>;
 }
 

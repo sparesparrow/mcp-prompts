@@ -2,10 +2,12 @@ import type { Server } from 'http';
 import type { DeepMockProxy } from 'jest-mock-extended';
 import { mock } from 'jest-mock-extended';
 import request from 'supertest';
+import { jest } from '@jest/globals';
+import type { NextFunction, Request, Response } from 'express';
 
 import { closeServer } from '../../tests/setup.js';
-import { AppError } from '../errors.js';
-import { errorHandler, HttpErrorCode, startHttpServer } from '../http-server';
+import { AppError, HttpErrorCode } from '../errors.js';
+import { errorHandler, startHttpServer } from '../http-server.js';
 import type { Prompt } from '../interfaces.js';
 import type { PromptService } from '../prompt-service.js';
 import type { SequenceService } from '../sequence-service.js';
@@ -153,7 +155,7 @@ describe.skip('HTTP Server', () => {
   describe('Error Handling', () => {
     it('should handle internal server errors', async () => {
       promptService.getPrompt.mockRejectedValue(
-        new AppError('Database error', 500, 'INTERNAL_SERVER_ERROR'),
+        new AppError('Database error', 500, HttpErrorCode.INTERNAL_SERVER_ERROR),
       );
 
       const apiKey = 'test-key';
@@ -200,3 +202,5 @@ describe('errorHandler', () => {
   let next: NextFunction;
   // ... existing code ...
 });
+
+export { HttpErrorCode };

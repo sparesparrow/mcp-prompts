@@ -102,7 +102,7 @@ describe.skip('FileAdapter Integration Tests', () => {
     };
     const updatedPrompt = await adapter.updatePrompt(
       savedPrompt.id,
-      savedPrompt.version as number,
+      savedPrompt.version || 1,
       updates,
     );
     expect(updatedPrompt).toBeDefined();
@@ -202,6 +202,29 @@ describe.skip('FileAdapter Integration Tests', () => {
 
       const prompts = await adapter.listPrompts();
       expect(prompts.prompts.find(p => p.id === 'invalid-schema-prompt')).toBeUndefined();
+    });
+  });
+
+  describe('validation', () => {
+    it('should ignore malformed JSON files', async () => {
+      // Setup a malformed file
+      const malformedFilePath = path.join(testDir, 'malformed.json');
+      await fsp.writeFile(malformedFilePath, '{"name": "malformed", "content": }'); // Invalid JSON
+
+      const prompts = await adapter.listPrompts();
+      expect(prompts.prompts.find((p: Prompt) => p.name === 'malformed')).toBeUndefined();
+    });
+
+    it('should ignore files that do not match the prompt schema', async () => {
+      // Setup a file with an invalid schema
+      const invalidSchemaFilePath = path.join(testDir, 'invalid-schema-prompt-v1.json');
+      await fsp.writeFile(
+        invalidSchemaFilePath,
+        JSON.stringify({ id: 'invalid-schema-prompt', name: 'Invalid Schema' }), // Missing 'content'
+      );
+
+      const prompts = await adapter.listPrompts();
+      expect(prompts.prompts.find((p: Prompt) => p.id === 'invalid-schema-prompt')).toBeUndefined();
     });
   });
 });

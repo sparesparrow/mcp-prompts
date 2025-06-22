@@ -15,9 +15,6 @@
     "sourceMap": false,
     "declaration": true,
     "baseUrl": ".",
-    "paths": {
-      "@modelcontextprotocol/sdk": ["node_modules/@modelcontextprotocol/sdk/dist/esm"]
-    },
     "isolatedModules": true
   },
   "include": ["src/**/*.ts", "tests/**/*.ts"],

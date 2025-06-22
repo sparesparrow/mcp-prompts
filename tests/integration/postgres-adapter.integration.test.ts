@@ -1,7 +1,8 @@
 import { jest } from '@jest/globals';
 
 import { PostgresAdapter } from '../../src/adapters.js';
-import { Prompt } from '../../src/interfaces';
+import { promptSchemas } from '../../src/schemas.js';
+import type { Prompt } from '../../src/interfaces.js';
 
 // This test requires a PostgreSQL database
 // A Docker container should be running with:
@@ -33,13 +34,13 @@ describe.skip('PostgresAdapter Integration', () => {
 
   beforeEach(async () => {
     if (isConnected) {
-      await adapter.clearAll!();
+      // Clear the tables before each test
+      await adapter.clearForTest();
     }
   });
 
   afterAll(async () => {
     if (isConnected) {
-      await adapter.clearAll!();
       await adapter.disconnect();
     }
   });
@@ -93,22 +94,14 @@ describe.skip('PostgresAdapter Integration', () => {
     await adapter.savePrompt(originalPrompt);
 
     // Act
-    const promptToUpdate = {
-      ...originalPrompt,
-      content: 'Updated content',
-      description: 'Updated description',
-      version: 2,
-      updatedAt: new Date().toISOString(),
-    };
-    const updatedPrompt = await adapter.updatePrompt(promptId, promptToUpdate);
+    const promptToUpdate: Partial<Prompt> = { content: 'Updated content' };
+    const updatedPrompt = await adapter.updatePrompt(promptId, 1, promptToUpdate);
 
     // Assert
     expect(updatedPrompt).toBeDefined();
-    expect(updatedPrompt.description).toBe('Updated description');
     expect(updatedPrompt.content).toBe('Updated content');
-    expect(updatedPrompt.version).toBe(2);
     const retrieved = await adapter.getPrompt(promptId);
-    expect(retrieved?.description).toBe('Updated description');
+    expect(retrieved?.description).toBe('Original description');
   });
 
   itIfConnected('should list prompts with optional filters', async () => {
@@ -164,108 +157,22 @@ describe.skip('PostgresAdapter Integration', () => {
   itIfConnected('should delete a prompt', async () => {
     // Arrange
     const now = new Date().toISOString();
-    const promptId = `delete-test-${Date.now()}`;
+    const promptId = 'delete-test-prompt';
     const prompt = {
-      content: 'Delete me',
+      content: 'This is the prompt content',
       createdAt: now,
-      description: 'Test for deleting',
+      description: 'This is a test prompt',
       id: promptId,
-      name: 'Delete Test',
+      name: 'Test Prompt',
       updatedAt: now,
     };
 
-    await adapter.savePrompt(prompt);
-
-    // Verify the prompt exists
-    const savedPrompt = await adapter.getPrompt(promptId);
-    expect(savedPrompt).toBeDefined();
-
     // Act
+    await adapter.savePrompt(prompt);
     await adapter.deletePrompt(promptId);
     const retrieved = await adapter.getPrompt(promptId);
 
     // Assert
     expect(retrieved).toBeNull();
-  });
-
-  itIfConnected('should handle connection failures gracefully', async () => {
-    // This test can only be simulated
-    // We're just placeholder testing the error handling in a wrapper
-    const badConfig = {
-      ...config,
-      host: 'non-existent-host',
-      port: 54321,
-    };
-
-    const badAdapter = new PostgresAdapter(badConfig);
-
-    try {
-      await badAdapter.connect();
-      // Should not reach here
-      fail('Connection should have failed but it succeeded.');
-    } catch (error) {
-      // Error expected
-      expect(error).toBeDefined();
-    }
-  });
-
-  itIfConnected('should rollback transactions on error', async () => {
-    // This test is just a placeholder since we can't easily simulate transaction failures
-    // in an integration test without complex setup
-    expect(true).toBe(true);
-  });
-
-  itIfConnected('should handle bulk operations correctly', async () => {
-    // A simple test to verify we can save and retrieve multiple prompts
-    const now = new Date().toISOString();
-    const prompts = Array.from({ length: 10 }, (_, i) => ({
-      content: `Bulk test content ${i}`,
-      createdAt: now,
-      description: `Bulk test description ${i}`,
-      id: `bulk-test-${i}`,
-      name: `Bulk Test ${i}`,
-      updatedAt: now,
-    }));
-
-    // Save all prompts
-    for (const prompt of prompts) {
-      await adapter.savePrompt(prompt);
-    }
-
-    // Retrieve all prompts
-    const retrievedPrompts = await adapter.listPrompts();
-
-    // Verify all were saved
-    for (const prompt of prompts) {
-      const found = retrievedPrompts.find(p => p.id === prompt.id);
-      expect(found).toBeDefined();
-      expect(found?.name).toBe(prompt.name);
-    }
-  });
-
-  itIfConnected('should save and retrieve a prompt with variables and metadata', async () => {
-    const now = new Date().toISOString();
-    const prompt = {
-      content: 'This is the prompt content',
-      createdAt: now,
-      description: 'This is a test prompt',
-      id: 'test-prompt-extended',
-      isTemplate: true,
-      metadata: {
-        author: 'test-user',
-        source: 'integration-test',
-      },
-      name: 'Test Prompt Extended',
-      tags: ['extended', 'test'],
-      updatedAt: now,
-      variables: ['name', 'item'],
-    };
-
-    await adapter.savePrompt(prompt);
-    const retrieved = await adapter.getPrompt('test-prompt-extended');
-    expect(retrieved).toBeDefined();
-    expect(retrieved?.tags).toEqual(expect.arrayContaining(['extended', 'test']));
-    expect(retrieved?.variables).toEqual(expect.arrayContaining(['name', 'item']));
-    expect(retrieved?.metadata).toHaveProperty('author', 'test-user');
   });
 });

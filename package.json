@@ -2,17 +2,11 @@
   "name": "@sparesparrow/mcp-prompts",
   "version": "3.0.3-main",
   "description": "A standalone server for managing and serving prompts for the Model Context Protocol (MCP)",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
+  "main": "dist/index.mjs",
+  "type": "module",
   "types": "dist/types/index.d.ts",
   "bin": {
-    "mcp-prompts": "dist/cjs/index.js"
-  },
-  "exports": {
-    ".": {
-      "import": "./dist/esm/index.js",
-      "require": "./dist/cjs/index.js"
-    }
+    "mcp-prompts": "dist/index.mjs"
   },
   "files": [
     "dist",
@@ -31,7 +25,7 @@
     "test": "npm run test:unit && npm run test:integration",
     "lint": "eslint \"src/**/*.ts\" && prettier --check .",
     "validate:prompts": "ts-node src/scripts/validate-prompts.ts",
-    "build": "npm run clean && npm run build:esm && npm run build:cjs",
+    "build": "node build.mjs",
     "prepare": "npm run build",
     "watch": "tsc --watch",
     "clean": "rimraf dist",
@@ -52,9 +46,7 @@
     "workflow:run:file": "ts-node src/scripts/workflow-cli.ts workflow run",
     "workflow:save:file": "ts-node src/scripts/workflow-cli.ts workflow save",
     "workflow:run:id": "ts-node src/scripts/workflow-cli.ts workflow run",
-    "docs:generate": "typedoc --ignoreCompilerErrors --out docs/api src/index.ts",
-    "build:esm": "tsc --project tsconfig.esm.json",
-    "build:cjs": "tsc --project tsconfig.cjs.json"
+    "docs:generate": "typedoc --ignoreCompilerErrors --out docs/api src/index.ts"
   },
   "keywords": [
     "mcp",

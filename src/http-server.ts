@@ -26,6 +26,8 @@ import {
 import { promptSchemas } from './schemas.js';
 import { StorageAdapter } from './interfaces.js';
 
+export { HttpErrorCode };
+
 const catchAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
   return (req: Request, res: Response, next: NextFunction) => {
     fn(req, res, next).catch(next);
@@ -263,9 +265,11 @@ export async function startHttpServer(
   });
 
   // Health check endpoint
-  app.get('/health', async (req, res) => {
+  app.get('/health', catchAsync(async (req, res) => {
     try {
-      const healthChecks = services.storageAdapters.map(adapter => adapter.healthCheck());
+      const healthChecks = services.storageAdapters.map(adapter =>
+        adapter.healthCheck ? adapter.healthCheck() : Promise.resolve(true)
+      );
       const results = await Promise.all(healthChecks);
       const allHealthy = results.every(healthy => healthy);
 
@@ -292,10 +296,10 @@ export async function startHttpServer(
         message: err instanceof Error ? err.message : String(err),
       });
     }
-  });
+  }));
 
   // Add API key authentication middleware
-  app.use(apiKeyAuth);
+  app.use(apiKeyAuth as express.RequestHandler);
 
   /**
    * @openapi
@@ -419,7 +423,11 @@ export async function startHttpServer(
         return next(new z.ZodError(parseResult.error.errors));
       }
       const prompt = parseResult.data;
-      const created = await services.promptService.createPrompt(prompt);
+      const created = await services.promptService.createPrompt({
+        ...prompt,
+        tags: prompt.tags ?? undefined,
+        variables: prompt.variables ?? undefined,
+      });
       return res.status(201).json({ success: true, prompt: created });
     }),
   );
@@ -556,7 +564,7 @@ export async function startHttpServer(
     catchAsync(async (req, res) => {
       const { prompts } = req.body;
       if (!Array.isArray(prompts)) {
-        throw new AppError('`prompts` must be an array', 400, 'VALIDATION_ERROR');
+        throw new AppError('`prompts` must be an array', 400, HttpErrorCode.VALIDATION_ERROR);
       }
       const results = await services.promptService.createPromptsBulk(prompts);
       const hasErrors = results.some(r => !r.success);
@@ -602,7 +610,7 @@ export async function startHttpServer(
     catchAsync(async (req, res) => {
       const { ids } = req.body;
       if (!Array.isArray(ids)) {
-        throw new AppError('`ids` must be an array of strings', 400, 'VALIDATION_ERROR');
+        throw new AppError('`ids` must be an array of strings', 400, HttpErrorCode.VALIDATION_ERROR);
       }
       const results = await services.promptService.deletePromptsBulk(ids);
       const hasErrors = results.some(r => !r.success);
@@ -978,33 +986,7 @@ export async function startHttpServer(
   });
 
   // Global error handler middleware
-  app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-    console.error(err);
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Invalid input data.',
-          details: err.errors,
-        },
-      });
-    }
-    if (err instanceof AppError) {
-      return res.status(err.statusCode).json({
-        error: {
-          code: err.code,
-          message: err.message,
-          details: 'details' in err ? (err as any).details : undefined,
-        },
-      });
-    }
-    return res.status(500).json({
-      error: {
-        code: 'INTERNAL_SERVER_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    });
-  });
+  app.use(errorHandler as express.ErrorRequestHandler);
 
   // Start the server
   return await new Promise<http.Server>((resolve, reject) => {
@@ -1019,5 +1001,38 @@ export async function startHttpServer(
     } catch (error) {
       reject(error);
     }
+  });
+}
+
+export function errorHandler(
+  err: any,
+  req: express.Request,
+  res: express.Response,
+  next: express.NextFunction,
+) {
+  console.error(err);
+  if (err instanceof z.ZodError) {
+    return res.status(400).json({
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: 'Invalid input data.',
+        details: err.errors,
+      },
+    });
+  }
+  if (err instanceof AppError) {
+    return res.status(err.statusCode).json({
+      error: {
+        code: err.code,
+        message: err.message,
+        details: 'details' in err ? (err as any).details : undefined,
+      },
+    });
+  }
+  return res.status(500).json({
+    error: {
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'An unexpected error occurred',
+    },
   });
 }
