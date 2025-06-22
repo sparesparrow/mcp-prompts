@@ -220,3 +220,54 @@ This section contains features to be implemented after the core migration is com
 - [ ] **Enterprise Audit Logging:** Standardize audit logs across all implementations.
 - [ ] **Resource URI System:** Implement a full Resource URI parser and router for deep ecosystem integration (`@github:`, `@filesystem:`, etc.).
 - [ ] **Bidirectional GitHub Sync:** Allow for a full Git-based workflow for managing prompts.
+
+```mermaid
+graph TD
+    %% Styling
+    classDef meta fill:#f9f,stroke:#333,stroke-width:2px,color:#fff;
+    classDef contracts fill:#bbf,stroke:#333,stroke-width:2px,color:#fff;
+    classDef core fill:#fb9,stroke:#333,stroke-width:2px,color:#fff;
+    classDef app fill:#9f9,stroke:#333,stroke-width:2px,color:#fff;
+    classDef client fill:#9ff,stroke:#333,stroke-width:2px,color:#000;
+
+    %% Subgraphs for Logical Grouping
+    subgraph "Centrální Správa a Orchestrace"
+        META["mcp-prompts-meta<br/>Globální Dokumentace<br/>CI/CD Workflows<br/>Issue Tracking"]:::meta
+    end
+
+    subgraph "Základní Stavební Bloky (Foundation)"
+        CONTRACTS["mcp-prompts-contracts<br/>npm: @sparesparrow/mcp-prompts-contracts"]:::contracts
+        CATALOG["mcp-prompts-catalog<br/>npm: @sparesparrow/mcp-prompts-catalog"]:::contracts
+    end
+
+    subgraph "Aplikační a Serverová Logika"
+        CORE["mcp-prompts-core<br/>Služby a Adaptéry<br/>npm: @sparesparrow/mcp-prompts-core"]:::core
+        SERVER["mcp-prompts-server<br/>HTTP Server & Docker<br/>npm: @sparesparrow/mcp-prompts"]:::app
+        CLI["mcp-prompts-cli<br/>Nástroje CLI<br/>npm: @sparesparrow/mcp-prompts-cli"]:::app
+    end
+
+    subgraph "Klientské Aplikace (Clients)"
+        ANDROID["mcp-prompts-android<br/>Nativní Android Aplikace<br/>(AAR/APK)"]:::client
+    end
+
+    %% Dependencies
+    CORE -- "Závisí na<br/>(depends on)" --> CONTRACTS
+    SERVER -- "Závisí na<br/>(depends on)" --> CORE
+    SERVER -- "Využívá<br/>(uses)" --> CATALOG
+    CLI -- "Závisí na<br/>(depends on)" --> CORE
+    ANDROID -- "Závisí na<br/>(depends on)" --> CONTRACTS
+
+    %% CI/CD Orchestration and Triggers
+    META -.->|"Orchestruje Reusable Workflows"| CONTRACTS
+    META -.->|"Orchestruje Reusable Workflows"| CATALOG
+    META -.->|"Orchestruje Reusable Workflows"| CORE
+    META -.->|"Orchestruje Reusable Workflows"| SERVER
+    META -.->|"Orchestruje Reusable Workflows"| CLI
+    META -.->|"Orchestruje Reusable Workflows"| ANDROID
+
+    CONTRACTS -.->|"Spouští validaci (repository_dispatch)"| CORE
+    CONTRACTS -.->|"Spouští validaci (repository_dispatch)"| SERVER
+    SERVER -.->|"Publikuje (publishes)"| DOCKER["Docker Hub<br/>Image: sparesparrow/mcp-prompts"]
+    ANDROID -.->|"Publikuje (publishes)"| GHP["GitHub Packages<br/>(AAR/APK)"]
+
+```
