@@ -87,6 +87,11 @@ export const promptSchemas = {
     category: z.string().optional(),
     isTemplate: z.boolean().optional(),
     tags: z.array(z.string()).optional(),
+    search: z.string().optional(),
+    sort: z.string().optional(),
+    order: z.enum(['asc', 'desc']).optional(),
+    offset: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).optional(),
   }),
 
   /**
