@@ -8,6 +8,8 @@ import type { Prompt } from '../interfaces.js';
 import type { PromptService } from '../prompt-service.js';
 import type { SequenceService } from '../sequence-service.js';
 import type { WorkflowService } from '../workflow-service.js';
+import { closeServer } from '../../tests/setup.js';
+import { AppError } from '../errors.js';
 
 describe('HTTP Server', () => {
   let server: Server;
@@ -35,8 +37,9 @@ describe('HTTP Server', () => {
     );
   });
 
-  afterEach(done => {
-    server.close(done);
+  afterEach(async () => {
+    // Použijeme helper funkci místo callback
+    await closeServer(server);
   });
 
   describe('Security Headers', () => {
@@ -107,7 +110,7 @@ describe('HTTP Server', () => {
       expect(response.status).toBe(400);
       expect(response.body.success).toBe(false);
       expect(response.body.error.code).toBe('VALIDATION_ERROR');
-      expect(response.body.error.message).toBe('Invalid prompt data');
+      expect(response.body.error.message).toBe('Invalid input data.');
       expect(Array.isArray(response.body.error.details)).toBe(true);
       expect(response.body.error.details.length).toBeGreaterThan(0);
     });
@@ -122,7 +125,7 @@ describe('HTTP Server', () => {
         version: 1,
       };
 
-      promptService.getPrompt.mockResolvedValue(prompt);
+      promptService.getPrompt.mockResolvedValue(prompt as Prompt);
 
       const apiKey = 'test-key';
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);
@@ -149,7 +152,7 @@ describe('HTTP Server', () => {
 
   describe('Error Handling', () => {
     it('should handle internal server errors', async () => {
-      promptService.getPrompt.mockRejectedValue(new Error('Database error'));
+      promptService.getPrompt.mockRejectedValue(new AppError('Database error', 500, 'INTERNAL_SERVER_ERROR'));
 
       const apiKey = 'test-key';
       const response = await request(server).get('/prompts/123').set('x-api-key', apiKey);

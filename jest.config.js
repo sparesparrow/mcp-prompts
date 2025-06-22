@@ -34,4 +34,8 @@ export default {
     },
   },
   testPathIgnorePatterns: ['/node_modules/', '/dist/', '\\.d\\.ts$'],
+  setupFilesAfterEnv: ['<rootDir>/tests/setup.ts'],
+  testTimeout: 30000,
+  maxWorkers: 1,
+  forceExit: true,
 }; 
