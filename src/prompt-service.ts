@@ -15,6 +15,7 @@ import { DuplicateError, AppError, HttpErrorCode } from './errors.js';
 import { getRedisClient, jsonFriendlyErrorReplacer } from './utils.js';
 import { config } from './config.js';
 import { templateHelpers } from './utils.js';
+import { ValidationError, NotFoundError } from './errors.js';
 
 export class PromptService {
   private storage: StorageAdapter;
@@ -52,6 +53,11 @@ export class PromptService {
    * If no ID is provided, a new one will be generated from the name.
    */
   public async createPrompt(args: CreatePromptParams): Promise<Prompt> {
+    try {
+      promptSchemas.create.parse(args);
+    } catch (error: any) {
+      throw new ValidationError(`Invalid prompt data: ${error.message}`, error.issues);
+    }
     const promptId = args.id ?? this.generateId(args.name);
     const versions = await this.storage.listPromptVersions(promptId);
     const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
@@ -103,26 +109,24 @@ export class PromptService {
    */
   public async updatePrompt(
     id: string,
-    args: Omit<UpdatePromptParams, 'id'>,
+    version: number,
+    args: Omit<UpdatePromptParams, 'id' | 'version'>,
   ): Promise<Prompt> {
-    const latestPrompt = await this.getPrompt(id);
-    if (!latestPrompt) {
-      throw new AppError(`Prompt not found: ${id}`, 404);
+    const existingPrompt = await this.getPrompt(id, version);
+    if (!existingPrompt) {
+      throw new NotFoundError(`Prompt not found: ${id} v${version}`);
     }
-
-    const newVersion = (latestPrompt.version ?? 1) + 1;
 
     // Merge existing data with new data
     const updatedPromptData: Prompt = {
-      ...latestPrompt, // Base with latest prompt data
+      ...existingPrompt, // Base with latest prompt data
       ...args, // Apply updates
       id, // Ensure ID is not changed
-      version: newVersion, // Increment version
-      createdAt: latestPrompt.createdAt, // Preserve original creation date
+      version, // Keep the same version for update
       updatedAt: new Date().toISOString(), // Set new update date
     };
 
-    const result = await this.storage.savePrompt(updatedPromptData);
+    const result = await this.storage.updatePrompt(id, version, updatedPromptData);
     await this.invalidatePromptCache(id);
     return result;
   }
@@ -162,7 +166,7 @@ export class PromptService {
   ): Promise<ApplyTemplateResult> {
     const prompt = await this.getPrompt(id, version);
     if (!prompt) {
-      throw new AppError(`Template prompt not found: ${id} v${version ?? 'latest'}`, 404, 'NOT_FOUND');
+      throw new NotFoundError(`Template prompt not found: ${id} v${version ?? 'latest'}`);
     }
     if (!prompt.isTemplate) {
       throw new Error(`Prompt is not a template: ${id}`);
@@ -332,10 +336,15 @@ export class PromptService {
   }
 
   private processTemplate(template: string, variables: Record<string, any>): string {
-    const compiled = Handlebars.compile(template, {
-      noThrow: true, // Do not throw on missing partials/helpers
-    });
-    return compiled(variables);
+    try {
+      const compiled = Handlebars.compile(template, {
+        strict: true,
+        preventIndent: true,
+      });
+      return compiled(variables);
+    } catch (e: any) {
+      throw new Error(`Template compilation failed: ${e.message}`);
+    }
   }
 
   // Alias for interface compatibility

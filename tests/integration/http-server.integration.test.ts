@@ -422,15 +422,11 @@ describe('Workflow Engine Integration', () => {
       .post(`/api/v1/workflows/${workflow.id}/run`)
       .set('x-api-key', 'test-key')
       .send({
-<<<<<<< HEAD
-        country: 'France',
-=======
         context: {
           parameters: {
             country: 'France',
           },
         },
->>>>>>> 47bdc82 (feat(templating): Squash commits for advanced templating feature)
       });
     expect(runRes.status).toBe(200);
     expect(runRes.body).toHaveProperty('outputs');

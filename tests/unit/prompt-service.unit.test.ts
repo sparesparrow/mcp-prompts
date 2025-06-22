@@ -21,7 +21,7 @@ describe('PromptService', () => {
       isTemplate: true,
       variables: ['name'],
     };
-    const id = promptData.name.toLowerCase().replace(/\s+/g, '-');
+    const id = 'unit-test-prompt';
     const expectedPrompt = {
       ...promptData,
       id,
@@ -30,12 +30,11 @@ describe('PromptService', () => {
       updatedAt: expect.any(String),
     };
 
-    mockAdapter.getPrompt.calledWith(id, 1).mockResolvedValue(null);
+    mockAdapter.listPromptVersions.calledWith(id).mockResolvedValue([]);
     mockAdapter.savePrompt.mockResolvedValue(expectedPrompt);
+    mockAdapter.getPrompt.calledWith(id, 1).mockResolvedValue(expectedPrompt);
 
     const prompt = await service.createPrompt(promptData);
-
-    mockAdapter.getPrompt.calledWith(id, 1).mockResolvedValue(expectedPrompt);
     const loaded = await service.getPrompt(prompt.id, prompt.version);
 
     expect(mockAdapter.savePrompt).toHaveBeenCalledWith(
@@ -67,7 +66,11 @@ describe('PromptService', () => {
 
     const retrieved = await service.updatePrompt('update-test', 1, updatedData);
 
-    expect(mockAdapter.updatePrompt).toHaveBeenCalledWith('update-test', 1, expect.any(Object));
+    expect(mockAdapter.updatePrompt).toHaveBeenCalledWith(
+      'update-test',
+      1,
+      expect.objectContaining(updatedData),
+    );
     expect(retrieved?.content).toBe('Updated content');
   });
 
@@ -122,16 +125,12 @@ describe('PromptService', () => {
 
   it('should throw for invalid fields', async () => {
     const invalidPromptData = {
-      content: '', // invalid
+      content: '',
       isTemplate: false,
-      name: '', // invalid
+      name: '',
     };
-    try {
-      await service.createPrompt(invalidPromptData);
-      fail('Expected createPrompt to throw');
-    } catch (e: unknown) {
-      expect(e).toBeInstanceOf(AppError);
-    }
+
+    await expect(service.createPrompt(invalidPromptData)).rejects.toThrow(AppError);
   });
 
   describe('Conditional Templating', () => {
