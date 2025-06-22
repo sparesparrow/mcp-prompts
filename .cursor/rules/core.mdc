@@ -1,0 +1,58 @@
+---
+description:
+globs:
+alwaysApply: false
+---
+# Core Development Rules for MCP-Prompts
+
+This document establishes foundational rules for all interactions with the `mcp-prompts` codebase.
+
+---
+
+### Key Project Files
+
+- **Package & Scripts**: [package.json](mdc:package.json) defines all dependencies and scripts.
+- **Development Environment**: The dev environment is defined by [docker-compose.yml](mdc:docker-compose.yml) and configured in [.devcontainer/devcontainer.json](mdc:.devcontainer/devcontainer.json).
+- **Application Entry Point**: The main server entry point is [src/index.ts](mdc:src/index.ts).
+- **Configuration**: All configuration is loaded via [src/config.ts](mdc:src/config.ts).
+- **Storage Layer**: All data storage adapters are implemented in [src/adapters.ts](mdc:src/adapters.ts).
+- **API and Schemas**: The single source of truth for all data schemas is [src/schemas.ts](mdc:src/schemas.ts). The HTTP server implementation is in [src/http-server.ts](mdc:src/http-server.ts).
+- **Testing**: Integration tests are critical. Refer to existing tests, especially [tests/integration/http-server.integration.test.ts](mdc:tests/integration/http-server.integration.test.ts), for examples.
+- **Contribution Guidelines**: Always follow the guidelines in [CONTRIBUTING.md](mdc:CONTRIBUTING.md).
+
+---
+
+### General Principles
+
+#### Accuracy and Relevance
+- Responses **must directly address** user requests. Always gather and validate context using tools before proceeding.
+- If user intent is unclear, **pause and pose concise clarifying questions**—e.g., "Did you mean X or Y?"—before taking any further steps.
+
+#### Validation Over Modification
+- **Avoid altering code without full comprehension.** Analyze the existing structure, dependencies, and purpose using available tools before suggesting or making edits.
+- Prioritize investigation and validation over assumptions. The `edit_file` tool can be unreliable; verify its output and be prepared to correct it.
+
+#### Safety-First Execution
+- Review all relevant dependencies and workflows **before proposing or executing changes**.
+- **Clearly outline risks and implications** in your response before acting.
+- Make only **minimal, validated edits**.
+
+#### User Intent Comprehension
+- **Focus on discerning the user's true objective**, not just the literal text of the request.
+- Draw on the current request, **prior conversation history**, and **codebase context** to infer the intended goal.
+
+---
+
+### Commit Message Convention (Conventional Commits)
+
+Adhere strictly to the Conventional Commits specification. This is critical for versioning and changelog generation.
+
+- **`feat`**: A new feature (minor version bump).
+- **`fix`**: A bug fix (patch version bump).
+- **`docs`**: Documentation only changes.
+- **`style`**: Changes that do not affect the meaning of the code (white-space, formatting, missing semi-colons, etc).
+- **`refactor`**: A code change that neither fixes a bug nor adds a feature.
+- **`perf`**: A code change that improves performance.
+- **`test`**: Adding missing tests or correcting existing tests.
+- **`chore`**: Changes to the build process or auxiliary tools and libraries.
+- **`BREAKING CHANGE`**: A commit that has a footer `BREAKING CHANGE:` or appends a `!` after the type/scope, introduces a breaking API change (major version bump).
