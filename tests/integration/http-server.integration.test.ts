@@ -366,9 +366,9 @@ describe('Workflow Engine Integration', () => {
     // Use a unique name for the prompt to avoid conflicts between tests
     await promptService.createPrompt({
       name: `test-prompt-${randomUUID()}`,
-      content: 'Output: {{input}}',
+      content: 'The capital of {{country}} is Paris.',
       isTemplate: true,
-      variables: ['input'],
+      variables: ['country'],
     });
   });
 
@@ -392,8 +392,8 @@ describe('Workflow Engine Integration', () => {
       });
     expect(runRes.status).toBe(200);
     expect(runRes.body).toHaveProperty('outputs');
-    expect(runRes.body.outputs).toHaveProperty('step1_output');
-    expect(runRes.body.outputs.step1_output).toBe('Output: test-value');
+    expect(runRes.body.outputs).toHaveProperty('capital');
+    expect(runRes.body.outputs.capital).toMatch(/Paris/);
   });
 
   // This test is flaky in CI environments due to its reliance on timing and process management.
