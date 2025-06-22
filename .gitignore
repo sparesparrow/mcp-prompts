@@ -1,43 +1,106 @@
 # Dependencies
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
 
-# Build output
-build/
+# Build outputs
 dist/
+build/
+*.tsbuildinfo
 
 # Environment variables
 .env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # Logs
 logs/
 *.log
-npm-debug.log*
 
-# Editor directories and files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# Coverage reports
+# Coverage directory used by tools like istanbul
 coverage/
-.nyc_output/
-test-results/
+*.lcov
 
-# Legacy files
-legacy/
+# nyc test coverage
+.nyc_output
 
-# Temporary files
-temp*.json
-claude_desktop_config*.json
-mcp-config*.json
+# Dependency directories
+jspm_packages/
 
-# NPM package files
+# Optional npm cache directory
+.npm
+
+# Optional eslint cache
+.eslintcache
+
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
+
+# Optional REPL history
+.node_repl_history
+
+# Output of 'npm pack'
 *.tgz
 
-# Temporary output directories
-output/
+# Yarn Integrity file
+.yarn-integrity
 
-# Docker temporary files
-.docker-*
+# parcel-bundler cache (https://parceljs.org/)
+.cache
+.parcel-cache
+
+# Next.js build output
+.next
+
+# Nuxt.js build / generate output
+.nuxt
+
+# Gatsby files
+.cache/
+public
+
+# Storybook build outputs
+.out
+.storybook-out
+
+# Temporary folders
+tmp/
+temp/
+
+# Docker
+.dockerignore
+
+# Local development
+data/
+
+# Embedded git repositories (submodules)
+mcp-prompts/
+mcp-prompts-ts/
+mcp-prompts-rs/
+mcp-prompts-pg/
+mcp-prompts-aidl/
+mcp-prompts-collection/
+mcp-prompts-contracts/
