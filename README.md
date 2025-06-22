@@ -60,23 +60,83 @@ npx -y @sparesparrow/mcp-prompts
 ### 2. Run with Docker
 For production deployment with persistent storage:
 
+> ⚠️ **Note:** The Docker images currently have a build issue and may not work properly. We recommend using the NPX method or building from source until this is resolved.
+
 **File storage:**
 ```bash
+# Unix/Linux/macOS
 docker run -d --name mcp-server \
   -p 3003:3003 \
   -v $(pwd)/data:/app/data \
-  sparesparrow/mcp-prompts:latest
+  ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows PowerShell
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows Command Prompt
+docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
 ```
 
 **Postgres storage:**
 ```bash
+# Unix/Linux/macOS
 docker run -d --name mcp-server \
   -p 3003:3003 \
   -v $(pwd)/data:/app/data \
   -e "STORAGE_TYPE=postgres" \
   -e "POSTGRES_URL=your_connection_string" \
-  sparesparrow/mcp-prompts:latest
+  ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows PowerShell
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
+
+# Windows Command Prompt
+docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
 ```
+
+**Alternative: Build from source**
+If the Docker images don't work, you can build your own:
+
+```bash
+# Clone the repository
+git clone https://github.com/sparesparrow/mcp-prompts.git
+cd mcp-prompts
+
+# Build the Docker image
+docker build -t mcp-prompts:local .
+
+# Run the local image
+docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data mcp-prompts:local
+```
+
+**Note:** If you encounter "invalid reference format" errors, ensure Docker Desktop is running and try using the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
+
+### Troubleshooting Docker Issues
+
+**Common Problems:**
+
+1. **"docker: invalid reference format"**
+   - Ensure Docker Desktop is running
+   - Use the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
+   - Check that the image exists: `docker images | grep mcp-prompts`
+
+2. **"Cannot connect to the Docker daemon"**
+   - Start Docker Desktop
+   - On Windows, ensure WSL2 is properly configured
+
+3. **"Unknown file extension '.ts'" error**
+   - This indicates a Docker build issue where TypeScript files aren't compiled
+   - **Solution:** Use the NPX method instead: `npx -y @sparesparrow/mcp-prompts`
+   - Or build from source using the instructions above
+
+4. **Volume mounting issues on Windows**
+   - Use forward slashes: `/app/data` not `\app\data`
+   - Use `${PWD}` in PowerShell or `%cd%` in Command Prompt
+
+5. **Port already in use**
+   - Stop existing container: `docker stop mcp-server`
+   - Remove container: `docker rm mcp-server`
+   - Or use a different port: `-p 3004:3003`
 
 ### 3. Verify It's Running
 Check that the server is running and accessible:
