@@ -21,6 +21,7 @@ import {
   type WorkflowExecutionState,
 } from './interfaces.js';
 import { promptSchemas, workflowSchema } from './schemas.js';
+import { LockError } from './errors.js';
 
 export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
   const { storage } = config;
@@ -74,6 +75,33 @@ export class FileAdapter implements StorageAdapter {
     this.promptsDir = options.promptsDir;
     this.sequencesDir = path.join(options.promptsDir, 'sequences');
     this.workflowStatesDir = path.join(options.promptsDir, 'workflow-states');
+  }
+
+  private async withLock<T>(filePath: string, fn: () => Promise<T>): Promise<T> {
+    let release;
+    try {
+      try {
+        // Using a stale timeout to prevent indefinite locks.
+        // realpath: false is important because the lock target file may not exist.
+        release = await lockfile.lock(filePath, {
+          realpath: false,
+          retries: 3,
+          stale: 20000,
+        });
+      } catch (error: any) {
+        // If locking fails, throw a custom error.
+        throw new LockError(
+          `Could not acquire lock for ${path.basename(filePath)}: ${error.message}`,
+          filePath,
+        );
+      }
+      return await fn();
+    } finally {
+      // Ensure the lock is always released.
+      if (release) {
+        await release();
+      }
+    }
   }
 
   public async isConnected(): Promise<boolean> {
@@ -136,34 +164,34 @@ export class FileAdapter implements StorageAdapter {
     const parsedData = promptSchemas.create.parse(promptData);
     const id = this.generateId(parsedData.name);
 
-    const versions = await this.listPromptVersions(id);
-    const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+    // This is a critical section. We need to lock based on the prompt ID
+    // to prevent a race condition where two processes try to create the
+    // same new version number.
+    const idLockPath = path.join(this.promptsDir, `${id}.lock`);
 
-    const promptWithDefaults: Prompt = {
-      id,
-      version: newVersion,
-      ...parsedData,
-      variables: (parsedData.variables as any) ?? undefined,
-      tags: parsedData.tags ?? undefined,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    };
+    return this.withLock(idLockPath, async () => {
+      const versions = await this.listPromptVersions(id);
+      const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
 
-    promptSchemas.full.parse(promptWithDefaults);
+      const promptWithDefaults: Prompt = {
+        id,
+        version: newVersion,
+        ...parsedData,
+        variables: (parsedData.variables as any) ?? undefined,
+        tags: parsedData.tags ?? undefined,
+        metadata: parsedData.metadata ?? undefined,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
 
-    const promptFilePath = this.getPromptFileName(id, newVersion);
+      promptSchemas.full.parse(promptWithDefaults);
 
-    let release;
-    try {
-      release = await lockfile.lock(promptFilePath, { retries: 3 });
+      const promptFilePath = this.getPromptFileName(id, newVersion);
+      // We don't need a separate lock on the file itself since we hold the ID lock.
       await fsp.writeFile(promptFilePath, JSON.stringify(promptWithDefaults, null, 2));
-    } finally {
-      if (release) {
-        await release();
-      }
-    }
 
-    return promptWithDefaults as Prompt;
+      return promptWithDefaults as Prompt;
+    });
   }
 
   public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
@@ -216,27 +244,23 @@ export class FileAdapter implements StorageAdapter {
     }
 
     const updatedData = promptSchemas.update.parse(prompt);
+    const { metadata, ...restOfUpdatedData } = updatedData;
 
     const updatedPrompt: Prompt = {
       ...existingPrompt,
-      ...updatedData,
+      ...restOfUpdatedData,
       id,
       version,
       variables: (updatedData.variables as any) ?? existingPrompt.variables,
       tags: updatedData.tags ?? existingPrompt.tags,
+      metadata: metadata === null ? undefined : metadata ?? existingPrompt.metadata,
       updatedAt: new Date().toISOString(),
     };
 
     const finalPath = this.getPromptFileName(id, version);
-    let release;
-    try {
-      release = await lockfile.lock(finalPath, { retries: 3 });
-      await fsp.writeFile(finalPath, JSON.stringify(updatedPrompt, null, 2));
-    } finally {
-      if (release) {
-        await release();
-      }
-    }
+    await this.withLock(finalPath, () =>
+      fsp.writeFile(finalPath, JSON.stringify(updatedPrompt, null, 2)),
+    );
 
     return updatedPrompt;
   }
@@ -245,47 +269,36 @@ export class FileAdapter implements StorageAdapter {
     if (!this.connected) throw new Error('File storage not connected');
     if (version !== undefined) {
       const promptFilePath = this.getPromptFileName(id, version);
-      let release;
       try {
-        release = await lockfile.lock(promptFilePath, { retries: 3 });
-        await fsp.unlink(promptFilePath);
-        return true;
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-          return false; // Not found is ok, but indicates no deletion occurred
+        await this.withLock(promptFilePath, () => fsp.unlink(promptFilePath));
+      } catch (error: any) {
+        if (error instanceof LockError) {
+          throw error; // Re-throw lock errors to be handled by the caller
+        }
+        if (error.code === 'ENOENT') {
+          return true; // Consider it successfully deleted if it doesn't exist.
         }
         throw error;
-      } finally {
-        if (release) {
-          await release();
-        }
       }
+      return true;
     }
-    const allVersions = await this.listPromptVersions(id);
-    if (allVersions.length === 0) {
+
+    const versions = await this.listPromptVersions(id);
+    if (versions.length === 0) {
       return false;
     }
-    let deletedCount = 0;
-    for (const v of allVersions) {
+    for (const v of versions) {
       const promptFilePath = this.getPromptFileName(id, v);
-      let release;
       try {
-        release = await lockfile.lock(promptFilePath, { retries: 3 });
-        await fsp.unlink(promptFilePath);
-        deletedCount++;
-      } catch (error: unknown) {
-        if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-          // Ignore if already deleted somehow
-        } else {
-          throw error;
-        }
-      } finally {
-        if (release) {
-          await release();
+        await this.withLock(promptFilePath, () => fsp.unlink(promptFilePath));
+      } catch (error: any) {
+        if (error.code !== 'ENOENT') {
+          console.error(`Error deleting prompt ${id} v${v}:`, error);
+          // Decide if we should re-throw. For now, we continue but log the error.
         }
       }
     }
-    return deletedCount > 0;
+    return true;
   }
 
   public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
@@ -361,14 +374,11 @@ export class FileAdapter implements StorageAdapter {
 
   public async getSequence(id: string): Promise<PromptSequence | null> {
     const sequencePath = path.join(this.sequencesDir, `${id}.json`);
-    if (!this.connected) {
-      throw new Error('File storage not connected');
-    }
     try {
       const content = await fsp.readFile(sequencePath, 'utf-8');
-      return JSON.parse(content);
-    } catch (error: unknown) {
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
+      return workflowSchema.parse(JSON.parse(content)) as unknown as PromptSequence;
+    } catch (error: any) {
+      if (error.code === 'ENOENT') {
         return null;
       }
       throw error;
@@ -376,37 +386,35 @@ export class FileAdapter implements StorageAdapter {
   }
 
   public async saveSequence(sequence: PromptSequence): Promise<PromptSequence> {
-    if (!this.connected) {
-      throw new Error('File storage not connected');
-    }
-    const finalPath = path.join(this.sequencesDir, `${sequence.id}.json`);
-    await fsp.writeFile(finalPath, JSON.stringify(sequence, null, 2));
+    const sequencePath = path.join(this.sequencesDir, `${sequence.id}.json`);
+    await this.withLock(sequencePath, () =>
+      fsp.writeFile(sequencePath, JSON.stringify(sequence, null, 2)),
+    );
     return sequence;
   }
 
   public async deleteSequence(id: string): Promise<void> {
-    if (!this.connected) {
-      throw new Error('File storage not connected');
-    }
+    const sequencePath = path.join(this.sequencesDir, `${id}.json`);
     try {
-      await fsp.unlink(path.join(this.sequencesDir, `${id}.json`));
-    } catch (error: unknown) {
-      if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return;
-      throw error;
+      await this.withLock(sequencePath, () => fsp.unlink(sequencePath));
+    } catch (error: any) {
+      if (error.code !== 'ENOENT') {
+        throw error;
+      }
     }
   }
 
   public async saveWorkflowState(state: WorkflowExecutionState): Promise<void> {
-    const finalPath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
-    await fsp.writeFile(finalPath, JSON.stringify(state, null, 2));
+    const statePath = path.join(this.workflowStatesDir, `${state.executionId}.json`);
+    await this.withLock(statePath, () =>
+      fsp.writeFile(statePath, JSON.stringify(state, null, 2)),
+    );
   }
 
   public async getWorkflowState(executionId: string): Promise<WorkflowExecutionState | null> {
+    const statePath = path.join(this.workflowStatesDir, `${executionId}.json`);
     try {
-      const content = await fsp.readFile(
-        path.join(this.workflowStatesDir, `${executionId}.json`),
-        'utf-8',
-      );
+      const content = await fsp.readFile(statePath, 'utf-8');
       const state: WorkflowExecutionState = JSON.parse(content);
       workflowSchema.parse(state);
       return state;
