@@ -69,9 +69,9 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-contracts`
 
-- [ ] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
-  - [ ] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
-  - [ ] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
+- [x] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
+  - [x] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
+  - [x] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
 - [ ] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
 - [ ] **Set up OpenAPI Generation:** Configure automatic generation of an OpenAPI specification from the Zod schemas.
 - [ ] **CI/CD Pipeline:**
@@ -82,9 +82,9 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-collection`
 
-- [ ] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
-  - [ ] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
-  - [ ] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
+- [x] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
+  - [x] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
+  - [x] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Add a pipeline to validate all prompts against the JSON schema from `mcp-prompts-contracts`.
   - [ ] Set up multi-format package publishing (NPM `@sparesparrow/mcp-prompts-collection`, Crates.io `mcp-prompts-collection`).
