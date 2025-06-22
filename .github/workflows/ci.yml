@@ -63,7 +63,7 @@ jobs:
         run: npm run test:build
       
       - name: Upload test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: test-results
@@ -85,7 +85,7 @@ jobs:
         run: npm run test:docker
       
       - name: Upload Docker test results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         if: always()
         with:
           name: docker-test-results

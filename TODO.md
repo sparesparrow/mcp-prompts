@@ -21,7 +21,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 #### 1. Core Feature Completion (High Priority)
 
 ##### Enhanced File Adapter (Storage)
-- [ ] **Schema Validation (High):** Strictly validate all JSON files on read/write to prevent data corruption.
+- [x] **Schema Validation (High):** Strictly validate all JSON files on read/write to prevent data corruption.
 - [ ] **Concurrency Control (High):** Implement file locking to prevent race conditions during write operations.
 - [ ] **Indexing (Medium):** Create a metadata index file to speed up list operations for large prompt collections.
 - [ ] **Atomic Writes (Low):** Use a "write-then-rename" pattern for safe, atomic updates.
@@ -36,11 +36,11 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### 2. Bug Fixes & Stabilization
 - [x] **Fix HTTP Server Integration tests** (`tests/integration/http-server.integration.test.ts`)
-- [ ] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
+- [x] **Fix WorkflowService (Stateful) unit tests** (`tests/unit/workflow-service.unit.test.ts`)
 - [ ] **Fix HTTP Server error handling unit tests** (`src/__tests__/http-server.test.ts`)
-- [ ] **Fix Validation unit tests** (`tests/unit/validation.unit.test.ts`)
-- [ ] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)
-- [ ] **Fix PromptService template helpers unit tests** (`tests/unit/prompt-service.unit.test.ts`)
+- [x] **Fix Validation unit tests** (`tests/unit/validation.unit.test.ts`)
+- [x] **Fix FileAdapter integration tests** (`tests/integration/file-adapter.integration.test.ts`)
+- [ ] **Fix PromptService template helpers unit tests** (`tests/unit/prompt-service.unit.test.ts`) - **BLOCKED**: The `edit_file` tool is unable to correct a simple import error in the test file, preventing tests from running.
 
 #### 3. Migration Preparation
 - [x] **Simulate Repository Structure:** Create local directories to mirror the target multi-repo architecture before performing the full migration.

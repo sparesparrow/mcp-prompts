@@ -26,6 +26,12 @@ import {
 import { promptSchemas } from './prompts.js';
 import { StorageAdapter } from './interfaces.js';
 
+const catchAsync = (fn: (req: Request, res: Response, next: NextFunction) => Promise<any>) => {
+  return (req: Request, res: Response, next: NextFunction) => {
+    fn(req, res, next).catch(next);
+  };
+};
+
 export interface HttpServerConfig {
   port: number;
   host: string;
@@ -362,44 +368,41 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        // Parse and validate query params
-        const querySchema = z.object({
-          offset: z.string().optional().transform(v => (v ? parseInt(v, 10) : 0)),
-          limit: z.string().optional().transform(v => (v ? parseInt(v, 10) : 20)),
-          sort: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
-          order: z.enum(['asc', 'desc']).optional(),
-          category: z.string().optional(),
-          tags: z.string().optional(),
-          isTemplate: z.string().optional().transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
-          search: z.string().optional(),
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      // This is a comment to help the apply model.
+      // Parse and validate query params
+      const querySchema = z.object({
+        offset: z.string().optional().transform(v => (v ? parseInt(v, 10) : 0)),
+        limit: z.string().optional().transform(v => (v ? parseInt(v, 10) : 20)),
+        sort: z.enum(['createdAt', 'updatedAt', 'name']).optional(),
+        order: z.enum(['asc', 'desc']).optional(),
+        category: z.string().optional(),
+        tags: z.string().optional(),
+        isTemplate: z.string().optional().transform(v => (v === 'true' ? true : v === 'false' ? false : undefined)),
+        search: z.string().optional(),
+      });
+      const parseResult = querySchema.safeParse(req.query);
+      if (!parseResult.success) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid query parameters',
+            details: parseResult.error.errors,
+          },
         });
-        const parseResult = querySchema.safeParse(req.query);
-        if (!parseResult.success) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Invalid query parameters',
-              details: parseResult.error.errors,
-            },
-          });
-          return;
-        }
-        const { offset, limit, sort, order, category, tags, isTemplate, search } = parseResult.data;
-        const options: any = { offset, limit, sort, order, category, isTemplate, search };
-        if (tags) {
-          options.tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
-        }
-        const prompts = await services.promptService.listPrompts(options);
-        // For total count, fetch without pagination
-        const total = (await services.promptService.listPrompts({ ...options, offset: 0, limit: undefined })).length;
-        res.json({ prompts, total, offset, limit });
-      } catch (err) {
-        next(err);
+        return;
       }
-    },
+      const { offset, limit, sort, order, category, tags, isTemplate, search } = parseResult.data;
+      const options: any = { offset, limit, sort, order, category, isTemplate, search };
+      if (tags) {
+        options.tags = tags.split(',').map((t: string) => t.trim()).filter(Boolean);
+      }
+      const prompts = await services.promptService.listPrompts(options);
+      // For total count, fetch without pagination
+      const total = (await services.promptService.listPrompts({ ...options, offset: 0, limit: undefined })).length;
+      res.json({ prompts, total, offset, limit });
+    }),
   );
 
   /**
@@ -408,20 +411,16 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const parseResult = promptSchemas.create.safeParse(req.body);
-        if (!parseResult.success) {
-          // Forward validation error to the global handler
-          return next(new z.ZodError(parseResult.error.errors));
-        }
-        const prompt = parseResult.data;
-        const created = await services.promptService.createPrompt(prompt);
-        return res.status(201).json({ success: true, prompt: created });
-      } catch (err) {
-        return next(err);
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const parseResult = promptSchemas.create.safeParse(req.body);
+      if (!parseResult.success) {
+        // Forward validation error to the global handler
+        return next(new z.ZodError(parseResult.error.errors));
       }
-    },
+      const prompt = parseResult.data;
+      const created = await services.promptService.createPrompt(prompt);
+      return res.status(201).json({ success: true, prompt: created });
+    }),
   );
 
   /**
@@ -430,19 +429,15 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const id = req.params.id;
-        const version = req.query.version ? Number(req.query.version) : undefined;
-        const prompt = await services.promptService.getPrompt(id, version);
-        if (!prompt) {
-          return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found' } });
-        }
-        return res.status(200).json({ success: true, prompt });
-      } catch (err) {
-        next(err);
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const id = req.params.id;
+      const version = req.query.version ? Number(req.query.version) : undefined;
+      const prompt = await services.promptService.getPrompt(id, version);
+      if (!prompt) {
+        return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Prompt not found' } });
       }
-    },
+      return res.status(200).json({ success: true, prompt });
+    }),
   );
 
   /**
@@ -475,18 +470,14 @@ export async function startHttpServer(
    *             schema:
    *               $ref: '#/components/schemas/Prompt'
    */
-  app.put('/prompts/:id/:version', async (req, res, next) => {
-    try {
-      const prompt = await services.promptService.updatePrompt(
-        req.params.id,
-        parseInt(req.params.version, 10),
-        req.body,
-      );
-      res.json({ prompt });
-    } catch (error: any) {
-      next(error);
-    }
-  });
+  app.put('/prompts/:id/:version', catchAsync(async (req, res, next) => {
+    const prompt = await services.promptService.updatePrompt(
+      req.params.id,
+      parseInt(req.params.version, 10),
+      req.body,
+    );
+    res.json({ prompt });
+  }));
 
   /**
    * @openapi
@@ -508,14 +499,10 @@ export async function startHttpServer(
    *       204:
    *         description: Prompt deleted successfully
    */
-  app.delete('/prompts/:id/:version', async (req, res, next) => {
-    try {
-      await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
-      res.status(204).send();
-    } catch (error: any) {
-      next(error);
-    }
-  });
+  app.delete('/prompts/:id/:version', catchAsync(async (req, res, next) => {
+    await services.promptService.deletePrompt(req.params.id, parseInt(req.params.version, 10));
+    res.status(204).send();
+  }));
 
   /**
    * GET /prompts/:id/versions
@@ -523,14 +510,10 @@ export async function startHttpServer(
    */
   app.get(
     '/prompts/:id/versions',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const versions = await services.promptService.listPromptVersions(req.params.id);
-        res.json({ success: true, id: req.params.id, versions });
-      } catch (err) {
-        next(err);
-      }
-    },
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const versions = await services.promptService.listPromptVersions(req.params.id);
+      res.json({ success: true, id: req.params.id, versions });
+    }),
   );
 
   /**
@@ -565,7 +548,7 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts/bulk',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const parseResult = promptSchemas.bulkCreate.safeParse(req.body);
       if (!parseResult.success) {
         res.status(400).json({
@@ -580,7 +563,7 @@ export async function startHttpServer(
       }
       const results = await services.promptService.createPromptsBulk(parseResult.data);
       res.status(200).json(results);
-    },
+    }),
   );
 
   /**
@@ -618,7 +601,7 @@ export async function startHttpServer(
    */
   app.delete(
     '/prompts/bulk',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
       if (!parseResult.success) {
         res.status(400).json({
@@ -633,54 +616,40 @@ export async function startHttpServer(
       }
       const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
       res.status(200).json(results);
-    },
+    }),
   );
 
   app.get(
     '/api/v1/sequence/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const { id } = req.params;
-      try {
-        const result = await services.sequenceService.getSequenceWithPrompts(id);
-        res.json(result);
-      } catch (error: any) {
-        // Use next() to pass error to global error handler
-        error.status = 404;
-        error.code = 'NOT_FOUND';
-        error.details = { id };
-        next(error);
-      }
-    },
+      const result = await services.sequenceService.getSequenceWithPrompts(id);
+      res.json(result);
+    }),
   );
 
   // Add after other endpoints, before the 404 handler
   app.post(
     '/diagram',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const { promptIds } = req.body;
-        if (!Array.isArray(promptIds) || promptIds.length === 0) {
-          res.status(400).json({ error: true, message: 'promptIds must be a non-empty array.' });
-          return;
-        }
-        // Fetch prompt names for diagram nodes
-        const prompts = await Promise.all(
-          promptIds.map((id: string) => services.promptService.getPrompt(id)),
-        );
-        const nodes = prompts.map((p, i) => `P${i}[${p ? p.name : promptIds[i]}]`);
-        // Simple linear flow: P0 --> P1 --> P2 ...
-        let edges = '';
-        for (let i = 0; i < nodes.length - 1; i++) {
-          edges += `${nodes[i]} --> ${nodes[i + 1]}\n`;
-        }
-        const mermaid = `graph TD\n${nodes.join('\n')}\n${edges}`;
-        res.json({ mermaid });
-      } catch (err: any) {
-        res
-          .status(500)
-          .json({ error: true, message: err instanceof Error ? err.message : String(err) });
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const { promptIds } = req.body;
+      if (!Array.isArray(promptIds) || promptIds.length === 0) {
+        res.status(400).json({ error: true, message: 'promptIds must be a non-empty array.' });
+        return;
       }
-    },
+      // Fetch prompt names for diagram nodes
+      const prompts = await Promise.all(
+        promptIds.map((id: string) => services.promptService.getPrompt(id)),
+      );
+      const nodes = prompts.map((p, i) => `P${i}[${p ? p.name : promptIds[i]}]`);
+      // Simple linear flow: P0 --> P1 --> P2 ...
+      let edges = '';
+      for (let i = 0; i < nodes.length - 1; i++) {
+        edges += `${nodes[i]} --> ${nodes[i + 1]}\n`;
+      }
+      const mermaid = `graph TD\n${nodes.join('\n')}\n${edges}`;
+      res.json({ mermaid });
+    }),
   );
 
   const checkWorkflowRateLimit = getWorkflowRateLimiter();
@@ -693,59 +662,55 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const workflow = req.body;
-        if (!services.workflowService.validateWorkflow(workflow)) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Invalid workflow definition.',
-            },
-          });
-          return;
-        }
-        if (!workflow.id || typeof workflow.id !== 'string') {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Workflow must have a string id.',
-            },
-          });
-          return;
-        }
-        // Determine version
-        let version = workflow.version;
-        if (typeof version !== 'number') {
-          // Auto-increment version
-          const versions = getAllWorkflowVersions(workflow.id);
-          version = versions.length > 0 ? Math.max(...versions) + 1 : 1;
-          workflow.version = version;
-        }
-        // Check if this version already exists
-        if (loadWorkflowFromFile(workflow.id, version)) {
-          res.status(409).json({
-            success: false,
-            error: {
-              code: 'CONFLICT',
-              message: `Workflow version ${version} already exists for id ${workflow.id}`,
-            },
-          });
-          return;
-        }
-        saveWorkflowToFile(workflow);
-        res.status(201).json({
-          id: workflow.id,
-          version,
-          message: 'Workflow version saved.',
-          success: true,
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const workflow = req.body;
+      if (!services.workflowService.validateWorkflow(workflow)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Invalid workflow definition.',
+          },
         });
-      } catch (err) {
-        next(err);
+        return;
       }
-    },
+      if (!workflow.id || typeof workflow.id !== 'string') {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Workflow must have a string id.',
+          },
+        });
+        return;
+      }
+      // Determine version
+      let version = workflow.version;
+      if (typeof version !== 'number') {
+        // Auto-increment version
+        const versions = getAllWorkflowVersions(workflow.id);
+        version = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+        workflow.version = version;
+      }
+      // Check if this version already exists
+      if (loadWorkflowFromFile(workflow.id, version)) {
+        res.status(409).json({
+          success: false,
+          error: {
+            code: 'CONFLICT',
+            message: `Workflow version ${version} already exists for id ${workflow.id}`,
+          },
+        });
+        return;
+      }
+      saveWorkflowToFile(workflow);
+      res.status(201).json({
+        id: workflow.id,
+        version,
+        message: 'Workflow version saved.',
+        success: true,
+      });
+    }),
   );
 
   /**
@@ -755,24 +720,20 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const workflow = loadWorkflowFromFile(req.params.id);
-        if (!workflow) {
-          res.status(404).json({
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Workflow not found.',
-            },
-          });
-          return;
-        }
-        res.json(workflow);
-      } catch (err) {
-        next(err);
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const workflow = loadWorkflowFromFile(req.params.id);
+      if (!workflow) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Workflow not found.',
+          },
+        });
+        return;
       }
-    },
+      res.json(workflow);
+    }),
   );
 
   /**
@@ -782,29 +743,25 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id/versions',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const versions = getAllWorkflowVersions(req.params.id);
-        if (!versions.length) {
-          res.status(404).json({
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: 'No versions found for workflow.',
-            },
-          });
-          return;
-        }
-        // Optionally, include createdAt for each version
-        const result = versions.map(v => {
-          const wf = loadWorkflowFromFile(req.params.id, v);
-          return { version: v, createdAt: wf?.createdAt };
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const versions = getAllWorkflowVersions(req.params.id);
+      if (!versions.length) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'No versions found for workflow.',
+          },
         });
-        res.json(result);
-      } catch (err) {
-        next(err);
+        return;
       }
-    },
+      // Optionally, include createdAt for each version
+      const result = versions.map(v => {
+        const wf = loadWorkflowFromFile(req.params.id, v);
+        return { version: v, createdAt: wf?.createdAt };
+      });
+      res.json(result);
+    }),
   );
 
   /**
@@ -814,35 +771,31 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows/:id/versions/:version',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const version = parseInt(req.params.version, 10);
-        if (isNaN(version)) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Version must be a number.',
-            },
-          });
-          return;
-        }
-        const workflow = loadWorkflowFromFile(req.params.id, version);
-        if (!workflow) {
-          res.status(404).json({
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Workflow version not found.',
-            },
-          });
-          return;
-        }
-        res.json(workflow);
-      } catch (err) {
-        next(err);
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const version = parseInt(req.params.version, 10);
+      if (isNaN(version)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Version must be a number.',
+          },
+        });
+        return;
       }
-    },
+      const workflow = loadWorkflowFromFile(req.params.id, version);
+      if (!workflow) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Workflow version not found.',
+          },
+        });
+        return;
+      }
+      res.json(workflow);
+    }),
   );
 
   /**
@@ -852,41 +805,37 @@ export async function startHttpServer(
    */
   app.delete(
     '/api/v1/workflows/:id/versions/:version',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const version = parseInt(req.params.version, 10);
-        if (isNaN(version)) {
-          res.status(400).json({
-            success: false,
-            error: {
-              code: 'VALIDATION_ERROR',
-              message: 'Version must be a number.',
-            },
-          });
-          return;
-        }
-        const file = getWorkflowFileName(req.params.id, version);
-        if (!fs.existsSync(file)) {
-          res.status(404).json({
-            success: false,
-            error: {
-              code: 'NOT_FOUND',
-              message: 'Workflow version not found.',
-            },
-          });
-          return;
-        }
-        fs.unlinkSync(file);
-        res.json({
-          success: true,
-          id: req.params.id,
-          version,
-          message: 'Workflow version deleted.',
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const version = parseInt(req.params.version, 10);
+      if (isNaN(version)) {
+        res.status(400).json({
+          success: false,
+          error: {
+            code: 'VALIDATION_ERROR',
+            message: 'Version must be a number.',
+          },
         });
-      } catch (err) {
-        next(err);
+        return;
       }
-    },
+      const file = getWorkflowFileName(req.params.id, version);
+      if (!fs.existsSync(file)) {
+        res.status(404).json({
+          success: false,
+          error: {
+            code: 'NOT_FOUND',
+            message: 'Workflow version not found.',
+          },
+        });
+        return;
+      }
+      fs.unlinkSync(file);
+      res.json({
+        success: true,
+        id: req.params.id,
+        version,
+        message: 'Workflow version deleted.',
+      });
+    }),
   );
 
   /**
@@ -896,14 +845,10 @@ export async function startHttpServer(
    */
   app.get(
     '/api/v1/workflows',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      try {
-        const workflows = getAllWorkflows(true); // latestOnly = true
-        res.json(workflows);
-      } catch (err) {
-        next(err);
-      }
-    },
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+      const workflows = getAllWorkflows(true); // latestOnly = true
+      res.json(workflows);
+    }),
   );
 
   /**
@@ -913,7 +858,7 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows/:id/run',
-    async (req: express.Request, res: express.Response, next: express.NextFunction) => {
+    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       const userId = (req.headers['x-user-id'] as string) || 'anonymous';
       const workflowId = req.params.id;
       const versionParam = req.query.version;
@@ -982,7 +927,7 @@ export async function startHttpServer(
       } finally {
         releaseWorkflowSlot(userId);
       }
-    },
+    }),
   );
 
   /**
@@ -1032,16 +977,12 @@ export async function startHttpServer(
    */
   app.post(
     '/api/v1/workflows/:executionId/resume',
-    async (req, res, next) => {
+    catchAsync(async (req, res, next) => {
       const { executionId } = req.params;
       const { input } = req.body;
-      try {
-        const result = await services.workflowService.resumeWorkflow(executionId, input);
-        res.status(200).json(result);
-      } catch (err) {
-        next(err);
-      }
-    },
+      const result = await services.workflowService.resumeWorkflow(executionId, input);
+      res.status(200).json(result);
+    }),
   );
 
   // Set up SSE if enabled

@@ -20,6 +20,33 @@ import {
 } from './interfaces.js';
 import { z } from 'zod';
 import { promptSchemas, workflowSchema } from './schemas.js';
+import lockfile from 'proper-lockfile';
+
+export function adapterFactory(config: McpConfig, logger: pino.Logger): StorageAdapter {
+  const { storage } = config;
+
+  switch (storage.type) {
+    case 'file':
+      logger.info(`Using file storage adapter with directory: ${storage.promptsDir}`);
+      return new FileAdapter({ promptsDir: storage.promptsDir as string });
+    case 'memory':
+      logger.info('Using memory storage adapter');
+      return new MemoryAdapter();
+    case 'postgres':
+      logger.info(`Using postgres storage adapter with host: ${storage.host}`);
+      return new PostgresAdapter({
+        host: storage.host,
+        port: storage.port,
+        user: storage.user,
+        password: storage.password,
+        database: storage.database,
+        max: storage.maxConnections,
+        ssl: storage.ssl,
+      });
+    default:
+      throw new Error(`Unknown storage adapter type: ${storage.type}`);
+  }
+}
 
 export type { StorageAdapter };
 
@@ -62,8 +89,8 @@ export class FileAdapter implements StorageAdapter {
           const filePath = path.join(this.promptsDir, file);
           try {
             const content = await fsp.readFile(filePath, 'utf-8');
-            const data = JSON.parse(content);
-            promptSchemas.full.parse(data);
+            const prompt = JSON.parse(content);
+            promptSchemas.full.parse(prompt);
           } catch (error: unknown) {
             if (error instanceof z.ZodError) {
               console.warn(`Validation failed for ${file}: ${error.message}`);
@@ -95,27 +122,40 @@ export class FileAdapter implements StorageAdapter {
     return name.toLowerCase().replace(/\s+/g, '-');
   }
 
-  public async savePrompt(prompt: Prompt): Promise<Prompt> {
+  public async savePrompt(promptData: Omit<Prompt, 'id' | 'version' | 'createdAt' | 'updatedAt'>): Promise<Prompt> {
     if (!this.connected) {
       throw new Error('File storage not connected');
     }
 
-    promptSchemas.full.parse(prompt);
+    const parsedData = promptSchemas.create.parse(promptData);
+    const id = this.generateId(parsedData.name);
 
-    const finalPath = this.getPromptFileName(prompt.id, prompt.version as number);
-    const tempPath = `${finalPath}.tmp`;
+    const versions = await this.listPromptVersions(id);
+    const newVersion = versions.length > 0 ? Math.max(...versions) + 1 : 1;
+
+    const promptWithDefaults: Prompt = {
+      id,
+      version: newVersion,
+      ...parsedData,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    promptSchemas.full.parse(promptWithDefaults);
+
+    const promptFilePath = this.getPromptFileName(id, newVersion);
+
+    let release;
     try {
-      await fsp.writeFile(tempPath, JSON.stringify(prompt, null, 2));
-      await fsp.rename(tempPath, finalPath);
-      return prompt;
-    } catch (error: unknown) {
-      try {
-        await fsp.unlink(tempPath);
-      } catch {
-        // ignore
+      release = await lockfile.lock(promptFilePath, { retries: 3 });
+      await fsp.writeFile(promptFilePath, JSON.stringify(promptWithDefaults, null, 2));
+    } finally {
+      if (release) {
+        await release();
       }
-      throw error;
     }
+
+    return promptWithDefaults;
   }
 
   public async getPrompt(id: string, version?: number): Promise<Prompt | null> {
@@ -131,12 +171,12 @@ export class FileAdapter implements StorageAdapter {
 
     try {
       const content = await fsp.readFile(this.getPromptFileName(id, versionToFetch), 'utf-8');
-      const data = JSON.parse(content);
-      const prompt = promptSchemas.full.parse(data);
-      return prompt as Prompt;
+      const prompt: Prompt = JSON.parse(content);
+      return promptSchemas.full.parse(prompt);
     } catch (error: unknown) {
       if (error instanceof z.ZodError) {
-        throw new ValidationError(`Prompt validation failed for ${id}: ${error.message}`, error.issues);
+        console.warn(`Validation failed for prompt ${id} v${versionToFetch}: ${error.message}`);
+        return null;
       }
       if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
         return null;
@@ -176,46 +216,60 @@ export class FileAdapter implements StorageAdapter {
     };
 
     const finalPath = this.getPromptFileName(id, version);
-    const tempPath = `${finalPath}.tmp`;
+    let release;
     try {
-      await fsp.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
-      await fsp.rename(tempPath, finalPath);
-      return updatedPrompt;
-    } catch (error: unknown) {
-      try {
-        await fsp.unlink(tempPath);
-      } catch {
-        // ignore
+      release = await lockfile.lock(finalPath, { retries: 3 });
+      await fsp.writeFile(finalPath, JSON.stringify(updatedPrompt, null, 2));
+    } finally {
+      if (release) {
+        await release();
       }
-      throw error;
     }
+
+    return updatedPrompt;
   }
 
   public async deletePrompt(id: string, version?: number): Promise<void> {
     if (!this.connected) throw new Error('File storage not connected');
     if (version !== undefined) {
+      const promptFilePath = this.getPromptFileName(id, version);
+      let release;
       try {
-        await fsp.unlink(this.getPromptFileName(id, version));
+        release = await lockfile.lock(promptFilePath, { retries: 3 });
+        await fsp.unlink(promptFilePath);
       } catch (error: unknown) {
         if (error instanceof Error && (error as NodeJS.ErrnoException).code === 'ENOENT') return; // Not found is ok
         throw error;
+      } finally {
+        if (release) {
+          await release();
+        }
       }
       return;
     }
     const allVersions = await this.listPromptVersions(id);
     for (const v of allVersions) {
+      const promptFilePath = this.getPromptFileName(id, v);
+      let release;
       try {
-        await fsp.unlink(this.getPromptFileName(id, v));
+        release = await lockfile.lock(promptFilePath, { retries: 3 });
+        await fsp.unlink(promptFilePath);
       } catch (error: unknown) {
-        // Only ignore 'file not found' errors. Re-throw others.
         if (error instanceof Error && (error as NodeJS.ErrnoException).code !== 'ENOENT') {
           throw error;
+        }
+      } finally {
+        if (release) {
+          await release();
         }
       }
     }
   }
 
-  public async listPrompts(options?: ListPromptsOptions, allVersions = false): Promise<Prompt[]> {
+  public async listPrompts(
+    options?: ListPromptsOptions,
+    allVersions = false,
+  ): Promise<{ prompts: Prompt[]; total: number }> {
     if (!this.connected) throw new Error('File storage not connected');
     const allFiles = await fsp.readdir(this.promptsDir);
     const promptFiles = allFiles.filter(f => f.endsWith('.json'));
@@ -225,12 +279,15 @@ export class FileAdapter implements StorageAdapter {
       try {
         const content = await fsp.readFile(path.join(this.promptsDir, file), 'utf-8');
         const data = JSON.parse(content);
-        prompts.push(promptSchemas.full.parse(data) as Prompt);
-      } catch (error: unknown) {
+        const prompt = promptSchemas.full.parse(data);
+        prompts.push(prompt);
+      } catch (error) {
+        // Log warnings for malformed or invalid files, then ignore
         if (error instanceof z.ZodError) {
-          console.warn(`Skipping malformed prompt file ${file}: ${error.message}`);
+          console.warn(`Skipping invalid prompt file ${file}: ${error.message}`);
+        } else if (error instanceof Error) {
+          console.warn(`Skipping malformed JSON file ${file}: ${error.message}`);
         }
-        // ignore malformed files for now
       }
     }
 
@@ -241,17 +298,37 @@ export class FileAdapter implements StorageAdapter {
     }
 
     if (allVersions) {
-      return filtered;
+      return { prompts: filtered, total: filtered.length };
     }
 
-    const latestPrompts = new Map<string, Prompt>();
-    for (const prompt of filtered) {
-      const existing = latestPrompts.get(prompt.id);
-      if (!existing || prompt.version > existing.version) {
-        latestPrompts.set(prompt.id, prompt);
+    const latestVersionsMap = new Map<string, Prompt>();
+    for (const p of filtered) {
+      const existing = latestVersionsMap.get(p.id);
+      if (!existing || p.version > existing.version) {
+        latestVersionsMap.set(p.id, p);
       }
     }
-    return Array.from(latestPrompts.values());
+    filtered = Array.from(latestVersionsMap.values());
+
+    // Apply sorting
+    if (options?.sort) {
+      filtered.sort((a, b) => {
+        const aVal = a[options.sort!];
+        const bVal = b[options.sort!];
+        if (aVal < bVal) return options.order === 'desc' ? 1 : -1;
+        if (aVal > bVal) return options.order === 'desc' ? -1 : 1;
+        return 0;
+      });
+    }
+
+    const total = filtered.length;
+
+    // Apply pagination
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? 20;
+    const paginated = filtered.slice(offset, offset + limit);
+
+    return { prompts: paginated, total };
   }
 
   public async getSequence(id: string): Promise<PromptSequence | null> {
@@ -356,7 +433,7 @@ export class MemoryAdapter implements StorageAdapter {
   }
 
   public async healthCheck(): Promise<boolean> {
-    return this.isConnected();
+    return this.connected;
   }
 
   public async clearAll(): Promise<void> {
@@ -741,19 +818,17 @@ export class PostgresAdapter implements StorageAdapter {
     };
 
     const finalPath = this.getPromptFileName(id, version);
-    const tempPath = `${finalPath}.tmp`;
+    let release;
     try {
-      await fsp.writeFile(tempPath, JSON.stringify(updatedPrompt, null, 2));
-      await fsp.rename(tempPath, finalPath);
-      return updatedPrompt;
-    } catch (error: unknown) {
-      try {
-        await fsp.unlink(tempPath);
-      } catch {
-        // ignore
+      release = await lockfile.lock(finalPath, { retries: 3 });
+      await fsp.writeFile(finalPath, JSON.stringify(updatedPrompt, null, 2));
+    } finally {
+      if (release) {
+        await release();
       }
-      throw error;
     }
+
+    return updatedPrompt;
   }
 
   public async deletePrompt(idOrName: string, version?: number): Promise<void> {
