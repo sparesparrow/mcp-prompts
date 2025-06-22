@@ -550,7 +550,6 @@ export async function startHttpServer(
   app.post(
     '/prompts/bulk',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      // The schema validation is too strict. The service layer will handle per-item validation.
       if (!Array.isArray(req.body)) {
         return res.status(400).json({
           success: false,
@@ -561,7 +560,8 @@ export async function startHttpServer(
         });
       }
       const results = await services.promptService.createPromptsBulk(req.body);
-      res.status(200).json(results);
+      const hasErrors = results.some(r => !r.success);
+      res.status(hasErrors ? 207 : 201).json({ results });
     }),
   );
 
@@ -598,8 +598,8 @@ export async function startHttpServer(
    *                   error:
    *                     type: string
    */
-  app.delete(
-    '/prompts/bulk',
+  app.post(
+    '/prompts/bulk-delete',
     catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
       console.log('BULK DELETE BODY:', JSON.stringify(req.body, null, 2));
       const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
@@ -616,7 +616,8 @@ export async function startHttpServer(
         return;
       }
       const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
-      res.status(200).json(results);
+      const hasErrors = results.some(r => !r.success);
+      res.status(hasErrors ? 207 : 200).json({ results });
     }),
   );
 
@@ -877,16 +878,6 @@ export async function startHttpServer(
           return;
         }
       }
-      if (!checkWorkflowRateLimit(userId)) {
-        res.status(429).json({
-          success: false,
-          error: {
-            code: 'RATE_LIMIT',
-            message: 'Too many concurrent workflows. Please wait and try again.',
-          },
-        });
-        return;
-      }
       let result;
       try {
         const workflow = loadWorkflowFromFile(workflowId, version);
@@ -903,7 +894,8 @@ export async function startHttpServer(
         // Audit: workflow start
         auditLogWorkflowEvent({ details: { workflow }, eventType: 'start', userId, workflowId });
         // Run the workflow
-        result = await services.workflowService.runWorkflow(workflow, req.body.context || {});
+        const initialContext = { ...req.body, userId };
+        result = await services.workflowService.runWorkflow(workflow, initialContext);
         // Audit: workflow end
         auditLogWorkflowEvent({ details: { result }, eventType: 'end', userId, workflowId });
         res.status(result.success ? 200 : 400).json(result);

@@ -5,6 +5,7 @@ import path from 'path';
 import { promisify } from 'util';
 import type { z } from 'zod';
 
+import { AppError } from './errors.js';
 import type { StorageAdapter, WorkflowExecutionState } from './interfaces.js';
 import type { PromptService } from './prompt-service.js';
 import { workflowSchema } from './schemas.js';
@@ -341,27 +342,38 @@ export class WorkflowServiceImpl implements WorkflowService {
     workflow: Workflow,
     initialContext: WorkflowContext = {},
   ): Promise<RunWorkflowResult> {
-    const stepRunners: Record<string, StepRunner> = {
-      http: new HttpRunner(),
-      prompt: new PromptRunner(this.promptService),
-      shell: new ShellRunner(),
-    };
+    const userId = initialContext.userId as string || 'anonymous';
+    const rateLimiter = getWorkflowRateLimiter();
 
-    const executionId = randomUUID();
-    const initialState: WorkflowExecutionState = {
-      context: { ...workflow.variables, ...initialContext },
-      createdAt: new Date().toISOString(),
-      currentStepId: workflow.steps[0]?.id,
-      executionId,
-      history: [],
-      status: 'running',
-      updatedAt: new Date().toISOString(),
-      version: workflow.version,
-      workflowId: workflow.id,
-    };
+    if (!rateLimiter(userId)) {
+      throw new AppError('Rate limit exceeded', 429, 'RATE_LIMIT_EXCEEDED');
+    }
 
-    await this.storageAdapter.saveWorkflowState(initialState);
-    return this.runWorkflowSteps(workflow, initialState, stepRunners);
+    try {
+      const stepRunners: Record<string, StepRunner> = {
+        http: new HttpRunner(),
+        prompt: new PromptRunner(this.promptService),
+        shell: new ShellRunner(),
+      };
+
+      const executionId = randomUUID();
+      const initialState: WorkflowExecutionState = {
+        context: { ...workflow.variables, ...initialContext },
+        createdAt: new Date().toISOString(),
+        currentStepId: workflow.steps[0]?.id,
+        executionId,
+        history: [],
+        status: 'running',
+        updatedAt: new Date().toISOString(),
+        version: workflow.version,
+        workflowId: workflow.id,
+      };
+
+      await this.storageAdapter.saveWorkflowState(initialState);
+      return this.runWorkflowSteps(workflow, initialState, stepRunners);
+    } finally {
+      releaseWorkflowSlot(userId);
+    }
   }
 
   /**

@@ -30,7 +30,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 ##### Advanced Templating Engine
 
 - [ ] **Conditional Logic (High):** Support `if/else` constructs within templates for dynamic content generation.
-- [ ] **Loops (Medium):** Support iteration over arrays (`#each`) to dynamically generate content.
+- [x] **Loops (Medium):** Support iteration over arrays (`#each`) to dynamically generate content.
 - [ ] **Nested Templates / Partials (Medium):** Allow templates to include other templates to promote reuse.
 - [ ] **Configurable Delimiters (Low):** Allow users to specify variable delimiters (e.g., `{{var}}`, `${var}`).
 - [ ] **Variable Extraction (Low):** Implement a server-side function to automatically extract all variables from a template.

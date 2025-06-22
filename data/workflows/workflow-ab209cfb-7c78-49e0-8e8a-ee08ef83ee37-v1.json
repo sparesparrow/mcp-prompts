@@ -1,0 +1,16 @@
+{
+  "id": "workflow-ab209cfb-7c78-49e0-8e8a-ee08ef83ee37",
+  "name": "Test Workflow",
+  "version": 1,
+  "steps": [
+    {
+      "id": "get-capital",
+      "type": "prompt",
+      "promptId": "test-prompt",
+      "input": {
+        "country": "{{context.country}}"
+      },
+      "output": "capital"
+    }
+  ]
+}

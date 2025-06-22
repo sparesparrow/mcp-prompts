@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { randomUUID } from 'crypto';
 
 import { MemoryAdapter } from '../../src/adapters.js';
+import { AppError } from '../../src/errors.js';
 import { startHttpServer } from '../../src/http-server.js';
 import { PromptService } from '../../src/prompt-service.js';
 import type { SequenceService } from '../../src/sequence-service.js';
@@ -162,6 +163,14 @@ describe('HTTP Server Integration', () => {
   });
 
   it('should return 400 for missing required fields', async () => {
+    const cases = [{}, { name: 'No Content' }, { content: 'No Name' }, { name: '', content: '' }];
+    for (const body of cases) {
+      const res = await request(baseUrl).post('/prompts').set('x-api-key', 'test-key').send(body);
+      expect(res.status).toBe(400);
+    }
+  });
+
+  it('should return 400 for invalid field types', async () => {
     const cases = [
       {},
       { name: 'No Content', isTemplate: false },
@@ -271,7 +280,9 @@ describe('Prompt List (GET /prompts)', () => {
   });
 
   it('should filter by category', async () => {
-    const res = await request(baseUrl).get('/prompts?category=general').set('x-api-key', 'test-key');
+    const res = await request(baseUrl)
+      .get('/prompts?category=general')
+      .set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     expect(res.body.prompts.length).toBe(2);
     for (const prompt of res.body.prompts) {
@@ -285,9 +296,7 @@ describe('Prompt List (GET /prompts)', () => {
       content: 'a template',
       isTemplate: true,
     });
-    const res = await request(baseUrl)
-      .get('/prompts?isTemplate=true')
-      .set('x-api-key', 'test-key');
+    const res = await request(baseUrl).get('/prompts?isTemplate=true').set('x-api-key', 'test-key');
     expect(res.status).toBe(200);
     expect(res.body.prompts.length).toBe(1);
     expect(res.body.prompts[0].isTemplate).toBe(true);
@@ -316,7 +325,7 @@ describe('Bulk Prompt Operations', () => {
     await promptService.createPrompt({ name: 'p2', content: 'c2', isTemplate: false });
   });
 
-  it('should bulk create prompts successfully, skipping duplicates', async () => {
+  it('should bulk create prompts successfully, handling duplicates and invalids', async () => {
     const prompts = [
       { name: 'p1', content: 'c1', isTemplate: false }, // Duplicate
       { name: 'New 1', content: 'content', isTemplate: false }, // New
@@ -327,33 +336,38 @@ describe('Bulk Prompt Operations', () => {
       .post('/prompts/bulk')
       .set('x-api-key', 'test-key')
       .send(prompts);
-    expect(res.status).toBe(200);
-    expect(res.body.length).toBe(4);
-    expect(res.body[0].success).toBe(false);
-    expect(res.body[0].error).toMatch(/already exists/);
-    expect(res.body[1].success).toBe(true);
-    expect(res.body[2].success).toBe(false);
-    expect(res.body[3].success).toBe(true);
+
+    expect(res.status).toBe(207);
+    expect(res.body.results).toHaveLength(4);
+
+    expect(res.body.results).toContainEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining('already exists') }),
+    );
+    expect(res.body.results).toContainEqual(
+      expect.objectContaining({ success: false, error: expect.stringContaining('Invalid prompt data') }),
+    );
+    expect(res.body.results).toContainEqual({ success: true, id: 'new-1' });
+    expect(res.body.results).toContainEqual({ success: true, id: 'new-2' });
   });
 
   it('should bulk delete prompts and return per-id results', async () => {
     const res = await request(baseUrl)
-      .delete('/prompts/bulk')
+      .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['p1', 'non-existent'] });
-    expect(res.status).toBe(200);
-    expect(res.body.length).toBe(2);
-    expect(res.body.find((r: any) => r.id === 'p1').success).toBe(true);
-    expect(res.body.find((r: any) => r.id === 'non-existent').success).toBe(false);
+    expect(res.status).toBe(207);
+    expect(res.body.results.length).toBe(2);
+    expect(res.body.results.find((r: any) => r.id === 'p1').success).toBe(true);
+    expect(res.body.results.find((r: any) => r.id === 'non-existent').success).toBe(false);
   });
 
   it('should return all errors for bulk delete with all non-existent IDs', async () => {
     const res = await request(baseUrl)
-      .delete('/prompts/bulk')
+      .post('/prompts/bulk-delete')
       .set('x-api-key', 'test-key')
       .send({ ids: ['a', 'b', 'c'] });
-    expect(res.status).toBe(200);
-    expect(res.body.every((r: any) => !r.success)).toBe(true);
+    expect(res.status).toBe(207);
+    expect(res.body.results.every((r: any) => !r.success)).toBe(true);
   });
 });
 
@@ -365,9 +379,8 @@ describe('Workflow Engine Integration', () => {
 
   beforeEach(async () => {
     await adapter.clearAll();
-    // Use a unique name for the prompt to avoid conflicts between tests
     await promptService.createPrompt({
-      name: `test-prompt-${randomUUID()}`,
+      name: 'test-prompt',
       content: 'The capital of {{country}} is Paris.',
       isTemplate: true,
       variables: ['country'],
@@ -375,7 +388,22 @@ describe('Workflow Engine Integration', () => {
   });
 
   it('should save and run a sample workflow', async () => {
-    const workflow = { ...sampleWorkflow, id: `workflow-${randomUUID()}` };
+    const workflow = {
+      id: `workflow-${randomUUID()}`,
+      name: 'Test Workflow',
+      version: 1,
+      steps: [
+        {
+          id: 'get-capital',
+          type: 'prompt',
+          promptId: 'test-prompt',
+          input: {
+            country: '{{context.country}}',
+          },
+          output: 'capital',
+        },
+      ],
+    };
     const saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
@@ -386,11 +414,7 @@ describe('Workflow Engine Integration', () => {
       .post(`/api/v1/workflows/${workflow.id}/run`)
       .set('x-api-key', 'test-key')
       .send({
-        state: {
-          parameters: {
-            country: 'France',
-          },
-        },
+        country: 'France',
       });
     expect(runRes.status).toBe(200);
     expect(runRes.body).toHaveProperty('outputs');
@@ -398,7 +422,6 @@ describe('Workflow Engine Integration', () => {
     expect(runRes.body.outputs.capital).toMatch(/Paris/);
   });
 
-  // This test is flaky in CI environments due to its reliance on timing and process management.
   it.skip('should enforce workflow rate limiting', async () => {
     const workflow = { ...sampleWorkflow, id: `workflow-${randomUUID()}` };
     const saveRes = await request(baseUrl)
@@ -408,13 +431,32 @@ describe('Workflow Engine Integration', () => {
     expect([200, 201]).toContain(saveRes.status);
 
     const workflowServiceWithRateLimit = new WorkflowService(adapter, promptService);
+    process.env.WORKFLOW_MAX_CONCURRENT = '1';
 
-    const runPromise = workflowServiceWithRateLimit.runWorkflow(workflow.id, {
+    const runPromise = workflowServiceWithRateLimit.runWorkflow(workflow, {
       userId: 'ratelimit-test',
-    } as any);
-    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(workflow.id, {
+    });
+    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(workflow, {
       userId: 'ratelimit-test',
-    } as any);
+    });
     await expect(Promise.all([runPromise, runPromise2])).rejects.toThrow(/Rate limit exceeded/);
   });
 });
+
+function makePromptPayload(overrides: Partial<Record<string, any>> = {}) {
+  const now = new Date().toISOString();
+  return {
+    id: `prompt-${Math.random().toString(36).slice(2, 10)}`,
+    name: 'Test Prompt',
+    content: 'Test content',
+    isTemplate: false,
+    version: 1,
+    createdAt: now,
+    updatedAt: now,
+    ...overrides,
+  };
+}
+
+function sleep(ms: number) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}

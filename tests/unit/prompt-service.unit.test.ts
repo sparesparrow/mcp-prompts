@@ -120,7 +120,7 @@ describe('PromptService', () => {
     expect(applied.content).toBe('Hello, Alice!');
   });
 
-  it('should throw AppError for invalid fields', async () => {
+  it('should throw for invalid fields', async () => {
     const invalidPromptData = {
       content: '', // invalid
       isTemplate: false,
@@ -128,7 +128,7 @@ describe('PromptService', () => {
     };
     try {
       await service.createPrompt(invalidPromptData);
-      fail('Expected createPrompt to throw an AppError');
+      fail('Expected createPrompt to throw');
     } catch (e: unknown) {
       expect(e).toBeInstanceOf(AppError);
     }

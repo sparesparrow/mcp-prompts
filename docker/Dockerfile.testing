@@ -21,16 +21,18 @@ ENV NODE_ENV=test \
     LOG_LEVEL=debug \
     TEST_MODE=true
 
-# Copy source code, tests, and dependencies will be mounted in docker-compose
-COPY package*.json ./
-COPY tsconfig.json ./
-COPY jest.config.js ./
+# Copy source code and other necessary files
+COPY . .
+
+# Install dependencies and build the project
+RUN npm install
+RUN npm run build
 
 # Expose port for test reporting
 EXPOSE 9323
 
 # Use node user for security
-USER node
+# USER node
 
 # Default test command
 CMD ["npm", "test"] 

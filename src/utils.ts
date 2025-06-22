@@ -1,4 +1,5 @@
 import { Redis } from 'ioredis';
+import Handlebars from 'handlebars';
 
 import { config } from './config.js';
 
@@ -67,3 +68,14 @@ export function jsonFriendlyErrorReplacer(_key: string, value: unknown) {
   }
   return value;
 }
+
+export const templateHelpers: Record<string, Handlebars.HelperDelegate> = {
+  toUpperCase: (str: unknown) => (typeof str === 'string' ? str.toUpperCase() : ''),
+  toLowerCase: (str: unknown) => (typeof str === 'string' ? str.toLowerCase() : ''),
+  jsonStringify: (context: any) => JSON.stringify(context, jsonFriendlyErrorReplacer, 2),
+  join: (arr: unknown, sep: unknown) => {
+    if (!Array.isArray(arr)) return '';
+    return arr.join(typeof sep === 'string' ? sep : ', ');
+  },
+  eq: (a: unknown, b: unknown) => a === b,
+};

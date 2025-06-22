@@ -1,0 +1,32 @@
+{
+  "id": "workflow-62db72ff-cb2a-4aed-b859-6a5073862afe",
+  "name": "Sample Workflow",
+  "version": 1,
+  "variables": {
+    "greeting": "Hello, world!"
+  },
+  "steps": [
+    {
+      "id": "prompt_step",
+      "type": "prompt",
+      "promptId": "basic-template",
+      "input": {
+        "text": "{{ greeting }}"
+      },
+      "output": "promptResult"
+    },
+    {
+      "id": "shell_step",
+      "type": "shell",
+      "command": "sleep 2 && echo 'Shell step executed'",
+      "output": "shellResult"
+    },
+    {
+      "id": "http_step",
+      "type": "http",
+      "method": "GET",
+      "url": "https://httpbin.org/get",
+      "output": "httpResult"
+    }
+  ]
+}
