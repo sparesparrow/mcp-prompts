@@ -1,3 +1,32 @@
 {
-  "agentCanUpdateSnapshot": true
+  "name": "MCP Prompts Development Environment",
+  "user": "node",
+  "install": "npm install",
+  "start": "npm run dev",
+  "env": {
+    "LOG_LEVEL": "info"
+  },
+  "agentCanUpdateSnapshot": true,
+  "terminals": [
+    {
+      "name": "Development Server",
+      "command": "npm run dev",
+      "description": "Starts the MCP Prompts development server with hot reloading"
+    },
+    {
+      "name": "Test Runner",
+      "command": "npm test",
+      "description": "Runs the test suite to ensure code quality and functionality"
+    },
+    {
+      "name": "Type Check",
+      "command": "npm run type-check",
+      "description": "Performs TypeScript type checking across the codebase"
+    },
+    {
+      "name": "Linter",
+      "command": "npm run lint",
+      "description": "Runs ESLint to check for code style and quality issues"
+    }
+  ]
 }

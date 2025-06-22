@@ -1,5 +1,13 @@
 import esbuild from 'esbuild';
 import { exec } from 'child_process';
+import { readFileSync } from 'fs';
+
+// Read dependencies from package.json to mark them as external
+const packageJson = JSON.parse(readFileSync('./package.json', 'utf8'));
+const external = [
+  ...Object.keys(packageJson.dependencies || {}),
+  ...Object.keys(packageJson.devDependencies || {}),
+];
 
 const entryPoints = [
   'src/index.ts',
@@ -15,14 +23,14 @@ esbuild
     bundle: true,
     platform: 'node',
     target: 'node20',
-    format: 'cjs',
+    format: 'esm',
     outdir: 'dist',
-    outExtension: { '.js': '.cjs' },
+    outExtension: { '.js': '.mjs' },
     logLevel: 'info',
-    external: ['pg-native'],
+    external: ['pg-native', 'pino', 'pino-pretty'],
   })
   .then(() => {
-    exec('shx chmod +x dist/index.cjs dist/scripts/*.cjs', (error, stdout, stderr) => {
+    exec('shx chmod +x dist/index.mjs dist/scripts/*.mjs', (error, stdout, stderr) => {
       if (error) {
         console.error(`exec error: ${error}`);
         return;

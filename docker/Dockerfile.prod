@@ -20,11 +20,8 @@ RUN npm run build
 FROM node:20-alpine AS prod
 WORKDIR /app
 
-# Only copy package.json and package-lock.json to leverage Docker cache
-COPY package*.json ./
-
-# Install only production dependencies
-RUN npm ci --only=production --ignore-scripts
+# Copy production dependencies from the builder stage
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy the compiled code from the builder stage
 COPY --from=builder /app/dist ./dist
@@ -57,4 +54,4 @@ EXPOSE 3003
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 CMD /health-check.sh
 
 # Run the compiled application
-CMD ["node", "dist/index.cjs"] 
+CMD ["node", "dist/index.mjs"] 

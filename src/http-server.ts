@@ -197,7 +197,7 @@ function apiKeyAuth(req: express.Request, res: express.Response, next: express.N
  * @param services
  */
 export async function startHttpServer(
-  server: Server | null = null,
+  server: any | null = null,
   config: HttpServerConfig,
   services: ServerServices,
 ): Promise<http.Server> {
@@ -477,7 +477,11 @@ export async function startHttpServer(
       parseInt(req.params.version, 10),
       req.body,
     );
-    res.json({ prompt });
+    if (prompt) {
+      res.status(200).json({ prompt });
+    } else {
+      res.status(404).json({ error: 'Prompt not found' });
+    }
   }));
 
   /**
@@ -519,7 +523,7 @@ export async function startHttpServer(
 
   /**
    * @openapi
-   * /prompts/bulk:
+   * /prompts/bulk-create:
    *   post:
    *     summary: Bulk create prompts
    *     requestBody:
@@ -531,7 +535,7 @@ export async function startHttpServer(
    *             items:
    *               $ref: '#/components/schemas/Prompt'
    *     responses:
-   *       200:
+   *       207:
    *         description: Array of results for each prompt
    *         content:
    *           application/json:
@@ -548,18 +552,13 @@ export async function startHttpServer(
    *                     type: string
    */
   app.post(
-    '/prompts/bulk',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      if (!Array.isArray(req.body)) {
-        return res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Request body must be an array of prompt objects.',
-          },
-        });
+    '/prompts/bulk-create',
+    catchAsync(async (req, res) => {
+      const { prompts } = req.body;
+      if (!Array.isArray(prompts)) {
+        throw new AppError('`prompts` must be an array', 400, 'VALIDATION_ERROR');
       }
-      const results = await services.promptService.createPromptsBulk(req.body);
+      const results = await services.promptService.createPromptsBulk(prompts);
       const hasErrors = results.some(r => !r.success);
       res.status(hasErrors ? 207 : 201).json({ results });
     }),
@@ -567,8 +566,8 @@ export async function startHttpServer(
 
   /**
    * @openapi
-   * /prompts/bulk:
-   *   delete:
+   * /prompts/bulk-delete:
+   *   post:
    *     summary: Bulk delete prompts
    *     requestBody:
    *       required: true
@@ -582,7 +581,7 @@ export async function startHttpServer(
    *                 items:
    *                   type: string
    *     responses:
-   *       200:
+   *       207:
    *         description: Array of results for each ID
    *         content:
    *           application/json:
@@ -600,22 +599,12 @@ export async function startHttpServer(
    */
   app.post(
     '/prompts/bulk-delete',
-    catchAsync(async (req: express.Request, res: express.Response, next: express.NextFunction) => {
-      console.log('BULK DELETE BODY:', JSON.stringify(req.body, null, 2));
-      const parseResult = promptSchemas.bulkDelete.safeParse(req.body);
-      console.log('PARSE RESULT:', JSON.stringify(parseResult, null, 2));
-      if (!parseResult.success) {
-        res.status(400).json({
-          success: false,
-          error: {
-            code: 'VALIDATION_ERROR',
-            message: 'Invalid bulk delete data',
-            details: parseResult.error.errors,
-          },
-        });
-        return;
+    catchAsync(async (req, res) => {
+      const { ids } = req.body;
+      if (!Array.isArray(ids)) {
+        throw new AppError('`ids` must be an array of strings', 400, 'VALIDATION_ERROR');
       }
-      const results = await services.promptService.deletePromptsBulk(parseResult.data.ids);
+      const results = await services.promptService.deletePromptsBulk(ids);
       const hasErrors = results.some(r => !r.success);
       res.status(hasErrors ? 207 : 200).json({ results });
     }),
@@ -990,40 +979,20 @@ export async function startHttpServer(
 
   // Global error handler middleware
   app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+    console.error(err);
     if (err instanceof AppError) {
-      const response: { code: string; message: string; details?: any } = {
-        code: err.code,
-        message: err.message,
-      };
-      if ((err as any).details) {
-        response.details = (err as any).details;
-      }
       return res.status(err.statusCode).json({
-        success: false,
-        error: response,
-      });
-    }
-
-    if (err instanceof z.ZodError) {
-      return res.status(400).json({
-        success: false,
         error: {
-          code: HttpErrorCode.VALIDATION_ERROR,
-          message: 'Invalid input data.',
-          details: err.issues,
+          code: err.code,
+          message: err.message,
+          details: 'details' in err ? (err as any).details : undefined,
         },
       });
     }
-
-    // Log unexpected errors for debugging
-    // In production, use a structured logger like Pino or Winston
-    console.error('UNHANDLED_ERROR:', err);
-
-    res.status(500).json({
-      success: false,
+    return res.status(500).json({
       error: {
-        code: HttpErrorCode.INTERNAL_SERVER_ERROR,
-        message: 'An unexpected internal server error occurred.',
+        code: 'INTERNAL_SERVER_ERROR',
+        message: 'An unexpected error occurred',
       },
     });
   });

@@ -10,6 +10,7 @@ export enum HttpErrorCode {
   INTERNAL_SERVER_ERROR = 'INTERNAL_SERVER_ERROR',
   RATE_LIMIT = 'RATE_LIMIT',
   CONFLICT = 'CONFLICT',
+  LOCKED = 'LOCKED',
 }
 
 /**
@@ -74,5 +75,17 @@ export class ForbiddenError extends AppError {
 export class DuplicateError extends AppError {
   public constructor(message: string) {
     super(message, 409, HttpErrorCode.CONFLICT);
+  }
+}
+
+/**
+ * Represents a file lock error (HTTP 423).
+ */
+export class LockError extends AppError {
+  public readonly details: { file: string };
+
+  public constructor(message: string, file: string) {
+    super(message, 423, HttpErrorCode.LOCKED);
+    this.details = { file };
   }
 }
