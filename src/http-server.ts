@@ -426,7 +426,11 @@ export async function startHttpServer(
       const created = await services.promptService.createPrompt({
         ...prompt,
         tags: prompt.tags ?? undefined,
-        variables: prompt.variables ?? undefined,
+        variables: Array.isArray(prompt.variables) && (
+          prompt.variables.every(v => typeof v === 'string') ||
+          prompt.variables.every(v => typeof v === 'object' && v !== null && 'name' in v)
+        ) ? prompt.variables : undefined,
+        metadata: prompt.metadata === null ? undefined : prompt.metadata,
       });
       return res.status(201).json({ success: true, prompt: created });
     }),

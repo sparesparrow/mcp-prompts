@@ -167,6 +167,20 @@ Expected response:
 }
 ```
 
+### CLI Usage
+
+The CLI entry point includes a Node.js shebang (#!/usr/bin/env node) so you can run it directly:
+
+```sh
+npx -y @sparesparrow/mcp-prompts@3.0.3-main
+```
+
+Or, after installing globally:
+
+```sh
+mcp-prompts --help
+```
+
 ---
 
 ## 🏛️ Core Concepts and Data Structure

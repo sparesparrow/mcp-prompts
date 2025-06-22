@@ -8,3 +8,5 @@
   },
   "include": ["src"]
 }
+
+// Note: CLI entry points should include a shebang (#!/usr/bin/env node) for Node.js CLI compatibility.

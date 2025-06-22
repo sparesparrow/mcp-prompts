@@ -6,7 +6,7 @@
   "type": "module",
   "types": "dist/types/index.d.ts",
   "bin": {
-    "mcp-prompts": "dist/index.mjs"
+    "mcp-prompts": "dist/cjs/index.js"
   },
   "files": [
     "dist",
