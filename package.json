@@ -2,10 +2,10 @@
   "name": "@sparesparrow/mcp-prompts",
   "version": "1.8.1",
   "description": "A standalone server for managing and serving prompts for the Model Context Protocol (MCP)",
-  "main": "dist/index.cjs",
+  "main": "dist/index.mjs",
   "type": "module",
   "bin": {
-    "mcp-prompts": "dist/index.cjs"
+    "mcp-prompts": "dist/index.mjs"
   },
   "files": [
     "dist",

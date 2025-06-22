@@ -1,6 +1,7 @@
 #!/usr/bin/env node
+console.log('Starting MCP Prompts Server...');
 
-// import { McpServer } from '@modelcontextprotocol/sdk/server/mcp';
+import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 // import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
 // import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
 import { pino } from 'pino';
@@ -15,13 +16,14 @@ import { SequenceServiceImpl } from './sequence-service.js';
 import { WorkflowServiceImpl } from './workflow-service.js';
 
 // Mock McpServer for compilation
-
+/*
 const McpServer = class {
   constructor(o: any) {}
   tool(t: any, d: any, i: any, o: any, h: any) {}
   resource(t: any, d: any, i: any, o: any) {}
   async close() {}
 };
+*/
 
 /**
  *

@@ -57,4 +57,4 @@ EXPOSE 3003
 HEALTHCHECK --interval=15s --timeout=5s --start-period=30s --retries=3 CMD /health-check.sh
 
 # Run the compiled application
-CMD ["node", "dist/index.cjs"] 
+CMD ["node", "dist/index.mjs"] 
