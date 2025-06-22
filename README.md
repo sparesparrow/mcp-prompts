@@ -51,10 +51,13 @@ Most teams working with AI struggle with chaos: prompts are stored in code, shar
 > ⚠️ **Requirements:** Node.js 20+ and npm 10+ (due to npm workspaces support).
 
 ### 1. Run with NPX
+
+> 🚨 **Critical Alert:** The latest version of `@sparesparrow/mcp-prompts` has a critical runtime error. Please use version `1.2.22` for a stable experience until this is resolved.
+
 Run the server without a permanent installation with a single command:
 
 ```bash
-npx -y @sparesparrow/mcp-prompts
+npx -y @sparesparrow/mcp-prompts@1.2.22
 ```
 
 ### 2. Run with Docker
