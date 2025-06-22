@@ -33,6 +33,10 @@ esbuild
       'pino', 
       'pino-pretty',
       'proper-lockfile',
+      'form-data',
+      'combined-stream',
+      'proxy-from-env',
+      'follow-redirects',
       'path',
       'fs',
       'crypto',
@@ -63,7 +67,15 @@ esbuild
       'tty',
       'v8',
       'vm',
-      'worker_threads'
+      'worker_threads',
+      'events',
+      'assert',
+      'constants',
+      'fs/promises',
+      'perf_hooks',
+      'inspector',
+      'trace_events',
+      'async_hooks'
     ],
   })
   .then(() => {
