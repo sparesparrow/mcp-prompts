@@ -1,8 +1,0 @@
-// rust.gradle
-apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
-
-cargo {
-    module = "../mcp_native_service"
-    libname = "mcp_native_service"
-    targets = ["arm64"]
-} 

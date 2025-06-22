@@ -5,74 +5,18 @@
 
 import type { z } from 'zod';
 
-import type { McpConfigSchema } from './config.js';
-
-export type McpConfig = z.infer<typeof McpConfigSchema>;
+import { promptSchemas, templateVariableSchema } from './schemas.js';
 
 /**
  * Variable definition for templates
  */
-export interface TemplateVariable {
-  /** The variable name in the template (without { }) */
-  name: string;
-
-  /** Description of the variable */
-  description?: string;
-
-  /** Default value for the variable */
-  default?: string;
-
-  /** Whether the variable is required */
-  required?: boolean;
-
-  /** Type of the variable */
-  type?: 'string' | 'number' | 'boolean' | 'array' | 'object';
-
-  /** Possible values for the variable (for enum-like variables) */
-  options?: string[];
-}
+export type TemplateVariable = z.infer<typeof templateVariableSchema>;
 
 /**
  * Prompt interface
  * Represents a prompt in the system, either a template or a concrete prompt
  */
-export interface Prompt {
-  /** Unique identifier for the prompt */
-  id: string;
-
-  /** Human-readable name of the prompt */
-  name: string;
-
-  /** Optional description of the prompt */
-  description?: string;
-
-  /** The actual prompt content */
-  content: string;
-
-  /** Whether this is a template prompt */
-  isTemplate?: boolean;
-
-  /** For templates, the list of variables */
-  variables?: string[] | TemplateVariable[];
-
-  /** Tags for categorization and filtering */
-  tags?: string[];
-
-  /** Primary category for organization */
-  category?: string;
-
-  /** Date when the prompt was created (ISO string) */
-  createdAt: string;
-
-  /** Date when the prompt was last updated (ISO string) */
-  updatedAt: string;
-
-  /** Version number, incremented on updates */
-  version?: number;
-
-  /** Optional metadata for additional information */
-  metadata?: Record<string, any>;
-}
+export type Prompt = z.infer<typeof promptSchemas.full>;
 
 /**
  * Format options for MutablePrompt conversion
@@ -162,6 +106,7 @@ export interface PromptConversion {
 export interface MutablePrompt extends Prompt, PromptConversion {
   clone(): MutablePrompt;
   createVersion(changes: Partial<Prompt>): MutablePrompt;
+  fromPgai(pgaiData: Record<string, any>, options?: PgaiFormatOptions): MutablePrompt;
 }
 
 export interface PromptFactory {
@@ -178,31 +123,7 @@ export interface PromptFactory {
 /**
  * Options for listing prompts
  */
-export interface ListPromptsOptions {
-  /** Filter by template status */
-  isTemplate?: boolean;
-
-  /** Filter by category */
-  category?: string;
-
-  /** Filter by tags (prompts must include all specified tags) */
-  tags?: string[];
-
-  /** Search term for name, description, and content */
-  search?: string;
-
-  /** Field to sort by */
-  sort?: string;
-
-  /** Sort order */
-  order?: 'asc' | 'desc';
-
-  /** Pagination offset */
-  offset?: number;
-
-  /** Maximum number of results to return */
-  limit?: number;
-}
+export type ListPromptsOptions = z.infer<typeof promptSchemas.list>;
 
 /**
  * Base storage adapter interface

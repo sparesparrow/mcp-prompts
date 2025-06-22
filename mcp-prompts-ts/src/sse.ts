@@ -18,12 +18,6 @@ import { EventEmitter } from 'events';
 import { Express, Request, Response } from 'express';
 import { pino } from 'pino';
 
-import { ServerConfig } from './interfaces.js';
-
-const gzipAsync = promisify(gzip);
-const deflateAsync = promisify(deflate);
-const brotliCompressAsync = promisify(brotliCompress);
-
 // Message compression options
 interface CompressionOptions {
   enabled: boolean;

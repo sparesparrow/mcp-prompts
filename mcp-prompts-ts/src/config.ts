@@ -1,8 +1,6 @@
 import * as path from 'path';
 import { z } from 'zod';
 
-import { ServerConfig } from './interfaces.js';
-
 /**
  * Zod schema for all supported environment variables.
  * Uses .coerce for numbers/booleans, provides defaults, and enforces required fields.
@@ -123,7 +121,7 @@ export const McpConfigSchema = EnvSchema.extend({
     port: z.number().optional(),
     promptsDir: z.string(),
     ssl: z.boolean().optional(),
-    type: z.enum(['file', 'postgres', 'memory', 'mdc', 'elasticsearch']),
+    type: z.enum(['file', 'memory', 'postgres']),
     user: z.string().optional(),
   }),
 });

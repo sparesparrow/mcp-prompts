@@ -1,6 +1,7 @@
 import { v4 as uuidv4 } from 'uuid';
+import type { Prompt, PromptSequence, StorageAdapter } from '@sparesparrow/mcp-prompts-contracts';
 
-import type { Prompt, PromptSequence, StorageAdapter } from './interfaces.js';
+import { PromptService } from './prompt-service.js';
 
 export interface GetSequenceWithPromptsResult {
   sequence: PromptSequence;

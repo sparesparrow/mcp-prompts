@@ -1,4 +1,10 @@
 import Handlebars from 'handlebars';
+import type {
+  StorageAdapter,
+  ApplyTemplateResult,
+  Prompt,
+} from '@sparesparrow/mcp-prompts-contracts';
+import { promptSchemas } from '@sparesparrow/mcp-prompts-contracts';
 
 import type {
   CreatePromptParams,

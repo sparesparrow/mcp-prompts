@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-const templateVariableSchema = z.object({
+export const templateVariableSchema = z.object({
   name: z.string(),
   description: z.string().optional(),
   default: z.string().optional(),
@@ -87,6 +87,11 @@ export const promptSchemas = {
     category: z.string().optional(),
     isTemplate: z.boolean().optional(),
     tags: z.array(z.string()).optional(),
+    search: z.string().optional(),
+    sort: z.string().optional(),
+    order: z.enum(['asc', 'desc']).optional(),
+    offset: z.number().int().min(0).optional(),
+    limit: z.number().int().min(1).optional(),
   }),
 
   /**

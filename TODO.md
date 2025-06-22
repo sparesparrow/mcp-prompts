@@ -50,16 +50,16 @@ This document serves as the master plan for the strategic migration of the MCP P
 - [x] **Simulate Repository Structure:** Create local directories to mirror the target multi-repo architecture before performing the full migration.
   - [x] Create directories: `mcp-prompts-ts`, `mcp-prompts-rs`, `mcp-prompts-aidl`, `mcp-prompts-collection`, `mcp-prompts-py`, `mcp-prompts-contracts`.
   - [x] Add placeholder `README.md` files to each directory to define its purpose.
-- [ ] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
-- [ ] **Prepare extraction scripts:**
-  - [ ] Create `scripts/extract-collection.sh` for prompt data.
-  - [ ] Create `scripts/extract-contracts.sh` for type definitions.
-  - [ ] Create `scripts/extract-implementations.sh` for each language.
+- [x] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
+- [x] **Prepare extraction scripts:**
+  - [x] Create `scripts/extract-collection.sh` for prompt data.
+  - [x] Create `scripts/extract-contracts.sh` for type definitions.
+  - [x] Create `scripts/extract-implementations.sh` for each language.
   - [ ] Add verification scripts to ensure history is preserved using `git-filter-repo`.
 - [ ] **Create final monorepo tag and documentation:**
   - [ ] Add tag `monorepo-final-v1.8.0` with comprehensive release notes.
-  - [ ] Update `README.md` with a migration notice and links to the new meta-repository.
-  - [ ] Create `MIGRATION.md` explaining the transition in detail.
+  - [x] Update `README.md` with a migration notice and links to the new meta-repository.
+  - [x] Create `MIGRATION.md` explaining the transition in detail.
 
 ---
 
@@ -69,10 +69,10 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-contracts`
 
-- [ ] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
-  - [ ] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
-  - [ ] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
-- [ ] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
+- [x] **Initialize repository:** Move API and data structure definitions into `mcp-prompts-contracts/`.
+  - [x] Move `src/interfaces.ts` to `mcp-prompts-contracts/src/interfaces.ts`.
+  - [x] Move `src/schemas.ts` to `mcp-prompts-contracts/src/schemas.ts`.
+- [x] **Establish Zod as Single Source of Truth:** Convert all type definitions to Zod schemas.
 - [ ] **Set up OpenAPI Generation:** Configure automatic generation of an OpenAPI specification from the Zod schemas.
 - [ ] **CI/CD Pipeline:**
   - [ ] Implement lint, test, and build pipeline.
@@ -82,9 +82,9 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-collection`
 
-- [ ] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
-  - [ ] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
-  - [ ] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
+- [x] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
+  - [x] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
+  - [x] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Add a pipeline to validate all prompts against the JSON schema from `mcp-prompts-contracts`.
   - [ ] Set up multi-format package publishing (NPM `@sparesparrow/mcp-prompts-collection`, Crates.io `mcp-prompts-collection`).
@@ -99,10 +99,10 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-ts`
 
-- [ ] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
-  - [ ] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
-  - [ ] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
-- [ ] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
+- [x] **Initialize repository:** Move the core TypeScript application source code and configuration into `mcp-prompts-ts/`.
+  - [x] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
+  - [x] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
+- [x] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
 - [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-collection`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Implement a comprehensive test suite (unit, integration).
@@ -112,8 +112,8 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 #### Repository: `mcp-prompts-rs`
 
-- [ ] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
-  - [ ] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
+- [x] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
+  - [x] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
 - [ ] **Update Dependencies:** Add `mcp-prompts-collection` as a Cargo dependency.
 - [ ] **CI/CD Pipeline:**
   - [ ] Configure a Cargo build and test pipeline, including `clippy` and `rustfmt` checks.
