@@ -304,13 +304,13 @@ describe('Prompt List (GET /prompts)', () => {
 });
 
 describe('Bulk Prompt Operations', () => {
+  let dupPrompt: any;
   beforeEach(async () => {
     await adapter.clearAll();
-    const dupPrompt = {
+    dupPrompt = await promptService.createPrompt({
       name: 'Bulk Dup',
       content: 'I will be duplicated',
-    };
-    await promptService.createPrompt(dupPrompt);
+    });
   });
 
   it('should bulk create prompts successfully, skipping duplicates', async () => {
@@ -338,18 +338,18 @@ describe('Bulk Prompt Operations', () => {
 
   it('should bulk delete prompts and return per-id results', async () => {
     const res = await request(baseUrl)
-      .post('/prompts/bulk-delete')
+      .delete('/prompts/bulk')
       .set('x-api-key', 'test-key')
-      .send({ ids: ['bulk-dup', 'non-existent'] });
+      .send({ ids: [dupPrompt.id, 'non-existent'] });
     expect(res.status).toBe(200);
     expect(res.body.length).toBe(2);
-    expect(res.body.find((r: any) => r.id === 'bulk-dup').success).toBe(true);
+    expect(res.body.find((r: any) => r.id === dupPrompt.id).success).toBe(true);
     expect(res.body.find((r: any) => r.id === 'non-existent').success).toBe(false);
   });
 
   it('should return all errors for bulk delete with all non-existent IDs', async () => {
     const res = await request(baseUrl)
-      .post('/prompts/bulk-delete')
+      .delete('/prompts/bulk')
       .set('x-api-key', 'test-key')
       .send({ ids: ['a', 'b', 'c'] });
     expect(res.status).toBe(200);
@@ -365,50 +365,55 @@ describe('Workflow Engine Integration', () => {
 
   beforeEach(async () => {
     await adapter.clearAll();
+    // This prompt is used by the sample workflow
     await promptService.createPrompt({
-      name: 'Test Prompt',
-      content: 'The capital of {{country}} is',
+      name: 'test-prompt',
+      content: 'The capital of {{country}} is Paris.',
       isTemplate: true,
       variables: ['country'],
     });
   });
 
   it('should save and run a sample workflow', async () => {
+    const workflowToSave = { ...sampleWorkflow, id: `workflow-${randomUUID()}` };
+    workflowToSave.steps[0].promptId = 'test-prompt';
+
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
-      .send(sampleWorkflow);
+      .send(workflowToSave);
     expect([200, 201]).toContain(saveRes.status);
 
     const runRes = await request(baseUrl)
-      .post(`/api/v1/workflows/${sampleWorkflow.id}/run`)
+      .post(`/api/v1/workflows/${workflowToSave.id}/run`)
       .set('x-api-key', 'test-key')
       .send({
-        state: {
-          parameters: {
-            country: 'France',
-          },
+        context: {
+          country: 'France',
         },
       });
     expect(runRes.status).toBe(200);
-    expect(runRes.body).toHaveProperty('state');
-    expect(runRes.body.state.outputs).toHaveProperty('capital');
-    expect(runRes.body.state.outputs.capital).toMatch(/Paris/);
+    expect(runRes.body).toHaveProperty('outputs');
+    expect(runRes.body.outputs).toHaveProperty('capital');
+    expect(runRes.body.outputs.capital).toMatch(/Paris/);
   });
 
   it('should enforce workflow rate limiting', async () => {
+    const workflowToSave = { ...sampleWorkflow, id: `workflow-${randomUUID()}` };
+    workflowToSave.steps[0].promptId = 'test-prompt';
+
     let saveRes = await request(baseUrl)
       .post('/api/v1/workflows')
       .set('x-api-key', 'test-key')
-      .send(sampleWorkflow);
+      .send(workflowToSave);
     expect([200, 201]).toContain(saveRes.status);
 
     const workflowServiceWithRateLimit = new WorkflowService(adapter, promptService);
 
-    const runPromise = workflowServiceWithRateLimit.runWorkflow(sampleWorkflow.id, {
+    const runPromise = workflowServiceWithRateLimit.runWorkflow(workflowToSave.id, {
       userId: 'ratelimit-test',
     });
-    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(sampleWorkflow.id, {
+    const runPromise2 = workflowServiceWithRateLimit.runWorkflow(workflowToSave.id, {
       userId: 'ratelimit-test',
     });
     await expect(Promise.all([runPromise, runPromise2])).rejects.toThrow(/Rate limit exceeded/);
