@@ -78,7 +78,8 @@
     "swagger-ui-express": "^5.0.1",
     "uuid": "^11.1.0",
     "ws": "^8.18.2",
-    "zod": "^3.25.67"
+    "zod": "^3.25.67",
+    "@sparesparrow/mcp-prompts-catalog": "workspace:*"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
@@ -119,7 +120,8 @@
     "ts-jest": "^29.1.2",
     "ts-node": "^10.9.2",
     "typedoc": "^0.28.5",
-    "typescript": "^5.4.5"
+    "typescript": "^5.4.5",
+    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
   },
   "workspaces": [
     "packages/mcp-prompts-catalog",

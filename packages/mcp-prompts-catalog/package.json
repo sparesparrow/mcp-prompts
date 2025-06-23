@@ -12,5 +12,12 @@
       "types": "./index.d.ts"
     },
     "./package.json": "./package.json"
-  }
+  },
+  "devDependencies": {},
+  "scripts": {
+    "build": "echo 'No build step for catalog'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": ""
 }

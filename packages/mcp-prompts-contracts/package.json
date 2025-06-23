@@ -4,5 +4,12 @@
   "description": "Shared TypeScript types and OpenAPI specifications for MCP Prompts.",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "license": "MIT"
+  "license": "MIT",
+  "devDependencies": {},
+  "scripts": {
+    "build": "echo 'No build step for contracts'",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": ""
 }
