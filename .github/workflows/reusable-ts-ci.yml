@@ -1,0 +1,45 @@
+# This reusable workflow defines the standard CI process for all
+# TypeScript packages.
+# It can be called by other repositories to ensure consistency.
+name: Reusable TypeScript CI
+
+on:
+  workflow_call:
+    inputs:
+      node-version:
+        required: false
+        type: string
+        default: '20.x'
+    secrets:
+      NPM_TOKEN:
+        required: true
+
+jobs:
+  ci-pipeline:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PNPM
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ inputs.node-version }}
+          cache: 'pnpm'
+
+      - name: Install Dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint Code
+        run: pnpm run lint
+
+      - name: Run Unit Tests
+        run: pnpm run test
+
+      - name: Build Project
+        run: pnpm run build 
