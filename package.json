@@ -1,0 +1,43 @@
+{
+  "name": "mcp-prompts-monorepo",
+  "version": "1.0.0",
+  "description": "MCP Prompts Monorepo - Federated ecosystem for Model Context Protocol prompt management",
+  "private": true,
+  "workspaces": [
+    "packages/*"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces",
+    "test": "npm run test --workspaces",
+    "lint": "npm run lint --workspaces",
+    "clean": "npm run clean --workspaces",
+    "install:all": "npm install",
+    "workspace:list": "npm list --workspaces"
+  },
+  "keywords": [
+    "mcp",
+    "prompts",
+    "monorepo",
+    "model-context-protocol"
+  ],
+  "author": "sparesparrow",
+  "license": "MIT",
+  "dependencies": {
+    "@sparesparrow/mcp-prompts-catalog": "workspace:*"
+  },
+  "devDependencies": {
+    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=8.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparesparrow/mcp-prompts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sparesparrow/mcp-prompts/issues"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme"
+} 
