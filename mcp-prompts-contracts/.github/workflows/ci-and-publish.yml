@@ -1,0 +1,25 @@
+name: CI and Publish Contracts
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  # Job to run the Continuous Integration pipeline
+  continuous-integration:
+    uses: sparesparrow/mcp-prompts/.github/workflows/reusable-ts-ci.yml@main
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  # Job to publish the package if CI is successful and the trigger is a push to main
+  publish-package:
+    needs: continuous-integration
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    uses: sparesparrow/mcp-prompts/.github/workflows/reusable-publish.yml@main
+    secrets:
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

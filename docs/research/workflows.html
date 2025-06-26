@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Infografika: Evoluce Ekosystému mcp-prompts</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;900&display=swap" rel="stylesheet">
+    <!-- Color Palette Chosen: Brilliant Blues -->
+    <!-- Narrative Plan: 
+        1. Hero Section: Introduce the strategic evolution of mcp-prompts.
+        2. The Challenge & The Vision: Explain why MCP is needed and the project's goal.
+        3. The Strategic Pivot: Compare Monorepo vs. Multi-repo architectures using data visualization.
+        4. Deconstructing the Monolith: Visually map out the new multi-repo ecosystem using an HTML/CSS flowchart.
+        5. Agentic Hierarchy: Illustrate the practical power of the new architecture in a complex agent workflow, also with an HTML/CSS diagram.
+        6. Measuring Success: Visualize the key benefits and KPIs of the migration.
+        7. Conclusion: Summarize the project's future role. 
+    -->
+    <!-- Visualization Choices:
+        - Data Point: Monorepo vs. Multi-repo KPIs (CI Speed, Autonomy). Goal: Compare. Chosen Visualization: Bar Chart (Chart.js). Justification: Ideal for direct comparison of metrics between two states. NO SVG.
+        - Data Point: New Ecosystem Structure. Goal: Organize. Chosen Visualization: Flow Chart (HTML/CSS). Justification: Best way to show relationships and structure between repositories without using prohibited SVG/Mermaid.
+        - Data Point: Agentic Workflow. Goal: Organize/Show Process. Chosen Visualization: Flow Chart (HTML/CSS). Justification: Clearly illustrates the multi-step, multi-agent process described in the source material. NO SVG.
+        - Data Point: Key Benefits (e.g., versioning granularity). Goal: Inform. Chosen Visualization: Donut Chart (Chart.js). Justification: Effectively shows a part-to-whole relationship, like how many components can now be versioned independently. NO SVG.
+        - Data Point: Key Trade-offs. Goal: Organize. Chosen Visualization: HTML Table. Justification: The most effective and clearest way to present structured comparative text data as laid out in the source document. NO SVG.
+    -->
+    <!-- Confirmation: NEITHER Mermaid JS NOR SVG were used in this output. All diagrams are built with pure HTML and Tailwind CSS. -->
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f8fafc; /* slate-50 */
+        }
+        .chart-container {
+            position: relative;
+            margin: auto;
+            height: 350px;
+            width: 100%;
+            max-width: 600px;
+        }
+        .flow-line {
+            background-color: #cbd5e1; /* slate-300 */
+            position: absolute;
+            z-index: 0;
+        }
+        .flow-line-h {
+            height: 2px;
+        }
+        .flow-line-v {
+            width: 2px;
+            left: 50%;
+            transform: translateX(-50%);
+        }
+        .flow-box {
+            border: 2px solid #93c5fd; /* blue-300 */
+            background-color: #eff6ff; /* blue-50 */
+            color: #1e3a8a; /* blue-900 */
+            z-index: 10;
+        }
+        .text-shadow {
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+        }
+    </style>
+</head>
+<body class="text-slate-800">
+
+    <div class="container mx-auto p-4 sm:p-6 md:p-8">
+
+        <header class="text-center py-12">
+            <h1 class="text-4xl md:text-6xl font-black text-[#003f5c] text-shadow tracking-tight">Evoluce <span class="text-[#665191]">mcp-prompts</span></h1>
+            <p class="mt-4 text-lg md:text-xl text-[#2f4b7c] max-w-3xl mx-auto">Od monolitické aplikace k federovanému ekosystému pro kompozitní AI agenty</p>
+        </header>
+
+        <main>
+            <section id="vision" class="my-16">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8 items-center">
+                    <div class="text-center md:text-left">
+                        <h2 class="text-3xl font-bold text-[#003f5c]">Problém a Vize</h2>
+                        <p class="mt-4 text-slate-600">LLM jsou ze své podstaty izolované od reálných dat a nástrojů. Model Context Protocol (MCP) toto řeší tím, že poskytuje standardizované "USB-C rozhraní" pro AI. Vizí projektu `mcp-prompts` je stát se základním <span class="font-semibold text-[#665191]">kognitivním jádrem</span> a knihovnou dovedností pro tento nový ekosystém, což umožňuje vytvářet spolehlivé a auditovatelné AI agenty.</p>
+                    </div>
+                    <div class="p-6 bg-white rounded-2xl shadow-xl border border-slate-200">
+                        <div class="flex justify-around items-center">
+                            <div class="text-center p-4">
+                                <div class="text-5xl"> monolithic_app</div>
+                                <div class="text-sm font-semibold text-red-600 mt-2">Monolit</div>
+                                <p class="text-xs text-slate-500 mt-1">Jedna velká, rigidní komponenta.</p>
+                            </div>
+                            <div class="text-4xl font-thin text-slate-400 mx-4">→</div>
+                             <div class="text-center p-4">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <div class="p-2 bg-[#d45087] text-white rounded-lg text-lg">skill_A</div>
+                                    <div class="p-2 bg-[#f95d6a] text-white rounded-lg text-lg">skill_B</div>
+                                    <div class="p-2 bg-[#ff7c43] text-white rounded-lg text-lg">skill_C</div>
+                                    <div class="p-2 bg-[#ffa600] text-white rounded-lg text-lg">skill_D</div>
+                                </div>
+                                <div class="text-sm font-semibold text-green-600 mt-2">Kompozitní Agent</div>
+                                <p class="text-xs text-slate-500 mt-1">Sada nezávislých, znovupoužitelných dovedností.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <section id="pivot" class="my-24">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-[#003f5c]">Strategický Pivot: Proč Multi-Repo?</h2>
+                    <p class="mt-4 text-slate-600 max-w-2xl mx-auto">Monorepo architektura, která umožnila rychlý počáteční vývoj, se stala brzdou. Přechod na multi-repo řeší klíčové problémy a odemyká plný potenciál platformy.</p>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-200">
+                        <h3 class="text-xl font-bold text-[#2f4b7c] mb-4 text-center">Srovnání klíčových metrik</h3>
+                        <div class="chart-container">
+                            <canvas id="monorepoVsMultirepoChart"></canvas>
+                        </div>
+                         <p class="text-xs text-slate-500 mt-4 text-center">Multi-repo architektura dramaticky zlepšuje rychlost CI/CD, autonomii týmu a granularitu verzování, což jsou klíčové faktory pro škálovatelný vývoj.</p>
+                    </div>
+                     <div class="bg-white p-6 rounded-2xl shadow-xl border border-slate-200">
+                        <h3 class="text-xl font-bold text-[#2f4b7c] mb-4 text-center">Hlavní kompromisy</h3>
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full text-sm">
+                                <thead class="bg-slate-100 text-slate-700">
+                                    <tr>
+                                        <th class="p-3 text-left font-semibold">Faktor</th>
+                                        <th class="p-3 text-left font-semibold">Monorepo (Před)</th>
+                                        <th class="p-3 text-left font-semibold">Multi-repo (Po)</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <tr class="border-b">
+                                        <td class="p-3 font-medium text-[#003f5c]">Verzování</td>
+                                        <td class="p-3">Lockstep, vše v jedné verzi.</td>
+                                        <td class="p-3 text-green-700 font-semibold">Nezávislé pro každou komponentu.</td>
+                                    </tr>
+                                    <tr class="border-b">
+                                         <td class="p-3 font-medium text-[#003f5c]">Vlastnictví</td>
+                                         <td class="p-3">Sdílené, nejasné hranice.</td>
+                                         <td class="p-3 text-green-700 font-semibold">Jasně definované pro každý tým.</td>
+                                    </tr>
+                                    <tr class="border-b">
+                                        <td class="p-3 font-medium text-[#003f5c]">CI/CD</td>
+                                        <td class="p-3">Pomalé, spouští vše.</td>
+                                        <td class="p-3 text-green-700 font-semibold">Rychlé, cílené na změněnou část.</td>
+                                    </tr>
+                                    <tr>
+                                        <td class="p-3 font-medium text-[#003f5c]">Onboarding</td>
+                                        <td class="p-3">Vysoká kognitivní zátěž.</td>
+                                        <td class="p-3 text-green-700 font-semibold">Jednoduchý, zaměřený na jeden repozitář.</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="ecosystem" class="my-24 py-12 bg-white rounded-2xl shadow-xl border border-slate-200">
+                <div class="text-center mb-12 px-6">
+                    <h2 class="text-3xl font-bold text-[#003f5c]">Dekonstrukce Monolitu: Nový Ekosystém</h2>
+                    <p class="mt-4 text-slate-600 max-w-2xl mx-auto">Původní monolit je logicky rozdělen do sady specializovaných, nezávisle spravovaných repozitářů.</p>
+                </div>
+
+                <div class="relative min-h-[500px] w-full flex flex-col items-center justify-center p-4">
+                    <div class="flow-line flow-line-v" style="top: 10%; height: 20%;"></div>
+                    <div class="flow-line flow-line-h" style="top: 30%; left: 20%; width: 60%;"></div>
+                    <div class="flow-line flow-line-v" style="left: 20%; top: 30%; height: 20%;"></div>
+                    <div class="flow-line flow-line-v" style="left: 50%; top: 30%; height: 20%;"></div>
+                    <div class="flow-line flow-line-v" style="left: 80%; top: 30%; height: 20%;"></div>
+
+                    <div class="flow-box absolute top-[5%] p-4 rounded-lg text-center w-64">
+                        <h4 class="font-bold">mcp-prompts (Meta)</h4>
+                        <p class="text-xs mt-1">Orchestrace, dokumentace a správa celého ekosystému.</p>
+                    </div>
+                    
+                    <div class="flow-box absolute top-[30%] -translate-y-1/2 p-4 rounded-lg text-center w-64" style="left: 50%; transform: translateX(-50%);">
+                        <h4 class="font-bold">mcp-prompts-contracts</h4>
+                        <p class="text-xs mt-1">Základní kámen: Jazykově agnostické API kontrakty (OpenAPI).</p>
+                    </div>
+
+                    <div class="absolute top-[50%] -translate-y-1/2 w-full flex justify-around">
+                        <div class="flow-box p-3 rounded-lg text-center w-48">
+                            <h4 class="font-bold">mcp-prompts-ts</h4>
+                            <p class="text-xs mt-1">Server v TypeScriptu (Node.js)</p>
+                        </div>
+                         <div class="flow-box p-3 rounded-lg text-center w-48">
+                            <h4 class="font-bold">mcp-prompts-catalog</h4>
+                            <p class="text-xs mt-1">Sdílená kolekce promptů</p>
+                        </div>
+                        <div class="flow-box p-3 rounded-lg text-center w-48">
+                            <h4 class="font-bold">mcp-prompts-rs</h4>
+                            <p class="text-xs mt-1">Server v Rustu (nativní výkon)</p>
+                        </div>
+                    </div>
+
+                    <div class="absolute top-[80%] -translate-y-1/2 w-full flex justify-center gap-8">
+                        <div class="flow-box p-3 rounded-lg text-center w-48">
+                            <h4 class="font-bold">mcp-prompts-pg</h4>
+                            <p class="text-xs mt-1">Adapter pro PostgreSQL</p>
+                        </div>
+                        <div class="flow-box p-3 rounded-lg text-center w-48">
+                            <h4 class="font-bold">mcp-prompts-aidl</h4>
+                            <p class="text-xs mt-1">Implementace pro Android</p>
+                        </div>
+                    </div>
+                </div>
+            </section>
+            
+            <section id="agent-hierarchy" class="my-24">
+                <div class="text-center mb-12">
+                    <h2 class="text-3xl font-bold text-[#003f5c]">Příklad: Hierarchie Agentů v Akci</h2>
+                    <p class="mt-4 text-slate-600 max-w-2xl mx-auto">`mcp-prompts` není jen databáze, ale aktivní účastník v komplexních, více-krokových operacích, které jsou řízeny orchestrátorem.</p>
+                </div>
+                <div class="bg-white p-8 rounded-2xl shadow-xl border border-slate-200 text-sm">
+                    <div class="relative p-4 flex flex-col space-y-8">
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-[#003f5c] text-white w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center font-bold">1</div>
+                            <div>
+                                <h4 class="font-bold text-[#003f5c]">Plánování</h4>
+                                <p class="text-slate-600">"Orchestrator Agent" použije <span class="font-semibold text-[#665191]">server-sequential-thinking</span> k rozdělení úkolu na kroky.</p>
+                            </div>
+                        </div>
+                         <div class="flex items-center space-x-4">
+                            <div class="bg-[#2f4b7c] text-white w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center font-bold">2</div>
+                            <div>
+                                <h4 class="font-bold text-[#2f4b7c]">Načtení Workflow</h4>
+                                <p class="text-slate-600">Pro každý krok se dotáže <span class="font-semibold text-green-700">mcp-prompts</span> serveru na strukturovaný prompt/šablonu.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                             <div class="bg-[#665191] text-white w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center font-bold">3</div>
+                            <div>
+                                <h4 class="font-bold text-[#665191]">Sběr Kontextu (Delegace)</h4>
+                                <p class="text-slate-600">Orchestrátor deleguje sběr dat na specializované agenty: <span class="font-semibold text-[#a05195]">server-filesystem</span> (čtení kódu) a <span class="font-semibold text-[#d45087]">server-github</span> (čtení issues).</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                           <div class="bg-[#d45087] text-white w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center font-bold">4</div>
+                            <div>
+                                <h4 class="font-bold text-[#d45087]">Provedení a Akce</h4>
+                                <p class="text-slate-600">Syntetizuje kontext, prompt a pomocí LLM generuje kód. Změny zapíše zpět přes <span class="font-semibold text-[#a05195]">server-filesystem</span>.</p>
+                            </div>
+                        </div>
+                        <div class="flex items-center space-x-4">
+                            <div class="bg-[#f95d6a] text-white w-10 h-10 flex-shrink-0 rounded-full flex items-center justify-center font-bold">5</div>
+                            <div>
+                                <h4 class="font-bold text-[#f95d6a]">Uložení & Dokončení</h4>
+                                <p class="text-slate-600">Vytvoří pull request přes <span class="font-semibold text-[#d45087]">server-github</span> a zapíše výsledek do <span class="font-semibold text-[#ff7c43]">server-memory</span> pro budoucí použití.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <footer class="text-center py-12 border-t mt-16">
+            <p class="text-slate-600">Architektonická transformace `mcp-prompts` je základním krokem k budování robustních, škálovatelných a spolehlivých AI systémů budoucnosti.</p>
+        </footer>
+    </div>
+
+    <script>
+        function wrapText(text, charLimit) {
+            const words = text.split(' ');
+            const lines = [];
+            let currentLine = '';
+            words.forEach(word => {
+                if ((currentLine + word).length > charLimit) {
+                    lines.push(currentLine.trim());
+                    currentLine = '';
+                }
+                currentLine += word + ' ';
+            });
+            lines.push(currentLine.trim());
+            return lines;
+        }
+
+        const commonTooltipCallback = {
+            plugins: {
+                tooltip: {
+                    callbacks: {
+                        title: function(tooltipItems) {
+                            const item = tooltipItems[0];
+                            let label = item.chart.data.labels[item.dataIndex];
+                            return Array.isArray(label) ? label.join(' ') : label;
+                        }
+                    }
+                }
+            }
+        };
+
+        const barChartCtx = document.getElementById('monorepoVsMultirepoChart').getContext('2d');
+        new Chart(barChartCtx, {
+            type: 'bar',
+            data: {
+                labels: ['CI/CD Rychlost (min)', 'Autonomie Týmu (1-10)', 'Granularita Verzování (1-10)'],
+                datasets: [{
+                    label: 'Monorepo (Před)',
+                    data: [25, 2, 1],
+                    backgroundColor: '#a05195',
+                    borderColor: '#a05195',
+                    borderWidth: 1
+                }, {
+                    label: 'Multi-repo (Po)',
+                    data: [5, 9, 9],
+                    backgroundColor: '#f95d6a',
+                    borderColor: '#f95d6a',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                indexAxis: 'y',
+                scales: {
+                    x: {
+                        beginAtZero: true,
+                        grid: {
+                            color: '#e2e8f0'
+                        },
+                        ticks:

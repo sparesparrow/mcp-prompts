@@ -6,6 +6,16 @@
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Roadmap](https://img.shields.io/badge/Project-Roadmap-5BC0BE?logo=github)](../../projects/1)
 
+> ⚠️ **Project Restructuring in Progress** ⚠️
+>
+> This project is currently undergoing a major migration from a monorepo to a multi-repository architecture. The goal is to create a more modular and scalable ecosystem.
+>
+> - **What this means:** The current `main` branch is stable, but all new development and the future of the project will be in the new repositories.
+> - **Track the progress:** You can follow the detailed plan in the [`MIGRATION.md`](./MIGRATION.md) file.
+> - **Find the new code:** Links to the new repositories will be added here once the migration is complete.
+>
+> We appreciate your patience and support during this transition!
+
 **MCP Prompts Server** is a robust solution to the problem of prompt fragmentation across development teams. It serves as the single source of truth for all your prompts, templates, and related metadata, enabling effective versioning, testing, and secure sharing within your organization and with external systems.
 
 ---
