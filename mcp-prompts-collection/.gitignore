@@ -1,0 +1,43 @@
+# Dependencies
+node_modules/
+
+# Build output
+build/
+dist/
+
+# Environment variables
+.env
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Editor directories and files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+
+# Coverage reports
+coverage/
+.nyc_output/
+test-results/
+
+# Legacy files
+legacy/
+
+# Temporary files
+temp*.json
+claude_desktop_config*.json
+mcp-config*.json
+
+# NPM package files
+*.tgz
+
+# Temporary output directories
+output/
+
+# Docker temporary files
+.docker-* 
