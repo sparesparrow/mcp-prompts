@@ -25,6 +25,6 @@
     3000,
     5432
   ],
-  "postCreateCommand": "npm install",
+  "postCreateCommand": "npm install && npm run build",
   "remoteUser": "node"
 }
