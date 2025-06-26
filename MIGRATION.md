@@ -16,7 +16,7 @@ The new architecture consists of several specialized repositories orchestrated b
 
 - **`mcp-prompts-meta`**: The central hub for the project. It will contain high-level documentation, roadmap, contribution guides, and shared CI/CD workflows.
 - **`mcp-prompts-contracts`**: A language-agnostic repository for API and data structure definitions (using Zod schemas and OpenAPI). This will be published as an NPM package.
-- **`mcp-prompts-collection`**: A versioned repository for the prompt collection and catalog. This will be published as both an NPM package and a Cargo crate.
+- **`mcp-prompts-catalog`**: A versioned repository for the prompt collection and catalog. This will be published as both an NPM package and a Cargo crate.
 - **`mcp-prompts-ts`**: The primary TypeScript server implementation.
 - **`mcp-prompts-rs`**: The native Rust implementation (used by the Android app).
 - **`mcp-prompts-pg`**: A dedicated repository for the PostgreSQL storage adapter, including `pgvector` integration.
@@ -28,7 +28,7 @@ The new architecture consists of several specialized repositories orchestrated b
 The migration is divided into several phases:
 
 1.  **Phase 0: Preparation:** Stabilize the monorepo, complete critical features, and prepare extraction scripts.
-2.  **Phase 1: Foundational Repositories:** Create the `mcp-prompts-contracts` and `mcp-prompts-collection` repositories.
+2.  **Phase 1: Foundational Repositories:** Create the `mcp-prompts-contracts` and `mcp-prompts-catalog` repositories.
 3.  **Phase 2: Core Implementations:** Migrate the TypeScript (`mcp-prompts-ts`) and Rust (`mcp-prompts-rs`) implementations.
 4.  **Phase 3: Specialized Implementations:** Migrate the PostgreSQL (`mcp-prompts-pg`) and Android (`mcp-prompts-aidl`) components.
 5.  **Phase 4: Orchestration:** Set up the `mcp-prompts-meta` and `mcp-prompts-e2e` repositories to manage the ecosystem.

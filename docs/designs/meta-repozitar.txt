@@ -48,11 +48,11 @@ posiluje roli meta-repozitáře jako centrálního zdroje informací. Stávajíc
 rozsáhlou dokumentaci a CI/CD workflow , což poskytuje solidní základ pro obsah tohoto
 nového repozitáře.
 
-1.2. Jediný zdroj pravdy (mcp-prompts-collection)
+1.2. Jediný zdroj pravdy (mcp-prompts-catalog)
 Plán správně identifikuje adresář prompts/ jako klíčové, sdílené aktivum. Návrh na jeho extrakci
-do samostatného, nezávisle verzovaného repozitáře mcp-prompts-collection a jeho následnou
-distribuci jako NPM balíčku (@sparesparrow/mcp-prompts-collection) a Cargo crate
-(mcp-prompts-collection) je zásadním krokem.
+do samostatného, nezávisle verzovaného repozitáře mcp-prompts-catalog a jeho následnou
+distribuci jako NPM balíčku (@sparesparrow/mcp-prompts-catalog) a Cargo crate
+(mcp-prompts-catalog) je zásadním krokem.
 Tato dekompozice odděluje data od implementací, což je fundamentální princip pro dosažení
 skutečné modularity. Zajišťuje, že všechny implementace (TypeScript, Rust, Python atd.)
 konzumují identickou, verziovanou a validovanou sadu promptů. Stávající struktura monorepa
@@ -66,7 +66,7 @@ komponenty.
 Migrace jednotlivých jazykově specifických implementací do vlastních repozitářů
 (mcp-prompts-ts, mcp-prompts-rs, mcp-prompts-pg, mcp-prompts-aidl) poskytne každému týmu
 nebo komponentě autonomii. Každý repozitář bude mít vlastní CI, verzování a release proces,
-přičemž bude konzumovat mcp-prompts-collection jako verziovanou závislost. To vede k čistší
+přičemž bude konzumovat mcp-prompts-catalog jako verziovanou závislost. To vede k čistší
 historii Gitu, menším a rychlejším klonům repozitářů a cílenějším a rychlejším CI pipeline, což
 jsou klasické výhody multi-repo přístupu.
 Stávající monorepo obsahuje jasně oddělitelné části, které jsou pro tuto migraci ideální:
@@ -194,7 +194,7 @@ verzování) a větvení (např. GitFlow) pro všechny nově vzniklé repozitá�
 1.​ Inicializace mcp-prompts (meta-repo): Založte na GitHubu prázdný repozitář
 mcp-prompts. Naplňte jej základními soubory README.md, CONTRIBUTING.md a
 architektonickou dokumentací z adresáře docs/ původního repozitáře.
-2.​ Extrakce mcp-prompts-collection: Vytvořte nový repozitář mcp-prompts-collection.
+2.​ Extrakce mcp-prompts-catalog: Vytvořte nový repozitář mcp-prompts-catalog.
 Pomocí git-filter-repo a zrcadlové zálohy extrahujte historii adresářů prompts/ a
 packages/mcp-prompts-catalog/. Nakonfigurujte CI pro publikaci jako NPM balíček a
 Cargo crate.
@@ -211,7 +211,7 @@ kompletní historie, issues a pull requesty.
 struktury všechny části, které nesouvisí s TypeScript implementací (např. rust/, android/).
 Odstraňte také adresáře extrahované v Fázi 1.
 3.​ Aktualizace závislostí: V package.json nahraďte lokální odkazy novými, verziovanými
-závislostmi na @sparesparrow/mcp-prompts-collection a
+závislostmi na @sparesparrow/mcp-prompts-catalog a
 @sparesparrow/mcp-prompts-contracts z NPM.
 4.​ Integrace s meta-repozitářem: Přidejte do .github/workflows GitHub Action, která po
 úspěšném release odešle událost repository_dispatch (nebo lépe, zavolá znovupoužitelné
@@ -222,7 +222,7 @@ Pro každou z následujících komponent vytvořte nový repozitář a pomocí g
 historii příslušného podadresáře ze zrcadlové zálohy.
 ●​ mcp-prompts-rs (Rust):
 ○​ Extrahujte adresář rust/.
-○​ Přidejte mcp-prompts-collection jako Cargo závislost.
+○​ Přidejte mcp-prompts-catalog jako Cargo závislost.
 ○​ Nakonfigurujte CI pro build crate, spuštění testů a publikaci Docker image na
 GHCR.
 ○​ Přidejte workflow pro orchestraci s meta-repozitářem.
@@ -241,7 +241,7 @@ Repozitář
 Klíčová akce
 Ověřovací krok
 1
-mcp-prompts-collection Extrahovat historii
+mcp-prompts-catalog Extrahovat historii
 Ověřit, že historie
 prompts/ pomocí
 souboru
@@ -268,7 +268,7 @@ NPM balíčku.
 mcp-prompts-rs
 Extrahovat historii rust/. Sestavit crate a spustit
 testy, které konzumují
-mcp-prompts-collection
+mcp-prompts-catalog
 crate.
 3.1
 mcp-prompts
@@ -360,11 +360,11 @@ V. Analýza rizik a mitigace
 Přechod na multi-repozitářovou architekturu s sebou nese specifická rizika, která je nutné
 identifikovat a řídit.
 ●​ 5.1. Riziko: Komplexní správa závislostí
-○​ Problém: Správa verzí sdíleného balíčku mcp-prompts-collection napříč mnoha
+○​ Problém: Správa verzí sdíleného balíčku mcp-prompts-catalog napříč mnoha
 repozitáři může vést k tzv. "dependency hell".
 ○​ Mitigace: Klíčem je tabulka kompatibility generovaná meta-repozitářem. Ta musí
 jasně definovat, které verze mcp-prompts-ts, -rs atd. jsou kompatibilní s jakou verzí
-mcp-prompts-collection. V každém implementačním repozitáři by měl být
+mcp-prompts-catalog. V každém implementačním repozitáři by měl být
 nakonfigurován nástroj jako Dependabot pro automatické vytváření PR na
 aktualizaci této závislosti.
 ●​ 5.2. Riziko: Složitost nástrojů a build procesů
@@ -403,7 +403,7 @@ poskytuje nejlepší rovnováhu mezi centralizovanou kontrolou, viditelností a 
 jednotlivých týmů.
 Tato nová architektura vytváří "plug-and-play" ekosystém. Přidání nové jazykové implementace,
 jako je navrhovaný mcp-prompts-py , se stává přímočarým procesem: založení nového
-repozitáře, přidání závislostí na mcp-prompts-collection a mcp-prompts-contracts a
+repozitáře, přidání závislostí na mcp-prompts-catalog a mcp-prompts-contracts a
 implementace definovaného API kontraktu. Právě tato modularita je klíčem k dlouhodobému
 úspěchu a škálovatelnosti projektu.
 
