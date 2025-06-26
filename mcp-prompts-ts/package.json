@@ -60,7 +60,7 @@
     "@modelcontextprotocol/sdk": "^1.13.0",
     "@modelcontextprotocol/server-postgres": "0.6.2",
     "@sparesparrow/mcp-prompts-contracts": "file:../mcp-prompts-contracts",
-    "@sparesparrow/mcp-prompts-collection": "file:../mcp-prompts-collection/catalog",
+    "@sparesparrow/mcp-prompts-catalog": "file:../mcp-prompts-catalog/catalog",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "axios": "^1.10.0",

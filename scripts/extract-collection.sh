@@ -8,7 +8,7 @@ echo "Moving prompt collection and catalog..."
 
 # Define paths
 MONOREPO_ROOT=$(pwd)
-COLLECTION_DIR="mcp-prompts-collection"
+COLLECTION_DIR="mcp-prompts-catalog"
 PROMPTS_SRC="prompts"
 CATALOG_SRC="packages/mcp-prompts-catalog"
 

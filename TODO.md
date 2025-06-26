@@ -48,7 +48,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 #### 3. Migration Preparation
 
 - [x] **Simulate Repository Structure:** Create local directories to mirror the target multi-repo architecture before performing the full migration.
-  - [x] Create directories: `mcp-prompts-ts`, `mcp-prompts-rs`, `mcp-prompts-aidl`, `mcp-prompts-collection`, `mcp-prompts-py`, `mcp-prompts-contracts`.
+  - [x] Create directories: `mcp-prompts-ts`, `mcp-prompts-rs`, `mcp-prompts-aidl`, `mcp-prompts-catalog`, `mcp-prompts-py`, `mcp-prompts-contracts`.
   - [x] Add placeholder `README.md` files to each directory to define its purpose.
 - [x] **Security audit and cleanup:** Run `npm audit fix --force` and `cargo audit` and remove any secrets from git history.
 - [x] **Prepare extraction scripts:**
@@ -80,14 +80,14 @@ This document serves as the master plan for the strategic migration of the MCP P
   - [ ] Configure automatic NPM package publishing (`@sparesparrow/mcp-prompts-contracts`) on tag.
   - [ ] Trigger a `repository_dispatch` event to the meta-repo on release.
 
-#### Repository: `mcp-prompts-collection`
+#### Repository: `mcp-prompts-catalog`
 
-- [x] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-collection/`.
-  - [x] Move the entire `prompts/` directory to `mcp-prompts-collection/prompts/`.
-  - [x] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-collection/catalog/`.
+- [x] **Initialize repository:** Move all prompt and catalog data into `mcp-prompts-catalog/`.
+  - [x] Move the entire `prompts/` directory to `mcp-prompts-catalog/prompts/`.
+  - [x] Move the entire `packages/mcp-prompts-catalog/` directory to `mcp-prompts-catalog/catalog/`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Add a pipeline to validate all prompts against the JSON schema from `mcp-prompts-contracts`.
-  - [ ] Set up multi-format package publishing (NPM `@sparesparrow/mcp-prompts-collection`, Crates.io `mcp-prompts-collection`).
+  - [ ] Set up multi-format package publishing (NPM `@sparesparrow/mcp-prompts-catalog`, Crates.io `mcp-prompts-catalog`).
   - [ ] Implement automated prompt quality checks (e.g., checking for placeholders).
   - [ ] Configure versioning based on data changes.
 
@@ -103,7 +103,7 @@ This document serves as the master plan for the strategic migration of the MCP P
   - [x] Move `src/`, `tests/`, `scripts/`, `data/`, and `docker/` directories.
   - [x] Move root configuration files (`package.json`, `package-lock.json`, `tsconfig.json`, `jest.config.js`, `eslint.config.js`, etc.).
 - [x] **Refactor and Cleanup:** Remove all non-TypeScript code (e.g., `android_app/`) and directories extracted in Phase 1.
-- [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-collection`.
+- [ ] **Update Dependencies:** Replace local workspace dependencies with versioned NPM packages for `@sparesparrow/mcp-prompts-contracts` and `@sparesparrow/mcp-prompts-catalog`.
 - [ ] **CI/CD Pipeline:**
   - [ ] Implement a comprehensive test suite (unit, integration).
   - [ ] Set up Docker image building and publishing to Docker Hub/GHCR.
@@ -114,7 +114,7 @@ This document serves as the master plan for the strategic migration of the MCP P
 
 - [x] **Initialize repository:** Move the Rust native service implementation into `mcp-prompts-rs/`.
   - [x] Move the contents of `android_app/android/mcp_native_service/` to `mcp-prompts-rs/`.
-- [ ] **Update Dependencies:** Add `mcp-prompts-collection` as a Cargo dependency.
+- [ ] **Update Dependencies:** Add `mcp-prompts-catalog` as a Cargo dependency.
 - [ ] **CI/CD Pipeline:**
   - [ ] Configure a Cargo build and test pipeline, including `clippy` and `rustfmt` checks.
   - [ ] Set up crates.io publishing (`mcp-prompts-rs`).
