@@ -1,3 +1,15 @@
+# MCP Prompts
+mcp-prompts-rs/
+mcp-prompts-contracts/
+mcp-prompts-collection/
+mcp-prompts-ts/
+mcp-prompts-catalog/
+mcp-prompts-pg/
+mcp-prompts-aidl/
+mcp-prompts-esp32/
+esp32-hid-rs/
+
+
 # Dependencies
 node_modules/
 

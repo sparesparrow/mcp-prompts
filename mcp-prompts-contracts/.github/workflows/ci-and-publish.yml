@@ -9,8 +9,25 @@ on:
       - main
 
 jobs:
+  # Job to check OpenAPI spec is up-to-date
+  check-openapi:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install dependencies
+        run: npm install
+      - name: Generate OpenAPI
+        run: npm run gen:openapi
+      - name: Check OpenAPI diff
+        run: |
+          if ! git diff --exit-code openapi.json; then
+            echo "\033[0;31mERROR: openapi.json není aktuální. Spusťte 'npm run gen:openapi' a commitněte změny.\033[0m"
+            exit 1
+          fi
+
   # Job to run the Continuous Integration pipeline
   continuous-integration:
+    needs: check-openapi
     uses: sparesparrow/mcp-prompts/.github/workflows/reusable-ts-ci.yml@main
     secrets:
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

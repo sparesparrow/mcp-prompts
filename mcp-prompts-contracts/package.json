@@ -6,7 +6,9 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "gen:openapi": "ts-node scripts/generate-openapi.ts",
+    "gen:json-schema": "ts-node scripts/generate-json-schema.ts"
   },
   "keywords": [
     "mcp",
@@ -14,14 +16,25 @@
     "contracts",
     "schema"
   ],
-  "author": "sparrow",
+  "author": "sparesparrow",
   "license": "MIT",
   "devDependencies": {
     "@types/node": "^24.0.3",
+    "ncp": "^2.0.0",
+    "ts-node": "^10.9.1",
     "typescript": "^5.4.5",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.24.6"
   },
   "files": [
     "dist"
-  ]
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparesparrow/mcp-prompts.git"
+  },
+  "bugs": {
+    "url": "https://github.com/sparesparrow/mcp-prompts/issues"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme"
 }
