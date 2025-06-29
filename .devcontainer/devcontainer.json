@@ -12,19 +12,25 @@
         "dbaeumer.vscode-eslint",
         "esbenp.prettier-vscode",
         "ms-azuretools.vscode-docker",
-        "ms-vscode.vscode-typescript-next"
+        "ms-vscode.vscode-typescript-next",
+        "eg2.vscode-npm-script",
+        "pnpm.pnpm-vscode"
       ],
       "settings": {
         "editor.formatOnSave": true,
         "editor.defaultFormatter": "esbenp.prettier-vscode",
-        "typescript.tsdk": "node_modules/typescript/lib"
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "npm.packageManager": "pnpm"
       }
     }
+  },
+  "features": {
+    "ghcr.io/devcontainers/features/pnpm:1": {}
   },
   "forwardPorts": [
     3000,
     5432
   ],
-  "postCreateCommand": "npm install && npm run build",
+  "postCreateCommand": "pnpm install && pnpm build",
   "remoteUser": "node"
 }

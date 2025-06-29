@@ -1,0 +1,15 @@
+{
+  "folders": [
+    { "path": "." },
+    { "path": "mcp-prompts-ts" },
+    { "path": "mcp-prompts-contracts" },
+    { "path": "packages/catalog" },
+    { "path": "packages/contracts" },
+    { "path": "packages/mcp-prompts-catalog" }
+  ],
+  "settings": {
+    "typescript.tsdk": "node_modules/typescript/lib",
+    "editor.formatOnSave": true,
+    "editor.defaultFormatter": "esbenp.prettier-vscode"
+  }
+} 

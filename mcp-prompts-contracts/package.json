@@ -36,5 +36,8 @@
   "bugs": {
     "url": "https://github.com/sparesparrow/mcp-prompts/issues"
   },
-  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme"
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme",
+  "dependencies": {
+    "@asteasolutions/zod-to-openapi": "^7.3.4"
+  }
 }

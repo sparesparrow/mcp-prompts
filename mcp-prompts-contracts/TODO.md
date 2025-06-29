@@ -3,14 +3,14 @@
 ## Úkoly pro migraci a vývoj
 
 ### Fáze 1: Základní nastavení
-- [ ] Vytvořit package.json s potřebnými závislostmi
-- [ ] Nastavit TypeScript konfiguraci
-- [ ] Přidat Zod jako závislost pro schémata
-- [ ] Vytvořit build skripty
+- [x] Vytvořit package.json s potřebnými závislostmi
+- [x] Nastavit TypeScript konfiguraci
+- [x] Přidat Zod jako závislost pro schémata
+- [x] Vytvořit build skripty
 
 ### Fáze 2: API Definice
-- [ ] Převést všechny typy na Zod schémata
-- [ ] Vytvořit OpenAPI specifikaci z Zod schémat
+- [x] Převést všechny typy na Zod schémata
+- [x] Vytvořit OpenAPI specifikaci z Zod schémat
 - [ ] Přidat validaci pro všechny API endpointy
 - [ ] Vytvořit TypeScript typy z Zod schémat
 
