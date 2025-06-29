@@ -37,7 +37,58 @@ coverage/
 .nyc_output/
 test-results/
 
-# Legacy files
+# MCP Prompts Monorepo
+
+# Node dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment variables
+.env
+
+# Editor/IDE files
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*.swo
+
+# Coverage/test
+coverage/
+.nyc_output/
+test-results/
+
+# Vendor/external code (if you vendor code, use one of these folders)
+vendor/
+external/
+
+# OS-specific
+Thumbs.db
+
+# pnpm
+.pnpm-debug.log*
+
+# Temporary files
+temp*.json
+claude_desktop_config*.json
+mcp-config*.json
+
+# NPM package files
+*.tgz
+
+# Temporary output directories
+output/
+
+# Docker temporary files
+.docker-*
 legacy/
 
 # Temporary files
