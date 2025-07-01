@@ -30,6 +30,7 @@
 - [Contributing and Community](#contributing-and-community)
 - [License](#license)
 - [Support and Community](#support-and-community)
+- [Testovací skripty pro MCP Prompts a MCP Inspector](#testovací-skripty-pro-mcp-prompts-a-mcp-inspector)
 
 ---
 
@@ -247,3 +248,33 @@ This project is licensed under the [MIT License](LICENSE).
 <div align="center">
   <sub>Built with ❤️ by <a href="https://github.com/sparesparrow">@sparesparrow</a> and the <a href="https://github.com/sparesparrow/mcp-prompts/graphs/contributors">community</a></sub>
 </div>
+
+## Testovací skripty pro MCP Prompts a MCP Inspector
+
+V adresáři `scripts/` jsou k dispozici robustní skripty pro testování různých verzí MCP Prompts (npm, Docker, Docker Compose) s inspektorem.
+
+### 1. Testování npm balíčku
+
+```bash
+./scripts/test-npm-mcp-prompts.sh --version latest
+```
+- Spustí MCP Prompts přes npx a inspektor.
+- Možnosti: `--version <verze>`, `--inspector-port <port>`, `--help`
+
+### 2. Testování Docker image
+
+```bash
+./scripts/test-docker-mcp-prompts.sh --tag latest
+```
+- Spustí oficiální Docker image MCP Prompts a inspektor.
+- Možnosti: `--tag <docker_tag>`, `--inspector-port <port>`, `--help`
+
+### 3. Testování Docker Compose
+
+```bash
+./scripts/test-docker-compose-mcp-prompts.sh --compose-file docker-compose.yml
+```
+- Spustí prostředí přes Docker Compose a inspektor.
+- Možnosti: `--compose-file <soubor>`, `--inspector-service <jméno>`, `--help`
+
+Každý skript lze spustit s parametrem `--help` pro zobrazení detailní nápovědy a příkladů použití.

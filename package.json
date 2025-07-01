@@ -23,10 +23,10 @@
   "author": "sparesparrow",
   "license": "MIT",
   "dependencies": {
-    "@sparesparrow/mcp-prompts-catalog": "workspace:*"
+    "@sparesparrow/mcp-prompts-catalog": "^1.0.0"
   },
   "devDependencies": {
-    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
+    "@sparesparrow/mcp-prompts-contracts": "^1.0.0"
   },
   "engines": {
     "node": ">=18.0.0",

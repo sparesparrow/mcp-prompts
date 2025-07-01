@@ -8,14 +8,7 @@ on:
 
 jobs:
   build-and-test:
-    uses: ./.github/workflows/build-and-test.yml
-    with:
-      node-version: '20.x'
-      run-integration: 'true'
-    secrets: inherit
-
-  test:
-    name: Run Tests
+    name: Build and Test
     runs-on: ubuntu-latest
 
     services:
@@ -72,7 +65,7 @@ jobs:
   docker-tests:
     name: Docker Tests
     runs-on: ubuntu-latest
-    needs: test
+    needs: build-and-test
 
     steps:
       - name: Checkout code
@@ -94,7 +87,7 @@ jobs:
   publish:
     name: Publish Package
     runs-on: ubuntu-latest
-    needs: [test, docker-tests]
+    needs: [build-and-test, docker-tests]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
