@@ -16,6 +16,8 @@ show_help() {
 
 VERSION="latest"
 INSPECTOR_PORT=4000
+SERVER_PID=""
+INSPECTOR_PID=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -39,13 +41,42 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+cleanup() {
+  echo "Uklízím..."
+  if [ -n "$SERVER_PID" ]; then
+    kill "$SERVER_PID" 2>/dev/null || true
+  fi
+  if [ -n "$INSPECTOR_PID" ]; then
+    kill "$INSPECTOR_PID" 2>/dev/null || true
+  fi
+}
+trap cleanup EXIT
+
 echo "Spouštím MCP Prompts verze $VERSION přes npx..."
 npx -y @sparesparrow/mcp-prompts@$VERSION &
 SERVER_PID=$!
-sleep 5
+
+# Robust health check with retries
+MAX_RETRIES=10
+RETRY_DELAY=2
+SUCCESS=0
+echo "Čekám na spuštění služby na /health..."
+for i in $(seq 1 $MAX_RETRIES); do
+  if curl -fs http://localhost:3000/health > /dev/null; then
+    SUCCESS=1
+    break
+  else
+    echo "Pokus $i/$MAX_RETRIES: Služba není připravena, čekám $RETRY_DELAY s..."
+    sleep $RETRY_DELAY
+  fi
+done
+if [ $SUCCESS -ne 1 ]; then
+  echo "Chyba: Služba na /health není dostupná ani po $MAX_RETRIES pokusech."
+  exit 1
+fi
 
 echo "Spouštím MCP Inspector na portu $INSPECTOR_PORT..."
-npx -y @modelcontextprotocol/inspector http://localhost:3000 --port $INSPECTOR_PORT > inspector.log 2>&1 &
+npx -y @modelcontextprotocol/inspector http://localhost:3000 --port "$INSPECTOR_PORT" > inspector.log 2>&1 &
 INSPECTOR_PID=$!
 sleep 5
 
@@ -53,7 +84,9 @@ echo "Testuji endpoint /health přes inspektor..."
 curl -f http://localhost:3000/health
 
 echo "Kontroluji, že inspektor zachytil komunikaci..."
-grep "/health" inspector.log && echo "Inspektor OK" || echo "Inspektor nezachytil požadavek!"
-
-echo "Uklízím..."
-kill $SERVER_PID $INSPECTOR_PID 
+if grep "/health" inspector.log; then
+  echo "Inspektor OK"
+else
+  echo "Inspektor nezachytil požadavek!"
+  exit 1
+fi 
