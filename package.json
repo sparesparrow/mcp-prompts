@@ -1,7 +1,7 @@
 {
-  "name": "mcp-prompts-monorepo",
+  "name": "mcp-prompts-meta",
   "version": "1.0.0",
-  "description": "MCP Prompts Monorepo - Federated ecosystem for Model Context Protocol prompt management",
+  "description": "MCP Prompts Meta Package",
   "private": true,
   "workspaces": [
     "packages/*"
