@@ -1,6 +1,8 @@
 # API Reference
 
-This section documents the HTTP API endpoints and error handling for MCP-Prompts. For MCP tool and resource APIs, see the MCP SDK documentation.
+This section documents the HTTP API endpoints and error handling for MCP-Prompts. For MCP tool and resource APIs, see the [MCP specification](https://modelcontextprotocol.io/specification/draft).
+
+> **MCP-Prompts** exposes its core features via a RESTful HTTP API. The transport layer is decoupled from business logic (hexagonal architecture), making it easy to add new APIs or protocols. See [Overview](00-overview.md) for architecture and [Developer Guide](07-developer-guide.md) for extension patterns.
 
 ---
 

@@ -1,12 +1,8 @@
-# MCP Integration (WIP)
+# MCP Integration
 
-Guides and examples for combining MCP-Prompts with other servers (memory, filesystem, orchestrator, diagram, etc.).
+MCP-Prompts can be combined with other MCP servers (memory, filesystem, orchestrator, diagram, etc.) to build powerful, composable AI workflows. Integration is enabled by the MCP protocol and the modular, hexagonal architecture of the server.
 
-Expected content:
-
-- How to enable `ENABLE_RESOURCES`.
-- Resource URI patterns and examples.
-- Docker Compose snippets.
+> See [Overview](00-overview.md) for architecture, [API Reference](04-api-reference.md) for endpoints, and [Workflow Guide](09-workflow-guide.md) for multi-step orchestration.
 
 ---
 

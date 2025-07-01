@@ -1,4 +1,8 @@
-# Developer Guide (WIP)
+# Developer Guide
+
+This guide helps you contribute to MCP-Prompts, extend its features, and understand its architecture.
+
+> **MCP-Prompts** is built with hexagonal architecture: core logic is isolated from adapters and transports, making it easy to add new storage, APIs, or integrations. See [Overview](00-overview.md) and [CONTRIBUTING.md](../CONTRIBUTING.md) for contribution workflow.
 
 Until this guide is complete, see:
 

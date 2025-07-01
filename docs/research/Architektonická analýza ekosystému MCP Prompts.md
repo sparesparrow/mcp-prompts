@@ -251,6 +251,54 @@ Na základě aktuálního stavu repozitářů a roadmapy doporučuji:
 
 Tento plán zajistí další růst kvality, udržitelnosti a rozšiřitelnosti MCP Prompts ekosystému.
 
+## Hexagonální architektura (Ports and Adapters)
+
+Ekosystém MCP Prompts je navržen podle principů hexagonální architektury (Hexagonal Architecture, také známé jako Ports and Adapters). Tento přístup klade důraz na oddělení doménové logiky od vnějších závislostí a umožňuje snadnou rozšiřitelnost, testovatelnost a nezávislost na konkrétních technologiích.
+
+### Hlavní vrstvy hexagonální architektury v MCP Prompts
+
+- **Domain/Core**: Obsahuje čistou doménovou logiku (např. PromptService, WorkflowService), která je nezávislá na konkrétním úložišti nebo transportní vrstvě.
+- **Ports (rozhraní)**: Definují kontrakty, které musí splňovat jednotlivé adaptéry (např. rozhraní pro úložiště promptů, šablonování, API porty).
+- **Adapters**: Konkrétní implementace portů, např. FileStorageAdapter, PostgresAdapter, MDCAdapter. Tyto adaptéry zajišťují komunikaci mezi doménovou logikou a vnějším světem.
+- **Transports**: Vnější okraj hexagonu – HTTP server, SSE, CLI, případně další transportní vrstvy.
+
+### Výhody hexagonální architektury
+
+- **Izolace domény**: Doménová logika není závislá na konkrétních technologiích, což usnadňuje její testování a vývoj.
+- **Snadná rozšiřitelnost**: Přidání nového úložiště nebo transportní vrstvy nevyžaduje změny v doménové logice.
+- **Testovatelnost**: Díky jasně definovaným portům lze doménovou logiku snadno testovat s mock implementacemi adaptérů.
+- **Nezávislost na technologiích**: Systém lze snadno přenést na nové platformy nebo integrovat s dalšími systémy.
+
+### Schéma (textová reprezentace)
+
+```
++-----------------------------+
+|        Transports           |
+|  (HTTP, SSE, CLI, ...)      |
++-----------------------------+
+            |
+            v
++-----------------------------+
+|         Adapters            |
+| (File, Postgres, MDC, ...)  |
++-----------------------------+
+            |
+            v
++-----------------------------+
+|   Ports (Interfaces)        |
++-----------------------------+
+            |
+            v
++-----------------------------+
+|        Domain/Core          |
+| (PromptService, ... )       |
++-----------------------------+
+```
+
+### Srovnání s předchozím přístupem
+
+Původní architektura byla více monolitická nebo vrstvená, což vedlo k těsnějšímu provázání domény a infrastruktury. Hexagonální architektura umožňuje větší modularitu, nezávislost a připravenost na budoucí rozšiřování ekosystému MCP Prompts.
+
 <div style="text-align: center">⁂</div>
 
 [^1]: https://github.com/sparesparrow/mcp-prompts

@@ -1,6 +1,8 @@
 # Quick-Start Guide
 
-This guide shows three ways to spin up MCP-Prompts in under five minutes.
+Get MCP-Prompts running in minutes. This guide covers the fastest ways to launch the server, whether for local development, Docker, or production.
+
+> **MCP-Prompts** is a modular, hexagonal-architecture MCP server for managing prompts, templates, and workflows. See [Overview](00-overview.md) for architecture and [Configuration](02-configuration.md) for all options.
 
 ---
 
@@ -92,6 +94,9 @@ Expect `{"status":"ok"}`.
 
 ## Next steps
 
-- Explore the HTTP API (`/openapi` – coming soon).
-- Read `docs/02-configuration.md` for all options.
-- Join the discussion on [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues).
+- [Configuration](02-configuration.md) – All environment variables
+- [API Reference](04-api-reference.md) – HTTP endpoints
+- [Templates Guide](05-templates-guide.md) – Using and creating templates
+- [Workflow Guide](09-workflow-guide.md) – Multi-step workflows
+- [Developer Guide](07-developer-guide.md) – Contributing & development
+- Join the discussion on [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)

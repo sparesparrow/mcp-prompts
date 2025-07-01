@@ -1,6 +1,8 @@
 # Templates Guide
 
-Best practices for creating, applying, and exporting templates.
+Templates are reusable prompt patterns with variables, enabling dynamic content generation for LLM workflows. In MCP-Prompts, templates are first-class resources, accessible via API, CLI, and workflows.
+
+> **MCP-Prompts** uses hexagonal architecture: template logic is part of the core domain, with adapters for storage and transport. See [Overview](00-overview.md) and [API Reference](04-api-reference.md) for details.
 
 ## Variable Syntax
 

@@ -1,6 +1,10 @@
 # Configuration
 
-MCP-Prompts uses environment variables for all configuration. All variables are validated at startup using [Zod](https://github.com/colinhacks/zod). If any required variable is missing or invalid, the server will print a clear error and exit.
+All configuration for MCP-Prompts is handled via environment variables. This enables flexible deployment across local, Docker, and cloud environments.
+
+> **MCP-Prompts** is built with hexagonal architecture: configuration is validated at the boundary, keeping core logic portable and testable. See [Overview](00-overview.md) for architecture and [Quickstart](01-quickstart.md) for setup.
+
+MCP-Prompts validates all variables at startup using [Zod](https://github.com/colinhacks/zod). If any required variable is missing or invalid, the server prints a clear error and exits.
 
 Below is a complete list of supported environment variables, grouped by section. Types and defaults are shown where applicable.
 

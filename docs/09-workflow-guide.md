@@ -1,5 +1,9 @@
 # Workflow Engine Guide
 
+The Workflow Engine in MCP-Prompts lets you define, save, and execute multi-step workflows that combine prompts, shell commands, and HTTP requests. This enables advanced automation and orchestration for LLM applications.
+
+> **MCP-Prompts** uses hexagonal architecture: workflow logic is part of the core domain, with adapters for storage and transport. See [Overview](00-overview.md), [Templates Guide](05-templates-guide.md), and [API Reference](04-api-reference.md) for details.
+
 ## Overview
 
 The MCP-Prompts Workflow Engine lets you define, save, and execute multi-step workflows that combine prompt templates, shell commands, and HTTP requests. Workflows can be run via API or CLI, with shared variables and outputs between steps.

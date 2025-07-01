@@ -486,3 +486,20 @@ https://github.com/marketplace/actions/automated-build-android-app-with-github-a
 enefce/AndroidLibraryForGitHubPackagesDemo: Sample project showcasing the steps to 
 publish and consume Android Libraries on the GitHub Packages Registry, 
 https://github.com/enefce/AndroidLibraryForGitHubPackagesDemo 
+
+### Hexagonální architektura jako základ nové struktury
+
+Navrhovaná multi-repo architektura MCP Prompts je inspirována hexagonální architekturou (Ports and Adapters). Tento přístup zajišťuje, že doménová logika (core) je zcela oddělena od vnějších závislostí (úložiště, transporty, externí služby) pomocí jasně definovaných portů (rozhraní). Každý repozitář v ekosystému odpovídá určité vrstvě hexagonu:
+
+- **mcp-prompts-contracts**: Definuje porty (rozhraní, kontrakty) pro celý ekosystém.
+- **mcp-prompts-core**: Obsahuje doménovou logiku (PromptService, WorkflowService) a implementace portů.
+- **mcp-prompts-catalog**: Slouží jako datový adaptér (zdroj promptů).
+- **mcp-prompts-server**: Implementuje transportní vrstvy (HTTP, SSE) a propojuje je s core.
+- **mcp-prompts-cli, mcp-prompts-android**: Další transportní nebo integrační vrstvy.
+
+Tato architektura umožňuje:
+- Nezávislý vývoj a testování jednotlivých vrstev
+- Snadné přidávání nových adaptérů (např. nové úložiště nebo transport)
+- Lepší udržitelnost a rozšiřitelnost celého ekosystému
+
+**Příklad:** PromptService v core komunikuje pouze přes rozhraní (port), konkrétní úložiště (FileAdapter, PostgresAdapter) lze libovolně měnit bez zásahu do domény. Transportní vrstvy (HTTP server, CLI) pouze volají služby přes porty, což zajišťuje čistotu a testovatelnost domény. 
