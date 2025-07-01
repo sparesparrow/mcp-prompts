@@ -4,277 +4,261 @@
 [![npm](https://img.shields.io/npm/v/@sparesparrow/mcp-prompts)](https://www.npmjs.com/package/@sparesparrow/mcp-prompts)
 [![Docker Pulls](https://img.shields.io/docker/pulls/sparesparrow/mcp-prompts)](https://hub.docker.com/r/sparesparrow/mcp-prompts)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Roadmap](https://img.shields.io/badge/Project-Roadmap-5BC0BE?logo=github)](../../projects/1)
 
-> ⚠️ **Project Restructuring in Progress** ⚠️
->
-> This project is currently undergoing a major migration from a monorepo to a multi-repository architecture. The goal is to create a more modular and scalable ecosystem.
->
-> - **What this means:** The current `main` branch is stable, but all new development and the future of the project will be in the new repositories.
-> - **Track the progress:** You can follow the detailed plan in the [`MIGRATION.md`](./MIGRATION.md) file.
-> - **Find the new code:** Links to the new repositories will be added here once the migration is complete.
->
-> We appreciate your patience and support during this transition!
-
-**MCP Prompts Server** is a robust solution to the problem of prompt fragmentation across development teams. It serves as the single source of truth for all your prompts, templates, and related metadata, enabling effective versioning, testing, and secure sharing within your organization and with external systems.
+> **MCP Prompts Server** is a robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the [Model Context Protocol (MCP)](https://modelcontextprotocol.io/specification/draft). It is the canonical TypeScript implementation and reference for prompt management in the MCP ecosystem.
 
 ---
 
 ## Table of Contents
-
-- [Why This Project?](#why-this-project)
-- [Key Features](#key-features)
+- [Why MCP Prompts?](#why-mcp-prompts)
+- [Features](#features)
 - [Quick Start](#quick-start)
-- [Core Concepts and Data Structure](#core-concepts-and-data-structure)
-- [Architecture and Roadmap](#architecture-and-roadmap)
-- [Contributing and Community](#contributing-and-community)
+- [Scripts & CLI Reference](#scripts--cli-reference)
+- [MCP Features & Architecture](#mcp-features--architecture)
+- [MCP TypeScript SDK Role](#mcp-typescript-sdk-role)
+- [Alternative Approaches](#alternative-approaches)
+- [Community Packages](#community-packages)
+- [Integration with Other MCP Servers](#integration-with-other-mcp-servers)
+- [Contributing](#contributing)
 - [License](#license)
-- [Support and Community](#support-and-community)
-- [Testovací skripty pro MCP Prompts a MCP Inspector](#testovací-skripty-pro-mcp-prompts-a-mcp-inspector)
+- [Support](#support)
 
 ---
 
-## 🎯 Why This Project? (The Problem It Solves)
+## Why MCP Prompts?
 
-Most teams working with AI struggle with chaos: prompts are stored in code, shared documents, or lost in chat histories. This project solves the following problems:
+Prompt chaos is real: teams lose track of prompt versions, struggle to test changes, and risk leaking sensitive instructions. **MCP Prompts** solves this by providing:
 
-- ❌ **No Versioning:** The inability to track changes and revert to previous, functional versions of prompts.
-- ❌ **Difficult Testing:** Complicated A/B testing and evaluation to determine which prompt version performs better.
-- ❌ **Security Risks:** Lack of control over who has access to valuable and sensitive prompts.
-- ❌ **Inefficient Collaboration:** Developers and team leaders lack a central place to share and approve prompts.
-
----
-
-## ✨ Key Features
-
-- **🗄️ Flexible Storage:** Native support for files, PostgreSQL, and in-memory. Can be extended for Elasticsearch for full-text search.
-- **🏷️ Categorization and Tagging:** Organize your prompts into hierarchical categories and assign tags for easy searching.
-- **🔄 Versioning:** Track the history of each prompt, similar to Git.
-- **🔒 Access Control (RBAC):** Detailed permission management for users and roles (admin, editor, viewer).
-- **🤖 MCP Ecosystem Integration:** Seamless communication with other MCP servers like @filesystem and @github.
-- **📄 Automatic Documentation:** Generate OpenAPI specifications directly from the code.
-- **🐳 Docker and CLI Support:** Easy deployment with Docker containers and command-line tools for batch operations.
-- **📊 Auditing and Metrics:** Track all changes and analyze the usage of individual prompts.
+- **Centralized, versioned prompt storage**
+- **Robust API for CRUD, search, and template application**
+- **Seamless integration with the broader MCP ecosystem**
+- **Extensible adapters for file, memory, and database backends**
+- **OpenAPI documentation and strong type safety**
 
 ---
 
-## 🚀 Quick Start
+## Features
 
-> ⚠️ **Requirements:** Node.js 20+ and npm 10+ (due to npm workspaces support).
+- **Full MCP Prompt API**: Create, read, update, delete, list, and apply prompts via MCP tools and HTTP endpoints
+- **Bulk Operations**: Batch import/export, bulk update, and catalog management
+- **Versioning**: Track prompt history, revert, and audit changes
+- **Template System**: Apply variables to prompts, validate required arguments
+- **Multiple Storage Backends**: File, in-memory, PostgreSQL, and pluggable adapters
+- **OpenAPI & Type Safety**: Auto-generated OpenAPI docs and strict TypeScript types
+- **Rate Limiting & Security**: Built-in rate limiting, CORS, and API key support
+- **Health Checks & Metrics**: `/health` endpoint, usage metrics, and audit logs
+- **Docker & Compose Support**: Production-ready images and multi-service orchestration
+- **MCP Ecosystem Integration**: Works with Filesystem, Memory, GitHub, and other MCP servers
+- **Extensible**: Add new adapters, tools, or integrations with minimal code
+- **ElevenLabs Integration**: Optional audio synthesis for prompt summaries
 
-### 1. Run with NPX
+---
 
-> 🚨 **Critical Alert:** The latest version of `@sparesparrow/mcp-prompts` has a critical runtime error. Please use version `1.2.22` for a stable experience until this is resolved.
+## Quick Start
 
-Run the server without a permanent installation with a single command:
+### 1. Run with NPX (Recommended for Most Users)
 
 ```bash
-npx -y @sparesparrow/mcp-prompts@1.2.22
+npx -y @sparesparrow/mcp-prompts
 ```
 
 ### 2. Run with Docker
 
-For production deployment with persistent storage:
-
-> ⚠️ **Note:** The Docker images currently have a build issue and may not work properly. We recommend using the NPX method or building from source until this is resolved.
-
 **File storage:**
-
 ```bash
-# Unix/Linux/macOS
-docker run -d --name mcp-server \
-  -p 3003:3003 \
-  -v $(pwd)/data:/app/data \
-  ghcr.io/sparesparrow/mcp-prompts:latest
-
-# Windows PowerShell
-docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
-
-# Windows Command Prompt
-docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
+docker run -d --name mcp-server -p 3003:3003 -v $(pwd)/data:/app/data ghcr.io/sparesparrow/mcp-prompts:latest
 ```
 
 **Postgres storage:**
-
 ```bash
-# Unix/Linux/macOS
-docker run -d --name mcp-server \
-  -p 3003:3003 \
-  -v $(pwd)/data:/app/data \
-  -e "STORAGE_TYPE=postgres" \
-  -e "POSTGRES_URL=your_connection_string" \
+docker run -d --name mcp-server -p 3003:3003 -v $(pwd)/data:/app/data \
+  -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" \
   ghcr.io/sparesparrow/mcp-prompts:latest
-
-# Windows PowerShell
-docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
-
-# Windows Command Prompt
-docker run -d --name mcp-server -p 3003:3003 -v %cd%/data:/app/data -e "STORAGE_TYPE=postgres" -e "POSTGRES_URL=your_connection_string" ghcr.io/sparesparrow/mcp-prompts:latest
 ```
 
-**Alternative: Build from source**
-If the Docker images don't work, you can build your own:
+**Docker Compose (multi-server):**
+```bash
+docker-compose -f docker-compose.yml -f docker-compose.extended.yml up -d
+```
+
+### 3. Build from Source
 
 ```bash
-# Clone the repository
 git clone https://github.com/sparesparrow/mcp-prompts.git
 cd mcp-prompts
-
-# Build the Docker image
-docker build -t mcp-prompts:local .
-
-# Run the local image
-docker run -d --name mcp-server -p 3003:3003 -v ${PWD}/data:/app/data mcp-prompts:local
+npm install
+npm run build
+npm start
 ```
 
-**Note:** If you encounter "invalid reference format" errors, ensure Docker Desktop is running and try using the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
-
-### Troubleshooting Docker Issues
-
-**Common Problems:**
-
-1. **"docker: invalid reference format"**
-
-   - Ensure Docker Desktop is running
-   - Use the full image path: `ghcr.io/sparesparrow/mcp-prompts:latest`
-   - Check that the image exists: `docker images | grep mcp-prompts`
-
-2. **"Cannot connect to the Docker daemon"**
-
-   - Start Docker Desktop
-   - On Windows, ensure WSL2 is properly configured
-
-3. **"Unknown file extension '.ts'" error**
-
-   - This indicates a Docker build issue where TypeScript files aren't compiled
-   - **Solution:** Use the NPX method instead: `npx -y @sparesparrow/mcp-prompts`
-   - Or build from source using the instructions above
-
-4. **Volume mounting issues on Windows**
-
-   - Use forward slashes: `/app/data` not `\app\data`
-   - Use `${PWD}` in PowerShell or `%cd%` in Command Prompt
-
-5. **Port already in use**
-   - Stop existing container: `docker stop mcp-server`
-   - Remove container: `docker rm mcp-server`
-   - Or use a different port: `-p 3004:3003`
-
-### 3. Verify It's Running
-
-Check that the server is running and accessible:
+### 4. Health Check
 
 ```bash
 curl http://localhost:3003/health
 ```
 
-Expected response:
+---
+
+## Scripts & CLI Reference
+
+All scripts are in the `scripts/` directory. Key scripts include:
+
+| Script                                 | Description                                                      |
+|----------------------------------------|------------------------------------------------------------------|
+| `test-npm-mcp-prompts.sh`              | Test MCP Prompts via npx and MCP Inspector                       |
+| `test-docker-mcp-prompts.sh`           | Test official Docker image and MCP Inspector                     |
+| `test-docker-compose-mcp-prompts.sh`   | Test Docker Compose environment with MCP Inspector               |
+| `extract-catalog.sh`                   | Extract and validate prompt catalog                              |
+| `extract-contracts.sh`                 | Extract and validate API contracts                               |
+| `extract-implementations.sh`           | Extract implementation details for documentation                 |
+| `setup-claude-desktop.sh`              | Setup integration with Claude Desktop                            |
+| `build-and-push-docker.sh`             | Build and push Docker images                                     |
+| `run-tests.sh`                         | Run all unit and integration tests                               |
+| `release.sh`                           | Automated release and version bump script                        |
+| `publish.sh`                           | Publish package to npm                                          |
+
+**Usage:**
+```bash
+./scripts/<script-name> --help
+```
+
+---
+
+## MCP Features & Architecture
+
+MCP Prompts implements the full [Model Context Protocol](https://modelcontextprotocol.io/specification/draft) prompt API:
+
+- **Prompts**: CRUD, list, search, and apply (with variable substitution)
+- **Resources**: Expose prompt data as MCP resources
+- **Tools**: Register prompt management tools (add, get, list, apply, delete)
+- **Bulk Operations**: Import/export, batch update
+- **Versioning**: Track and revert prompt changes
+- **Adapters**: File, memory, PostgreSQL, and pluggable custom adapters
+- **OpenAPI Docs**: `/api-docs` endpoint with live documentation
+- **Health & Metrics**: `/health` endpoint, audit logs, and usage stats
+- **Security**: API key, CORS, rate limiting, and RBAC (role-based access control)
+- **Extensibility**: Add new tools, adapters, or integrations via plugin pattern
+- **ElevenLabs Integration**: Optional audio synthesis for prompt summaries
+
+**Architecture Overview:**
+- **Core**: Prompt management, template engine, versioning
+- **Adapters**: Storage (file, memory, Postgres), external MCP servers
+- **API Layer**: MCP tools/resources, HTTP endpoints, OpenAPI docs
+- **Integrations**: ElevenLabs, Filesystem/Memory/GitHub MCP servers
+
+---
+
+## MCP TypeScript SDK Role
+
+MCP Prompts is built on the [@modelcontextprotocol/sdk](https://www.npmjs.com/package/@modelcontextprotocol/sdk), the canonical TypeScript implementation of the MCP specification. The SDK provides:
+
+- **Protocol Compliance**: Handles JSON-RPC, connection lifecycle, and capability negotiation
+- **Server/Client Abstractions**: Easy creation of MCP servers and clients
+- **Transport Support**: stdio, Streamable HTTP, and SSE
+- **Schema-Driven APIs**: Zod-based validation for all tool/resource definitions
+- **Extensibility**: Register new tools, resources, and prompts with minimal code
+
+By using the SDK, MCP Prompts ensures full compatibility with the evolving MCP standard and can be easily extended or integrated with other MCP-based tools.
+
+---
+
+## Alternative Approaches
+
+Depending on your needs, you may consider:
+
+- **Other Language Implementations**: Use [mcp-prompts-rs](https://github.com/sparesparrow/mcp-prompts-rs) (Rust) for high-performance or embedded use cases
+- **Custom Adapters**: Implement your own storage or metadata adapters using the documented interfaces
+- **Direct Integration**: Use the MCP TypeScript SDK to build your own server or client for specialized workflows
+- **Community Servers**: Leverage other MCP servers (Filesystem, Memory, GitHub, etc.) for federated or distributed prompt management
+
+---
+
+## Community Packages
+
+Recommended packages for advanced use:
+
+- [`@sparesparrow/mcp-prompts-catalog`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts-catalog): Curated prompt catalog for MCP
+- [`@sparesparrow/mcp-prompts-contracts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts-contracts): Shared TypeScript types and OpenAPI contracts
+- [`@modelcontextprotocol/server-postgres`](https://www.npmjs.com/package/@modelcontextprotocol/server-postgres): PostgreSQL storage adapter
+- [`@modelcontextprotocol/server-filesystem`](https://www.npmjs.com/package/@modelcontextprotocol/server-filesystem): Filesystem MCP server
+- [`@modelcontextprotocol/server-memory`](https://www.npmjs.com/package/@modelcontextprotocol/server-memory): In-memory MCP server
+- [`@modelcontextprotocol/server-github`](https://www.npmjs.com/package/@modelcontextprotocol/server-github): GitHub sync MCP server
+- [`@modelcontextprotocol/inspector`](https://www.npmjs.com/package/@modelcontextprotocol/inspector): Debugging and inspection tool for MCP servers
+
+---
+
+## Integration with Other MCP Servers
+
+MCP Prompts can be used standalone or as part of a federated MCP ecosystem. Integration patterns include:
+
+### 1. **Client-Side Federation**
+Configure multiple MCP servers in your host application (e.g., Claude Desktop, Cursor):
 
 ```json
 {
-  "status": "ok",
-  "version": "1.4.0",
-  "storage": "postgres"
+  "mcpServers": {
+    "mcp-prompts": { "command": "npx", "args": ["-y", "@sparesparrow/mcp-prompts"] },
+    "filesystem": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/files"] },
+    "memory": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-memory"] },
+    "github": { "command": "npx", "args": ["-y", "@modelcontextprotocol/server-github"] }
+  }
 }
 ```
 
-### CLI Usage
+### 2. **Server-Side Integration**
+MCP Prompts can connect to other MCP servers (Filesystem, Memory, GitHub) as storage or metadata backends via adapters. Use Docker Compose for orchestration:
 
-The CLI entry point includes a Node.js shebang (#!/usr/bin/env node) so you can run it directly:
-
-```sh
-npx -y @sparesparrow/mcp-prompts@3.0.3-main
+```yaml
+version: '3.8'
+services:
+  mcp-prompts:
+    image: ghcr.io/sparesparrow/mcp-prompts:latest
+    environment:
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/prompts
+    volumes:
+      - ./prompts:/app/prompts
+    depends_on:
+      - filesystem-server
+      - memory-server
+      - github-server
+  filesystem-server:
+    image: ghcr.io/modelcontextprotocol/server-filesystem:latest
+    volumes:
+      - ./prompts:/prompts
+  memory-server:
+    image: ghcr.io/modelcontextprotocol/server-memory:latest
+    volumes:
+      - ./data:/data
+  github-server:
+    image: ghcr.io/modelcontextprotocol/server-github:latest
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN}
 ```
 
-Or, after installing globally:
-
-```sh
-mcp-prompts --help
-```
+### 3. **Routing and Federation**
+MCP Prompts does not natively proxy or federate requests to other servers, but you can use API gateways, custom adapters, or orchestration tools to build federated workflows. See the [MCP Integration Guide](docs/06-mcp-integration.md) for advanced patterns.
 
 ---
 
-## 🏛️ Core Concepts and Data Structure
+## Contributing
 
-| Entity   | Attributes                             | Description                                    |
-| -------- | -------------------------------------- | ---------------------------------------------- |
-| Prompt   | name, content, tags, version, metadata | The basic unit containing the template text.   |
-| Category | name, description, parent_category     | Used for hierarchical organization of prompts. |
-| Template | variables, validation_rules            | A special type of prompt with dynamic parts.   |
-| User     | username, role                         | An account with assigned permissions.          |
+We welcome contributions of all kinds! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines, code style, and the PR process.
 
 ---
 
-## 🏗️ Architecture and Roadmap
+## License
 
-The project is designed as a modern monorepo with separate packages, which facilitates maintenance and scaling.
-
-| Component | Description                                    | Technology                   |
-| --------- | ---------------------------------------------- | ---------------------------- |
-| core      | Main application logic, API, and storage mgmt. | Node.js, Express, TypeScript |
-| catalog   | A distributable package with default prompts.  | NPM                          |
-| contracts | Shared TypeScript types and OpenAPI specs.     | OpenAPI, JSON Schema         |
-
-📊 **[Track our detailed progress on the GitHub Project Board](../../projects/1)**
+MIT License. See [LICENSE](LICENSE).
 
 ---
 
-## 🤝 Contributing and Community
+## Support
 
-We welcome community contributions! Whether it's code, documentation, a bug report, or a new idea, your help is appreciated.
-
-Please read our **[Contributor Guide](CONTRIBUTING.md)** to find everything you need.
-
-### ✨ Our Contributors
-
-Thank you to all the wonderful people who have contributed to this project!
-
-[![Contributors](https://contrib.rocks/image?repo=sparesparrow/mcp-prompts)](https://github.com/sparesparrow/mcp-prompts/graphs/contributors)
+- **Bugs & Issues:** [GitHub Issues](../../issues)
+- **Discussions:** [GitHub Discussions](../../discussions)
+- **Commercial Support:** [Sparrow AI & Tech](mailto:support@sparrowai.tech)
 
 ---
 
-## 📄 License
-
-This project is licensed under the [MIT License](LICENSE).
-
----
-
-## 📞 Support and Community
-
-- 🐛 **Report a Bug:** [GitHub Issues](../../issues)
-- 💬 **Join the Discussion:** [GitHub Discussions](../../discussions)
-- 🏢 **Commercial Support & Custom Solutions:** [Sparrow AI & Tech](mailto:support@sparrowai.tech)
-
-<div align="center">
-  <sub>Built with ❤️ by <a href="https://github.com/sparesparrow">@sparesparrow</a> and the <a href="https://github.com/sparesparrow/mcp-prompts/graphs/contributors">community</a></sub>
-</div>
-
-## Testovací skripty pro MCP Prompts a MCP Inspector
-
-V adresáři `scripts/` jsou k dispozici robustní skripty pro testování různých verzí MCP Prompts (npm, Docker, Docker Compose) s inspektorem.
-
-### 1. Testování npm balíčku
-
-```bash
-./scripts/test-npm-mcp-prompts.sh --version latest
-```
-- Spustí MCP Prompts přes npx a inspektor.
-- Možnosti: `--version <verze>`, `--inspector-port <port>`, `--help`
-
-### 2. Testování Docker image
-
-```bash
-./scripts/test-docker-mcp-prompts.sh --tag latest
-```
-- Spustí oficiální Docker image MCP Prompts a inspektor.
-- Možnosti: `--tag <docker_tag>`, `--inspector-port <port>`, `--help`
-
-### 3. Testování Docker Compose
-
-```bash
-./scripts/test-docker-compose-mcp-prompts.sh --compose-file docker-compose.yml
-```
-- Spustí prostředí přes Docker Compose a inspektor.
-- Možnosti: `--compose-file <soubor>`, `--inspector-service <jméno>`, `--help`
-
-Každý skript lze spustit s parametrem `--help` pro zobrazení detailní nápovědy a příkladů použití.
+<sub>Built with ❤️ by [@sparesparrow](https://github.com/sparesparrow) and the [community](https://github.com/sparesparrow/mcp-prompts/graphs/contributors)</sub>
