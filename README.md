@@ -18,10 +18,13 @@
 - [MCP TypeScript SDK Role](#mcp-typescript-sdk-role)
 - [Alternative Approaches](#alternative-approaches)
 - [Community Packages](#community-packages)
+- [End-to-End Usage: Official MCP TypeScript SDK, PostgreSQL, Inspector, and Proxy](#end-to-end-usage-official-mcp-typescript-sdk-postgresql-inspector-and-proxy)
 - [Integration with Other MCP Servers](#integration-with-other-mcp-servers)
 - [Contributing](#contributing)
 - [License](#license)
 - [Support](#support)
+- [🛠️ Příklady konfigurace MCP klienta a serveru (`mcp.json`, `.env`)](#️-příklady-konfigurace-mcp-klienta-a-serveru-mcpjson-env)
+- [Hexagonální architektura v MCP-Prompts](#hexagonální-architektura-v-mcp-prompts)
 
 ---
 
@@ -187,6 +190,117 @@ Recommended packages for advanced use:
 
 ---
 
+## End-to-End Usage: Official MCP TypeScript SDK, PostgreSQL, Inspector, and Proxy
+
+This section provides a complete workflow for building, running, debugging, and exposing a custom MCP server using the official TypeScript SDK, PostgreSQL, MCP Inspector, and mcp-proxy. All commands and examples work on Linux, macOS, and Windows (including WSL).
+
+### 1. Install the Official TypeScript SDK and Dependencies
+
+```bash
+npm install @modelcontextprotocol/sdk zod pg
+```
+- `@modelcontextprotocol/sdk` – Official MCP SDK (server, types, transports)
+- `zod` – Input and schema validation
+- `pg` – PostgreSQL driver
+
+---
+
+### 2. Example MCP Server with PostgreSQL
+
+```ts
+// src/server.ts
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+import { Pool } from "pg";
+import { z } from "zod";
+
+const db = new Pool({ connectionString: process.env.DATABASE_URL });
+
+const server = new McpServer({
+  name: "mcp-prompts-postgres",
+  version: "1.0.0"
+});
+
+// Example tool: fetch a prompt from the database
+server.registerTool(
+  "getPromptFromDb",
+  {
+    title: "Get prompt from DB",
+    description: "Returns a prompt template stored in Postgres",
+    inputSchema: { id: z.string() }
+  },
+  async ({ id }) => {
+    const { rows } = await db.query(
+      "SELECT text FROM prompts WHERE id = $1",
+      [id]
+    );
+    return {
+      content: [{ type: "text", text: rows[0]?.text ?? "Not found" }]
+    };
+  }
+);
+
+// Start the server using stdio transport
+await server.connect(new StdioServerTransport());
+```
+
+---
+
+### 3. Local Environment with Docker Compose
+
+```yaml
+# docker-compose.yml
+version: "3.9"
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_DB: mcp
+      POSTGRES_USER: mcp
+      POSTGRES_PASSWORD: mcp
+    ports: ["5432:5432"]
+    volumes: ["./pgdata:/var/lib/postgresql/data"]
+
+  mcp-server:
+    build: .
+    command: node dist/server.js
+    environment:
+      DATABASE_URL: postgres://mcp:mcp@postgres:5432/mcp
+    depends_on: [postgres]
+```
+
+---
+
+### 4. Debugging with MCP Inspector
+
+1. Build your server:
+   ```bash
+   npx tsc
+   ```
+2. Start the Inspector with your server binary:
+   ```bash
+   npx @modelcontextprotocol/inspector node dist/server.js
+   ```
+   The Inspector UI will open at http://localhost:6274 and allows you to:
+   - Switch transport (stdio / http)
+   - Browse Resources/Prompts/Tools
+   - Send test requests and view logs
+
+---
+
+### 5. Exposing the Server Remotely with mcp-proxy
+
+If you need to connect a client expecting SSE or Streamable HTTP to your stdio-based server, use mcp-proxy as a bridge:
+
+```bash
+# stdio → SSE bridge on port 8080
+npx -y @modelcontextprotocol/proxy --stdio "node dist/server.js" --sse 8080
+```
+
+This will expose your MCP server over SSE/HTTP for remote access.
+
+---
+
 ## Integration with Other MCP Servers
 
 MCP Prompts can be used standalone or as part of a federated MCP ecosystem. Integration patterns include:
@@ -262,3 +376,190 @@ MIT License. See [LICENSE](LICENSE).
 ---
 
 <sub>Built with ❤️ by [@sparesparrow](https://github.com/sparesparrow) and the [community](https://github.com/sparesparrow/mcp-prompts/graphs/contributors)</sub>
+
+---
+
+## 🛠️ Příklady konfigurace MCP klienta a serveru (`mcp.json`, `.env`)
+
+MCP klienti (např. Cursor, Claude Desktop, VS Code, Amazon Q) podporují různé formáty konfiguračních souborů a způsoby spouštění MCP serveru. Níže najdete vzorové konfigurace pro všechny běžné scénáře.
+
+### 1. Formáty `mcp.json`
+
+#### a) Formát `mcpServers` (Cursor, Claude Desktop, Amazon Q)
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
+      "env": {
+        "PROMPTS_DIR": "./my-prompts",
+        "STORAGE_TYPE": "postgres"
+      },
+      "timeout": 30000
+    }
+  }
+}
+```
+
+#### b) Formát `servers` (VS Code, Hugging Face clients)
+```json
+{
+  "servers": [
+    {
+      "name": "mcp-prompts",
+      "transport": {
+        "type": "stdio",
+        "command": "npx",
+        "args": ["-y", "@sparesparrow/mcp-prompts"]
+      },
+      "env": {
+        "PROMPTS_DIR": "./my-prompts"
+      }
+    }
+  ]
+}
+```
+
+### 2. Konfigurace pro různá prostředí
+
+#### **Linux Host**
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "/usr/bin/node",
+      "args": ["/opt/mcp-prompts/dist/server.js"],
+      "env": {
+        "PROMPTS_DIR": "/home/user/prompts",
+        "STORAGE_TYPE": "file",
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
+```
+
+Alternativně s wrapper scriptem:
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "./scripts/start-mcp-prompts.sh"
+    }
+  }
+}
+```
+
+#### **Windows Host**
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "C:\\Program Files\\nodejs\\node.exe",
+      "args": ["C:\\mcp-prompts\\dist\\server.js"],
+      "env": {
+        "PROMPTS_DIR": "C:\\Users\\%USERNAME%\\Documents\\prompts",
+        "STORAGE_TYPE": "file"
+      }
+    }
+  }
+}
+```
+
+#### **Docker Image**
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-v", "${PWD}/prompts:/app/prompts",
+        "-e", "PROMPTS_DIR=/app/prompts",
+        "-e", "POSTGRES_URL",
+        "sparesparrow/mcp-prompts:latest"
+      ],
+      "env": {
+        "POSTGRES_URL": "${POSTGRES_URL}"
+      }
+    }
+  }
+}
+```
+
+#### **NPM Package (doporučený způsob)**
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "npx",
+      "args": [
+        "-y", 
+        "@sparesparrow/mcp-prompts",
+        "--source", "catalog:",
+        "--source", "file:./company-prompts"
+      ],
+      "env": {
+        "STORAGE_TYPE": "postgres",
+        "POSTGRES_URL": "${POSTGRES_URL}",
+        "LOG_LEVEL": "info"
+      }
+    }
+  }
+}
+```
+
+### 3. Bezpečné proměnné prostředí (`.env` a VS Code style)
+
+Doporučujeme používat `.env` soubor nebo bezpečné prompty pro citlivé údaje:
+
+```env
+POSTGRES_URL=postgres://user:password@localhost:5432/mcp_prompts
+PROMPTS_DIR=./prompts
+LOG_LEVEL=info
+```
+
+Nebo v konfiguraci VS Code:
+```json
+{
+  "inputs": [
+    {
+      "type": "promptString",
+      "id": "postgres-url",
+      "description": "PostgreSQL Connection URL",
+      "password": true
+    },
+    {
+      "type": "promptString", 
+      "id": "prompts-dir",
+      "description": "Cesta k promptům"
+    }
+  ]
+}
+```
+
+## Hexagonální architektura v MCP-Prompts
+
+Projekt `mcp-prompts` je navržen podle principů hexagonální architektury (architektura portů a adaptérů), která zajišťuje čisté oddělení doménové logiky od vnějších závislostí (např. úložiště, templating, transportní vrstvy). Tento přístup přináší:
+
+- **Lepší testovatelnost**: Doménová logika je izolovaná a snadno testovatelná bez závislosti na konkrétních implementacích adaptérů.
+- **Snadná rozšiřitelnost**: Nové typy úložišť, šablonovacích systémů nebo transportních vrstev lze přidávat bez zásahu do jádra aplikace.
+- **Udržovatelnost**: Jasné rozhraní mezi doménou a infrastrukturou usnadňuje refaktoring a vývoj.
+
+### Struktura projektu podle hexagonální architektury
+
+- `core/domain/` – Doménové entity a business logika (např. `prompt.entity.ts`)
+- `core/ports/` – Rozhraní (porty) pro interakci s doménou (např. `prompt.repository.ts`, `templating.port.ts`, `api.port.ts`)
+- `core/services/` – Doménové služby (např. `prompt.service.ts`)
+- `adapters/` – Implementace portů (adaptéry), např. `file-storage.adapter.ts`, `eta-templating.adapter.ts`
+- `transports/` – Transportní vrstvy (např. HTTP, MCP, SSE)
+- `index.ts` – Kompozice aplikace, propojení portů a adaptérů
+
+### Praktické příklady
+- Pro přidání nového úložiště stačí implementovat rozhraní `PromptRepository` a zaregistrovat adaptér.
+- Pro změnu templating systému stačí implementovat `TemplatingPort`.
+
+### Odkazy
+- [Oficiální MCP architektura](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
+- [Hexagonal Architecture (Alistair Cockburn)](https://alistair.cockburn.us/hexagonal-architecture/)

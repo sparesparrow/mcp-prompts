@@ -221,6 +221,20 @@ This section contains features to be implemented after the core migration is com
 - [ ] **Resource URI System:** Implement a full Resource URI parser and router for deep ecosystem integration (`@github:`, `@filesystem:`, etc.).
 - [ ] **Bidirectional GitHub Sync:** Allow for a full Git-based workflow for managing prompts.
 
+# Hexagonální architektura – TODO
+
+- [ ] Zajistit, že všechny nové funkce jsou navrhovány jako porty a implementovány jako adaptéry
+- [ ] Pokrýt doménovou logiku unit testy bez závislosti na konkrétních adaptérech
+- [ ] Přidat příklady implementace nových adapterů (úložiště, templating, transport)
+- [ ] Zvážit oddělení transportních vrstev do samostatných balíčků
+- [ ] Pravidelně revidovat rozhraní portů pro udržení čistoty domény
+
+## Poznámky
+- Hexagonální architektura zvyšuje udržitelnost a rozšiřitelnost projektu
+- Viz README.md a MIGRATION.md pro detailní popis a příklady
+
+---
+
 ```mermaid
 graph TD
     %% Styling

@@ -40,4 +40,21 @@ The migration is divided into several phases:
 - **New Repositories:** All future development will happen in the new, specialized repositories. Links will be provided in the main `README.md`.
 - **Dependencies:** Implementations will now consume versioned packages for contracts and the prompt collection instead of using local files.
 
-We believe this transition will make the MCP Prompts project more robust, scalable, and easier to contribute to. Thank you for your support during this process. 
+We believe this transition will make the MCP Prompts project more robust, scalable, and easier to contribute to. Thank you for your support during this process.
+
+## Migrace na hexagonální architekturu
+
+Při migraci projektu `mcp-prompts` na hexagonální architekturu byly provedeny tyto klíčové kroky:
+
+1. **Oddělení doménové logiky** do složky `core/domain` a služeb do `core/services`.
+2. **Definice portů (rozhraní)** v `core/ports` pro úložiště, templating a API.
+3. **Přesun implementací** do složky `adapters` (např. souborový adaptér, šablonovací adaptér).
+4. **Transportní vrstvy** (HTTP, MCP, SSE) přesunuty do `transports`.
+5. **Kompozice aplikace** v `index.ts` – zde se propojují porty a adaptéry.
+
+### Doporučení pro další rozvoj
+- Nové funkcionality vždy navrhujte nejprve jako port (rozhraní) v doméně.
+- Implementace přidávejte jako samostatné adaptéry.
+- Testujte doménovou logiku odděleně od infrastruktury.
+
+Tento přístup zajišťuje dlouhodobou udržitelnost a snadnou rozšiřitelnost projektu. 
