@@ -23,8 +23,8 @@ This document serves as the master plan for the strategic migration of the MCP P
 ##### Enhanced File Adapter (Storage)
 
 - [x] **Schema Validation (High):** Strictly validate all JSON files on read/write to prevent data corruption.
-- [ ] **Concurrency Control (High):** Implement file locking to prevent race conditions during write operations.
-- [ ] **Indexing (Medium):** Create a metadata index file to speed up list operations for large prompt collections.
+- [x] **Concurrency Control (High):** Implement file locking to prevent race conditions during write operations. (Implemented and tested for prompts, sequences, and workflow states. See new concurrency tests in `mcp-prompts-ts/tests/integration/file-adapter.integration.test.ts`.)
+- [x] **Indexing (Medium):** Create a metadata index file to speed up list operations for large prompt collections. (Implemented as `index.json` in the prompts directory; FileAdapter now uses this for fast listing. Tested and committed.)
 - [ ] **Atomic Writes (Low):** Use a "write-then-rename" pattern for safe, atomic updates.
 
 ##### Advanced Templating Engine
