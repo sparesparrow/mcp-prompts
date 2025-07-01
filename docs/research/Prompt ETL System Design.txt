@@ -1,0 +1,392 @@
+﻿Re-architecting the MCP-Prompts Ecosystem: A Prompt-ETL Blueprint
+I. Executive Summary & Architectural Vision
+This document presents a formal architectural blueprint for the comprehensive re-engineering of the mcp-prompts ecosystem. The current state, characterized by prompt fragmentation and a lack of formal governance, presents significant challenges to scalability, maintainability, and collaboration. To address these challenges, this blueprint proposes a paradigm shift: treating prompts not as incidental strings of text, but as first-class data assets that are managed through a robust, automated Prompt-ETL (Extract, Transform, Load) pipeline.
+The core problem this architecture solves is "prompt rot"—a state where valuable prompts become fragmented across codebases, unversioned, and difficult to manage within a team, leading to inefficiency and security risks. By applying the mature, battle-tested principles of data engineering, the Prompt-ETL system will establish a single source of truth, transforming a chaotic landscape into a governed, reliable, and scalable asset pipeline.
+Strategic Benefits of the Re-architecture
+The adoption of a formal Prompt-ETL pipeline delivers critical strategic advantages that directly address the limitations of the current system and enable future growth.
+* Maintainability & Scalability: The proposed architecture is fundamentally decoupled, separating the concerns of prompt sourcing (Extraction), prompt processing (Transformation), and prompt storage (Loading). This modularity, based on the Hexagonal Architecture pattern, allows each component of the pipeline to be modified, scaled, or replaced independently. For example, adding a new source format like XML or a new storage target like a PostgreSQL database will not require any changes to the core prompt transformation logic. This inherent flexibility is essential for an ecosystem intended to grow and adapt to new AI development practices.
+* Developer Experience & Collaboration: This architecture establishes a clear separation between the roles of prompt engineer and software developer. Prompt engineers can author and manage prompts in simple, human-readable formats like Markdown or plain text, stored in familiar locations like local directories or Git repositories. The ETL pipeline then automatically processes these raw assets into a guaranteed, standardized, and machine-readable JSON format. This eliminates the need for developers to handle inconsistent prompt formats, creating a "single source of truth" that streamlines integration and reduces friction between teams.
+* Quality & Governance: By formalizing the journey of a prompt from creation to consumption, the system introduces critical checkpoints for quality and governance. The pipeline becomes the natural place to implement automated validation, versioning, and auditing. Every prompt can be tracked from its origin, through its transformation, to its final loaded state, complete with metadata and checksums. This level of rigor treats prompts with the same importance as other critical data assets, ensuring consistency, reliability, and security across the entire Model Context Protocol (MCP) ecosystem.
+High-Level Architectural Diagram
+The following diagram provides a high-level contextual view of the Prompt-ETL system. It illustrates the primary inputs—various user-defined sources—and its main output: a catalog of standardized, versioned, and validated JSON prompts ready for consumption by downstream MCP services.
+graph TD
+   subgraph User-Defined Sources
+       A
+       B
+   end
+
+   subgraph Prompt-ETL System
+       direction LR
+       subgraph Extraction Layer
+           C --> D{File Discovery & Parsing};
+       end
+       subgraph Transformation Layer
+           D --> E;
+       end
+       subgraph Loading Layer
+           E --> F;
+       end
+   end
+
+   subgraph Output
+       G
+   end
+
+   subgraph Consumers
+       H
+       I[Other AI Applications]
+   end
+
+   A --> C;
+   B --> C;
+   F --> G;
+   G --> H;
+   G --> I;
+
+   style User-Defined Sources fill:#e6f3ff,stroke:#333,stroke-width:2px
+   style Prompt-ETL System fill:#e8f5e9,stroke:#333,stroke-width:2px,stroke-dasharray: 5 5
+   style Output fill:#fffde7,stroke:#333,stroke-width:2px
+   style Consumers fill:#f3e5f5,stroke:#333,stroke-width:2px
+
+II. Core Architectural Framework: Applying Hexagonal Architecture to Prompt-ETL
+To achieve the strategic goals of modularity, testability, and scalability, the Prompt-ETL system will be built upon the Hexagonal Architecture, also known as the Ports and Adapters pattern. This architectural choice is not arbitrary; it is a direct response to the primary requirements of the system: to support multiple, interchangeable technologies for data input and output while protecting the core business logic from external complexities.
+Rationale for Hexagonal (Ports and Adapters) Architecture
+The fundamental principle of Hexagonal Architecture is the strict separation of the application's core logic from the infrastructure it interacts with. This creates a system that is resilient to technological churn and inherently easier to test and maintain.
+* Decoupling the Core Domain: The "hexagon" represents the application's core domain. In this system, the core domain is the business logic of prompt transformation—the rules that define how a raw string of text becomes a structured, templated prompt object. By isolating this core, it remains pure and independent of implementation details like whether the input came from a local file or a Git repository, or whether the output is a JSON file or a database record. This core logic becomes a self-contained, reusable asset.
+* Enabling Pluggability through Ports and Adapters: The architecture's power lies in its use of "ports" and "adapters" to manage interactions with the outside world.
+   * Ports are interfaces defined within the core logic. They specify a contract for a particular interaction, such as "fetching raw prompts" or "persisting transformed prompts," without defining how that interaction is performed.
+   * Adapters are concrete implementations of these ports that live outside the core. They contain the specific technology-dependent code needed to connect to external systems. For example, a FileSystemAdapter knows how to read local files, while a GitAdapter knows how to clone a repository. This "pluggable" nature directly addresses the user's requirement to support various file formats and sources, both now and in the future.
+Mapping ETL to Hexagonal Concepts
+The three stages of the ETL process map cleanly onto the components of the Hexagonal Architecture, providing a clear and logical structure for the system.
+* The Hexagon (Core Domain / Transformation Layer): This is the heart of the Prompt-ETL system.
+   * Responsibilities: It contains the pure, stateless business logic for transforming prompts. This includes parsing raw text for placeholders, applying templating rules, enriching metadata, and generating the final structured output. It is completely agnostic of Node.js-specific I/O operations like fs.readFile or network calls.
+   * Domain Entities: It defines the primary data structures of the application, such as the RawPrompt (the input to the core) and the canonical TransformedPrompt (the output from the core).
+* Driving/Input Ports & Adapters (The "Extract" Layer): These components are responsible for feeding data into the core.
+   * Input Port: An interface defined within the core, for example, IFetchPrompts. This port will declare methods like fetch(sourceConfig: SourceConfig): Promise<RawPrompt>, establishing the contract for how the core requests data.
+   * Driving Adapters: These are the concrete implementations that interact with the outside world to fulfill the IFetchPrompts contract. They live outside the core.
+      * FileSystemAdapter: Implements the fetch method by reading from local directories based on the provided configuration.
+      * GitAdapter: Implements fetch by cloning a remote Git repository and then reading files from the local clone.
+      * Future Extension: An HttpAdapter could be added to implement fetch by downloading prompts from a web server, without any changes to the core logic.
+* Driven/Output Ports & Adapters (The "Load" Layer): These components are used by the core to send data out to the world.
+   * Output Port: An interface defined within the core, for example, IPersistPrompts. This port will declare a method like save(prompts: TransformedPrompt): Promise<void>.
+   * Driven Adapters: These are the concrete implementations that the core uses to persist the transformed data.
+      * JsonFileAdapter: Implements the save method by writing the array of TransformedPrompt objects to the local filesystem as individual JSON files.
+      * Future Extension: A DatabaseAdapter could be added to implement save by storing the transformed prompts in a PostgreSQL database, a capability already anticipated in the existing mcp-prompts server.
+Dependency Injection and System Composition
+To make the Hexagonal Architecture practical and maintain loose coupling, a Dependency Injection (DI) container is essential. Without DI, the core logic would be forced to instantiate concrete adapters, which would create a direct dependency on infrastructure code and violate the core principle of the pattern.
+* The Role of a DI Container: A DI container, or Inversion of Control (IoC) container, is responsible for "wiring up" the application. It instantiates the various components (adapters, services) and injects them into the classes that depend on them, based on the abstract interfaces (ports) they implement.
+* Recommended DI Framework: For a modern TypeScript project, a lightweight, decorator-based DI container is ideal. Both TSyringe from Microsoft and InversifyJS are excellent choices. TSyringe is often favored for its simplicity and strong integration with TypeScript's metadata reflection capabilities.
+* Implementation Strategy:
+   1. Define Ports as Interfaces/Symbols: The ports (IFetchPrompts, IPersistPrompts) will be defined as TypeScript interfaces. In DI containers like InversifyJS, unique symbols are often used as injection tokens to represent these interfaces at runtime.
+   2. Decorate Adapters and Services: The concrete adapter classes (FileSystemAdapter) and core services will be decorated with @injectable() to mark them as manageable by the container.
+   3. Inject Dependencies: The core services will declare their dependencies on the ports in their constructors, using the @inject(TOKEN) decorator to specify which dependency to inject.
+   4. Compose the Application: A single entry point file (e.g., /src/main.ts) will be responsible for creating the DI container, registering the bindings (e.g., container.bind<IFetchPrompts>(Tokens.IFetchPrompts).to(FileSystemAdapter)), and resolving the main application service to kick off the entire ETL process.
+* The Testing Advantage: This architectural approach yields significant benefits for testing. To unit test the core transformation logic, one can simply inject mock adapters that simulate file reading or database writing without performing any actual I/O. These mock adapters can return predefined data or verify that the save method was called with the correct output. This makes tests extremely fast, reliable, and independent of external systems.
+III. The Extraction Layer: mcp-prompts-catalog Re-imagined
+The "Extract" phase of the pipeline is the responsibility of the re-imagined mcp-prompts-catalog component. It will evolve from a simple collection of prompts into a powerful, configuration-driven data ingestion engine capable of sourcing raw prompts from diverse locations and formats.
+Configuration-Driven Sources
+The entire ETL process will be governed by a single, declarative configuration file named prompt-etl.config.json, located at the project root. This file defines an array of sources, allowing users to compose a catalog from multiple origins.
+Each source object in the configuration will contain the following fields:
+* id: A unique string identifier for the source, used for logging and traceability.
+* type: A string specifying the adapter to use, either "local" or "git".
+* path: The location of the source. For local sources, this is a relative or absolute filesystem path. For git sources, this is the path within the cloned repository to search for prompts.
+* repository (git only): The URL of the Git repository to clone.
+* branch (git only): The specific branch, tag, or commit hash to check out.
+* include: An array of glob patterns specifying which files to process.
+* exclude: An optional array of glob patterns specifying which files or directories to ignore.
+Example prompt-etl.config.json:
+{
+ "sources": [
+   {
+     "id": "local-project-prompts",
+     "type": "local",
+     "path": "./prompt_sources/projectA",
+     "include": ["**/*.md", "**/*.yaml"],
+     "exclude": ["**/drafts/**", "**/archive/**"]
+   },
+   {
+     "id": "remote-standard-prompts",
+     "type": "git",
+     "repository": "https://github.com/sparesparrow/mcp-prompts-catalog.git",
+     "branch": "main",
+     "path": "prompts/",
+     "include": ["**/*.txt", "**/*.json"]
+   }
+ ]
+}
+
+Source Adapters Implementation
+The type field in the source configuration directly maps to a specific driving adapter responsible for fetching the raw data.
+* GitAdapter: This adapter handles sources of type git.
+   * Technology: It will leverage a robust, promise-based Node.js Git client library. simple-git is a strong candidate due to its lightweight nature and reliance on the system's git binary, ensuring compatibility and performance. For environments where a native dependency is undesirable, isomorphic-git provides a pure JavaScript alternative.
+   * Process: Upon invocation, the adapter will:
+      1. Create a temporary, managed directory for the clone.
+      2. Execute the clone operation using the repository URL.
+      3. Check out the specific branch or ref.
+      4. Pass the local path to the cloned repository's sub-path (defined by the path property) to the shared file discovery service.
+* FileSystemAdapter: This adapter handles sources of type local.
+   * Process: It will use the provided path directly as the starting point for the file discovery service.
+   * Critical Security Mandate: This adapter is a primary vector for path traversal attacks. It MUST implement stringent security checks. The canonical path of any user-provided file path must be resolved and validated to ensure it remains within the intended project's base directory. Any path containing .. sequences that attempts to escape this "jail" will be immediately rejected, and the operation will fail with a security error. This is a non-negotiable security requirement.
+File Discovery with Glob Patterns
+A high-performance globbing library is essential for efficiently finding files that match the user-defined include and exclude patterns.
+* Recommended Library: fast-glob is the recommended choice over older libraries like glob. It offers superior performance, a modern promise-based and stream-based API, and rich support for advanced patterns like brace expansion and extglobs, providing users with a powerful and familiar syntax for defining their file sets.
+File Format Parsers (Parser Adapters)
+Once files are discovered, a specific parser adapter will be chosen based on the file's extension. This creates another layer of pluggability within the extraction stage, making it easy to add support for new file formats in the future.
+* YAML (.yml, .yaml): The yaml library is the recommended parser. It is more actively maintained than the widely used js-yaml and has superior support for the YAML 1.2 specification. This is critical for avoiding subtle parsing bugs, such as the "Norway problem" where strings like NO could be misinterpreted as boolean false in older YAML versions.
+* JSON (.json): For standard use cases, the native JSON.parse() method, wrapped in a try...catch block to handle syntax errors, is sufficient and performant. For environments handling extremely large JSON files or untrusted sources where event-loop blocking is a concern, a two-stage streaming parser like everything-json can be employed to mitigate DoS risks.
+* Markdown (.md, .mdc): The primary requirement for Markdown parsing is to separate YAML front-matter (which will become the prompt's metadata) from the main body content. gray-matter is the industry-standard library for this task and is highly recommended. The content remaining after front-matter extraction will be treated as the raw prompt text.
+* Plain Text (.txt): The file will be read directly as a UTF-8 string using fs.createReadStream. No complex parsing is required.
+* Future Formats (e.g., CSV, XML): The adapter pattern ensures that adding support for other formats is straightforward. A CsvParserAdapter could be implemented using a library like csv-parse , and an XmlParserAdapter could use fast-xml-parser.
+Incremental Processing with Streams
+To ensure the ETL pipeline is memory-efficient and scalable, it must leverage Node.js streams for I/O operations.
+* File Discovery: For directories containing tens of thousands of files, the fast-glob stream API (fg.stream()) should be used to emit file paths one by one, rather than buffering them all into an array.
+* File Reading: For reading file contents, especially for potentially large files, fs.createReadStream() is mandatory. This prevents the entire file from being loaded into memory at once. The readable stream can be piped directly to a compatible streaming parser (many modern parsers for CSV, XML, and JSON support this), optimizing the entire extraction process from disk to parsed object.
+Table 1: File Parser Library Comparison
+Library Name
+	Supported Format(s)
+	Key Features
+	Performance Rank
+	Security Considerations
+	Recommended for Project
+	yaml
+	YAML
+	YAML 1.2 support, comment parsing, robust error handling, active development.
+	High
+	Low risk. Handles spec edge cases well, reducing ambiguity.
+	Yes
+	js-yaml
+	YAML
+	Widely used, supports YAML 1.2.
+	Medium
+	Stale development. Potential for ambiguity with YAML 1.1 constructs ("Norway problem").
+	No (Superseded by yaml)
+	gray-matter
+	Markdown
+	Extracts YAML/JSON/TOML front-matter, returns content and metadata separately.
+	High
+	Low risk. Focused scope limits attack surface.
+	Yes
+	fast-glob
+	Glob Patterns
+	Asynchronous, Synchronous, and Stream APIs. High performance. Rich pattern support.
+	Very High
+	Low risk. Not involved in parsing file content.
+	Yes
+	csv-parse
+	CSV
+	Streaming API, flexible delimiter/quote options, part of a larger CSV suite.
+	High
+	Low risk. Mature and well-tested.
+	Yes (For future extension)
+	fast-xml-parser
+	XML
+	Pure JS, no native dependencies, validation, attribute parsing.
+	High
+	Low risk. Actively maintained.
+	Yes (For future extension)
+	JSON.parse (native)
+	JSON
+	Built-in, extremely fast for valid JSON.
+	Very High
+	Can block event loop on very large strings. Malformed JSON throws a catchable error.
+	Yes (with try/catch)
+	IV. The Control & Transformation Plane: mcp-prompts-contracts and the add_prompt Tool
+The "Transform" stage of the ETL process is the intellectual core of the system. It is here that raw, unstructured text is converted into valuable, structured prompt templates. This logic resides within the Hexagon, orchestrated by the mcp-prompts-contracts package and embodying the functionality of the add_prompt tool.
+The mcp-prompts-contracts Package as Orchestrator
+The user's vision for mcp-prompts-contracts as a "middleman" using a "build configuration" is a sophisticated one. This elevates the package from a simple container of shared TypeScript types into the control plane for the entire Prompt-ETL pipeline.
+* Role and Responsibility: This package will contain the primary executable script for the ETL process, exposed via the bin field in its package.json. When a user runs prompt-etl from the command line, it is this script that executes.
+* Execution Flow: The orchestrator script will perform the following sequence of operations:
+   1. Read Configuration: It begins by parsing the prompt-etl.config.json file to understand the user's intent.
+   2. Initialize DI Container: It instantiates the Dependency Injection container and registers the appropriate adapter implementations based on the configuration.
+   3. Initiate Extraction: It iterates through each source defined in the configuration. For each source, it resolves the correct IFetchPrompts adapter (e.g., GitAdapter for a git source) and invokes its fetch method.
+   4. Receive Raw Prompts: It collects the array of RawPrompt objects returned by the adapters. Each RawPrompt contains the raw content and any metadata extracted from the source file (e.g., from Markdown front-matter).
+   5. Filtering (Optional): It can apply pre-transformation filtering logic, for example, excluding prompts that have a status: draft tag in their metadata.
+   6. Invoke Transformation: It passes the filtered array of RawPrompt objects to the core Transformation Engine.
+   7. Receive Transformed Prompts: It collects the resulting array of TransformedPrompt objects.
+   8. Initiate Loading: It resolves the IPersistPrompts adapter (e.g., JsonFileAdapter) and invokes its save method, passing the final transformed prompts for persistence.
+The Transformation Engine (Core Logic)
+This engine is the pure, testable service that implements the logic of the add_prompt tool. It is the central "hexagon" in the architecture, completely decoupled from any I/O.
+* Input: The engine accepts a RawPrompt object. This object is a simple data structure with properties like id (a unique identifier derived from the source), sourcePath, format, raw content (which can be a string or a parsed object from YAML/JSON), and a metadata object.
+* Transformation Pipeline: Each RawPrompt is processed through a series of deterministic steps:
+   1. Content Normalization: The engine first ensures it has a single string to work with. If the content is an object (from YAML/JSON), it extracts the primary prompt text based on a predefined key (e.g., prompt_text).
+   2. Static Placeholder Replacement: A simple, global string replacement step is performed. This can substitute predefined static values (e.g., replacing {{CURRENT_YEAR}} with "2024"). This logic is configurable.
+   3. Dynamic Variable Identification: This is the most critical transformation step. The engine parses the prompt content to identify dynamic variables, typically denoted by a convention like {{variable_name}}. A lightweight parser, potentially derived from a templating engine's own logic, is used to robustly extract these variable names without accidentally capturing other text.
+   4. Template Creation: Once variables are identified, the engine converts the raw text into a valid template string compatible with the chosen runtime templating engine. This ensures the output is immediately usable. The result is a template string and an array of identified variables.
+   5. Metadata Enrichment: The engine combines the original metadata from the source file (e.g., from front-matter) with new metadata generated during the transformation process. This new metadata includes the list of identified variables, a timestamp of the transformation, and a version hash of the logic itself.
+* Output: The final product of the engine is a TransformedPrompt object, which is a rich, structured representation ready for the Loading layer.
+Templating Engine Selection
+The transformation engine must produce a template string that is compatible with a specific runtime templating engine. The choice of this engine is critical for performance and security.
+* Requirements: The engine should be lightweight, secure, fast, and support basic variable substitution. It does not need complex logic like loops or conditionals, as those are antithetical to the goal of a simple, predictable prompt template.
+* Candidate Analysis:
+   * EJS (Embedded JavaScript templates): While popular, EJS is explicitly designed to execute arbitrary JavaScript. The official documentation warns against using it with any untrusted input, as it can create a vector for code injection. Although our templates are internally generated, adopting a tool with such inherent risks is a poor security posture. The express-fileupload vulnerability, where prototype pollution led to RCE through an EJS templating engine, serves as a stark warning.
+   * Handlebars: A more secure, logic-less templating engine that is a strong and mature option.
+   * Eta: A modern, lightweight, and extremely fast engine with an EJS-like syntax but without the arbitrary code execution vulnerabilities. It is highly configurable and supports plugins, making it both safe and flexible.
+* Recommendation: Eta is the recommended templating engine. Its combination of high performance, low overhead, and a secure-by-default design makes it the ideal choice. The transformation engine will be configured to produce template strings that conform to Eta's syntax (e.g., <%= variable_name %>).
+V. The Loading Layer: Persisting Transformed Prompts
+The "Load" phase is the final stage of the ETL pipeline, where the structured, validated, and transformed prompts are persisted into a durable and standardized data store. This layer ensures that all downstream consumers, such as the mcp-prompts server, receive data in a consistent and predictable format.
+The Standardized Prompt Schema (prompt.schema.json)
+To enforce consistency and provide a clear contract for all data consumers, a formal JSON Schema will define the canonical structure of a TransformedPrompt. This schema is a critical artifact of the system, enabling automated validation and serving as documentation.
+* Schema Definition: A prompt.schema.json file will be created and maintained within the mcp-prompts-contracts package.
+* Core Schema Fields: The schema will define the following properties for each prompt object:
+   * id (string, required): A unique, deterministic identifier for the prompt, ideally a SHA256 hash of its source path and original content to ensure stability across runs.
+   * name (string, required): A human-readable name, derived from the source filename or a name field in the metadata.
+   * version (string, optional): The semantic version of the prompt (e.g., "1.2.0"), if specified in the source metadata. This allows for explicit version management of individual prompts.
+   * source_id (string, required): A reference to the id of the source from the prompt-etl.config.json file, providing clear data lineage.
+   * tags (array of strings, optional): A list of tags for categorization and filtering, sourced from metadata.
+   * metadata (object, optional): A key-value store for any other relevant information, such as author, description, creation_date, etc.
+   * template (string, required): The final, transformed prompt string, formatted to be compatible with the chosen templating engine (Eta).
+   * variables (array of objects, required): An array describing each dynamic variable identified during transformation. Each variable object will have:
+      * name (string, required): The name of the variable (e.g., "user_name").
+      * type (string, optional): An optional type hint (e.g., "string", "number").
+      * description (string, optional): A human-readable description of the variable's purpose.
+   * checksum (string, required): A SHA256 hash of the template content. This allows consumers to quickly detect if a prompt's content has changed without needing to parse the full string.
+Output Adapter: Secure Filesystem Writer
+The primary driven adapter for this system will be a JsonFileAdapter that implements the IPersistPrompts output port.
+* Functionality: This adapter will receive the array of TransformedPrompt objects from the core engine and perform the following actions for each prompt:
+   1. Validation: Before writing, it will validate the prompt object against the prompt.schema.json using a fast and robust schema validator like Ajv. Any prompt that fails validation will be shunted to the error handling mechanism and will not be written to the main catalog.
+   2. Serialization: It will serialize the valid prompt object into a prettified JSON string.
+   3. File Writing: It will write the JSON string to a file in a designated output directory (e.g., ./dist/prompts/). The filename will be derived from the prompt's unique id to prevent naming collisions (e.g., {id}.json).
+* Security Considerations: The adapter must perform rigorous path validation on the configured output directory. It will resolve the absolute path and ensure that it is a subdirectory of the project root. This prevents any possibility of a misconfiguration or malicious input causing files to be written to unintended or sensitive system locations, such as /etc or C:\Windows.
+Data Integrity and Versioning
+The loading layer is the final gatekeeper for data quality and integrity.
+* Checksum Verification: On subsequent ETL runs, the adapter can compare the checksum of a newly transformed prompt with the checksum of an existing prompt file (if one exists with the same ID). If the checksums match, the file write can be skipped, optimizing the process for incremental updates.
+* Catalog Manifest: In addition to individual prompt files, the adapter can generate a manifest.json file in the output directory. This manifest would contain a summary of the ETL run, including a list of all generated prompt IDs, their versions, and their checksums. This provides a single, lightweight file that consumers can use to quickly determine the state of the entire prompt catalog.
+VI. System Structure and CI/CD
+A robust architectural blueprint must extend beyond the code itself to encompass the organization of the project and the automation of its lifecycle. This section details the recommended monorepo structure, package management strategy, and a comprehensive CI/CD pipeline to ensure quality and reliability.
+Monorepo Strategy
+Given the tightly coupled nature of the ecosystem's components (catalog, contracts, core, and various adapters), a monorepo is the most effective organizational strategy. It offers significant advantages over managing multiple separate repositories (polyrepo).
+* Rationale:
+   * Atomic Changes: A monorepo allows for atomic commits that span multiple packages. For instance, a change to a core TransformedPrompt interface can be updated simultaneously in the core library, the JsonFileAdapter, and the consuming CLI application in a single commit, ensuring consistency.
+   * Simplified Dependency Management: It eliminates the complexities of managing dependencies between local packages using npm link or a private registry. All packages within the monorepo can reference each other directly, and a single lockfile governs third-party dependencies, preventing version conflicts.
+   * Consistent Tooling: A single, unified set of tools for linting, testing, and building can be enforced across the entire project, improving developer mobility and reducing configuration overhead.
+* Recommended Tooling: While several tools exist for managing TypeScript monorepos, Nx is recommended for this project. Although Turborepo is a strong contender, Nx provides more advanced capabilities that are particularly well-suited for this architecture, including:
+   * Dependency Graph Visualization: Nx can generate an accurate, up-to-date diagram of how packages depend on each other, which is invaluable for understanding and enforcing architectural boundaries.
+   * Enforced Boundaries: Nx allows the definition of rules to prevent illegal imports (e.g., ensuring an adapter cannot be imported by the core), which programmatically enforces the Hexagonal Architecture.
+   * Advanced Caching and Task Orchestration: Nx's "affected" commands (npx nx affected:test) intelligently run tests and builds only on the packages impacted by a code change, dramatically speeding up CI cycles.
+Table 2: Proposed Monorepo Package Structure
+Package Name
+	Directory
+	Description
+	Key Dependencies
+	@mcp-prompts/cli
+	apps/prompt-etl-cli
+	The primary executable application. Orchestrates the ETL pipeline by consuming the library packages.
+	commander, @mcp-prompts/contracts
+	@mcp-prompts/contracts
+	libs/contracts
+	Defines the core interfaces (Ports), data schemas (prompt.schema.json), and shared types.
+	zod or ajv
+	@mcp-prompts/core
+	libs/core
+	The Hexagonal core. Contains the pure, framework-agnostic transformation logic.
+	eta
+	@mcp-prompts/adapter-filesystem
+	libs/adapter-filesystem
+	Implements the adapters for reading from and writing to the local filesystem.
+	@mcp-prompts/contracts, fast-glob
+	@mcp-prompts/adapter-git
+	libs/adapter-git
+	Implements the adapter for extracting prompts from remote Git repositories.
+	@mcp-prompts/contracts, simple-git
+	@mcp-prompts/adapter-parsers
+	libs/adapter-parsers
+	A utility library containing all file format parsers (YAML, Markdown, etc.).
+	yaml, gray-matter
+	Package Management and Versioning
+* Package Configuration: Each package within the monorepo will have its own package.json file. The main CLI application (@mcp-prompts/cli) will define a bin field to make the prompt-etl command available system-wide upon installation. All packages will adhere to best practices, including specifying name, version, license, and repository fields.
+* Semantic Versioning (SemVer): The ecosystem will strictly adhere to Semantic Versioning 2.0.0. This is not merely a convention but a contract with consumers of the packages and the final prompt catalog.
+   * MAJOR version change (e.g., 1.x.x -> 2.0.0): Required for any backward-incompatible change, such as a breaking change to the canonical prompt.schema.json.
+   * MINOR version change (e.g., 1.2.x -> 1.3.0): For adding new, backward-compatible functionality, such as a new file parser or a new optional field in the schema.
+   * PATCH version change (e.g., 1.2.3 -> 1.2.4): For backward-compatible bug fixes. Automated versioning and publishing tools like semantic-release can be used to enforce this discipline.
+Continuous Integration / Continuous Deployment (CI/CD) Pipeline
+A robust CI/CD pipeline, implemented using GitHub Actions, is critical for ensuring the quality, stability, and reliability of the ETL system.
+* Workflow Definition (.github/workflows/ci.yml):
+   1. Trigger: The workflow will trigger on every push to the main branch and on every pull_request targeting main.
+   2. Setup: The job will check out the source code and set up the correct Node.js version.
+   3. Lint & Format: It will run static analysis tools like ESLint and Prettier to enforce code quality and style consistency.
+   4. Unit & Integration Testing: It will execute the full test suite. Using npx nx affected:test will ensure that only tests for packages impacted by the changes are run, optimizing for speed.
+   5. End-to-End (E2E) Test with MCP Inspector: This is a crucial step that validates the entire system's output.
+      * The CI job will first execute the prompt-etl command on a sample set of raw prompt files located within the test directory.
+      * It will then start a downstream consumer—a test instance of the mcp-prompts server—configured to use the newly generated JSON catalog.
+      * Finally, it will use the mcp-inspector tool in its command-line mode to send JSON-RPC requests to the running server. The test will assert that the server correctly lists the transformed prompts and that their content matches the expected output. This provides a high-confidence check that the entire pipeline, from extraction to consumption, is functioning correctly.
+   6. Build: The workflow will create production-ready builds of all packages.
+   7. Publish (Conditional): A separate workflow, triggered only on the creation of a Git tag (e.g., v1.2.3), will automatically publish the updated packages to the npm registry. This separates the continuous integration process from the release process.
+VII. Operational Readiness: Configuration, Logging, and Error Handling
+For the Prompt-ETL system to be a reliable, production-grade tool, it must be designed with operational concerns at the forefront. This includes flexible configuration, transparent logging, and a resilient error-handling strategy that adheres to established ETL best practices.
+Unified Configuration Management
+The system's behavior will be controlled through a combination of a declarative configuration file and environment variables, providing a clear separation between pipeline definition and operational settings.
+* Pipeline Configuration: The prompt-etl.config.json file serves as the single source of truth for defining the ETL pipeline itself—what sources to extract from and what files to include/exclude. This file should be version-controlled alongside the project code.
+* Operational Configuration: Environment variables will be used for settings that may change between environments (local development, CI, production) without altering the pipeline's logic. This includes:
+   * LOG_LEVEL: Controls the verbosity of logging (e.g., debug, info, warn, error).
+   * GIT_AUTH_TOKEN: A personal access token for cloning private Git repositories.
+   * OUTPUT_DIR: Overrides the default output directory for the loaded prompts. For local development, a .env file can be used with a library like dotenv to manage these variables easily.
+Structured Logging
+To ensure the system is observable and debuggable, it must implement structured logging. Instead of printing plain text messages, logs will be output as JSON objects, which can be easily ingested, parsed, and queried by modern logging platforms.
+* Recommended Library: A high-performance logging library like Pino or Winston should be used.
+* Essential Context: Every log entry must contain a rich set of contextual information to be useful. This is a cornerstone of ETL best practices.
+   * traceId: A unique identifier generated at the start of each ETL run. This ID should be present in every log message for that run, allowing for easy filtering and reconstruction of the entire process.
+   * sourceId: The id of the source from the configuration file currently being processed.
+   * filePath: The path of the specific file being processed.
+   * promptId: The unique ID of the prompt once it has been generated.
+* Key Log Events: The system should log key events throughout the pipeline to provide a clear audit trail of its operations :
+   * ETLRunStart, ETLRunComplete
+   * SourceFetchStart, SourceFetchSuccess, SourceFetchFailure
+   * FileDiscovered
+   * ParseStart, ParseSuccess, ParseFailure
+   * TransformStart, TransformSuccess
+   * LoadStart, LoadSuccess, LoadSkipped (if checksum matches)
+Error Handling and Recovery
+A production ETL pipeline must be resilient. It should not fail entirely because of a single bad record; instead, it must handle errors gracefully, isolate problematic data, and provide mechanisms for recovery.
+* Extraction Errors: Failures during the extraction phase (e.g., invalid Git URL, insufficient permissions to read a directory) are typically fatal for that specific source. The system should log the error with the sourceId and traceId, report the failure, and move on to the next source in the configuration.
+* Parsing and Transformation Errors: Errors that occur on a per-file basis, such as malformed YAML or a file that fails schema validation after transformation, should not halt the entire batch. The system will implement a quarantine strategy:
+   1. Log the Error: A detailed error message is logged, including the filePath, sourceId, and the specific reason for failure.
+   2. Isolate the Record: The problematic file is skipped and not processed further in the pipeline.
+   3. Continue Processing: The ETL process continues with the next valid file.
+* Dead-Letter Queue (DLQ): To facilitate manual inspection and reprocessing, all quarantined records will be written to a "dead-letter queue". In this file-based system, the DLQ will be a single JSON file (e.g., dist/errors.json). Each entry in this file will contain the filePath of the failed record, the sourceId, the timestamp, and the specific error message. This allows developers or administrators to review the failures, correct the source files, and re-run the pipeline.
+* Loading Errors: Failures during the loading phase (e.g., filesystem write permissions, disk full) are generally more critical and may indicate a systemic problem. The pipeline should attempt to write all files but log each failure. If any write operations fail, the entire ETL run should be marked as a failure, and a high-priority alert should be triggered.
+VIII. Implementation Roadmap
+The development and deployment of the Prompt-ETL system should follow a phased, iterative approach. This strategy allows for the delivery of value incrementally, reduces risk, and provides opportunities for feedback and course correction throughout the development lifecycle.
+Phase 1: Core Scaffolding & Hexagonal Foundation
+The goal of this initial phase is to establish the core architectural structure and prove its viability. This phase focuses on building the skeleton of the application without implementing all the features.
+* Tasks:
+   1. Initialize the Nx monorepo with the proposed package structure (apps/prompt-etl-cli, libs/core, libs/contracts, etc.).
+   2. Define the primary port interfaces (e.g., IFetchPrompts, IPersistPrompts) as TypeScript interfaces within the @mcp-prompts/contracts package.
+   3. Define the initial TransformedPrompt data structure and its corresponding JSON Schema.
+   4. Set up the chosen Dependency Injection container (e.g., TSyringe) in the main CLI application entry point.
+   5. Create skeleton implementations for the core services and adapters.
+   6. Develop foundational unit tests that verify the DI container can correctly wire up mock adapters to the core services. This validates the fundamental architectural pattern before business logic is added.
+Phase 2: Minimum Viable ETL (Local Files -> JSON)
+This phase aims to deliver the simplest possible end-to-end working pipeline. It will prove the core ETL flow and provide a tangible product for early testing and feedback.
+* Tasks:
+   1. Implement the FileSystemAdapter for both extraction and loading. This includes the critical path traversal security checks.
+   2. Implement the simplest file parsers for TXT and JSON formats within the @mcp-prompts/adapter-parsers library.
+   3. Implement the core transformation logic for the most basic case: static placeholder replacement.
+   4. Connect all the pieces to achieve a working pipeline that can read a directory of .txt files, perform a simple transformation, and write the output as standardized JSON files.
+   5. Expand the E2E test suite to cover this simple case.
+Phase 3: Expanding Extraction Capabilities
+With the core pipeline in place, this phase focuses on expanding the system's ability to ingest prompts from more complex sources and formats as required by the user query.
+* Tasks:
+   1. Implement the GitAdapter using simple-git to clone remote repositories and extract prompts from them.
+   2. Implement the more complex parsers for YAML (using the yaml library) and Markdown (using gray-matter for front-matter extraction).
+   3. Fully integrate the fast-glob library to support advanced include and exclude file matching patterns in the prompt-etl.config.json.
+   4. Add comprehensive unit tests for each new parser and adapter.
+Phase 4: Advanced Transformation and Operationalization
+The final phase focuses on implementing the more advanced features and ensuring the system is robust, automated, and ready for production use.
+* Tasks:
+   1. Implement the advanced dynamic variable templating logic within the core transformation engine, producing templates compatible with the Eta engine.
+   2. Build out the complete CI/CD pipeline in GitHub Actions, including linting, unit testing, and the critical E2E integration test that uses mcp-inspector to validate the output consumed by a live test server.
+   3. Implement the robust structured logging system with traceId and other contextual fields.
+   4. Implement the full error handling and quarantine mechanism, including the "dead-letter queue" for failed records.
+   5. Finalize documentation, including user guides for the prompt-etl.config.json and developer guides for extending the system with new adapters.
+IX. Conclusion and Recommendations
+The proposed re-architecture of the mcp-prompts ecosystem into a formal Prompt-ETL pipeline represents a strategic investment in the long-term health, scalability, and security of the platform. By moving away from ad-hoc prompt management and adopting the disciplined principles of data engineering, the system will transform prompts from a source of fragmentation and "rot" into a governed, reliable, and collaborative asset.
+The selection of a Hexagonal (Ports and Adapters) Architecture is the cornerstone of this design. It provides the necessary decoupling to isolate the stable, high-value prompt transformation logic from the volatile world of external technologies—be it file formats, data sources, or storage mechanisms. This architectural choice directly enables the pluggability required by the user query and future-proofs the system against technological change. The use of a Dependency Injection container like TSyringe is the critical enabling mechanism that makes this loose coupling practical and testable.
+The implementation of a robust CI/CD pipeline, culminating in an end-to-end test with the mcp-inspector, ensures that the quality of the final prompt catalog is continuously validated. Furthermore, the emphasis on operational readiness through structured logging and resilient error handling ensures the system is not just functional but also transparent and manageable in a production environment.
+Actionable Recommendations:
+1. Adopt the Hexagonal Architecture: The development team should prioritize the implementation of the Ports and Adapters pattern as the foundational structure. This initial investment in architectural rigor will yield significant long-term benefits in maintainability and extensibility.
+2. Prioritize Security: The security measures outlined for file system adapters, particularly path traversal prevention, and the selection of secure parsing and templating libraries, must be treated as non-negotiable requirements from day one.
+3. Embrace the Monorepo with Nx: The Nx monorepo structure should be established early. Its features for enforcing architectural boundaries will be invaluable in maintaining the integrity of the Hexagonal design as the team grows and the codebase evolves.
+4. Follow the Phased Roadmap: The implementation should proceed according to the four-phase roadmap. This iterative approach will mitigate risk, allow for early and continuous feedback, and ensure that a functional, value-delivering system is available at each stage of development.
+By executing this blueprint, the mcp-prompts ecosystem can evolve into a mature, enterprise-grade system that empowers both prompt engineers and developers, fostering collaboration and enabling the creation of more powerful and reliable AI applications within the Model Context Protocol.
+Works cited
+1. sparesparrow/mcp-prompts: Model Context Protocol server for managing, storing, and providing prompts and prompt templates for LLM interactions. - GitHub, https://github.com/sparesparrow/mcp-prompts 2. MCP Prompts - Collection - GitHub, https://github.com/sparesparrow/mcp-prompts-catalog 3. Structuring a Node.js Project with Hexagonal Architecture - Medium, https://medium.com/@yecaicedo/structuring-a-node-js-project-with-hexagonal-architecture-7be2ef1364e2 4. How a start-up implemented hexagonal architecture - The case of Packmind, https://packmind.com/implement-hexagonal-architecture-start-up/ 5. The Missing Links in MCP: Orchestration and Runtime Execution at Enterprise Scale - Nexla, https://nexla.com/blog/missing-links-in-mcp-orchestration-and-runtime-execution-at-enterprise-scale 6. The 6 ETL Best Practices You Need to Know - Boomi, https://www.boomi.com/blog/6-etl-best-practices/ 7. ETL Best Practices - Tim Mitchell, https://www.timmitchell.net/etl-best-practices/ 8. Hexagonal Architecture and Clean Architecture (with examples) - DEV Community, https://dev.to/dyarleniber/hexagonal-architecture-and-clean-architecture-with-examples-48oi 9. Building a REST API: A Hexagonal Approach with TypeScript ..., https://medium.com/@christianinyekaka/building-a-rest-api-a-hexagonal-approach-with-typescript-typeorm-postgresql-and-jwt-946d372860ee 10. A Color Coded Guide to Ports and Adapters | 8th Light, https://8thlight.com/insights/a-color-coded-guide-to-ports-and-adapters 11. Ports & Adapters architecture on example | by Wojciech Krzywiec - Medium, https://wkrzywiec.medium.com/ports-adapters-architecture-on-example-19cab9e93be7 12. JavaScript dependency injection in Node.js – introduction - The Software House, https://tsh.io/blog/dependency-injection-in-node-js/ 13. What DI framework are you using? : r/typescript - Reddit, https://www.reddit.com/r/typescript/comments/105fr6e/what_di_framework_are_you_using/ 14. [TypeScript] Try DI with TSyringe - DEV Community, https://dev.to/masanori_msl/typescript-try-di-with-tsyringe-p4n 15. microsoft/tsyringe: Lightweight dependency injection container for JavaScript/TypeScript - GitHub, https://github.com/microsoft/tsyringe 16. TSyringe and Dependency Injection in TypeScript - DEV Community, https://dev.to/gdsources/tsyringe-and-dependency-injection-in-typescript-3i67 17. Getting started - InversifyJS, https://inversify.github.io/docs/introduction/getting-started/ 18. Dependency injection: setting up InversifyJS IoC for Typescript Apps - Medium, https://medium.com/tkssharma/dependency-injection-setting-up-inversifyjs-ioc-for-typescript-apps-da65edfb1ea8 19. A Beginner's Guide to InversifyJS for Node.js Developers - DEV Community, https://dev.to/saint_vandora/a-beginners-guide-to-inversifyjs-for-nodejs-developers-52a 20. Hexagonal Architecture Distilled in JavaScript | by Pedro Morais, https://javascript.plainenglish.io/hexagonal-architecture-distilled-in-javascript-ultimate-guide-aac2eaa6726c 21. Hexagonal Architecture with Nest.js and TypeScript | by Krzysztof Słomka - Medium, https://kisztof.medium.com/hexagonal-architecture-with-nest-js-and-typescript-f181cc7b6452 22. simple-git - npm, https://www.npmjs.com/package/simple-git 23. isomorphic-git/isomorphic-git: A pure JavaScript implementation of git for node and browsers! - GitHub, https://github.com/isomorphic-git/isomorphic-git 24. isomorphic-git · A pure JavaScript implementation of git for node and browsers!, https://isomorphic-git.org/ 25. Directory Traversal in node | CVE-2025-23084 - Snyk Vulnerability Database, https://security.snyk.io/vuln/SNYK-UPSTREAM-NODE-8651420 26. Node.js API Security Vulnerabilities with Path Traversal in files-bucket-server, https://www.nodejs-security.com/blog/nodejs-api-security-vulnerabilities-path-traversal-files-bucket-server 27. Question: NodeJS secure file saving into file system. Preventing path traversal - Reddit, https://www.reddit.com/r/node/comments/aimrih/question_nodejs_secure_file_saving_into_file/ 28. How to prevent directory traversal when joining paths in node.js?, https://security.stackexchange.com/questions/123720/how-to-prevent-directory-traversal-when-joining-paths-in-node-js 29. Directory Traversal in node-static | CVE-2023-26111 - Snyk Vulnerability Database, https://security.snyk.io/vuln/SNYK-JS-NODESTATIC-3149928 30. micromatch vs fast-glob | File Pattern Matching Libraries Comparison - NPM Compare, https://npm-compare.com/fast-glob,micromatch 31. mrmlnc/fast-glob: :rocket: It's a very fast and efficient glob ... - GitHub, https://github.com/mrmlnc/fast-glob 32. glob - NPM, https://www.npmjs.com/package/glob 33. node-glob - npm search, https://www.npmjs.com/search?q=node-glob 34. yaml - NPM, https://www.npmjs.com/package/yaml 35. js-yaml - NPM, https://www.npmjs.com/package/js-yaml 36. The yaml document from hell — JavaScript edition - Phil Nash, https://philna.sh/blog/2023/02/02/yaml-document-from-hell-javascript-edition/ 37. How to parse JSON using Node.js? [closed] - Stack Overflow, https://stackoverflow.com/questions/5726729/how-to-parse-json-using-node-js 38. mmomtchev/everything-json: An alternative `JSON` parser for Node.js that does not block the event loop - GitHub, https://github.com/mmomtchev/everything-json 39. Node.js Markdown modules | LibHunt, https://nodejs.libhunt.com/modules/markdown 40. CSV Parse - Usage - CSV for Node.js, https://csv.js.org/parse/ 41. csv-parse - NPM, https://www.npmjs.com/package/csv-parse 42. fast-xml-parser - NPM, https://www.npmjs.com/package/fast-xml-parser 43. How to use Streams - Node.js, https://nodejs.org/en/learn/modules/how-to-use-streams 44. Streams in Node.js: Efficient Data Processing Made Easy | by Samuelnoye | Medium, https://medium.com/@samuelnoye35/streams-in-node-js-efficient-data-processing-made-easy-ebd4d332be61 45. How to Process Large Files with Node.js - Stateful, https://stateful.com/blog/process-large-files-nodejs-streams 46. Efficient Data Handling with Node.js Streams - DEV Community, https://dev.to/imsushant12/efficient-data-handling-with-nodejs-streams-4483 47. Best practices for building CLI and publishing it to NPM - WebbyLab, https://webbylab.com/blog/best-practices-for-building-cli-and-publishing-it-to-npm/ 48. The largest Node.js CLI Apps best practices list - GitHub, https://github.com/lirantal/nodejs-cli-apps-best-practices 49. EJS -- Embedded JavaScript templates, https://ejs.co/ 50. Flaw in popular NodeJS 'express-fileupload' module allows DoS attacks and code injection, https://securityaffairs.com/106782/security/nodejs-express-fileupload-module-flaw.html 51. NodeJS module downloaded 7M times lets hackers inject code - Bleeping Computer, https://www.bleepingcomputer.com/news/security/nodejs-module-downloaded-7m-times-lets-hackers-inject-code/ 52. Top 13 Templating Engines for JavaScript To Improve and Simplify Your Workflow 2023, https://colorlib.com/wp/top-templating-engines-for-javascript/ 53. Eta | Eta, https://eta.js.org/ 54. I built a JS template engine 3x faster than EJS - DEV Community, https://dev.to/nebrelbug/i-built-a-js-template-engine-3x-faster-than-ejs-lj8 55. Semantic Versioning 2.0.0 | Semantic Versioning, https://semver.org/ 56. Mastering Semantic Versioning in NPM: Smooth Releases Without the Chaos!, https://blog.bajonczak.com/versioning-in-npm/ 57. Benefits of Module Federation in a Monorepo, https://module-federation.io/practice/monorepos/ 58. Monorepos - NX Dev, https://nx.dev/concepts/decisions/why-monorepos 59. Lerna vs Turborepo vs Rush: The best monorepo tool : r/javascript - Reddit, https://www.reddit.com/r/javascript/comments/10ulw5p/lerna_vs_turborepo_vs_rush_the_best_monorepo_tool/ 60. package.json - npm Docs, https://docs.npmjs.com/files/package.json/ 61. package-manager-best-practices/published/npm.md at main - GitHub, https://github.com/ossf/package-manager-best-practices/blob/main/published/npm.md 62. Best Practices for Creating a Modern npm Package with Security in Mind | Snyk, https://snyk.io/blog/best-practices-create-modern-npm-package/ 63. Github actions — write your first action using typescript | by Amit Kumar Dube (अमित दुबे), https://medium.com/worldwide-writing-network/github-actions-write-your-first-action-using-typescript-c5e2783faaae 64. Creating Your Own GitHub Action With TypeScript - This Dot Labs, https://www.thisdot.co/blog/creating-your-own-github-action-with-typescript 65. Inspector - Model Context Protocol, https://modelcontextprotocol.io/docs/tools/inspector 66. Inspecting and Debugging MCP Servers Using CLI and jq - fka.dev, https://blog.fka.dev/blog/2025-03-25-inspecting-mcp-servers-using-cli/ 67. Introducing MCP Tools: A Command-Line Inspector for Model Context Protocol Servers, https://blog.fka.dev/blog/2025-03-26-introducing-mcp-tools-cli/ 68. nextDriveIoE/github-action-trigger-mcp, https://github.com/nextDriveIoE/github-action-trigger-mcp 69. ETL Pipelines: 5 Key Components and 5 Critical Best Practices - Dagster, https://dagster.io/guides/etl/etl-pipelines-5-key-components-and-5-critical-best-practices 70. Building an ETL Design Pattern: Essential Steps for Success - Visual Flow, https://visual-flow.com/blog/building-an-etl-design-pattern-the-essential-steps 71. How to Use the Model Context Protocol (MCP) Inspector: A Detailed Guide for 2025, https://www.bluudit.com/blogs/how-to-use-the-model-context-protocol-mcp-inspector-a-detailed-guide-for-2025/

@@ -1,0 +1,358 @@
+﻿A Strategic Development Plan for @sparesparrow/mcp-prompts: Milestone 1 and Future Roadmap
+I. Strategic Analysis of the @sparesparrow MCP Ecosystem
+To formulate a robust development plan for the @sparesparrow/mcp-prompts package, a comprehensive understanding of its role within the broader @sparesparrow ecosystem is essential. This ecosystem represents a sophisticated, polyglot suite of tools designed to address critical challenges in the modern AI development lifecycle, such as prompt management, workflow orchestration, and project automation. The architecture is not monolithic but federated, comprising several distinct yet interconnected services that collectively aim to streamline the creation and management of AI-driven applications. An analysis of these components reveals a strategic push towards an enterprise-grade, highly automated development platform.
+A. The Core Components: A Comparative Analysis
+The @sparesparrow ecosystem is composed of several key repositories, each with a specific purpose and technology stack. Understanding their individual functions and interrelationships is fundamental to positioning the new version of mcp-prompts for success.
+* @sparesparrow/mcp-prompts (TypeScript): The Central Prompt Management Server This package is the central subject of this report. It is designed to be the "single source of truth" for managing AI prompts and templates, solving the pervasive problem of "prompt rot" where valuable prompts become fragmented and unversioned across an organization. Its core features include flexible storage backends (file system, PostgreSQL, in-memory), prompt versioning, hierarchical categorization, Role-Based Access Control (RBAC), and auditing capabilities. However, the project is currently in a state of transition. The main branch is marked for migration, and the latest published version on npm contains a critical runtime error, with users advised to use the older version 1.2.22 for stability. This situation underscores the urgent need for a well-architected, stable, and thoroughly tested Milestone 1 release.
+* @sparesparrow/mcp-prompts-rs (Rust): The High-Performance Counterpart This repository contains a complete rewrite of the prompt server in the Rust programming language. It mirrors the essential functionality of its TypeScript sibling, including prompt management, template support, and multiple storage backends, but is architected for the performance, memory safety, and concurrency guarantees that Rust provides. Notably, its feature set explicitly includes Server-Sent Events (SSE) for real-time updates and a clearly defined RESTful API, offering a glimpse into the desired feature parity for the ecosystem. The existence of this parallel project is a significant strategic indicator, suggesting a long-term vision where different deployment scenarios can be met with the most appropriate technology—TypeScript for rapid development and ecosystem compatibility, and Rust for high-throughput, mission-critical environments.
+* @sparesparrow/mcp-prompts-catalog: The Declarative Prompt Repository This repository's purpose is to act as a data source, providing a canonical collection of prompts in a declarative JSON format. It is intended to be consumed by the mcp-prompts server, effectively decoupling the prompt content from the server's operational logic. This separation is a sound architectural practice, allowing prompt engineers and developers to manage prompt collections in a version-controlled, code-like manner. The current state of the repository, showing minimal activity in pull requests or discussions, suggests it may be in its early stages or functions as a stable, infrequently changing data asset.
+* @sparesparrow/mcp-router: The Agentic Workflow Designer Described as a "robust workflow designer and router for agent-based systems," this component represents a higher level of abstraction within the ecosystem. It is structured as a monorepo containing distinct frontend (React), backend (Node.js), and shared utility packages, indicating a full-fledged application for orchestrating complex AI agent behaviors. This tool would logically be a primary consumer of the mcp-prompts server, retrieving versioned prompts to execute its designed workflows. It is important to distinguish this from other open-source MCP routers, as it appears to be a custom, in-house solution tailored to the specific needs of the @sparesparrow platform.
+* @sparesparrow/mcp-project-orchestrator: The Automation and Scaffolding Engine This Python-based tool further extends the ecosystem's automation capabilities by focusing on project inception. It analyzes user requirements to scaffold new software projects from predefined templates, manage associated prompts, and even generate architectural documentation using Mermaid diagrams. Like the router, the orchestrator is a natural consumer of the mcp-prompts server, likely fetching foundational prompts or templates required during the project creation process. Its presence solidifies the ecosystem's ambition to cover the entire AI development lifecycle, from initial scaffolding to runtime prompt management.
+B. Architectural Implications and Interservice Dependencies
+The structure of the @sparesparrow ecosystem is not accidental; it is a deliberate choice reflecting a modern, federated approach to building complex software systems. This has profound implications for the development of mcp-prompts. The collection of services, written in different languages, must communicate effectively. This necessitates stable, well-defined APIs and data contracts. The mcp-prompts server, being a foundational service, must expose a reliable interface that can be consumed by tools like the mcp-router and mcp-project-orchestrator. The API structure documented in the Rust implementation provides a strong starting point for defining this contract.
+The dual TypeScript and Rust implementations point to a sophisticated deployment strategy. The TypeScript version can leverage the vast Node.js ecosystem and the large pool of TypeScript developers for rapid feature development and integration. The Rust version provides a pathway for deployments that demand maximum performance and resource efficiency. Any new architecture for the TypeScript version should anticipate this duality, aiming for interoperability where possible, for instance, by sharing a common database schema or ensuring that the data formats are identical. This would allow an organization to use the TypeScript server for development and staging environments and seamlessly switch to the Rust server in a high-load production environment without data migration.
+This analysis reveals that the initial mcp-prompts package, while a successful proof-of-concept, likely encountered the scaling and maintenance challenges typical of a first-generation monolithic service. The documented migration, the critical runtime error, and the significant engineering investment in a Rust rewrite all point to a strategic pivot towards a more mature, robust, and enterprise-ready architecture. Therefore, the Milestone 1 plan for the TypeScript package must be more than a simple bug fix; it must be an architectural evolution that establishes a resilient foundation for the entire ecosystem.
+Table 1: @sparesparrow Ecosystem Component Overview
+	
+
+	
+
+	
+
+	
+
+	Repository
+	Primary Language
+	Core Purpose
+	Current Status
+	Key Dependencies/Consumers
+	@sparesparrow/mcp-prompts
+	TypeScript
+	Centralized server for prompt storage, versioning, and management.
+	In transition; latest version has critical error. Migration planned.
+	Consumes: mcp-prompts-catalog. Consumed by: mcp-router, mcp-project-orchestrator.
+	@sparesparrow/mcp-prompts-rs
+	Rust
+	High-performance, memory-safe implementation of the prompts server.
+	Active development; serves as a feature and API reference.
+	Shares purpose and likely database schema with the TS version.
+	@sparesparrow/mcp-prompts-catalog
+	JSON (Data)
+	Declarative, version-controlled repository for prompt content.
+	Stable / Early Stage. Minimal activity.
+	Data source for mcp-prompts.
+	@sparesparrow/mcp-router
+	TypeScript (Full-stack)
+	A robust workflow designer and router for orchestrating AI agents.
+	Active development.
+	Primary consumer of mcp-prompts for retrieving prompts for workflows.
+	@sparesparrow/mcp-project-orchestrator
+	Python
+	Automates project scaffolding, documentation, and setup.
+	Active development.
+	Consumer of mcp-prompts for initial project templates and prompts.
+	II. A Resilient Architecture for mcp-prompts Milestone 1
+To address the stability and maintenance issues of the previous version and to align with the ecosystem's enterprise-grade trajectory, the new @sparesparrow/mcp-prompts package will be built upon a Hexagonal Architecture, also known as the Ports and Adapters pattern. This architectural choice is a direct response to the likely tight coupling of the original implementation, which is a common cause of the types of critical runtime and build errors the project has experienced.
+A. The Hexagonal Architecture: Decoupling Core Logic from Infrastructure
+The core principle of Hexagonal Architecture is the strict separation of the application's central business logic from the external tools and services it interacts with, such as databases, file systems, or user interfaces. This separation is achieved through the use of "ports" (interfaces defined by the application core) and "adapters" (concrete implementations of those interfaces that bridge the gap to external technologies).
+This approach offers several compelling advantages for mcp-prompts:
+* Testability: The application's core logic can be tested in complete isolation from any external dependency. For example, the prompt management logic can be tested with a simple in-memory mock of the storage adapter, making unit tests fast, reliable, and comprehensive. This robust testing capability would likely have prevented the "critical runtime error" from reaching a published release.
+* Extensibility: Adding new functionality, such as a new storage backend like Elasticsearch (as mentioned in the project's feature list), becomes a straightforward task of creating a new adapter that implements the existing PromptRepositoryPort. The core application logic remains untouched, minimizing the risk of introducing regressions.
+* Maintainability: By clearly defining the boundaries between components, the codebase becomes easier to understand, navigate, and modify. Developers can work on a specific adapter (e.g., the PostgreSQL adapter) with confidence that they will not inadvertently break the API layer.
+The architecture will be structured around the following ports and adapters:
+* Ports (Interfaces defined within the core):
+   * PromptRepositoryPort: This port will define the contract for all persistence-related operations. It will include methods such as save(prompt), findById(id), findAll(filters), delete(id), and search(query). The core logic will interact with this interface, entirely ignorant of whether the data is stored in a JSON file or a PostgreSQL database.
+   * TemplatingPort: This port will define the contract for the templating engine, with methods like render(templateContent, variables) and extractVariables(templateContent).
+   * APIPort: This port defines the application's capabilities as exposed to the outside world. It will contain the business logic for each MCP tool, such as addPrompt, getPrompt, and applyTemplate.
+* Adapters (Concrete implementations outside the core):
+   * Driving/Input Adapters: These adapters drive the application.
+      * MCPAdapter: This will be the primary entry point into the application. It will use the official @modelcontextprotocol/sdk to implement an MCP server. It will listen for incoming JSON-RPC requests, validate them, and call the appropriate methods on the APIPort. It will be designed to support both the stdio transport for CLI usage and an http/sse transport for web-based or remote clients.
+   * Driven/Output Adapters: These adapters are driven by the application.
+      * FileStorageAdapter: The focus of Milestone 1, this adapter will implement the PromptRepositoryPort to store prompts and their metadata on the local file system.
+      * PostgresStorageAdapter: A future adapter that will implement the PromptRepositoryPort to connect to a PostgreSQL database.
+      * EtaTemplatingAdapter: This adapter will implement the TemplatingPort using the eta templating library, which is chosen for its performance, security, and TypeScript support.
+B. Architectural Visualization
+The following diagram illustrates the proposed Hexagonal Architecture for @sparesparrow/mcp-prompts.
+graph TD
+   subgraph External Infrastructure
+       A[User/MCP Client]
+       B
+       C
+       D
+   end
+
+   subgraph Application Boundary
+       subgraph Core Application
+           E
+           F[Ports (Interfaces)]
+       end
+
+       subgraph Adapters
+           G[MCP Adapter (stdio/sse)]
+           H
+           I
+           J
+       end
+   end
+
+   A -- JSON-RPC --> G
+   G -- Calls --> F
+   F -- Implemented by --> H
+   F -- Implemented by --> I
+   F -- Implemented by --> J
+   E -- Uses --> F
+
+   H -- Interacts with --> B
+   I -- Interacts with --> C
+   J -- Interacts with --> D
+
+C. Core Domain Model and Data Structures
+A stable and well-defined domain model is crucial for the health of the entire ecosystem, as it forms the data contract between mcp-prompts and its consumers. The original project already identified the need for a contracts package to share types , a practice that will be formalized in this new architecture.
+All data structures will be defined and validated using the zod library. This provides robust runtime validation, preventing malformed data from entering the system, and allows for the automatic inference of TypeScript types, creating a single source of truth. These Zod schemas and their inferred types can be published as a separate package, @sparesparrow/mcp-prompts-contracts, for consumption by mcp-router and other ecosystem tools.
+* Entity Definitions (Zod Schemas):
+   * CategorySchema:
+      * id: z.string().uuid()
+      * name: z.string().min(1)
+      * description: z.string().optional()
+      * parentId: z.string().uuid().nullable()
+   * PromptSchema:
+      * id: z.string().uuid()
+      * name: z.string().min(1)
+      * content: z.string()
+      * tags: z.array(z.string()).optional()
+      * version: z.string().semver()
+      * metadata: z.record(z.any()).optional()
+      * categoryId: z.string().uuid().optional()
+   * TemplateSchema:
+      * Extends PromptSchema.
+      * variables: z.array(z.object({ name: z.string(), type: z.string(), description: z.string().optional() })).optional()
+These schemas will be used to validate all data entering the application via the MCPAdapter and all data being read from storage adapters, ensuring end-to-end type safety and data integrity.
+III. Milestone 1 Implementation Blueprint: The Secure File Adapter
+This section outlines the concrete, step-by-step plan for developing the initial, file-based version of @sparesparrow/mcp-prompts. The primary goals for this milestone are to establish a secure, functional, and well-tested foundation based on the hexagonal architecture defined previously.
+A. Project Scaffolding and Directory Structure
+The project will be structured to be clean, scalable, and ready for potential inclusion in a larger monorepo managed by a tool like Turborepo. This foresight in organization simplifies future integration with the rest of the @sparesparrow ecosystem.
+Proposed Directory Structure:
+packages/mcp-prompts/
+├── src/
+│   ├── adapters/
+│   │   ├── file-storage.adapter.ts  # Milestone 1: File system implementation of PromptRepositoryPort
+│   │   └── eta-templating.adapter.ts  # Milestone 1: Eta implementation of TemplatingPort
+│   ├── core/
+│   │   ├── domain/
+│   │   │   ├── prompt.entity.ts       # Zod schemas and types for Prompt, Template
+│   │   │   └── category.entity.ts     # Zod schemas and types for Category
+│   │   ├── ports/
+│   │   │   ├── prompt.repository.ts   # Definition of PromptRepositoryPort interface
+│   │   │   └── templating.port.ts     # Definition of TemplatingPort interface
+│   │   └── services/
+│   │       └── prompt.service.ts      # Implements APIPort, contains core business logic
+│   ├── transports/
+│   │   └── mcp.transport.ts         # Milestone 1: MCP server setup (stdio)
+│   └── index.ts                     # Main entry point, CLI parsing, server initialization
+├── data/                            # Default directory for storing prompt JSON files
+│   └──.gitkeep                     # Placeholder to ensure directory is committed
+├── tests/
+│   ├── unit/                        # Unit tests for services and adapters (with mocks)
+│   └── integration/                 # Integration tests (e.g., testing FileStorageAdapter against the actual FS)
+├── package.json
+└── tsconfig.json
+
+B. The File Storage Adapter: A Security-First Approach
+The FileStorageAdapter is the most critical component of Milestone 1, and its implementation must prioritize security above all else, specifically mitigating the risk of path traversal attacks.
+* Path Traversal Countermeasures: Path traversal is a severe vulnerability where an attacker manipulates file path inputs to access files and directories outside of the intended "jail" directory. The Node.js path module's functions are powerful but not inherently safe against this attack if they process unsanitized user input. The implementation will follow a strict, multi-layered defense:
+   1. Configuration: The adapter will be initialized with a single, absolute base path for storing all prompts, configured via an environment variable (PROMPTS_DIR). All subsequent path operations will be confined within this directory.
+   2. Input Sanitization: Any user-provided input that is used to construct a file path (such as a prompt ID) will be rigorously sanitized. This involves stripping any characters that could be used for traversal, such as .., /, and \.
+   3. Path Resolution and Verification: For every file operation, the full, absolute path to the target file will be constructed using path.join(). A final, critical verification step will then be performed: the resolved absolute path of the target file must be a child of the resolved absolute base directory. This can be reliably checked with path.resolve(targetPath).startsWith(path.resolve(baseDirectory) + path.sep). If this check fails, the operation will be immediately aborted, and an error will be thrown, ensuring no file access can occur outside the designated data directory.
+* CRUD Logic and Indexing: A naive implementation where every prompt is a separate file would lead to poor performance for listing and filtering operations, as it would require reading every single file from the disk. To solve this, a more efficient indexing strategy will be employed.
+   * Data Storage: Each prompt will be stored as an individual JSON file (e.g., data/prompts/c7a4e2f0-9b1d-4e8a-9f0a-3d1b7c6e5d4f.json).
+   * Indexing: A single master index file, data/_index.json, will be maintained. This file will store an array of prompt metadata (ID, name, tags, category) and a structure for categories. This allows the list_prompts tool to perform its function by reading only this single index file and filtering the results in memory, which is significantly faster than performing numerous disk I/O operations.
+   * Atomicity: All write operations (create, update, delete) will update both the individual prompt file and the master index. To ensure data consistency, these operations will be performed atomically (e.g., by writing to a temporary file and then renaming it) to prevent a corrupted state if the process is interrupted.
+C. Templating Engine Integration
+* Engine Selection: The eta library is the recommended choice for the templating engine. Compared to the more traditional EJS, eta is more lightweight, offers better performance, is written in TypeScript (providing excellent type support), and has a more robust syntax that avoids common pitfalls, such as delimiter collisions. As templates are managed internally and not supplied by end-users, the primary security concern is library maintenance and soundness, where eta is a strong candidate.
+* Adapter Implementation: The EtaTemplatingAdapter will be a thin wrapper around the eta library, implementing the TemplatingPort. The apply_template tool, a key feature of the server , will be implemented in the PromptService. This service will use the PromptRepositoryPort to fetch a prompt by its ID and then use the TemplatingPort to render its content with the user-provided variables.
+Table 2: Milestone 1 Deliverables and Acceptance Criteria
+	
+
+	
+
+	
+
+	Feature
+	Description
+	Acceptance Criteria
+	MCP Tool(s) Affected
+	Secure Prompt Creation
+	Adds a new prompt to the file-based storage.
+	A call to add_prompt creates a new JSON file and updates the master index. The new prompt is retrievable via get_prompt. An attempt to create a prompt with a malicious ID (e.g., ../../etc/passwd) must fail with a security error.
+	add_prompt
+	Prompt Retrieval
+	Fetches a single prompt by its unique ID.
+	A call to get_prompt with a valid ID returns the full prompt object. A call with an invalid ID returns an error.
+	get_prompt
+	Prompt Listing & Filtering
+	Lists all available prompts, with optional filtering by tags.
+	A call to list_prompts returns an array of prompt metadata from the index. A call with a tags parameter returns only prompts containing at least one of the specified tags.
+	list_prompts
+	Prompt Update
+	Modifies an existing prompt.
+	A call to update_prompt with a valid ID and payload updates the corresponding JSON file and the master index. The changes are reflected in a subsequent get_prompt call.
+	update_prompt
+	Prompt Deletion
+	Removes a prompt from storage.
+	A call to delete_prompt removes the prompt's JSON file and its entry from the master index. The prompt is no longer returned by list_prompts or get_prompt.
+	delete_prompt
+	Template Application
+	Renders a prompt template with provided variables.
+	A call to apply_template with a valid prompt ID and a dictionary of variables returns the rendered string content.
+	apply_template
+	IV. Foundational Configuration and Best Practices
+A professional, maintainable, and distributable software package is built on a foundation of solid configuration. This section provides prescriptive guidance for package.json and tsconfig.json, establishing best practices that directly address the types of build and runtime failures previously observed in the project.
+A. Optimizing package.json for a CLI Tool
+The package.json file is more than just metadata; it is the manifest that defines the project's identity, dependencies, and development workflows. For a CLI tool intended for distribution via npm, several fields are critical.
+* Identity and Versioning:
+   * "name": "@sparesparrow/mcp-prompts": The scoped name is standard for organizational packages and avoids naming conflicts in the public registry.
+   * "version": "1.3.0": It is crucial to adopt Semantic Versioning (SemVer) correctly. Since the previous latest version has a critical bug and this new version introduces a significant architectural refactor, a minor version increment to 1.3.0 is appropriate. This signals new features and improvements while maintaining backward compatibility from an API user's perspective, and it clearly moves past the problematic 1.2.x series.
+* Execution and Distribution:
+   * "bin": { "mcp-prompts": "./dist/index.js" }: This entry is essential. It tells npm to create a symbolic link in the user's node_modules/.bin directory, which allows the package to be executed directly from the command line (e.g., mcp-prompts --help) or via npx.
+   * "type": "module": This flag enables native ECMAScript Modules (ESM), allowing for the use of modern import/export syntax, which is the current standard for Node.js development.
+   * "main": "./dist/index.js": Specifies the entry point for the package when it is required or imported by other Node.js applications.
+   * "files":: This is a critical field for ensuring a clean and minimal package is published to npm. It acts as an allowlist, specifying that only the compiled dist directory and essential documentation files should be included in the published tarball. This prevents source code, test files, and local configuration from being unnecessarily distributed.
+   * "publishConfig": { "access": "public" }: For scoped packages under an organization, the default access level is private. This configuration ensures the package is published publicly.
+* Dependencies and Environment:
+   * "engines": { "node": ">=18.0.0" }: This field declares the minimum Node.js version required to run the package. It prevents users on older, incompatible Node.js versions from installing the package, thus proactively avoiding runtime errors related to unsupported syntax or APIs.
+   * Dependencies will be carefully managed in dependencies (for runtime) and devDependencies (for build/test time).
+B. Crafting a Modern tsconfig.json for Node.js
+A strict and well-configured tsconfig.json is the primary defense against many common TypeScript errors and is fundamental to producing high-quality, reliable code.
+* Base Configuration and Module System:
+   * "extends": "@tsconfig/node18/tsconfig.json": Instead of manually configuring dozens of compiler options, this approach inherits from a community-vetted base configuration tailored for Node.js 18. This ensures compatibility with the runtime environment's features and APIs.
+   * "module": "NodeNext", "moduleResolution": "NodeNext": These are the correct settings for a modern Node.js project that uses native ES Modules. They instruct TypeScript on how to resolve and generate module-related code that is compliant with Node's ESM implementation.
+* Code Quality and Structure:
+   * "strict": true: This is arguably the most important flag. It enables a full suite of strict type-checking options (like noImplicitAny, strictNullChecks, etc.), which catches a vast range of potential errors at compile time rather than at runtime.
+   * "esModuleInterop": true: This flag smooths over differences between CommonJS and ES Modules, improving compatibility with a wider range of third-party libraries.
+   * "outDir": "dist": This directs all compiled JavaScript output to a dist directory, keeping the project root clean and clearly separating source code from compiled artifacts.
+   * "include": ["src/**/*"]: This tells the compiler to only process files within the src directory, preventing accidental compilation of test files or other scripts.
+C. Establishing Code Quality with Linting and Formatting
+To enforce a consistent and high-quality codebase across all contributors, the project will use ESLint for static analysis and Prettier for code formatting. These tools will be integrated into the development workflow using husky and lint-staged to automatically format and lint files upon every git commit. This automated guardrail prevents stylistic debates and ensures that code entering the version control system adheres to project standards.
+The establishment of these foundational configurations and practices is a direct, strategic response to the project's history. The "critical runtime error" and build failures are symptoms of a development process that lacked sufficient guardrails. A strict tsconfig.json, a comprehensive test suite run via package.json scripts, and automated linting create a safety net that forces errors to be surfaced early in the development cycle, long before they can impact a published release.
+Table 3: Recommended package.json Scripts
+	
+
+	
+
+	Script Name
+	Command
+	Purpose
+	dev
+	ts-node-dev --respawn --transpile-only src/index.ts
+	Starts the server in development mode with live-reloading for rapid feedback.
+	build
+	tsc --project tsconfig.json
+	Compiles the TypeScript source code into JavaScript in the dist directory.
+	start
+	node dist/index.js
+	Runs the compiled production-ready application from the dist directory.
+	lint
+	eslint "src/**/*.ts" --fix
+	Analyzes the source code for potential errors and style issues, automatically fixing what it can.
+	format
+	prettier --write "src/**/*.ts"
+	Automatically formats all source code to ensure a consistent style.
+	test
+	jest --config./jest.config.js
+	Runs all unit and integration tests defined in the project.
+	test:watch
+	jest --watch --config./jest.config.js
+	Runs tests in an interactive watch mode, re-running tests on file changes.
+	test:e2e
+	npm run build && jest --config./tests/e2e/jest-e2e.config.js
+	Runs the end-to-end test suite against the compiled application.
+	prepublishOnly
+	npm run build
+	A special npm script that automatically runs the build process before publishing.
+	V. The Path Forward: A Roadmap to Enterprise-Grade Features
+With a stable Milestone 1 foundation, @sparesparrow/mcp-prompts can evolve into a feature-rich, enterprise-ready service. The feature set outlined in the project's documentation—PostgreSQL support, real-time events, and robust containerization—clearly indicates a product vision for a deployable, multi-user, collaborative platform. This roadmap outlines a logical, phased approach to realizing that vision.
+A. Milestone 2: PostgreSQL and PGAI Integration
+Goal: Transition from a file-based storage system to a robust, scalable, and search-capable relational database backend. This is a critical step for supporting multi-user environments and enabling advanced features.
+Technical Approach:
+1. Database Schema Design: A formal SQL schema will be designed for prompts, categories, and tags tables, including relational constraints. Crucially, this will involve enabling the pgvector extension in PostgreSQL and adding a vector column to the prompts table to store text embeddings.
+2. Adapter Implementation: A new PostgresStorageAdapter will be created, implementing the same PromptRepositoryPort as the file adapter. This demonstrates the power of the hexagonal architecture, as the core application logic will require no changes to switch to this new data source. The adapter will use a mature Node.js library like pg for database interaction.
+3. PGAI and Embedding Generation: To support the PGAI (PostgreSQL AI) format mentioned in the feature list, the add_prompt and update_prompt methods within the new adapter will be enhanced. When a prompt is saved, its content will be passed to an embedding model (either via a local library or an external API) to generate a vector representation. This vector will then be stored in the vector column.
+4. Semantic Search Capability: A new MCP tool, search_prompts, will be introduced. This tool will take a natural language query, generate an embedding for that query, and then perform a vector similarity search (e.g., cosine similarity) against the prompts table in PostgreSQL to find the most semantically relevant prompts.
+B. Milestone 3: Real-Time Capabilities with Server-Sent Events (SSE)
+Goal: Enable real-time notifications to connected clients, allowing for collaborative workflows where changes made by one user are instantly visible to others. This feature is already present in the Rust counterpart, indicating its strategic importance.
+Technical Approach:
+1. SSE Transport Layer: The MCPAdapter will be extended to support an HTTP-based transport using Server-Sent Events (SSE), a standard for pushing notifications from a server to a client. This can be implemented using a lightweight web framework like Express.js, as demonstrated in other MCP starter projects. The server will expose a new endpoint (e.g., /sse) for clients to connect to.
+2. Internal Event Emitter: The core PromptService will be modified to emit events on an internal event bus (e.g., Node.js's EventEmitter) whenever a significant action occurs, such as prompt:created, prompt:updated, or prompt:deleted.
+3. Event Broadcasting: The SSE transport layer will subscribe to these internal events. When an event is caught, it will format an MCP notification message and broadcast it to all connected SSE clients. This architecture decouples the core logic from the notification mechanism.
+C. Milestone 4: Production-Grade Containerization with Docker
+Goal: Provide a reliable, secure, and easy-to-use Docker image for deployment, definitively resolving the build and runtime issues documented in the original repository.
+Technical Approach:
+1. Multi-Stage Dockerfile: A new Dockerfile will be authored using a multi-stage build pattern to create optimized and secure images.
+   * Stage 1 (builder): This stage will start from a full node:18 image. It will copy over the package.json files and run npm install to get all dependencies (including devDependencies). Then, it will copy the TypeScript source code and execute npm run build to transpile it into JavaScript.
+   * Stage 2 (production): This stage will start from a minimal node:18-slim image for a smaller footprint and reduced attack surface. It will copy only the necessary package.json and run npm install --production to install only runtime dependencies. Finally, it will copy the compiled dist directory from the builder stage. This process ensures that no source code, development tools, or unnecessary files are present in the final image, resolving the "Unknown file extension '.ts'" error class by design.
+2. docker-compose.yml for Development: A docker-compose.yml file will be provided to orchestrate a complete local development and testing environment. It will define two services:
+   * mcp-prompts: The application service, built from the Dockerfile.
+   * postgres: A standard PostgreSQL service, with pgvector enabled. This allows any developer to get a fully functional, database-backed instance of the application running with a single command: docker-compose up.
+Table 4: Future Milestones Roadmap
+	
+
+	
+
+	
+
+	Milestone
+	Key Features
+	Strategic Value
+	Technical Dependencies
+	Milestone 2
+	PostgreSQL Storage Adapter, pgvector integration, Semantic Search tool (search_prompts).
+	Provides persistent, scalable storage suitable for multi-user, enterprise environments. Enables powerful semantic search for prompt discovery.
+	PostgreSQL server with pgvector extension, Embedding model/service.
+	Milestone 3
+	Server-Sent Events (SSE) transport, Real-time notifications for CRUD operations.
+	Enables real-time collaborative workflows, bringing feature parity with the Rust version and allowing UIs to update dynamically.
+	HTTP server framework (e.g., Express.js).
+	Milestone 4
+	Multi-stage Dockerfile, docker-compose.yml for dev environment.
+	Delivers a secure, optimized, production-ready container. Drastically simplifies deployment and local development setup. Resolves historical build issues.
+	Docker and Docker Compose.
+	VI. Development Lifecycle and Continuous Integration
+To ensure the delivery of a high-quality, reliable software package, a professional development lifecycle supported by robust testing and automation is required. This framework will build confidence in every release and encourage community contribution.
+A. A Comprehensive Testing Strategy
+A multi-layered testing strategy will be implemented to validate the application's correctness, from individual functions to its compliance with the MCP specification.
+* Unit Tests: Jest will be used as the testing framework. The hexagonal architecture will be leveraged to test components in isolation. For example, the PromptService (containing the core logic) will be tested by providing it with mock implementations of the PromptRepositoryPort and TemplatingPort. This allows for exhaustive testing of business rules without the overhead of file system or database access.
+* Integration Tests: These tests will verify the interaction between the application's core and its adapters. For instance, an integration test for the FileStorageAdapter will involve writing actual files to a temporary directory on the file system and asserting that they can be read back correctly. Similarly, the PostgresStorageAdapter will be tested against a live, containerized PostgreSQL instance.
+* End-to-End (E2E) Tests: This is the final and most critical layer of testing. It will validate the entire application as a black box, ensuring it is a compliant citizen of the Model Context Protocol ecosystem. The official @modelcontextprotocol/inspector tool is the key to this process. E2E tests will be scripted to:
+   1. Launch the mcp-prompts server as a child process.
+   2. Communicate with it via its stdio by sending JSON-RPC 2.0 request messages.
+   3. Capture the stdout of the server process and parse the JSON-RPC responses.
+   4. Assert that the responses are correctly formatted and contain the expected data. This approach directly simulates how an MCP client like Claude Desktop or Cursor would interact with the server, providing the highest level of confidence in the package's correctness and interoperability.
+B. CI/CD Pipeline with GitHub Actions
+Automation is the backbone of a modern development workflow. A Continuous Integration and Continuous Deployment (CI/CD) pipeline will be established using GitHub Actions, a tool already in use across the @sparesparrow ecosystem.
+* Continuous Integration Workflow (ci.yml):
+   * Trigger: This workflow will run on every push to the main branch and on every pull_request targeting main.
+   * Jobs:
+      * lint-and-test: This job will set up the specified Node.js environment, install dependencies using the lockfile (npm ci for speed and consistency), run the linter (npm run lint), and execute all unit and integration tests (npm test).
+      * e2e-test: This job will build the application (npm run build) and then run the full E2E test suite (npm run test:e2e) to validate protocol compliance.
+* Release Workflow (release.yml):
+   * Trigger: This workflow will be triggered automatically when a new release is created in the GitHub repository (e.g., by tagging a commit with a version number like v1.3.0).
+   * Jobs:
+      * The workflow will first run all the checks from the ci.yml workflow to ensure the release candidate is valid.
+      * Upon success, a publish job will execute. It will use a secret token (NPM_TOKEN) to authenticate with the npm registry and publish the package.
+      * Simultaneously, a publish-docker job will build the production Docker image and push it to the GitHub Container Registry (ghcr.io/sparesparrow/mcp-prompts).
+C. Contribution and Community Standards
+To foster a healthy open-source community and streamline contributions, the project will adopt clear standards and provide helpful resources.
+* CONTRIBUTING.md: A comprehensive contribution guide will be created based on established best-practice templates. It will detail the development setup process, coding standards (including the use of the linter and formatter), the process for submitting pull requests, and the project's code of conduct.
+* LICENSE: The repository will include an MIT License file, consistent with the licensing of other projects in the @sparesparrow ecosystem.
+* Issue and Pull Request Templates: Standardized GitHub templates for bug reports and feature requests will be implemented. These templates will prompt contributors to provide all necessary information, such as steps to reproduce, version numbers, and the expected outcome, which will significantly accelerate the triage and resolution process.
+VII. Conclusion and Recommendations
+The @sparesparrow/mcp-prompts package is a cornerstone of a larger, ambitious ecosystem aimed at solving fundamental challenges in AI development. The existing implementation's instability, coupled with the strategic pivot indicated by the planned migration and the creation of a Rust counterpart, presents a clear mandate: the next version must be built on a foundation of architectural soundness, security, and professional engineering discipline.
+This report has laid out a comprehensive blueprint to achieve that goal. The key recommendations are as follows:
+1. Adopt a Hexagonal Architecture: Immediately refactor the application to decouple the core domain logic from external infrastructure like the file system and API transports. This is the single most important step to improve testability, maintainability, and future extensibility.
+2. Prioritize Security in the File Adapter: The implementation of the file-based storage for Milestone 1 must treat path traversal as a primary threat. The multi-layered defense mechanism—combining path normalization, sanitization, and absolute path verification—should be implemented without compromise.
+3. Formalize Data Contracts with Zod: Use Zod schemas as the single source of truth for all data structures. Publish these schemas and their inferred types as a separate @sparesparrow/mcp-prompts-contracts package to ensure type-safe communication across the entire federated ecosystem.
+4. Implement a Robust CI/CD Pipeline: Automate linting, testing, building, and publishing using GitHub Actions. The E2E testing stage, which leverages the principles of the mcp-inspector tool, is critical for ensuring protocol compliance and preventing regressions.
+5. Follow the Phased Roadmap: Execute the development plan in the proposed stages. Begin with a stable, secure file-based implementation (Milestone 1) before moving on to more complex enterprise features like PostgreSQL, SSE, and production-ready Docker containers. This incremental approach mitigates risk and ensures that each new feature is built upon a stable core.
+By executing this plan, the @sparesparrow/mcp-prompts package can be transformed from a source of instability into a reliable, secure, and performant foundational service. This will not only resolve its immediate issues but also unlock the full potential of the surrounding ecosystem, enabling the development of sophisticated AI orchestration and automation tools.
+Works cited
+1. sparesparrow/mcp-prompts: Model Context Protocol server for managing, storing, and providing prompts and prompt templates for LLM interactions. - GitHub, https://github.com/sparesparrow/mcp-prompts 2. MCP Prompts - Collection - GitHub, https://github.com/sparesparrow/mcp-prompts-catalog 3. Prompt Manager MCP server for AI agents - Playbooks, https://playbooks.com/mcp/sparesparrow-prompt-manager 4. sparesparrow/mcp-prompts-rs: Rust-based server for managing AI prompts using the Model Context Protocol (MCP) - GitHub, https://github.com/sparesparrow/mcp-prompts-rs 5. Pull requests · sparesparrow/mcp-prompts-catalog - GitHub, https://github.com/sparesparrow/mcp-prompts-catalog/pulls 6. sparesparrow mcp-prompts-catalog Polls · Discussions - GitHub, https://github.com/sparesparrow/mcp-prompts-catalog/discussions/categories/polls 7. Discussions - sparesparrow mcp-prompts-catalog - GitHub, https://github.com/sparesparrow/mcp-prompts-catalog/discussions 8. sparesparrow/mcp-router: A comprehensive system monitoring solution with cognitive workflows and enhanced security. - GitHub, https://github.com/sparesparrow/mcp-router 9. nacos-group/nacos-mcp-router - GitHub, https://github.com/nacos-group/nacos-mcp-router 10. mcp-router/mcp-router: The MCP manager. Easily manage your MCP servers with enhanced security and customizability - GitHub, https://github.com/mcp-router/mcp-router 11. sparesparrow/mcp-project-orchestrator: Analyze user input ... - GitHub, https://github.com/sparesparrow/mcp-project-orchestrator 12. Project Orchestrator - MCP Server - Magic Slides, https://www.magicslides.app/pt/mcps/sparesparrow-project-orchestrator 13. MCP Prompts Server - Glama, https://glama.ai/mcp/servers/@sparesparrow/mcp-prompts 14. TypeScript SDK: Build Model Context Protocol (MCP) Clients - MCP Market, https://mcpmarket.com/server/typescript-sdk 15. What is the Model Context Protocol ? How to Use It with TypeScript ? | Medium, https://medium.com/@halilxibrahim/simplifying-ai-integration-with-mcp-a-guide-for-typescript-developers-c6f2b93c1b56 16. madhukarkumar/mcp-ts-starter: Typescript starter for MCP server with resource, prompt and tool - GitHub, https://github.com/madhukarkumar/mcp-ts-starter 17. Eta | Eta, https://eta.js.org/ 18. I built a JS template engine 3x faster than EJS - DEV Community, https://dev.to/nebrelbug/i-built-a-js-template-engine-3x-faster-than-ejs-lj8 19. Mono Repo; Turbo Repo vs Nx vs Lerna and Why Turbo? | by Vivi | Medium, https://medium.com/@givvemeee/mono-repo-turbo-repo-vs-nx-vs-lerna-and-why-turbo-4616be2aadb3 20. What is Turborepo and Why Should You Care? - Refine dev, https://refine.dev/blog/how-to-use-turborepo/ 21. Directory Traversal in node | CVE-2025-23084 - Snyk Vulnerability Database, https://security.snyk.io/vuln/SNYK-UPSTREAM-NODE-8651420 22. Prevent path traversal - Datadog Docs, https://docs.datadoghq.com/security/code_security/static_analysis/static_analysis_rules/java-security/path-traversal/ 23. Node.js API Security Vulnerabilities with Path Traversal in files-bucket-server, https://www.nodejs-security.com/blog/nodejs-api-security-vulnerabilities-path-traversal-files-bucket-server 24. Question: NodeJS secure file saving into file system. Preventing path traversal - Reddit, https://www.reddit.com/r/node/comments/aimrih/question_nodejs_secure_file_saving_into_file/ 25. How to prevent directory traversal when joining paths in node.js?, https://security.stackexchange.com/questions/123720/how-to-prevent-directory-traversal-when-joining-paths-in-node-js 26. EJS -- Embedded JavaScript templates, https://ejs.co/ 27. package.json - npm Docs, https://docs.npmjs.com/files/package.json/ 28. Best Practices for Creating a Modern npm Package with Security in Mind | Snyk, https://snyk.io/blog/best-practices-create-modern-npm-package/ 29. Semantic Versioning 2.0.0 | Semantic Versioning, https://semver.org/ 30. About semantic versioning - npm Docs, https://docs.npmjs.com/about-semantic-versioning/ 31. Best practices for building CLI and publishing it to NPM - WebbyLab, https://webbylab.com/blog/best-practices-for-building-cli-and-publishing-it-to-npm/ 32. A Modern Node.js + TypeScript Setup for 2025 - DEV Community, https://dev.to/woovi/a-modern-nodejs-typescript-setup-for-2025-nlk 33. 7 Common Build Errors in Node.js and How to Fix Them | by Arunangshu Das - Medium, https://arunangshudas.medium.com/7-common-build-errors-in-node-js-and-how-to-fix-them-476d014babb3 34. Documentation - What is a tsconfig.json - TypeScript, https://www.typescriptlang.org/docs/handbook/tsconfig-json.html 35. TSConfig Reference - Docs on every TSConfig option - TypeScript, https://www.typescriptlang.org/tsconfig/ 36. How to Set Up a Node.js Project with TypeScript - AppSignal Blog, https://blog.appsignal.com/2022/01/19/how-to-set-up-a-nodejs-project-with-typescript.html 37. Setting up TypeScript in a Node.js Application: A Step-by-Step Guide - DEV Community, https://dev.to/luqmanshaban/setting-up-typescript-in-a-nodejs-application-a-step-by-step-guide-5af9 38. How To Set Up a Node Project With Typescript - DigitalOcean, https://www.digitalocean.com/community/tutorials/setting-up-a-node-project-with-typescript 39. How to Use the Model Context Protocol (MCP) Inspector: A Detailed Guide for 2025, https://www.bluudit.com/blogs/how-to-use-the-model-context-protocol-mcp-inspector-a-detailed-guide-for-2025/ 40. MatthewDailey/mcp-starter: A start template for a typescript mcp server - GitHub, https://github.com/MatthewDailey/mcp-starter 41. Inspector - Model Context Protocol, https://modelcontextprotocol.io/docs/tools/inspector 42. Inspecting and Debugging MCP Servers Using CLI and jq - fka.dev, https://blog.fka.dev/blog/2025-03-25-inspecting-mcp-servers-using-cli/ 43. nextDriveIoE/github-action-trigger-mcp, https://github.com/nextDriveIoE/github-action-trigger-mcp 44. CONTRIBUTING.md - pieces-app/example-typescript - GitHub, https://github.com/pieces-app/example-typescript/blob/main/CONTRIBUTING.md 45. CONTRIBUTING.MD Example & Template, https://contributing.md/example/

@@ -62,10 +62,28 @@ jobs:
           name: test-results
           path: test-results/
 
+  rust-build-and-test:
+    name: Build and Test (Rust)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Install Rust toolchain
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          override: true
+      - name: Build mcp-prompts-rs
+        run: cargo build --verbose
+        working-directory: ./mcp-prompts-rs
+      - name: Test mcp-prompts-rs
+        run: cargo test --verbose
+        working-directory: ./mcp-prompts-rs
+
   docker-tests:
     name: Docker Tests
     runs-on: ubuntu-latest
-    needs: build-and-test
+    needs: [build-and-test, rust-build-and-test]
 
     steps:
       - name: Checkout code
@@ -87,7 +105,7 @@ jobs:
   publish:
     name: Publish Package
     runs-on: ubuntu-latest
-    needs: [build-and-test, docker-tests]
+    needs: [build-and-test, docker-tests, rust-build-and-test]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
     steps:
