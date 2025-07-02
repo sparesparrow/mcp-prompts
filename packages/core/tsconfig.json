@@ -18,6 +18,8 @@
     "tests"
   ],
   "references": [
-    { "path": "../../adapters-file" }
+    { "path": "../adapters-file" },
+    { "path": "../adapters-memory" },
+    { "path": "../mcp-prompts-contracts" }
   ]
 } 
