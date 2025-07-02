@@ -5,7 +5,7 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "dependencies": {
-    "@sparesparrow/mcp-prompts-contracts": "^1.0.1"
+    "@sparesparrow/mcp-prompts-contracts": "^1.0.0"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
