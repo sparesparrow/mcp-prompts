@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { MemoryPromptRepository } from '@mcp-prompts/adapters-memory/src/MemoryPromptRepository';
-import { addPrompt } from '@core/use-cases/addPrompt';
-import { getPromptById } from '@core/use-cases/getPromptById';
-import { listPrompts } from '@core/use-cases/listPrompts';
-import { updatePrompt } from '@core/use-cases/updatePrompt';
-import { deletePrompt } from '@core/use-cases/deletePrompt';
+import { addPrompt } from '../src/use-cases/addPrompt.js';
+import { getPromptById } from '../src/use-cases/getPromptById.js';
+import { listPrompts } from '../src/use-cases/listPrompts.js';
+import { updatePrompt } from '../src/use-cases/updatePrompt.js';
+import { deletePrompt } from '../src/use-cases/deletePrompt.js';
 
 const samplePrompt = {
   id: '018e7b2e-7b2e-7b2e-7b2e-7b2e7b2e7b2e',

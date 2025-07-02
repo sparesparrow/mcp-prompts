@@ -2,18 +2,19 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "../../",
+    "rootDir": "src",
     "paths": {
-      "@core/*": ["../../packages/core/src/*"],
+      "@core/*": ["../../src/*", "../../packages/core/src/*"],
       "@adapters-file/*": ["../../packages/adapters-file/src/*"],
       "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
     },
-    "baseUrl": "../../"
+    "baseUrl": "../../",
+    "composite": true
   },
   "include": [
     "src/**/*",
-    "../core/src/**/*",
-    "../adapters-memory/src/**/*"
+    "../../src/errors.ts",
+    "../../src/schemas.ts"
   ],
   "references": [
     { "path": "../core" }

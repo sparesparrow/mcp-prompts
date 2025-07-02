@@ -15,9 +15,8 @@ const Ajv = require('ajv');
 import fs from 'fs/promises';
 import path from 'path';
 import { cwd } from 'process';
-
-import { FileAdapter } from '@adapters-file/FileAdapter';
-import { PromptService } from './PromptService';
+import { FileAdapter } from '@mcp-prompts/adapters-file';
+import { PromptService } from '../prompt-service.js';
 
 interface PromptTemplate {
   id: string;
@@ -73,7 +72,7 @@ const validate = ajv.compile(schema);
  * @param filePath
  * @param promptService
  */
-async function validateFile(filePath: string, promptService: PromptService): Promise<boolean> {
+async function validateFile(filePath: string, promptService: any): Promise<boolean> {
   try {
     const raw = await fs.readFile(filePath, 'utf8');
     const json: unknown = JSON.parse(raw);
@@ -100,25 +99,24 @@ async function validateFile(filePath: string, promptService: PromptService): Pro
  * @param dir
  * @param cb
  */
-async function walk(dir: string, cb: (file: string) => Promise<boolean>): Promise<boolean> {
+async function walk(dir: string, cb: (file: string, idx: number) => Promise<boolean>, idx = 0): Promise<boolean> {
   let allOk = true;
   const entries = await fs.readdir(dir, { withFileTypes: true });
   for (const entry of entries) {
     const full = path.join(dir, entry.name);
     if (entry.isDirectory()) {
-      const ok = await walk(full, cb);
+      const ok = await walk(full, cb, idx);
+      idx++;
       if (!ok) allOk = false;
     } else if (entry.name.endsWith('.json')) {
-      const ok = await cb(full);
+      const ok = await cb(full, idx);
+      idx++;
       if (!ok) allOk = false;
     }
   }
   return allOk;
 }
 
-/**
- *
- */
 async function main() {
   const baseDir = process.argv[2] || path.resolve(cwd());
   const targetDirs = [
@@ -130,7 +128,9 @@ async function main() {
   const fileAdapter = new FileAdapter({
     promptsDir: path.join(process.cwd(), 'data', 'prompts')
   });
-  const promptService = new PromptService(fileAdapter);
+  // Minimal dummy templating engine
+  const dummyTemplatingEngine = { render: (template: string, variables: Record<string, string>) => template };
+  const promptService = new PromptService(fileAdapter, dummyTemplatingEngine);
   let success = true;
   for (const dir of targetDirs) {
     const exists = await fs
@@ -138,7 +138,8 @@ async function main() {
       .then(() => true)
       .catch(() => false);
     if (!exists) continue;
-    const ok = await walk(dir, file => validateFile(file, promptService));
+    const validateCallback: (file: string, idx: number) => Promise<boolean> = (file, idx) => validateFile(file, promptService);
+    const ok = await walk(dir, validateCallback, 0);
     if (!ok) success = false;
   }
   if (!success) {
