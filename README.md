@@ -25,6 +25,7 @@
 - [Support](#support)
 - [🛠️ Příklady konfigurace MCP klienta a serveru (`mcp.json`, `.env`)](#️-příklady-konfigurace-mcp-klienta-a-serveru-mcpjson-env)
 - [Hexagonální architektura v MCP-Prompts](#hexagonální-architektura-v-mcp-prompts)
+- [Architecture: Hexagonal (Ports & Adapters)](#architecture-hexagonal-ports--adapters)
 
 ---
 
@@ -563,3 +564,61 @@ Projekt `mcp-prompts` je navržen podle principů hexagonální architektury (ar
 ### Odkazy
 - [Oficiální MCP architektura](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
 - [Hexagonal Architecture (Alistair Cockburn)](https://alistair.cockburn.us/hexagonal-architecture/)
+
+## Architecture: Hexagonal (Ports & Adapters)
+
+mcp-prompts is architected using the Hexagonal Architecture (Ports & Adapters) pattern. This design separates the core business logic from external systems (storage, APIs, UI) via well-defined interfaces (ports) and their implementations (adapters).
+
+**Key Components:**
+- **Core (Hexagon):** Pure business logic for prompt management, versioning, templating, and validation. No dependencies on frameworks or infrastructure.
+- **Ports (Interfaces):**
+  - **Primary Port:** `IPromptApplication` – defines the API for all use cases (add, get, list, apply, etc.).
+  - **Secondary Ports:**
+    - `IPromptRepository` – contract for data persistence (file, Postgres, etc.).
+    - `ITemplatingEngine` – contract for rendering templates.
+- **Adapters (Implementations):**
+  - **Primary/Driving:**
+    - `MCPAdapter` (MCP JSON-RPC stdio/SSE)
+    - `RestApiAdapter` (Express/HTTP, optional/future)
+  - **Secondary/Driven:**
+    - `FileStorageAdapter` (JSON files)
+    - `PostgresStorageAdapter` (PostgreSQL)
+    - `EtaTemplatingAdapter` (template rendering)
+
+**Benefits:**
+- Isolated, testable core logic
+- Easy to add new storage or API adapters
+- Stable, maintainable, and extensible foundation for the MCP ecosystem
+
+**Directory Structure Example:**
+```
+mcp-prompts/
+  core/
+    entities/
+    services/
+    ports/
+  adapters/
+    primary/
+      mcp/
+      rest/
+    secondary/
+      file/
+      postgres/
+      eta/
+  tests/
+    core/
+    adapters/
+```
+
+**Testing:**
+- Core logic is tested with in-memory/mock ports (no I/O required).
+- Adapters are tested with real dependencies (integration tests).
+
+**Integration:**
+- MCPAdapter uses `@modelcontextprotocol/sdk` to register tools/resources.
+- Compatible with MCP Inspector, mcp-cli, Claude Desktop, and other MCP clients.
+
+**References:**
+- [Hexagonal Architecture: Wikipedia](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software))
+- [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
+- [DEV: Stop Losing Prompts – Build Your Own MCP Prompt Registry](https://dev.to/stevengonsalvez/stop-losing-prompts-build-your-own-mcp-prompt-registry-4fi1)
