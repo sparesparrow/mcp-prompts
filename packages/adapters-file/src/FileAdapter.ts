@@ -4,10 +4,11 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import lockfile from 'proper-lockfile';
 import { z } from 'zod';
-import { promptSchemas, workflowSchema } from '@core/schemas';
-import { LockError } from '@core/errors';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@core/interfaces';
-import type { IPromptRepository, ISequenceRepository, IWorkflowRepository } from '@core/ports/IPromptRepository';
+import { promptSchemas, workflowSchema } from '@sparesparrow/mcp-prompts-contracts/dist/src/schemas.js';
+import { LockError } from '../../../src/errors.js';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@mcp-prompts/core/dist/interfaces.js';
+import type { IPromptRepository } from '@mcp-prompts/core/dist/ports/IPromptRepository.js';
+import type { PromptId } from '@mcp-prompts/core/dist/value-objects/PromptId.js';
 
 export async function atomicWriteFile(filePath: string, data: string) {
   const dir = path.dirname(filePath);
@@ -26,7 +27,7 @@ function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   return prompt;
 }
 
-export class FileAdapter implements IPromptRepository, ISequenceRepository, IWorkflowRepository {
+export class FileAdapter implements IPromptRepository {
   private promptsDir: string;
   private sequencesDir: string;
   private workflowStatesDir: string;
@@ -488,5 +489,25 @@ export class FileAdapter implements IPromptRepository, ISequenceRepository, IWor
 
   public async healthCheck(): Promise<boolean> {
     return this.connected;
+  }
+
+  async add(prompt: Prompt): Promise<Prompt> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async getById(id: PromptId): Promise<Prompt | null> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async list(): Promise<Prompt[]> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async update(id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async delete(id: PromptId): Promise<boolean> {
+    return Promise.reject(new Error('Not implemented'));
   }
 } 

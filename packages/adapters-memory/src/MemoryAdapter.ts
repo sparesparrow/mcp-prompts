@@ -1,5 +1,5 @@
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@core/interfaces';
-import type { IPromptRepository, ISequenceRepository, IWorkflowRepository } from '@core/ports/IPromptRepository';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@mcp-prompts/core/dist/interfaces.js';
+import type { IPromptRepository } from '@mcp-prompts/core/dist/ports/IPromptRepository.js';
 
 function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   if ('metadata' in prompt && prompt.metadata === null) {
@@ -8,7 +8,7 @@ function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   return prompt;
 }
 
-export class MemoryAdapter implements IPromptRepository, ISequenceRepository, IWorkflowRepository {
+export class MemoryAdapter implements IPromptRepository {
   private prompts = new Map<string, Map<number, Prompt>>();
   private sequences = new Map<string, PromptSequence>();
   private workflowStates = new Map<string, WorkflowExecutionState>();
@@ -54,7 +54,7 @@ export class MemoryAdapter implements IPromptRepository, ISequenceRepository, IW
         if (options.isTemplate !== undefined && p.isTemplate !== options.isTemplate) return false;
         if (options.category && p.category !== options.category) return false;
         if (options.tags) {
-          if (!p.tags || !options.tags.every(t => p.tags?.includes(t))) return false;
+          if (!p.tags || !options.tags.every((t: string) => p.tags?.includes(t))) return false;
         }
         if (options.search) {
           const searchTerm = options.search.toLowerCase();
@@ -206,5 +206,25 @@ export class MemoryAdapter implements IPromptRepository, ISequenceRepository, IW
       }
     }
     return states;
+  }
+
+  async add(prompt: Prompt): Promise<Prompt> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async getById(id: string): Promise<Prompt | null> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async list(): Promise<Prompt[]> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async update(id: string, update: Partial<Prompt>): Promise<Prompt | null> {
+    return Promise.reject(new Error('Not implemented'));
+  }
+
+  async delete(id: string): Promise<boolean> {
+    return Promise.reject(new Error('Not implemented'));
   }
 } 

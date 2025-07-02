@@ -18,7 +18,7 @@
     "@mcp-prompts/adapters-mcp": "workspace:*",
     "@mcp-prompts/adapters-rest": "workspace:*",
     "@mcp-prompts/adapters-cli": "workspace:*",
-    "@sparesparrow/mcp-prompts-contracts": "^1.0.1"
+    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.5.0",

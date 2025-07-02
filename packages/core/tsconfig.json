@@ -15,7 +15,8 @@
     "src/**/*"
   ],
   "exclude": [
-    "tests"
+    "tests",
+    "src/scripts/validate-prompts.ts"
   ],
   "references": [
     { "path": "../adapters-file" },

@@ -1,6 +1,6 @@
 import { Redis } from 'ioredis';
 import Handlebars from 'handlebars';
-import type { ITemplatingEngine } from '../packages/core/src/interfaces.js';
+import type { ITemplatingEngine } from './interfaces.js';
 
 import { config } from './config.js';
 
