@@ -1,8 +1,17 @@
-// Use-case: updatePrompt
-import { Prompt } from '../entities/Prompt';
-import { IPromptRepository } from '../ports/IPromptRepository';
-import { PromptId } from '../value-objects/PromptId';
+import type { IPromptRepository } from '../ports/IPromptRepository';
+import type { Prompt } from '../entities/Prompt';
+import { validateTemplateVariables } from '../validation/PromptValidation';
 
-export async function updatePrompt(repo: IPromptRepository, id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
-  return repo.update(id, update);
+export async function updatePrompt(
+  repo: IPromptRepository,
+  id: string,
+  version: number,
+  data: Partial<Prompt>
+): Promise<Prompt> {
+  // Fetch existing prompt for merging and validation
+  const existing = await repo.getPrompt(id, version);
+  if (!existing) throw new Error(`Prompt not found: ${id} v${version}`);
+  const updated: Prompt = { ...existing, ...data, id, version, updatedAt: new Date().toISOString() };
+  validateTemplateVariables(updated);
+  return repo.updatePrompt(id, version, updated);
 }

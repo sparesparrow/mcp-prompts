@@ -1,7 +1,6 @@
-// Use-case: listPrompts
-import { Prompt } from '../entities/Prompt';
-import { IPromptRepository } from '../ports/IPromptRepository';
+import type { IPromptRepository } from '../ports/IPromptRepository';
+import type { Prompt } from '../entities/Prompt';
 
-export async function listPrompts(repo: IPromptRepository): Promise<Prompt[]> {
-  return repo.list();
+export async function listPrompts(repo: IPromptRepository, options?: any, allVersions = false): Promise<Prompt[]> {
+  return repo.listPrompts(options, allVersions);
 }
