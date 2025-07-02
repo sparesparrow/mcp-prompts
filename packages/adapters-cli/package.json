@@ -1,0 +1,16 @@
+{
+  "name": "@mcp-prompts/adapters-cli",
+  "version": "0.1.0",
+  "main": "dist/cli.js",
+  "types": "dist/cli.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "bin": {
+    "mcp-prompts": "dist/cli.js"
+  },
+  "dependencies": {
+    "@mcp-prompts/core": "workspace:*",
+    "commander": "^11.0.0"
+  }
+}

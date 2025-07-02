@@ -1,0 +1,30 @@
+{
+  "files": [],
+  "references": [
+    { "path": "./packages/core" },
+    { "path": "./packages/adapters-file" },
+    { "path": "./packages/adapters-postgres" },
+    { "path": "./packages/adapters-memory" },
+    { "path": "./packages/adapters-mdc" },
+    { "path": "./packages/adapters-eta" },
+    { "path": "./packages/adapters-mcp" },
+    { "path": "./packages/adapters-rest" },
+    { "path": "./packages/adapters-cli" },
+    { "path": "./apps/server" }
+  ],
+  "compilerOptions": {
+    "composite": true,
+    "strict": true,
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["packages/core/src/*"],
+      "@adapters/*": ["packages/adapters-*/src/*"]
+    }
+  }
+}

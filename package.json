@@ -1,43 +1,30 @@
 {
-  "name": "mcp-prompts-meta",
-  "version": "1.0.0",
-  "description": "MCP Prompts Meta Package",
+  "name": "mcp-prompts-monorepo",
   "private": true,
+  "version": "3.0.0-alpha.0",
   "workspaces": [
-    "packages/*"
+    "packages/*",
+    "apps/*",
+    "docs"
   ],
-  "scripts": {
-    "build": "npm run build --workspaces",
-    "test": "npm run test --workspaces",
-    "lint": "npm run lint --workspaces",
-    "clean": "npm run clean --workspaces",
-    "install:all": "npm install",
-    "workspace:list": "npm list --workspaces"
-  },
-  "keywords": [
-    "mcp",
-    "prompts",
-    "monorepo",
-    "model-context-protocol"
-  ],
-  "author": "sparesparrow",
-  "license": "MIT",
-  "dependencies": {
-    "@sparesparrow/mcp-prompts-catalog": "^1.0.0"
-  },
   "devDependencies": {
-    "@sparesparrow/mcp-prompts-contracts": "^1.0.0"
+    "typescript": "^5.5.0",
+    "eslint": "^8.0.0",
+    "prettier": "^3.0.0",
+    "@types/node": "^20.0.0",
+    "eslint-config-airbnb-base": "^15.0.0",
+    "eslint-plugin-import": "^2.29.0",
+    "@typescript-eslint/eslint-plugin": "^7.0.0",
+    "@typescript-eslint/parser": "^7.0.0",
+    "vitest": "^1.0.0"
   },
   "engines": {
     "node": ">=18.0.0",
-    "npm": ">=8.0.0"
+    "pnpm": ">=9.0.0"
   },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/sparesparrow/mcp-prompts.git"
-  },
-  "bugs": {
-    "url": "https://github.com/sparesparrow/mcp-prompts/issues"
-  },
-  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme"
-} 
+  "scripts": {
+    "lint": "eslint . --ext .ts,.js",
+    "format": "prettier --write .",
+    "test": "vitest run"
+  }
+}

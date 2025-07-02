@@ -1,0 +1,13 @@
+{
+  "name": "@mcp-prompts/adapters-file",
+  "version": "0.1.0",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@mcp-prompts/core": "workspace:*",
+    "pathe": "^1.1.1"
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "@mcp-prompts/adapters-postgres",
+  "version": "0.1.0",
+  "main": "dist/PostgresPromptRepository.js",
+  "types": "dist/PostgresPromptRepository.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@mcp-prompts/core": "workspace:*",
+    "pg": "^8.11.3"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "@mcp-prompts/adapters-memory",
+  "version": "0.1.0",
+  "main": "dist/MemoryPromptRepository.js",
+  "types": "dist/MemoryPromptRepository.d.ts",
+  "type": "module",
+  "license": "MIT",
+  "private": false,
+  "dependencies": {
+    "@mcp-prompts/core": "workspace:*"
+  }
+}
