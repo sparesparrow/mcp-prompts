@@ -26,9 +26,9 @@ import {
 } from './workflow-service.js';
 import type { StorageAdapter } from '@core/types/manual-exports.js';
 import { promptSchemas } from '@core/types/manual-exports.js';
-import { Prompt, CreatePromptParams, UpdatePromptParams } from '../packages/core/src/interfaces.js';
+import { Prompt, CreatePromptParams, UpdatePromptParams } from '../../packages/core/src/interfaces.js';
 import { atomicWriteFile } from './adapters.js';
-import type { IPromptRepository, IPromptApplication } from '../packages/core/src/interfaces.js';
+import type { IPromptRepository, IPromptApplication } from '../../packages/core/src/interfaces.js';
 
 // Global error handler middleware (must be at module level for export)
 export const errorHandler: express.ErrorRequestHandler = (err, req, res, next) => {

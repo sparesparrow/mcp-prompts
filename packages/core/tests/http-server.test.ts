@@ -6,13 +6,13 @@ import { jest } from '@jest/globals';
 import type { NextFunction, Request, Response } from 'express';
 
 import { closeServer } from '../../tests/setup.js';
-import { AppError, HttpErrorCode } from '../errors.js';
-import { errorHandler, startHttpServer } from '../http-server.js';
+import { AppError, HttpErrorCode } from '../src/errors.js';
+import { errorHandler, startHttpServer } from '../src/http-server.js';
 import type { Prompt } from '@sparesparrow/mcp-prompts-contracts';
-import type { PromptService } from '../prompt-service.js';
-import type { SequenceService } from '../sequence-service.js';
-import type { WorkflowService } from '../workflow-service.js';
-import { promptSchemas } from '@core/types/manual-exports.js';
+import type { PromptService } from '../src/prompt-service.js';
+import type { SequenceService } from '../src/sequence-service.js';
+import type { WorkflowService } from '../src/workflow-service.js';
+import { promptSchemas } from '../src/types/manual-exports.js';
 
 describe('HTTP Server', () => {
   let server: Server;

@@ -1,10 +1,9 @@
 import Handlebars from 'handlebars';
 import type {
-  StorageAdapter,
   ApplyTemplateResult,
   Prompt,
-} from '@core/types/manual-exports.js';
-import { promptSchemas } from '@core/types/manual-exports.js';
+} from './types/manual-exports.js';
+import { promptSchemas } from './types/manual-exports.js';
 
 import type {
   CreatePromptParams,
@@ -15,7 +14,7 @@ import type {
   IPromptRepository,
   IPromptApplication,
   ITemplatingEngine,
-} from '../packages/core/src/interfaces.js';
+} from './interfaces.js';
 import * as Prompts from './prompts.js';
 import { DuplicateError, AppError, HttpErrorCode, ValidationError, NotFoundError } from './errors.js';
 import { getRedisClient, jsonFriendlyErrorReplacer, templateHelpers } from './utils.js';
@@ -158,10 +157,10 @@ export class PromptService implements IPromptApplication {
   public async updatePrompt(
     id: string,
     version: number,
-    args: Omit<UpdatePromptParams, 'id' | 'version'>,
+    data: Partial<Prompt>,
   ): Promise<Prompt> {
-    if ('metadata' in args && args.metadata === null) {
-      delete (args as any).metadata;
+    if ('metadata' in data && data.metadata === null) {
+      delete (data as any).metadata;
     }
     const existingPrompt = await this.getPrompt(id, version);
     if (!existingPrompt) {
@@ -170,17 +169,16 @@ export class PromptService implements IPromptApplication {
 
     const base: Omit<Prompt, 'metadata'> = {
       ...existingPrompt,
-      ...args,
+      ...data,
       id,
       version,
       updatedAt: new Date().toISOString(),
     };
     let updatedPromptData: Prompt;
-    if ('metadata' in args && args.metadata !== null && args.metadata !== undefined) {
-      updatedPromptData = { ...base, metadata: args.metadata };
+    if ('metadata' in data && data.metadata !== null && data.metadata !== undefined) {
+      updatedPromptData = { ...base, metadata: data.metadata };
     } else {
-      const { metadata, ...rest } = base;
-      updatedPromptData = rest as Prompt;
+      updatedPromptData = base as Prompt;
     }
 
     validateTemplateVariables({

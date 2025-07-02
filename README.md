@@ -26,6 +26,10 @@
 - [🛠️ Příklady konfigurace MCP klienta a serveru (`mcp.json`, `.env`)](#️-příklady-konfigurace-mcp-klienta-a-serveru-mcpjson-env)
 - [Hexagonální architektura v MCP-Prompts](#hexagonální-architektura-v-mcp-prompts)
 - [Architecture: Hexagonal (Ports & Adapters)](#architecture-hexagonal-ports--adapters)
+- [MCP Prompts Monorepo Build Setup](#mcp-prompts-monorepo-build-setup)
+- [TypeScript Monorepo Best Practices](#typescript-monorepo-best-practices)
+- [Troubleshooting](#troubleshooting)
+- [References](#references)
 
 ---
 
@@ -622,3 +626,26 @@ mcp-prompts/
 - [Hexagonal Architecture: Wikipedia](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software))
 - [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
 - [DEV: Stop Losing Prompts – Build Your Own MCP Prompt Registry](https://dev.to/stevengonsalvez/stop-losing-prompts-build-your-own-mcp-prompt-registry-4fi1)
+
+## MCP Prompts Monorepo Build Setup
+
+## TypeScript Monorepo Best Practices
+
+- Each package has its own `tsconfig.json` extending a shared `tsconfig.options.json`.
+- The shared config enables ESM (`module: NodeNext`), strict type checking, and emits both `.js` and `.d.ts` files for all source files.
+- `emitDeclarationOnly` is **not** used, so both JavaScript and type declarations are available for downstream packages.
+- **Build order matters:**
+  1. Build `@mcp-prompts/core` first (it emits all types and JS for downstream packages).
+  2. Then build `@mcp-prompts/adapters-file` and `@mcp-prompts/adapters-memory`.
+  3. Then run `pnpm -r build` for the full monorepo.
+- The script `src/scripts/validate-prompts.ts` is excluded from the core build to avoid circular dependencies (it depends on adapters-file, which depends on core). If you need to build or run this script, do so separately after the main build.
+- All imports between packages use the built outputs (e.g., `@mcp-prompts/core/dist/interfaces.js`).
+
+## Troubleshooting
+
+- If you see errors about missing modules or types, ensure you have built `@mcp-prompts/core` first and that all `dist/` directories are up to date.
+- If you change the shared config or move files, clean all `dist/` directories and rebuild.
+
+## References
+- [Turborepo TypeScript Monorepo Guide](https://turborepo.com/docs/guides/tools/typescript)
+- [Separate tsconfig for builds](https://www.timsanteford.com/posts/streamlining-your-next-js-builds-with-a-separate-typescript-configuration/)
