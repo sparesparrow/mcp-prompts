@@ -1,5 +1,34 @@
 # Changelog
 
+
+### npmjs published packages tested in Docker and local environment
+
+#### Recommended Versions:
+- "@sparesparrow/mcp-prompts@1.2.48" (Recommended for Docker)
+  - Most stable version
+  - Successfully connects to memory storage
+  - Starts HTTP server on port 3003
+  - Works reliably in both Docker and local environments
+
+#### Other Tested Versions:
+- "@sparesparrow/mcp-prompts@3.0.5"
+  - Starts successfully locally
+  - May have dependency issues in Docker
+- "@sparesparrow/mcp-prompts@1.2.8"
+  - Starts with warning about HTTP transport
+  - Shows as "MCP Prompts Server v3.0.0-alpha.0"
+
+#### Versions with Issues:
+- "@sparesparrow/mcp-prompts@3.0.3-main" through "@sparesparrow/mcp-prompts@3.0.1"
+  - Dynamic require errors
+  - Module resolution problems
+- "@sparesparrow/mcp-prompts@1.8.1" through "@sparesparrow/mcp-prompts@1.2.44"
+  - Various dependency and compatibility issues
+  - Not recommended for production use
+
+### Dockerhub published images
+- 
+
 All notable changes to this project will be documented in this file.
 
 ## [1.8.0] - 2025-06-21

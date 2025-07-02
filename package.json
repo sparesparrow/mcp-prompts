@@ -1,12 +1,24 @@
 {
-  "name": "mcp-prompts-monorepo",
+  "name": "mcp-prompts",
   "private": true,
-  "version": "3.0.0-alpha.0",
+  "version": "3.0.6",
   "workspaces": [
     "packages/*",
     "apps/*",
     "docs"
   ],
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
+    "@mcp-prompts/core": "workspace:*",
+    "@mcp-prompts/adapters-file": "workspace:*",
+    "@mcp-prompts/adapters-postgres": "workspace:*",
+    "@mcp-prompts/adapters-memory": "workspace:*",
+    "@mcp-prompts/adapters-mdc": "workspace:*",
+    "@mcp-prompts/adapters-eta": "workspace:*",
+    "@mcp-prompts/adapters-mcp": "workspace:*",
+    "@mcp-prompts/adapters-rest": "workspace:*",
+    "@mcp-prompts/adapters-cli": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.5.0",
     "eslint": "^8.0.0",
