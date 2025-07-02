@@ -2,7 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "paths": {
+      "@core/*": ["../../packages/core/src/*"],
+      "@adapters-file/*": ["../../packages/adapters-file/src/*"],
+      "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
+    },
+    "baseUrl": "../../"
   },
   "include": ["src"]
 }

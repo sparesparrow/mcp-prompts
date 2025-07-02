@@ -1,9 +1,7 @@
-import type { Prompt } from '../entities/Prompt';
-import type { ITemplatingEngine } from '../ports/ITemplatingEngine';
+// Use-case: validatePrompt
+import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
 
-export async function validatePrompt(
-  templating: ITemplatingEngine,
-  prompt: Prompt,
-): Promise<boolean> {
-  return templating.validate(prompt.template);
+export function validatePrompt(prompt: Prompt): boolean {
+  // Základní validace, lze rozšířit
+  return !!prompt.name && !!prompt.content;
 }

@@ -1,11 +1,17 @@
 {
   "folders": [
     { "path": "." },
-    { "path": "mcp-prompts-ts" },
-    { "path": "mcp-prompts-contracts" },
-    { "path": "packages/catalog" },
-    { "path": "packages/contracts" },
-    { "path": "packages/mcp-prompts-catalog" }
+    { "path": "packages/core" },
+    { "path": "packages/adapters-file" },
+    { "path": "packages/adapters-postgres" },
+    { "path": "packages/adapters-memory" },
+    { "path": "packages/adapters-mdc" },
+    { "path": "packages/adapters-eta" },
+    { "path": "packages/adapters-mcp" },
+    { "path": "packages/adapters-rest" },
+    { "path": "packages/adapters-cli" },
+    { "path": "apps/server" },
+    { "path": "docs" }
   ],
   "settings": {
     "typescript.tsdk": "node_modules/typescript/lib",

@@ -1,14 +1,17 @@
 # MCP Prompts
-mcp-prompts-rs/
-mcp-prompts-contracts/
-mcp-prompts-collection/
-mcp-prompts-ts/
-mcp-prompts-catalog/
-mcp-prompts-pg/
-mcp-prompts-aidl/
-mcp-prompts-esp32/
-esp32-hid-rs/
-
+# mcp-prompts-rs/
+# mcp-prompts-contracts/
+# mcp-prompts-collection/
+# mcp-prompts-ts/
+# mcp-prompts-catalog/
+# mcp-prompts-pg/
+# mcp-prompts-aidl/
+# mcp-prompts-esp32/
+# esp32-hid-rs/
+packages/mcp-prompts-catalog/
+packages/mcp-prompts-contracts/
+packages/*/node_modules/
+apps/*/node_modules/
 
 # Dependencies
 node_modules/
@@ -16,6 +19,7 @@ node_modules/
 # Build output
 build/
 dist/
+dist-tsc/
 
 # Environment variables
 .env

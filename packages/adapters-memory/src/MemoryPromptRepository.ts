@@ -1,33 +1,36 @@
-import type { Prompt } from '@mcp-prompts/core/src/entities/Prompt';
-import type { PromptId } from '@mcp-prompts/core/src/value-objects/PromptId';
-import type { IPromptRepository } from '@mcp-prompts/core/src/ports/IPromptRepository';
+// Jednoduchá paměťová implementace IPromptRepository
+import { IPromptRepository } from '@core/ports/IPromptRepository';
+import { Prompt } from '@core/entities/Prompt';
+import { PromptId } from '@core/value-objects/PromptId';
 
 export class MemoryPromptRepository implements IPromptRepository {
-  private prompts = new Map<string, Prompt>();
+  private prompts = new Map<PromptId, Prompt>();
 
-  async save(prompt: Prompt): Promise<void> {
+  async add(prompt: Prompt): Promise<Prompt> {
     this.prompts.set(prompt.id, prompt);
+    return prompt;
   }
 
-  async findById(id: PromptId): Promise<Prompt | null> {
-    return this.prompts.get(id.toString()) || null;
+  async getById(id: PromptId): Promise<Prompt | null> {
+    return this.prompts.get(id) ?? null;
   }
 
-  async findAll(): Promise<Prompt[]> {
+  async list(): Promise<Prompt[]> {
     return Array.from(this.prompts.values());
   }
 
-  async update(id: PromptId, update: Partial<Prompt>): Promise<void> {
-    const prompt = this.prompts.get(id.toString());
-    if (!prompt) throw new Error('Prompt not found');
-    this.prompts.set(id.toString(), { ...prompt, ...update });
+  async update(id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
+    const existing = this.prompts.get(id);
+    if (!existing) return null;
+    const updated = { ...existing, ...update, updatedAt: new Date() };
+    this.prompts.set(id, updated);
+    return updated;
   }
 
-  async delete(id: PromptId): Promise<void> {
-    this.prompts.delete(id.toString());
+  async delete(id: PromptId): Promise<boolean> {
+    return this.prompts.delete(id);
   }
 
-  // Pro testy: resetuje stav
   reset() {
     this.prompts.clear();
   }

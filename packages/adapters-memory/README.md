@@ -1,3 +1,6 @@
-# @adapters-memory
+# @mcp-prompts/adapters-memory
 
-In-memory mock implementation for tests.
+Jednoduchý paměťový adapter pro MCP server.
+
+- Implementuje porty z `@mcp-prompts/core`
+- Vhodné pro testování a vývoj

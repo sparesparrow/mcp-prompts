@@ -1,5 +1,5 @@
-import type { Prompt } from '../entities/Prompt';
-import type { TemplateVariable } from '../entities/TemplateVariable';
+import type { Prompt } from '@sparesparrow/mcp-prompts-contracts';
+import type { TemplateVariable } from '../interfaces';
 
 export class ValidationError extends Error {
   details?: any;

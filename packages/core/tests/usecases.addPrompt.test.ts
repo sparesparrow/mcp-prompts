@@ -1,6 +1,6 @@
-import { addPrompt } from '../src/usecases/AddPrompt';
-import { Prompt } from '../src/entities/Prompt';
-import { ValidationError } from '../src/validation/PromptValidation';
+import { addPrompt } from '@core/use-cases/addPrompt';
+import { Prompt } from '@core/entities/Prompt';
+import { ValidationError } from '@core/validation/PromptValidation';
 
 describe('addPrompt', () => {
   it('should add a valid prompt', async () => {

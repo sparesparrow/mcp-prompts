@@ -3,7 +3,12 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
-  "license": "MIT",
-  "private": false
-}
+  "files": ["dist"],
+  "dependencies": {
+    "@sparesparrow/mcp-prompts-contracts": "^1.0.1"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "jest --config jest.config.js"
+  }
+} 

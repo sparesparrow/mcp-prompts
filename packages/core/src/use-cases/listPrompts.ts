@@ -1,6 +1,7 @@
-import type { Prompt } from '../entities/Prompt';
-import type { IPromptRepository } from '../ports/IPromptRepository';
+// Use-case: listPrompts
+import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
+import { IPromptRepository } from '../ports/IPromptRepository';
 
 export async function listPrompts(repo: IPromptRepository): Promise<Prompt[]> {
-  return repo.findAll();
+  return repo.list();
 }

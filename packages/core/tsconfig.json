@@ -1,8 +1,23 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.options.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "baseUrl": ".",
+    "paths": {
+      "@core/*": ["../core/src/*"],
+      "@adapters-file/*": ["../adapters-file/src/*"],
+      "@adapters-memory/*": ["../adapters-memory/src/*"],
+      "@sparesparrow/mcp-prompts-contracts": ["../mcp-prompts-contracts/dist"]
+    }
   },
-  "include": ["src"]
-}
+  "include": [
+    "src/**/*"
+  ],
+  "exclude": [
+    "tests"
+  ],
+  "references": [
+    { "path": "../../adapters-file" }
+  ]
+} 

@@ -8,6 +8,6 @@
   "private": false,
   "dependencies": {
     "@mcp-prompts/core": "workspace:*",
-    "@modelcontextprotocol/sdk": ">=1.6.0"
+    "@modelcontextprotocol/sdk": ">=1.13.3"
   }
 }

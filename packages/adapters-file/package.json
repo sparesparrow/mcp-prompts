@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
-  "license": "MIT",
-  "private": false,
+  "files": ["dist"],
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*",
-    "pathe": "^1.1.1"
+    "@mcp-prompts/core": "workspace:*"
   }
 }

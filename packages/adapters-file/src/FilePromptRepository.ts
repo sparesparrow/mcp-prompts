@@ -1,21 +1,16 @@
-import { promises as fs } from 'fs';
-import pathe from 'pathe';
-import type { Prompt } from '@mcp-prompts/core/src/entities/Prompt';
-import type { PromptId } from '@mcp-prompts/core/src/value-objects/PromptId';
-import type { IPromptRepository } from '@mcp-prompts/core/src/ports/IPromptRepository';
+// Souborová implementace IPromptRepository
+import { IPromptRepository } from '@core/ports/IPromptRepository';
+import { Prompt } from '@core/entities/Prompt';
+import { PromptId } from '@core/value-objects/PromptId';
+import * as fs from 'fs/promises';
+import * as path from 'path';
 
-const DEFAULT_PATH = pathe.resolve(process.env.PROMPT_FILE_PATH || './data/prompts.json');
+const DATA_FILE = path.resolve(process.env.PROMPT_FILE_PATH || './prompts.json');
 
 export class FilePromptRepository implements IPromptRepository {
-  private filePath: string;
-
-  constructor(filePath: string = DEFAULT_PATH) {
-    this.filePath = filePath;
-  }
-
   private async readAll(): Promise<Prompt[]> {
     try {
-      const data = await fs.readFile(this.filePath, 'utf-8');
+      const data = await fs.readFile(DATA_FILE, 'utf-8');
       return JSON.parse(data) as Prompt[];
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code === 'ENOENT') return [];
@@ -24,38 +19,40 @@ export class FilePromptRepository implements IPromptRepository {
   }
 
   private async writeAll(prompts: Prompt[]): Promise<void> {
-    await fs.mkdir(pathe.dirname(this.filePath), { recursive: true });
-    await fs.writeFile(this.filePath, JSON.stringify(prompts, null, 2), 'utf-8');
+    await fs.writeFile(DATA_FILE, JSON.stringify(prompts, null, 2), 'utf-8');
   }
 
-  async save(prompt: Prompt): Promise<void> {
+  async add(prompt: Prompt): Promise<Prompt> {
     const prompts = await this.readAll();
-    const idx = prompts.findIndex(p => p.id === prompt.id);
-    if (idx >= 0) prompts[idx] = prompt;
-    else prompts.push(prompt);
+    prompts.push(prompt);
     await this.writeAll(prompts);
+    return prompt;
   }
 
-  async findById(id: PromptId): Promise<Prompt | null> {
+  async getById(id: PromptId): Promise<Prompt | null> {
     const prompts = await this.readAll();
-    return prompts.find(p => p.id === id.toString()) || null;
+    return prompts.find(p => p.id === id) ?? null;
   }
 
-  async findAll(): Promise<Prompt[]> {
+  async list(): Promise<Prompt[]> {
     return this.readAll();
   }
 
-  async update(id: PromptId, update: Partial<Prompt>): Promise<void> {
+  async update(id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
     const prompts = await this.readAll();
-    const idx = prompts.findIndex(p => p.id === id.toString());
-    if (idx < 0) throw new Error('Prompt not found');
-    prompts[idx] = { ...prompts[idx], ...update };
+    const idx = prompts.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+    const updated = { ...prompts[idx], ...update, updatedAt: new Date() };
+    prompts[idx] = updated;
     await this.writeAll(prompts);
+    return updated;
   }
 
-  async delete(id: PromptId): Promise<void> {
+  async delete(id: PromptId): Promise<boolean> {
     const prompts = await this.readAll();
-    const filtered = prompts.filter(p => p.id !== id.toString());
-    await this.writeAll(filtered);
+    const newPrompts = prompts.filter(p => p.id !== id);
+    const changed = newPrompts.length !== prompts.length;
+    if (changed) await this.writeAll(newPrompts);
+    return changed;
   }
 }

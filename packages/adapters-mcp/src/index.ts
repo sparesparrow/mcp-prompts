@@ -1,5 +1,5 @@
 // MCP Server Adapter – DI implementation
-import { createServer } from '@modelcontextprotocol/sdk';
+import { MCPServer } from '@modelcontextprotocol/sdk';
 import { z } from 'zod';
 import {
   PromptSchema,
@@ -8,7 +8,7 @@ import {
 import type { IPromptApplication } from '@mcp-prompts/core/src/ports/IPromptApplication';
 
 export function startMcpServer(promptApp: IPromptApplication) {
-  const server = createServer({
+  const server = MCPServer({
     methods: {
       addPrompt: {
         input: PromptSchema,

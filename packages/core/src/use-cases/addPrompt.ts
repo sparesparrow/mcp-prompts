@@ -1,7 +1,8 @@
-import type { Prompt } from '../entities/Prompt';
-import type { IPromptRepository } from '../ports/IPromptRepository';
+// Use-case: addPrompt
+import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
+import { IPromptRepository } from '../ports/IPromptRepository';
 
 export async function addPrompt(repo: IPromptRepository, prompt: Prompt): Promise<Prompt> {
-  await repo.save(prompt);
-  return prompt;
+  // Validace, business logika atd. může být doplněna
+  return repo.add(prompt);
 }
