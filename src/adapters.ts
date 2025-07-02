@@ -22,7 +22,7 @@ import {
   type ISequenceRepository,
   type IWorkflowRepository,
   type WorkflowExecutionState,
-} from '../../packages/core/src/interfaces.js';
+} from '../packages/core/src/interfaces.js';
 import { promptSchemas, workflowSchema } from './schemas.js';
 import { LockError } from './errors.js';
 

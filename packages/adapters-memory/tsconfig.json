@@ -8,11 +8,12 @@
       "@adapters-file/*": ["../../packages/adapters-file/src/*"],
       "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
     },
-    "baseUrl": "../../",
-    "composite": true
+    "baseUrl": "../../"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "../core/src/**/*",
+    "../adapters-file/src/**/*"
   ],
   "references": [
     { "path": "../core" }

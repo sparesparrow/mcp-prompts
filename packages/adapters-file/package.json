@@ -3,22 +3,11 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": [
-    "dist"
-  ],
+  "files": ["dist"],
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*",
-    "@types/proper-lockfile": "^4.1.4",
-    "proper-lockfile": "^4.1.2"
-  },
-  "exports": {
-    ".": {
-      "import": "./dist/index.js",
-      "require": "./dist/index.js",
-      "types": "./dist/index.d.ts"
-    }
+    "@mcp-prompts/core": "workspace:*"
   }
 }

@@ -1,6 +1,6 @@
 import pg from 'pg';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '../../../core/src/interfaces.js';
-import type { IPromptRepository, ISequenceRepository, IWorkflowRepository } from '../../../core/src/ports/IPromptRepository.js';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@core/interfaces';
+import type { IPromptRepository, ISequenceRepository, IWorkflowRepository } from '@core/ports/IPromptRepository';
 
 function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   if ('metadata' in prompt && prompt.metadata === null) {

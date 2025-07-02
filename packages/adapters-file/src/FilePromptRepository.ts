@@ -1,7 +1,7 @@
 // Souborová implementace IPromptRepository
-import { IPromptRepository } from '../../../packages/core/src/ports/IPromptRepository.js';
-import type { Prompt } from '@mcp-prompts/core/dist/interfaces.js';
-import type { PromptId } from '@mcp-prompts/core/dist/value-objects/PromptId.js';
+import { IPromptRepository } from '@core/ports/IPromptRepository';
+import { Prompt } from '@core/entities/Prompt';
+import { PromptId } from '@core/value-objects/PromptId';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 
@@ -23,22 +23,36 @@ export class FilePromptRepository implements IPromptRepository {
   }
 
   async add(prompt: Prompt): Promise<Prompt> {
-    return Promise.reject(new Error('Not implemented'));
+    const prompts = await this.readAll();
+    prompts.push(prompt);
+    await this.writeAll(prompts);
+    return prompt;
   }
 
   async getById(id: PromptId): Promise<Prompt | null> {
-    return Promise.reject(new Error('Not implemented'));
+    const prompts = await this.readAll();
+    return prompts.find(p => p.id === id) ?? null;
   }
 
   async list(): Promise<Prompt[]> {
-    return Promise.reject(new Error('Not implemented'));
+    return this.readAll();
   }
 
   async update(id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
-    return Promise.reject(new Error('Not implemented'));
+    const prompts = await this.readAll();
+    const idx = prompts.findIndex(p => p.id === id);
+    if (idx === -1) return null;
+    const updated = { ...prompts[idx], ...update, updatedAt: new Date() };
+    prompts[idx] = updated;
+    await this.writeAll(prompts);
+    return updated;
   }
 
   async delete(id: PromptId): Promise<boolean> {
-    return Promise.reject(new Error('Not implemented'));
+    const prompts = await this.readAll();
+    const newPrompts = prompts.filter(p => p.id !== id);
+    const changed = newPrompts.length !== prompts.length;
+    if (changed) await this.writeAll(newPrompts);
+    return changed;
   }
 }
