@@ -4,7 +4,7 @@ import path from 'path';
 import { randomUUID } from 'crypto';
 import lockfile from 'proper-lockfile';
 import { z } from 'zod';
-import { promptSchemas, workflowSchema } from '@sparesparrow/mcp-prompts-contracts/dist/src/schemas.js';
+import { promptSchemas } from '../../core/src/schemas';
 import { LockError } from '../../../src/errors.js';
 import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, PromptId } from '@mcp-prompts/core';
 

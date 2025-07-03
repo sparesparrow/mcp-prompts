@@ -1,8 +1,8 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { FileAdapter } from '../src/FileAdapter';
 import fs from 'fs/promises';
 import path from 'path';
 import { z } from 'zod';
-import { promptSchemas } from '@sparesparrow/mcp-prompts-contracts/dist/src/schemas.js';
 
 describe('FileAdapter Robustness', () => {
   const TMP_DIR = path.join(__dirname, 'tmp-prompts');

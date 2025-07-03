@@ -13,6 +13,7 @@ export * from './use-cases/getPromptById';
 export * from './use-cases/listPrompts';
 export * from './use-cases/updatePrompt';
 export * from './use-cases/deletePrompt';
+export * from './schemas';
 export type { Prompt } from './entities/Prompt';
 export type { PromptSequence } from './entities/PromptSequence';
 export type { WorkflowExecutionState, ListPromptsOptions } from './interfaces';

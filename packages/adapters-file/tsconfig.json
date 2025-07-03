@@ -5,6 +5,7 @@
     "rootDir": "src",
     "paths": {
       "@core/*": ["../../src/*", "../../packages/core/src/*"],
+      "@core": ["../../packages/core/src/index.ts"],
       "@adapters-file/*": ["../../packages/adapters-file/src/*"],
       "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
     },
