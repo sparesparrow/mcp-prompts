@@ -8,6 +8,20 @@
   "private": false,
   "dependencies": {
     "@mcp-prompts/core": "workspace:*",
-    "@modelcontextprotocol/sdk": ">=1.13.3"
+    "@modelcontextprotocol/sdk": "^1.13.3",
+    "zod": "^3.23.8"
+  },
+  "scripts": {
+    "build": "swc src -d dist --copy-files",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   }
 }

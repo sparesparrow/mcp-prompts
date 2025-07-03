@@ -82,3 +82,7 @@ All notable changes to this project will be documented in this file.
 - Robustness and concurrency tests for file adapter
 - Workspace and config cleanup
 - Skipped legacy/broken tests to unblock CI and release
+- **Automated Inspector UI testing:**
+  - Puppeteer-based smoke test for MCP Inspector UI
+  - End-to-end prompt CRUD UI test (add, edit, delete, verify)
+  - Tests run against live server and Inspector, ensuring UI/server integration

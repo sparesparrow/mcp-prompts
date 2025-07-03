@@ -1,7 +1,5 @@
 // Souborová implementace IPromptRepository
-import { IPromptRepository } from '../../../packages/core/src/ports/IPromptRepository.js';
-import type { Prompt } from '@mcp-prompts/core/dist/interfaces.js';
-import type { PromptId } from '@mcp-prompts/core/dist/value-objects/PromptId.js';
+import type { IPromptRepository, Prompt, PromptId } from '@mcp-prompts/core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

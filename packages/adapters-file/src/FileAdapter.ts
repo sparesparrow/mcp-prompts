@@ -6,9 +6,7 @@ import lockfile from 'proper-lockfile';
 import { z } from 'zod';
 import { promptSchemas, workflowSchema } from '@sparesparrow/mcp-prompts-contracts/dist/src/schemas.js';
 import { LockError } from '../../../src/errors.js';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@mcp-prompts/core/dist/interfaces.js';
-import type { IPromptRepository } from '@mcp-prompts/core/dist/ports/IPromptRepository.js';
-import type { PromptId } from '@mcp-prompts/core/dist/value-objects/PromptId.js';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, PromptId } from '@mcp-prompts/core';
 
 export async function atomicWriteFile(filePath: string, data: string) {
   const dir = path.dirname(filePath);
@@ -378,7 +376,7 @@ export class FileAdapter implements IPromptRepository {
         prompts = prompts.filter(p => p.category === options.category);
       }
       if (options.tags && options.tags.length > 0) {
-        prompts = prompts.filter(p => options.tags?.every(tag => p.tags?.includes(tag)));
+        prompts = prompts.filter(p => options.tags?.every((tag: string) => p.tags?.includes(tag)));
       }
       if (options.search) {
         const search = options.search.toLowerCase();

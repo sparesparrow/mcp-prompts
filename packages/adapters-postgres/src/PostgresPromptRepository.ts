@@ -1,7 +1,5 @@
 import { Pool } from 'pg';
-import type { Prompt } from '@mcp-prompts/core/src/entities/Prompt';
-import type { PromptId } from '@mcp-prompts/core/src/value-objects/PromptId';
-import type { IPromptRepository } from '@mcp-prompts/core/src/ports/IPromptRepository';
+import type { Prompt, PromptId, IPromptRepository } from '@mcp-prompts/core';
 
 export class PostgresPromptRepository implements IPromptRepository {
   private pool: Pool;

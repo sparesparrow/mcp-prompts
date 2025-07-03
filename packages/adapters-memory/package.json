@@ -5,8 +5,10 @@
   "types": "dist/index.d.ts",
   "files": ["dist"],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "build:swc": "swc src -d dist --copy-files"
+    "build": "swc src -d dist --copy-files",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@mcp-prompts/core": "workspace:*"

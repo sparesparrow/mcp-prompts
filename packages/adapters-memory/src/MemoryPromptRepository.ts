@@ -1,7 +1,5 @@
 // Jednoduchá paměťová implementace IPromptRepository
-import type { IPromptRepository } from '@mcp-prompts/core/dist/ports/IPromptRepository.js';
-import type { Prompt } from '@mcp-prompts/core/dist/interfaces.js';
-import type { PromptId } from '@mcp-prompts/core/dist/value-objects/PromptId.js';
+import type { IPromptRepository, Prompt, PromptId } from '@mcp-prompts/core';
 
 export class MemoryPromptRepository implements IPromptRepository {
   private prompts = new Map<PromptId, Prompt>();

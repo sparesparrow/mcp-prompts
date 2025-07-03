@@ -1,6 +1,5 @@
 import pg from 'pg';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '../../../core/src/interfaces.js';
-import type { IPromptRepository, ISequenceRepository, IWorkflowRepository } from '../../../core/src/ports/IPromptRepository.js';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, ISequenceRepository } from '@mcp-prompts/core';
 
 function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   if ('metadata' in prompt && prompt.metadata === null) {
@@ -9,7 +8,7 @@ function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   return prompt;
 }
 
-export class PostgresAdapter implements IPromptRepository, ISequenceRepository, IWorkflowRepository {
+export class PostgresAdapter implements IPromptRepository, ISequenceRepository {
   private pool: pg.Pool;
   private connected = false;
   private config: pg.PoolConfig;

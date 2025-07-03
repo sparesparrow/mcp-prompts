@@ -1,9 +1,7 @@
 import express from 'express';
-import type { Request, Response } from 'express';
-import { addPrompt } from '../../../packages/core/src/usecases/AddPrompt';
-import { listPrompts } from '../../../packages/core/src/usecases/ListPrompts';
-import { getPrompt } from '../../../packages/core/src/usecases/GetPrompt';
-import { FilePromptRepository } from '../../../packages/adapters-file/src/FilePromptRepository';
+import type { Request, Response, NextFunction } from 'express';
+import { addPrompt, listPrompts, getPromptById } from '@mcp-prompts/core';
+import { FilePromptRepository } from '@mcp-prompts/adapters-file';
 
 export async function startHttpServer() {
   const app = express();
@@ -13,24 +11,25 @@ export async function startHttpServer() {
   const repo = new FilePromptRepository({ promptsDir: './data/prompts' });
   await repo.connect();
 
-  app.get('/prompts', async (req: Request, res: Response) => {
-    const prompts = await listPrompts(repo);
-    res.json(prompts);
+  app.get('/prompts', (req: Request, res: Response, next: NextFunction) => {
+    listPrompts(repo)
+      .then((prompts: any) => res.json(prompts))
+      .catch(next);
   });
 
-  app.get('/prompts/:id', async (req: Request, res: Response) => {
-    const prompt = await getPrompt(repo, req.params.id);
-    if (!prompt) return res.status(404).json({ error: 'Not found' });
-    res.json(prompt);
+  app.get('/prompts/:id', (req: Request, res: Response, next: NextFunction) => {
+    getPromptById(repo, req.params.id)
+      .then((prompt: any) => {
+        if (!prompt) return res.status(404).json({ error: 'Not found' });
+        res.json(prompt);
+      })
+      .catch(next);
   });
 
-  app.post('/prompts', async (req: Request, res: Response) => {
-    try {
-      const prompt = await addPrompt(repo, req.body);
-      res.status(201).json(prompt);
-    } catch (err: any) {
-      res.status(400).json({ error: err.message });
-    }
+  app.post('/prompts', (req: Request, res: Response, next: NextFunction) => {
+    addPrompt(repo, req.body)
+      .then((prompt: any) => res.status(201).json(prompt))
+      .catch((err: any) => res.status(400).json({ error: err.message }));
   });
 
   const port = process.env.PORT || 3000;

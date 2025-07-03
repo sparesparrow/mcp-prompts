@@ -9,5 +9,14 @@
   "dependencies": {
     "@mcp-prompts/core": "workspace:*",
     "pg": "^8.11.3"
+  },
+  "scripts": {
+    "build": "swc src -d dist --copy-files",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "devDependencies": {
+    "@types/pg": "^8.15.4"
   }
 }

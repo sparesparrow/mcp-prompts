@@ -17,10 +17,13 @@
     "@mcp-prompts/adapters-postgres": "workspace:*",
     "@mcp-prompts/adapters-rest": "workspace:*",
     "@mcp-prompts/core": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.13.3",
-    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
+    "@sparesparrow/mcp-prompts-contracts": "workspace:*",
+    "@types/express": "^5.0.3",
+    "express": "^4.19.0",
+    "tsyringe": "^4.10.0"
   },
   "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.12.9",
     "@types/jest": "^30.0.0",
@@ -34,6 +37,7 @@
     "jest-mock-extended": "^4.0.0",
     "prettier": "^3.6.2",
     "proper-lockfile": "^4.1.2",
+    "puppeteer": "^24.11.2",
     "supertest": "^7.1.1",
     "typescript": "^5.8.3",
     "vitest": "^3.2.4",
@@ -44,6 +48,9 @@
     "pnpm": ">=9.0.0"
   },
   "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "clean": "pnpm -r run clean",
     "lint": "eslint . --ext .ts,.js",
     "format": "prettier --write .",
     "test": "vitest run"

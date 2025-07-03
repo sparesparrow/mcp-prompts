@@ -9,7 +9,8 @@
       "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
     },
     "baseUrl": "../../",
-    "composite": true
+    "composite": true,
+    "declaration": true
   },
   "include": [
     "src/**/*",

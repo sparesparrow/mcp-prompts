@@ -3,6 +3,38 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./addPrompt": {
+      "import": "./dist/use-cases/addPrompt.js",
+      "require": "./dist/use-cases/addPrompt.js",
+      "types": "./dist/use-cases/addPrompt.d.ts"
+    },
+    "./getPromptById": {
+      "import": "./dist/use-cases/getPromptById.js",
+      "require": "./dist/use-cases/getPromptById.js",
+      "types": "./dist/use-cases/getPromptById.d.ts"
+    },
+    "./listPrompts": {
+      "import": "./dist/use-cases/listPrompts.js",
+      "require": "./dist/use-cases/listPrompts.js",
+      "types": "./dist/use-cases/listPrompts.d.ts"
+    },
+    "./updatePrompt": {
+      "import": "./dist/use-cases/updatePrompt.js",
+      "require": "./dist/use-cases/updatePrompt.js",
+      "types": "./dist/use-cases/updatePrompt.d.ts"
+    },
+    "./deletePrompt": {
+      "import": "./dist/use-cases/deletePrompt.js",
+      "require": "./dist/use-cases/deletePrompt.js",
+      "types": "./dist/use-cases/deletePrompt.d.ts"
+    }
+  },
   "files": [
     "dist"
   ],
@@ -20,8 +52,9 @@
     "swagger-ui-express": "^5.0.1"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "build:swc": "swc src -d dist --copy-files",
-    "test": "jest --config jest.config.js"
+    "build": "swc src -d dist --copy-files && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   }
 }

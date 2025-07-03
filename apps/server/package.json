@@ -16,5 +16,11 @@
     "@mcp-prompts/adapters-mcp": "workspace:*",
     "@mcp-prompts/adapters-rest": "workspace:*",
     "@mcp-prompts/adapters-cli": "workspace:*"
+  },
+  "scripts": {
+    "build": "swc src -d dist --copy-files",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   }
 }

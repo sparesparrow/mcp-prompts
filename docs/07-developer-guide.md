@@ -12,6 +12,36 @@ Until this guide is complete, see:
 
 ---
 
+## Automated UI Testing with Puppeteer
+
+MCP-Prompts includes automated end-to-end UI tests for the MCP Inspector and server using [Puppeteer](https://pptr.dev/).
+
+- **Location:** `apps/server/tests/`
+- **Test files:**
+  - `mcp-inspector-ui.test.js` – Inspector UI smoke test
+  - `mcp-inspector-prompt-crud.test.js` – Prompt CRUD UI test
+
+### How to Run UI Tests
+
+1. Ensure the MCP server and Inspector are running (see project README).
+2. In the project root, run:
+   ```sh
+   node --experimental-vm-modules apps/server/tests/mcp-inspector-ui.test.js
+   node --experimental-vm-modules apps/server/tests/mcp-inspector-prompt-crud.test.js
+   ```
+   (Or use `pnpm exec` if preferred.)
+
+### How to Extend UI Tests
+- Copy an existing test file and modify selectors/actions for new flows.
+- Use Puppeteer's API to simulate user actions and assert UI state.
+- Prefer `[data-testid]` attributes for stable selectors.
+
+### Interpreting Results
+- Exit code 0: test passed, UI functional.
+- Exit code 1: test failed, see console output for error details.
+
+---
+
 ## GitHub Actions Workflows Summary
 
 MCP-Prompts uses a set of GitHub Actions workflows for CI/CD, testing, publishing, and automation. Below is a summary of each workflow:
