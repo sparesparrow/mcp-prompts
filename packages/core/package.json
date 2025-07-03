@@ -21,6 +21,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "build:swc": "swc src -d dist --copy-files",
     "test": "jest --config jest.config.js"
   }
 }

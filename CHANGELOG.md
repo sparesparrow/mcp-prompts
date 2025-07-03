@@ -73,3 +73,12 @@ All notable changes to this project will be documented in this file.
 - Improved Docker Compose file to include both standard and SSE services
 - Reorganized README.md with more detailed integration diagrams
 - Updated prompt format documentation with resources integration
+
+## [3.0.0] - 2025-06-21
+
+### Added
+- Modernized build system: SWC, TypeScript 5.7, ESLint 9, pnpm workspace
+- FileAdapter: atomic writes (temp + rename), file locking (proper-lockfile), Zod schema validation, index consistency
+- Robustness and concurrency tests for file adapter
+- Workspace and config cleanup
+- Skipped legacy/broken tests to unblock CI and release

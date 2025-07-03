@@ -1,0 +1,27 @@
+---
+globs: packages/adapter*/**/*.ts, packages/adapter*/**/package.json, packages/adapter*/**/tsconfig.json, packages/adapter*/
+alwaysApply: false
+---
+# MCP Prompts Adapters Rules
+
+## Implementation Guidelines
+- Implement core port interfaces
+- Handle all error cases gracefully
+- Use proper async/await patterns
+- Include integration tests
+
+## Dependencies
+- Can depend on @mcp-prompts/core
+- External libraries as needed
+- Follow adapter pattern strictly
+
+## Testing Strategy
+- Integration tests with real dependencies
+- Mock external services when needed
+- Test error handling extensively
+- Performance tests for critical paths
+
+## Build Configuration
+- Own tsconfig.json extending root options
+- Build outputs to dist/
+- Include type declarations 

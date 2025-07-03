@@ -189,3 +189,6 @@
 ---
 
 *Last updated:*  <!-- auto-insert by `scripts/bump-todo.ts` -->
+
+- [x] FileAdapter: atomic writes, file locking, schema validation, index, robustness tests
+- [ ] Restore and fix skipped/legacy core tests (sse, http-server, addPrompt)

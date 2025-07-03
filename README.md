@@ -59,6 +59,11 @@ Prompt chaos is real: teams lose track of prompt versions, struggle to test chan
 - **MCP Ecosystem Integration**: Works with Filesystem, Memory, GitHub, and other MCP servers
 - **Extensible**: Add new adapters, tools, or integrations with minimal code
 - **ElevenLabs Integration**: Optional audio synthesis for prompt summaries
+- **Atomic File Writes**: All prompt and index files are written atomically (temp file + rename) to prevent corruption.
+- **File Locking**: Uses proper-lockfile to prevent concurrent write corruption.
+- **Schema Validation**: All prompt files are validated with Zod on add/update and at startup.
+- **Indexing**: Maintains an index.json for fast prompt listing and metadata lookup.
+- **Robustness Tests**: Includes tests for atomicity, locking, and schema validation in the file adapter.
 
 ---
 

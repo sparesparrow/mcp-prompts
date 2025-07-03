@@ -1,0 +1,27 @@
+---
+globs: packages/core/**/*.ts, packages/core/**/package.json, packages/core/**/tsconfig.json, packages/core/
+alwaysApply: false
+---
+# MCP Prompts Core Package Rules
+
+## Domain Logic Purity
+- No dependencies on specific adapters
+- Pure TypeScript types and functions
+- Business logic only in core/
+
+## Module Structure
+- entities/ - Domain entities
+- ports/ - Interface definitions
+- services/ - Domain services
+- No infrastructure dependencies
+
+## Testing Approach
+- Unit tests with Jest
+- Mock all external dependencies
+- Test business logic in isolation
+- Coverage > 90%
+
+## Import Rules
+- No imports from adapter packages
+- Only standard library and domain contracts
+- Use dependency injection patterns

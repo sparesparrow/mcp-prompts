@@ -7,7 +7,8 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json"
+    "build": "tsc -p tsconfig.json",
+    "build:swc": "swc src -d dist --copy-files"
   },
   "dependencies": {
     "@mcp-prompts/core": "workspace:*",

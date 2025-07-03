@@ -1,0 +1,29 @@
+---
+globs: apps/server/**/*.ts,apps/server/**/*.json,apps/**/*.js,apps/**/*.md
+alwaysApply: false
+---
+# MCP Server Application Rules
+
+## MCP SDK Integration
+- Use @modelcontextprotocol/sdk latest
+- Register tools with server.tool()
+- Register resources with server.resource()
+- Use Zod for schema validation
+
+## Composition Root
+- Wire all dependencies in index.ts
+- Use dependency injection
+- Configure all adapters
+- Handle startup/shutdown gracefully
+
+## Transport Configuration
+- Support stdio and HTTP transports
+- Configure SSE for remote access
+- Handle connection lifecycle
+- Implement health checks
+
+## Error Handling
+- Structured error responses
+- Proper logging with Pino
+- Graceful degradation
+- Circuit breaker patterns # MCP Server Application Rules

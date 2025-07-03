@@ -8,36 +8,49 @@
     "docs"
   ],
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.3",
-    "@mcp-prompts/core": "workspace:*",
-    "@mcp-prompts/adapters-file": "workspace:*",
-    "@mcp-prompts/adapters-postgres": "workspace:*",
-    "@mcp-prompts/adapters-memory": "workspace:*",
-    "@mcp-prompts/adapters-mdc": "workspace:*",
-    "@mcp-prompts/adapters-eta": "workspace:*",
-    "@mcp-prompts/adapters-mcp": "workspace:*",
-    "@mcp-prompts/adapters-rest": "workspace:*",
     "@mcp-prompts/adapters-cli": "workspace:*",
+    "@mcp-prompts/adapters-eta": "workspace:*",
+    "@mcp-prompts/adapters-file": "workspace:*",
+    "@mcp-prompts/adapters-mcp": "workspace:*",
+    "@mcp-prompts/adapters-mdc": "workspace:*",
+    "@mcp-prompts/adapters-memory": "workspace:*",
+    "@mcp-prompts/adapters-postgres": "workspace:*",
+    "@mcp-prompts/adapters-rest": "workspace:*",
+    "@mcp-prompts/core": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.13.3",
     "@sparesparrow/mcp-prompts-contracts": "workspace:*"
   },
   "devDependencies": {
-    "typescript": "^5.5.0",
-    "eslint": "^8.0.0",
-    "prettier": "^3.0.0",
-    "@types/node": "^20.0.0",
+    "@swc/cli": "^0.7.7",
+    "@swc/core": "^1.12.9",
+    "@types/jest": "^30.0.0",
+    "@types/node": "^24.0.10",
+    "@typescript-eslint/eslint-plugin": "^8.35.1",
+    "@typescript-eslint/parser": "^8.35.1",
+    "eslint": "^9.30.1",
     "eslint-config-airbnb-base": "^15.0.0",
-    "eslint-plugin-import": "^2.29.0",
-    "@typescript-eslint/eslint-plugin": "^7.0.0",
-    "@typescript-eslint/parser": "^7.0.0",
-    "vitest": "^1.0.0"
+    "eslint-plugin-import": "^2.32.0",
+    "jest": "^30.0.3",
+    "jest-mock-extended": "^4.0.0",
+    "prettier": "^3.6.2",
+    "proper-lockfile": "^4.1.2",
+    "supertest": "^7.1.1",
+    "typescript": "^5.8.3",
+    "vitest": "^3.2.4",
+    "zod": "^3.23.8"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=20.0.0",
     "pnpm": ">=9.0.0"
   },
   "scripts": {
     "lint": "eslint . --ext .ts,.js",
     "format": "prettier --write .",
     "test": "vitest run"
+  },
+  "pnpm": {
+    "overrides": {
+      "eslint": "^9.0.0"
+    }
   }
 }
