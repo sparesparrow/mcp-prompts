@@ -54,6 +54,9 @@ importers:
       '@modelcontextprotocol/sdk':
         specifier: ^1.13.3
         version: 1.13.3
+      '@playwright/test':
+        specifier: ^1.53.2
+        version: 1.53.2
       '@swc/cli':
         specifier: ^0.7.7
         version: 0.7.7(@swc/core@1.12.9)
@@ -87,6 +90,9 @@ importers:
       jest-mock-extended:
         specifier: ^4.0.0
         version: 4.0.0(@jest/globals@30.0.3)(jest@30.0.3(@types/node@24.0.10)(ts-node@10.9.2(@swc/core@1.12.9)(@types/node@24.0.10)(typescript@5.8.3)))(typescript@5.8.3)
+      playwright:
+        specifier: ^1.53.2
+        version: 1.53.2
       prettier:
         specifier: ^3.6.2
         version: 3.6.2
@@ -960,6 +966,11 @@ packages:
   '@pkgr/core@0.2.7':
     resolution: {integrity: sha512-YLT9Zo3oNPJoBjBc4q8G2mjU4tqIbf5CEOORbUUr48dCD9q3umJ3IPlVqOqDakPfd2HuwccBaqlGhN4Gmr5OWg==}
     engines: {node: ^12.20.0 || ^14.18.0 || >=16.0.0}
+
+  '@playwright/test@1.53.2':
+    resolution: {integrity: sha512-tEB2U5z74ebBeyfGNZ3Jfg29AnW+5HlWhvHtb/Mqco9pFdZU1ZLNdVb2UtB5CvmiilNr2ZfVH/qMmAROG/XTzw==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   '@puppeteer/browsers@2.10.5':
     resolution: {integrity: sha512-eifa0o+i8dERnngJwKrfp3dEq7ia5XFyoqB17S4gK8GhsQE4/P8nxOfQSE0zQHxzzLo/cmF+7+ywEQ7wK7Fb+w==}
@@ -2462,6 +2473,11 @@ packages:
   fs.realpath@1.0.0:
     resolution: {integrity: sha512-OO0pH2lK6a0hZnAdau5ItzHPI6pUlvI7jMVnxUQRtw4owF2wk8lOSabtGDCTP4Ggrg2MbGnWO9X8K1t4+fGMDw==}
 
+  fsevents@2.3.2:
+    resolution: {integrity: sha512-xiqMQR4xAeHTuB9uWm+fFRcIOgKBMiOBP+eXiyT7jsgVCq1bkVygt00oASowB7EdtpOHaaPgKt812P9ab+DDKA==}
+    engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
+    os: [darwin]
+
   fsevents@2.3.3:
     resolution: {integrity: sha512-5xoDfX+fL7faATnagmWPpbFtwh/R77WmMMqqHGS65C3vvB0YHrgF+B1YmZ3441tMj5n63k0212XNoJwzlhffQw==}
     engines: {node: ^8.16.0 || ^10.6.0 || >=11.0.0}
@@ -3465,6 +3481,16 @@ packages:
   pkg-dir@4.2.0:
     resolution: {integrity: sha512-HRDzbaKjC+AOWVXxAU/x54COGeIv9eb+6CkDSQoNTt4XyWoIJvuPsXizxu/Fr23EiekbtZwmh1IcIG/l/a10GQ==}
     engines: {node: '>=8'}
+
+  playwright-core@1.53.2:
+    resolution: {integrity: sha512-ox/OytMy+2w1jcYEYlOo1Hhp8hZkLCximMTUTMBXjGUA1KoFfiSZ+DU+3a739jsPY0yoKH2TFy9S2fsJas8yAw==}
+    engines: {node: '>=18'}
+    hasBin: true
+
+  playwright@1.53.2:
+    resolution: {integrity: sha512-6K/qQxVFuVQhRQhFsVZ9fGeatxirtrpPgxzBYWyZLEXJzqYwuL4fuNmfOfD5et1tJE4GScKyPNeLhZeRwuTU3A==}
+    engines: {node: '>=18'}
+    hasBin: true
 
   possible-typed-array-names@1.1.0:
     resolution: {integrity: sha512-/+5VFTchJDoVj3bhoqi6UeymcD00DAwb1nJwamzPvHEszJ4FpF6SNNbUbOS8yI56qHzdV8eK0qEfOSiodkTdxg==}
@@ -5067,6 +5093,10 @@ snapshots:
     optional: true
 
   '@pkgr/core@0.2.7': {}
+
+  '@playwright/test@1.53.2':
+    dependencies:
+      playwright: 1.53.2
 
   '@puppeteer/browsers@2.10.5':
     dependencies:
@@ -6756,6 +6786,9 @@ snapshots:
 
   fs.realpath@1.0.0: {}
 
+  fsevents@2.3.2:
+    optional: true
+
   fsevents@2.3.3:
     optional: true
 
@@ -7917,6 +7950,14 @@ snapshots:
   pkg-dir@4.2.0:
     dependencies:
       find-up: 4.1.0
+
+  playwright-core@1.53.2: {}
+
+  playwright@1.53.2:
+    dependencies:
+      playwright-core: 1.53.2
+    optionalDependencies:
+      fsevents: 2.3.2
 
   possible-typed-array-names@1.1.0: {}
 

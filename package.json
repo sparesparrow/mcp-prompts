@@ -24,6 +24,7 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.13.3",
+    "@playwright/test": "^1.53.2",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.12.9",
     "@types/jest": "^30.0.0",
@@ -35,6 +36,7 @@
     "eslint-plugin-import": "^2.32.0",
     "jest": "^30.0.3",
     "jest-mock-extended": "^4.0.0",
+    "playwright": "^1.53.2",
     "prettier": "^3.6.2",
     "proper-lockfile": "^4.1.2",
     "puppeteer": "^24.11.2",
