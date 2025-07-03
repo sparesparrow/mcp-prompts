@@ -1,3 +1,4 @@
+# pnpm workspace configuration - optimized for all packages and apps
 packages:
   - 'packages/*'
   - 'apps/*'

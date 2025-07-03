@@ -1,3 +1,4 @@
+// VS Code workspace configuration for MCP Prompts monorepo - optimized for TypeScript, ESLint, Prettier, and pnpm
 {
   "folders": [
     { "path": "." },
