@@ -1,5 +1,13 @@
 # pnpm workspace configuration - optimized for all packages and apps
 packages:
+  # Main package directories
   - 'packages/*'
+  - 'packages/@sparesparrow/*'
   - 'apps/*'
   - 'docs'
+  
+  # Exclude build artifacts and cache
+  - '!**/dist'
+  - '!**/build'
+  - '!**/.cache'
+  - '!**/node_modules'

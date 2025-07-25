@@ -1,5 +1,20 @@
 # MCP-Prompts Deployment & Usage Guide
 
+## 🚀 Quick Setup
+
+One command to install, configure and deploy:
+```
+<copilot-edited-file>````
+```markdown
+# MCP-Prompts Deployment & Usage Guide
+
+## 🚀 Quick Setup
+
+One command to install, configure and deploy:
+```
+npx -y @sparesparrow/mcp-prompts
+```
+
 ## Prerequisites
 
 - **Node.js** (v18+ recommended) for local/server installs

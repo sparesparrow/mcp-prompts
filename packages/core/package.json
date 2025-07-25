@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/core",
+  "name": "@sparesparrow/mcp-prompts-core",
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -41,7 +41,7 @@
     "dist"
   ],
   "dependencies": {
-    "@sparesparrow/mcp-prompts-catalog": "^1.0.0",
+    "@sparesparrow/mcp-prompts-catalog": "workspace:*",
     "@sparesparrow/mcp-prompts-contracts": "workspace:*",
     "@types/handlebars": "^4.1.0",
     "handlebars": "^4.7.8",

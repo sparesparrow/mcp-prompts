@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/adapters-mdc",
+  "name": "@sparesparrow/mcp-prompts-adapters-mdc",
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -7,6 +7,6 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*"
+    "@sparesparrow/mcp-prompts-core": "workspace:*"
   }
 }
