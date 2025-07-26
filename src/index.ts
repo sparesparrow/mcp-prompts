@@ -28,6 +28,8 @@ import {
 } from "@modelcontextprotocol/sdk/server/protocol.js";
 import { promptSchemas } from './prompts.js';
 import { StorageConfig } from './interfaces.js';
+import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
+import { ResourceTemplate } from "@modelcontextprotocol/sdk/server/resource.js";
 
 // Get the directory name of the current module
 const __filename = fileURLToPath(import.meta.url);
@@ -36,7 +38,7 @@ const __dirname = dirname(__filename);
 // Configuration with defaults
 const DEFAULT_CONFIG: ServerConfig = {
   name: "mcp-prompts",
-  version: "1.2.38", // Set to the current package version
+  version: "1.2.43", // Set to the current package version
   storageType: "file",
   promptsDir: process.env.PROMPTS_DIR || path.join(process.cwd(), "prompts"),
   backupsDir: process.env.BACKUPS_DIR || path.join(process.cwd(), "backups"),
@@ -179,103 +181,130 @@ async function main() {
     await initializeDefaultPrompts();
   
     // Create MCP server
-    const server = new Server();
+    const server = new McpServer({
+      name: "mcp-prompts",
+      version: "1.2.43",
+      capabilities: {
+        resources: { subscribe: true, listChanged: true },
+        tools: { listChanged: true },
+        prompts: { listChanged: true }
+      }
+    });
     
     // Register prompt resources
-    server.resource('prompts', {
-      get: async ({ id }) => {
-        const prompt = await storageAdapter.getPrompt(id);
-        if (!prompt) {
-          throw new Error(`Prompt not found: ${id}`);
+    server.resource("prompts", {
+      name: "prompts",
+      readCallback: async (uri) => {
+        const id = uri.pathname.split("/").pop();
+        if (id) {
+          const prompt = await storageAdapter.getPrompt(id);
+          if (!prompt) {
+            throw new Error(`Prompt not found: ${id}`);
+          }
+          return { contents: [{ uri: uri.href, text: JSON.stringify(prompt) }] };
         }
-        return prompt;
+        return { contents: [] };
       },
-      list: async () => {
-        return storageAdapter.listPrompts({});
+      listCallback: async () => {
+        const prompts = await storageAdapter.listPrompts({});
+        return { 
+          resources: prompts.map(p => ({ 
+            uri: `prompts://${p.id}`,
+            name: p.name || p.id,
+            metadata: { isTemplate: p.isTemplate }
+          }))
+        };
       }
     });
 
-    server.resource('templates', {
-      list: async () => {
-        return storageAdapter.listPrompts({ isTemplate: true });
+    server.resource("templates", {
+      name: "templates",
+      listCallback: async () => {
+        const templates = await storageAdapter.listPrompts({ isTemplate: true });
+        return { 
+          resources: templates.map(t => ({ 
+            uri: `templates://${t.id}`,
+            name: t.name || t.id
+          }))
+        };
       }
     });
 
     // Register prompt management tools
-    server.tool('create_prompt', {
-      description: 'Create a new prompt',
-      parameters: promptSchemas.create,
-      handler: async ({ input }) => {
+    server.tool("create_prompt", {
+      description: "Create a new prompt",
+      inputSchema: z.object(promptSchemas.create.properties),
+      callback: async (input) => {
         return storageAdapter.createPrompt(input);
       }
     });
 
-    server.tool('update_prompt', {
-      description: 'Update an existing prompt',
-      parameters: promptSchemas.update,
-      handler: async ({ input }) => {
+    server.tool("update_prompt", {
+      description: "Update an existing prompt",
+      inputSchema: z.object(promptSchemas.update.properties),
+      callback: async (input) => {
         const { id, ...updates } = input;
         return storageAdapter.updatePrompt(id, updates);
       }
     });
 
-    server.tool('delete_prompt', {
-      description: 'Delete a prompt',
-      parameters: promptSchemas.delete,
-      handler: async ({ input }) => {
+    server.tool("delete_prompt", {
+      description: "Delete a prompt",
+      inputSchema: z.object(promptSchemas.delete.properties),
+      callback: async (input) => {
         await storageAdapter.deletePrompt(input.id);
         return { success: true };
       }
     });
 
-    server.tool('list_prompts', {
-      description: 'List prompts with optional filtering',
-      parameters: promptSchemas.list,
-      handler: async ({ input }) => {
+    server.tool("list_prompts", {
+      description: "List prompts with optional filtering",
+      inputSchema: z.object(promptSchemas.list.properties),
+      callback: async (input) => {
         return storageAdapter.listPrompts(input);
       }
     });
 
-    server.tool('apply_template', {
-      description: 'Apply variables to a template prompt',
-      parameters: {
-        id: 'string',
-        variables: 'object'
-      },
-      handler: async ({ input }) => {
+    server.tool("apply_template", {
+      description: "Apply variables to a template prompt",
+      inputSchema: z.object({
+        id: z.string(),
+        variables: z.record(z.string())
+      }),
+      callback: async (input) => {
         const content = await storageAdapter.applyTemplate(
           input.id,
-          input.variables as Record<string, string>
+          input.variables
         );
         return { content };
       }
     });
 
     // Register some example prompts
-    server.prompt('review-code', {
-      description: 'Review code changes and provide feedback',
-      parameters: {
-        code: 'string'
-      },
-      handler: async ({ input }) => {
-        const content = await storageAdapter.applyTemplate('code-review', {
+    server.prompt("review-code", {
+      description: "Review code changes and provide feedback",
+      argsSchema: z.object({
+        code: z.string()
+      }),
+      callback: async (input) => {
+        const content = await storageAdapter.applyTemplate("code-review", {
           code: input.code
         });
         return { content };
       }
     });
 
-    server.prompt('generate-bug-report', {
-      description: 'Generate a detailed bug report',
-      parameters: {
-        description: 'string',
-        steps: 'string',
-        expected: 'string',
-        actual: 'string',
-        environment: 'string'
-      },
-      handler: async ({ input }) => {
-        const content = await storageAdapter.applyTemplate('bug-report', input);
+    server.prompt("generate-bug-report", {
+      description: "Generate a detailed bug report",
+      argsSchema: z.object({
+        description: z.string(),
+        steps: z.string(),
+        expected: z.string(),
+        actual: z.string(),
+        environment: z.string()
+      }),
+      callback: async (input) => {
+        const content = await storageAdapter.applyTemplate("bug-report", input);
         return { content };
       }
     });
@@ -303,11 +332,23 @@ main().catch((error) => {
 });
 
 export async function createServer(config: StorageConfig) {
-  const server = new Server();
+  const server = new Server({
+    name: "mcp-prompts",
+    version: "1.2.43",
+    capabilities: {
+      resources: { subscribe: true, listChanged: true },
+      tools: { listChanged: true },
+      prompts: { listChanged: true }
+    }
+  });
   
   // Initialize storage and prompt service
   const storageAdapter = createStorageAdapter(config);
-  const promptService = new PromptService(storageAdapter);
+  const promptService = new PromptService(storageAdapter, {
+    applyTemplate: async (id, variables) => {
+      return storageAdapter.applyTemplate(id, variables);
+    }
+  });
   await storageAdapter.initialize();
 
   // Register prompt resources
@@ -317,16 +358,18 @@ export async function createServer(config: StorageConfig) {
       if (!prompt) {
         throw new Error(`Prompt not found: ${id}`);
       }
-      return prompt;
+      return { contents: [{ uri: `prompts://${id}`, text: JSON.stringify(prompt) }] };
     },
     list: async () => {
-      return promptService.listPrompts({});
+      const prompts = await promptService.listPrompts({});
+      return { contents: prompts.map(p => ({ uri: `prompts://${p.id}`, text: JSON.stringify(p) })) };
     }
   });
 
   server.resource('templates', {
     list: async () => {
-      return promptService.listPrompts({ isTemplate: true });
+      const templates = await promptService.listPrompts({ isTemplate: true });
+      return { contents: templates.map(t => ({ uri: `templates://${t.id}`, text: JSON.stringify(t) })) };
     }
   });
 
@@ -368,8 +411,12 @@ export async function createServer(config: StorageConfig) {
   server.tool('apply_template', {
     description: 'Apply variables to a template prompt',
     parameters: {
-      id: 'string',
-      variables: 'object'
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        variables: { type: 'object' }
+      },
+      required: ['id', 'variables']
     },
     handler: async ({ input }) => {
       const content = await promptService.applyTemplate(
@@ -384,7 +431,11 @@ export async function createServer(config: StorageConfig) {
   server.prompt('review-code', {
     description: 'Review code changes and provide feedback',
     parameters: {
-      code: 'string'
+      type: 'object',
+      properties: {
+        code: { type: 'string' }
+      },
+      required: ['code']
     },
     handler: async ({ input }) => {
       const content = await promptService.applyTemplate('code-review', {
@@ -397,11 +448,15 @@ export async function createServer(config: StorageConfig) {
   server.prompt('generate-bug-report', {
     description: 'Generate a detailed bug report',
     parameters: {
-      description: 'string',
-      steps: 'string',
-      expected: 'string',
-      actual: 'string',
-      environment: 'string'
+      type: 'object',
+      properties: {
+        description: { type: 'string' },
+        steps: { type: 'string' },
+        expected: { type: 'string' },
+        actual: { type: 'string' },
+        environment: { type: 'string' }
+      },
+      required: ['description', 'steps', 'expected', 'actual', 'environment']
     },
     handler: async ({ input }) => {
       const content = await promptService.applyTemplate('bug-report', input);

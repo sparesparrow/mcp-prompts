@@ -14,7 +14,7 @@ import type { Server as MCPServer } from '@modelcontextprotocol/sdk/server/index
 import { Express } from 'express';
 import type { IncomingMessage, Server as HttpServer, ServerResponse } from 'node:http';
 import EventEmitter from 'node:events';
-import { Transport } from '@modelcontextprotocol/sdk/cjs/shared/transport.js';
+import { Transport } from '@modelcontextprotocol/sdk/dist/esm/shared/transport.js';
 
 // Define the interfaces that were previously imported
 interface SseClient {
