@@ -1,14 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
-    "declaration": true,
-    "declarationMap": true,
-    "sourceMap": true
-  },
-  "include": ["src/**/*"],
+  "extends": "../../tsconfig.package.json",
   "references": [
     { "path": "../../packages/core" },
     { "path": "../../packages/adapters-cli" },
