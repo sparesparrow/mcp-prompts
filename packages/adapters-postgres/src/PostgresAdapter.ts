@@ -1,5 +1,5 @@
 import pg from 'pg';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, ISequenceRepository } from '@mcp-prompts/core';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, ISequenceRepository } from '@sparesparrow/mcp-prompts-core';
 
 function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   if ('metadata' in prompt && prompt.metadata === null) {

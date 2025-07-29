@@ -1,5 +1,5 @@
 // Souborová implementace IPromptRepository
-import type { IPromptRepository, Prompt, PromptId } from '@mcp-prompts/core';
+import type { IPromptRepository, Prompt, PromptId } from '@sparesparrow/mcp-prompts-core';
 import * as fs from 'fs/promises';
 import * as path from 'path';
 

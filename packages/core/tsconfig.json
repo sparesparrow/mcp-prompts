@@ -1,5 +1,14 @@
 {
-  "extends": "../../tsconfig.package.json",
+  "extends": "../../tsconfig.base.json", 
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
   "references": [
     { "path": "../@sparesparrow/mcp-prompts-contracts" }
   ]

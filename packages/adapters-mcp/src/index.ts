@@ -8,7 +8,7 @@ import {
   PromptSchema,
   PromptIdSchema,
 } from './schemas.js';
-import type { IPromptApplication } from '@mcp-prompts/core';
+import type { IPromptApplication } from '@sparesparrow/mcp-prompts-core';
 
 export function startMcpServer(promptApp: IPromptApplication) {
   const server = new McpServer({

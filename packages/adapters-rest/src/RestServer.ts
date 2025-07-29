@@ -1,5 +1,5 @@
 import express, { Request, Response, NextFunction } from 'express';
-import type { IPromptApplication } from '@mcp-prompts/core';
+import type { IPromptApplication } from '@sparesparrow/mcp-prompts-core';
 
 export function createRestServer(promptApp: IPromptApplication): express.Application {
   const app = express();

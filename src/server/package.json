@@ -1,16 +1,18 @@
 {
-  "name": "@mcp-prompts/server",
+  "name": "@sparesparrow/mcp-prompts-server",
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "files": ["dist"],
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "build:swc": "swc src -d dist --copy-files"
   },
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*",
-    "@mcp-prompts/adapters-file": "workspace:*",
-    "@mcp-prompts/adapters-memory": "workspace:*"
+    "@sparesparrow/mcp-prompts-core": "workspace:*",
+    "@sparesparrow/mcp-prompts-adapters-file": "workspace:*",
+    "@sparesparrow/mcp-prompts-adapters-memory": "workspace:*"
   }
 }

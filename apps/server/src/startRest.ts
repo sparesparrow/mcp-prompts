@@ -1,5 +1,5 @@
 import { container } from 'tsyringe';
-import { createRestServer } from '@mcp-prompts/adapters-rest';
+import { createRestServer } from '@sparesparrow/mcp-prompts-adapters-rest';
 
 export function startRest() {
   const promptApp = container.resolve('IPromptApplication');

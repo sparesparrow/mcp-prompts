@@ -1,8 +1,8 @@
-import type { Prompt } from '@mcp-prompts/core';
-import type { PromptId } from '@mcp-prompts/core';
-import type { IPromptRepository } from '@mcp-prompts/core';
-import type { IPromptApplication } from '@mcp-prompts/core';
-import { addPrompt, getPromptById, listPrompts, updatePrompt, deletePrompt } from '@mcp-prompts/core';
+import type { Prompt } from '@sparesparrow/mcp-prompts-core';
+import type { PromptId } from '@sparesparrow/mcp-prompts-core';
+import type { IPromptRepository } from '@sparesparrow/mcp-prompts-core';
+import type { IPromptApplication } from '@sparesparrow/mcp-prompts-core';
+import { addPrompt, getPromptById, listPrompts, updatePrompt, deletePrompt } from '@sparesparrow/mcp-prompts-core';
 
 export class PromptApplication implements IPromptApplication {
   constructor(private repo: IPromptRepository) {}
