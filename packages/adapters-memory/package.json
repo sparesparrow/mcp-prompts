@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/adapters-memory",
+  "name": "@sparesparrow/mcp-prompts-adapters-memory",
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -11,6 +11,6 @@
     "clean": "rm -rf dist"
   },
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*"
+    "@sparesparrow/mcp-prompts-core": "workspace:*"
   }
 }

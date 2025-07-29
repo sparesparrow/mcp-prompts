@@ -1,5 +1,5 @@
 {
-  "name": "mcp-prompts",
+  "name": "@sparesparrow/mcp-prompts",
   "private": true,
   "version": "3.0.6",
   "workspaces": [

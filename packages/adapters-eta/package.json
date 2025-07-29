@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/adapters-eta",
+  "name": "@sparesparrow/mcp-prompts-adapters-eta",
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*"
+    "@sparesparrow/mcp-prompts-core": "workspace:*"
   },
   "scripts": {
     "build": "swc src -d dist --copy-files",

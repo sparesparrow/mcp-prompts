@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/adapters-postgres",
+  "name": "@sparesparrow/mcp-prompts-adapters-postgres",
   "version": "0.1.0",
   "main": "dist/PostgresPromptRepository.js",
   "types": "dist/PostgresPromptRepository.d.ts",
@@ -7,7 +7,7 @@
   "license": "MIT",
   "private": false,
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*",
+    "@sparesparrow/mcp-prompts-core": "workspace:*",
     "pg": "^8.11.3"
   },
   "scripts": {
