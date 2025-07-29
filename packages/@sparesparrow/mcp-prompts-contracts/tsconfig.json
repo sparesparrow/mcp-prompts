@@ -8,12 +8,6 @@
     "declarationMap": true,
     "sourceMap": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "references": [
-    {
-      "path": "../../core"
-    }
-  ]
+  "include": ["src/**/*"],
+  "references": []
 }

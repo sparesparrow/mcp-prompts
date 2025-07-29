@@ -1,26 +1,13 @@
 {
-  "extends": "../../tsconfig.options.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "baseUrl": ".",
-    "paths": {
-      "@core/*": ["../core/src/*"],
-      "@adapters-file/*": ["../adapters-file/src/*"],
-      "@adapters-memory/*": ["../adapters-memory/src/*"],
-      "@sparesparrow/mcp-prompts-contracts": ["../mcp-prompts-contracts/dist"]
-    }
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "tests",
-    "src/scripts/validate-prompts.ts"
-  ],
-  "references": [
-    { "path": "../adapters-file" },
-    { "path": "../adapters-memory" },
-    { "path": "../mcp-prompts-contracts" }
-  ]
-} 
+  "include": ["src/**/*"],
+  "references": []
+}
