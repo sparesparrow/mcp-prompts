@@ -1,13 +1,15 @@
 {
-  "extends": "../../tsconfig.json",
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "rootDir": "src",
-    "typeRoots": [
-      "./src/@types",
-      "../../node_modules/@types"
-    ],
-    "declaration": true
+    "outDir": "./dist", 
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
   },
-  "include": ["src"]
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../core" }
+  ]
 }

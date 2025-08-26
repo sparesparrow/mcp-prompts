@@ -7,6 +7,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { pino } from 'pino';
 import { z } from 'zod';
 import http from 'http';
+import express from 'express';
 
 import { adapterFactory } from './adapters.js';
 import { loadConfig } from './config.js';
@@ -67,40 +68,33 @@ async function main() {
   const storageAdapter = adapterFactory(config, logger);
   await storageAdapter.connect();
 
-  const promptService = new PromptService(storageAdapter, defaultTemplatingEngine);
-  const sequenceService = new SequenceApplication(storageAdapter as ISequenceRepository);
-  const workflowService = new WorkflowApplication(storageAdapter, promptService);
-  const elevenLabsService = new ElevenLabsService({
-    apiKey: env.ELEVENLABS_API_KEY || '',
-    cacheDir: env.ELEVENLABS_CACHE_DIR,
-    model: env.ELEVENLABS_MODEL_ID,
-    voiceId: env.ELEVENLABS_VOICE_ID,
-  });
+  // Simplified startup - just get HTTP server running first
+  const promptService = null;
+  const sequenceService = null;
+  const workflowService = null;
+  const elevenLabsService = null;
 
   const mcpServer = new McpServer({
     name: 'mcp-prompts',
     version: '1.3.0',
   });
 
-  let httpServer: http.Server;
+    let httpServer: http.Server;
   try {
-    httpServer = await startHttpServer(
-      mcpServer,
-      {
-        corsOrigin: env.CORS_ORIGIN,
-        enableSSE: env.ENABLE_SSE,
-        host: env.HOST,
-        port: env.PORT,
-        ssePath: env.SSE_PATH,
-      },
-      {
-        elevenLabsService,
-        promptService,
-        sequenceService,
-        storageAdapters: [storageAdapter],
-        workflowService,
-      },
-    );
+    // Create minimal Express server with just health endpoint
+    const app = express();
+    app.use(express.json());
+    
+    // Health endpoint
+    app.get('/health', (req, res) => {
+      res.status(200).send('OK');
+    });
+    
+    // Create HTTP server
+    httpServer = http.createServer(app);
+    httpServer.listen(env.PORT, env.HOST, () => {
+      logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
+    });
 
     logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
 

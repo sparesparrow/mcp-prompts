@@ -6,7 +6,7 @@ import lockfile from 'proper-lockfile';
 import { z } from 'zod';
 import { promptSchemas } from '../../core/src/schemas';
 import { LockError } from '../../../src/errors.js';
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, PromptId } from '@mcp-prompts/core';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions, IPromptRepository, PromptId } from '@sparesparrow/mcp-prompts-core';
 
 export async function atomicWriteFile(filePath: string, data: string) {
   const dir = path.dirname(filePath);

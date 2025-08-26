@@ -1,5 +1,5 @@
 // Jednoduchá paměťová implementace IPromptRepository
-import type { IPromptRepository, Prompt, PromptId } from '@mcp-prompts/core';
+import type { IPromptRepository, Prompt, PromptId } from '@sparesparrow/mcp-prompts-core';
 
 export class MemoryPromptRepository implements IPromptRepository {
   private prompts = new Map<PromptId, Prompt>();

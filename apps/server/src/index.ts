@@ -1,8 +1,8 @@
 import 'reflect-metadata';
 import { container } from 'tsyringe';
-import { FilePromptRepository } from '@mcp-prompts/adapters-file';
+import { FilePromptRepository } from '@sparesparrow/mcp-prompts-adapters-file';
 import { PromptApplication } from './PromptApplication.js';
-import { startMcpServer } from '@mcp-prompts/adapters-mcp';
+import { startMcpServer } from '@sparesparrow/mcp-prompts-adapters-mcp';
 import { startRest } from './startRest.js';
 
 const storage = process.env.PROMPT_STORAGE || 'file';

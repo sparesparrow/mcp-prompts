@@ -1,5 +1,5 @@
-import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@mcp-prompts/core';
-import type { IPromptRepository } from '@mcp-prompts/core';
+import type { Prompt, PromptSequence, WorkflowExecutionState, ListPromptsOptions } from '@sparesparrow/mcp-prompts-core';
+import type { IPromptRepository } from '@sparesparrow/mcp-prompts-core';
 
 function sanitizePromptMetadata<T extends { metadata?: any }>(prompt: T): T {
   if ('metadata' in prompt && prompt.metadata === null) {

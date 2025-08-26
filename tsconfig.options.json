@@ -11,7 +11,43 @@
     "isolatedModules": true,
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
+    "baseUrl": ".",
     "strict": true,
-    "target": "esnext"
+    "target": "esnext",
+    "paths": {
+      "@sparesparrow/mcp-prompts-contracts": [
+        "packages/@sparesparrow/mcp-prompts-contracts/dist"
+      ],
+      "@sparesparrow/mcp-prompts-contracts/*": [
+        "packages/@sparesparrow/mcp-prompts-contracts/dist/*"
+      ],
+      "@sparesparrow/mcp-prompts-core": [
+        "packages/core/src"
+      ],
+      "@sparesparrow/mcp-prompts-core/*": [
+        "packages/core/src/*"
+      ],
+      "@sparesparrow/mcp-prompts-catalog": [
+        "packages/@sparesparrow/mcp-prompts-catalog/src"
+      ],
+      "@sparesparrow/mcp-prompts-catalog/*": [
+        "packages/@sparesparrow/mcp-prompts-catalog/src/*"
+      ],
+      "@sparesparrow/mcp-prompts-adapters-*": [
+        "packages/adapters-*/src"
+      ],
+      "@core": [
+        "packages/core/src"
+      ],
+      "@core/*": [
+        "packages/core/src/*"
+      ],
+      "@sparesparrow/mcp-prompts-server": [
+        "apps/server/src"
+      ],
+      "@sparesparrow/mcp-prompts-server/*": [
+        "apps/server/src/*"
+      ]
+    }
   }
 }

@@ -1,5 +1,5 @@
 {
-  "extends": "../../tsconfig.base.json", 
+  "extends": "../../tsconfig.base.json",
   "compilerOptions": {
     "outDir": "./dist",
     "rootDir": "./src",
@@ -9,7 +9,5 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
-  "references": [
-    { "path": "../@sparesparrow/mcp-prompts-contracts" }
-  ]
+  "exclude": ["node_modules", "dist", "tests", "**/*.test.ts"]
 }

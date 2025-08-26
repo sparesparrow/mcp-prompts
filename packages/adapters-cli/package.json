@@ -1,5 +1,5 @@
 {
-  "name": "@mcp-prompts/adapters-cli",
+  "name": "@sparesparrow/mcp-prompts-adapters-cli",
   "version": "0.1.0",
   "main": "dist/cli.js",
   "types": "dist/cli.d.ts",
@@ -10,7 +10,7 @@
     "mcp-prompts": "dist/cli.js"
   },
   "dependencies": {
-    "@mcp-prompts/core": "workspace:*",
+    "@sparesparrow/mcp-prompts-core": "workspace:*",
     "commander": "^11.0.0"
   }
 }

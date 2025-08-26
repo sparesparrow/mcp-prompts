@@ -108,3 +108,6 @@ output/
 
 # Docker temporary files
 .docker-*
+
+# TypeScript build cache
+**/*.tsbuildinfo

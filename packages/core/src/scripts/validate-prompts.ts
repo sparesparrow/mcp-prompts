@@ -15,7 +15,7 @@ const Ajv = require('ajv');
 import fs from 'fs/promises';
 import path from 'path';
 import { cwd } from 'process';
-import { FileAdapter } from '@mcp-prompts/adapters-file';
+import { FileAdapter } from '@sparesparrow/mcp-prompts-adapters-file';
 import { PromptService } from '../prompt-service.js';
 
 interface PromptTemplate {

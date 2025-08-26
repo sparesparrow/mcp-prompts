@@ -1,7 +1,7 @@
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
-import { addPrompt, listPrompts, getPromptById } from '@mcp-prompts/core';
-import { FilePromptRepository } from '@mcp-prompts/adapters-file';
+import { addPrompt, listPrompts, getPromptById } from '@sparesparrow/mcp-prompts-core';
+import { FilePromptRepository } from '@sparesparrow/mcp-prompts-adapters-file';
 
 export async function startHttpServer() {
   const app = express();
