@@ -1,0 +1,224 @@
+LINKEDIN POSTS (Professional)
+==================================================
+
+LinkedIn Post #1:
+🏗️ The Day AI Agents Rewrote Our Architecture: A 6,076 Line Commit Story
+
+We built MCP Prompts to solve "prompt chaos" - teams losing track of AI prompt versions.
+
+Then our AI agents created REPOSITORY CHAOS with commit 9a739da:
+• 127 files changed in one commit
+• +6,076 lines, -17,785 lines 
+• Complete monorepo restructure with hexagonal architecture
+
+Every decision seemed logical:
+✅ "Separate file adapters from memory adapters"
+✅ "Create dedicated packages for CLI/REST/Postgres" 
+✅ "Implement proper dependency injection"
+
+But commit 10674e5 told a different story:
+❌ Circular dependencies everywhere
+❌ Build order nightmares: core → adapters → apps
+❌ Import paths: @core/* became @mcp-prompts/core/dist/*
+
+The irony? We built a server to manage prompt chaos... and created architectural chaos.
+
+Key lesson: AI agents are brilliant at following patterns, terrible at knowing when to stop.
+
+Now we're teaching our agents: "Before creating complexity, ask WHY."
+
+#AIEngineering #SoftwareArchitecture #MCP #LessonsLearned #AIAgents
+Character count: 1035
+
+LinkedIn Post #2:
+💡 When AI Agents Go Full Microservices: The MCP Prompts Saga
+
+Our commit history tells a story every developer will recognize:
+
+📊 Commit 9a739da: "The Great Genesis"
+• AI agents create perfect monorepo structure
+• 127 files, TypeScript everywhere, hexagonal architecture
+• Everything organized, everything has its place
+
+🔄 Commit 10674e5: "The Build Labyrinth" 
+• Fix circular dependencies
+• Update ALL imports to built outputs
+• Add build order requirements
+
+🚀 Commit 0e55734: "The Modernization"
+• Atomic file writes with proper-lockfile
+• Zod validation for everything
+• ESLint 9, SWC build system
+
+🎯 Commit 8d2a84c: "Return to Simplicity"
+• Scripts for consolidation
+• Streamlined installation
+• Finally asking: "Do we need all this?"
+
+The lesson: Smart AI ≠ Wise AI
+
+Sometimes the best architecture is the one that doesn't try to solve every problem.
+
+Building better prompts for AI agents who understand restraint.
+
+#AI #PromptEngineering #Architecture #SoftwareDesign #MCP
+Character count: 979
+
+LinkedIn Post #3:
+🤖 The Recursive Problem: When AI Fixes AI Mistakes by Creating More AI Problems
+
+Real story from our MCP Prompts development:
+
+Problem: "We need better prompt organization"
+AI Solution: Create 6 separate repositories
+
+Each seemed logical:
+• mcp-prompts-catalog (data storage)
+• mcp-prompts-contracts (shared types)  
+• mcp-prompts-ts (core implementation)
+• mcp-prompts-rs (performance layer)
+• cursor-rules (dev experience)
+
+Result: Repository management became harder than prompt management.
+
+The beautiful irony? Our solution to "prompt chaos" created "architectural chaos."
+
+Now we face the ultimate 2025 challenge: How do you build AI agents that know when NOT to optimize?
+
+We're working on prompts that include:
+✅ "Before creating a new component, ask why"
+✅ "Default to keeping things together"  
+✅ "When in doubt, choose simplicity"
+
+Because the future belongs to AI that knows its limits.
+
+#ArtificialIntelligence #SoftwareArchitecture #AIWisdom #MCP #TechPhilosophy
+Character count: 976
+
+LinkedIn Post #4:
+⚡ The $1 Million Question: How Much Complexity Can AI Create?
+
+Our MCP Prompts journey in numbers:
+• Started with: 1 focused repository  
+• AI agents created: 6 separate repositories
+• Build complexity: Circular dependencies requiring specific build order
+• Import statements: @core/* → @mcp-prompts/core/dist/* 
+• Result: The exact chaos we set out to prevent
+
+But here's what we learned building enterprise prompt management:
+
+✅ AI agents excel at pattern recognition
+❌ AI agents struggle with pattern restraint  
+✅ Perfect organization can create imperfect workflows
+❌ More repositories ≠ better architecture
+
+The real value? Understanding how to guide AI decision-making.
+
+Our customers now get:
+• Centralized prompt versioning (the original goal)
+• Lessons in AI agent management 
+• A cautionary tale that saves them months of complexity
+
+Sometimes the best product is the one that learns from its own mistakes.
+
+Ready to solve prompt chaos without creating architectural chaos?
+
+#AITools #PromptManagement #SoftwareArchitecture #MCP #B2B
+Character count: 1043
+
+
+==================================================
+TWITTER/X.COM POSTS (Punchy)
+==================================================
+
+Twitter Post #1:
+🏗️ Commit 9a739da: The day our AI agents went full architect
+
++6,076 lines
+-17,785 lines  
+127 files changed
+1 perfect monorepo
+
+Commit 10674e5: The day we realized perfection has a price
+
+❌ Circular dependencies
+❌ Build order nightmares  
+❌ Import path chaos
+
+Lesson: Smart AI ≠ Wise AI
+
+#AIEngineering #TechLessons
+Character count: 316
+
+Twitter Post #2:
+💡 Our AI agents read "microservices best practices" 
+
+Result: 1 repo → 6 repos → build complexity hell
+
+The irony: We built MCP Prompts to solve "prompt chaos"
+
+AI agents created "repository chaos" instead 
+
+Sometimes the cure is worse than the disease 🤒
+
+#AI #SoftwareArchitecture #TechHumor
+Character count: 292
+
+Twitter Post #3:
+🤖 AI Agent Logic:
+1. See pattern: "separation of concerns"  
+2. Apply everywhere
+3. Create 6 repositories
+4. Require specific build order: core → adapters → apps
+5. Break all imports
+
+Us: "Maybe... one repo was fine?"
+
+AI: *creates mcp-prompts-consolidator repository*
+
+#ArtificialIntelligence #TechComedy
+Character count: 305
+
+Twitter Post #4:
+⚡ The Recursion Problem:
+
+Problem: Prompt chaos
+Solution: MCP server  
+AI result: Repository chaos
+
+Problem: Repository chaos
+Solution: Deploy AI to fix
+AI result: *creates more repositories*
+
+Break the loop. Teach AI wisdom, not just intelligence.
+
+#AI #TechPhilosophy #SoftwareDesign
+Character count: 285
+
+Twitter Post #5:
+📊 MCP Prompts Evolution Timeline:
+
+Day 1: Simple prompt server ✅
+Day 30: Hexagonal architecture ✅  
+Day 60: 6 separate repositories ❓
+Day 90: Build order requirements ❌
+Day 120: "Maybe one repo was better?" 💭
+
+Moral: AI agents need wisdom, not just patterns
+
+#AILessons #TechJourney
+Character count: 282
+
+Twitter Post #6:
+🎯 Building AI agents that know when to say "enough"
+
+Our latest prompts include:
+• "Before creating complexity, ask why"
+• "Default to keeping things together"  
+• "When in doubt, choose simplicity"
+
+Because the best AI knows its limits
+
+#AI #PromptEngineering #Wisdom
+Character count: 268
+

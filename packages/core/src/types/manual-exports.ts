@@ -1,3 +1,4 @@
-// This file is intentionally left empty to satisfy ESM import resolution for Jest and Node.js.
-export { promptSchemas } from '@sparesparrow/mcp-prompts-contracts/dist/src/schemas.js';
-export type { Prompt, ApplyTemplateResult } from '../interfaces.js'; 
+// This file provides central re-exports for commonly used types/schemas.
+// Temporarily commenting out schema export until paths are fixed
+// export { promptSchemas } from '../../../../src/schemas.ts';
+export type { Prompt, ApplyTemplateResult } from '../interfaces.js';

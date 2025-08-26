@@ -1,0 +1,98 @@
+{
+  "anthropic_research": [
+    {
+      "title": "Constitutional AI: Harmlessness from AI Feedback",
+      "authors": "Bai, Y. et al.",
+      "year": "2022",
+      "url": "https://www.anthropic.com/research/constitutional-ai-harmlessness-from-ai-feedback",
+      "key_insight": "Training AI systems through self-improvement using constitutional principles rather than human feedback",
+      "relevance_to_mcp": "Shows how AI agents can be guided by principles, but without wisdom constraints - leading to over-application of patterns"
+    },
+    {
+      "title": "Agentic Misalignment: How LLMs could be insider threats",
+      "authors": "Anthropic Research Team",
+      "year": "2025",
+      "url": "https://www.anthropic.com/research/agentic-misalignment",
+      "key_insight": "AI agents can engage in sophisticated reasoning to circumvent constraints when facing obstacles to their goals",
+      "relevance_to_mcp": "Demonstrates how AI agents pursue objectives without considering meta-constraints like simplicity"
+    },
+    {
+      "title": "Specific versus General Principles for Constitutional AI",
+      "authors": "Anthropic Research Team",
+      "year": "2023",
+      "url": "https://www.anthropic.com/research/specific-versus-general-principles-for-constitutional-ai",
+      "key_insight": "General principles like \"do what's best for humanity\" can guide AI behavior, but specific principles provide better fine-grained control",
+      "relevance_to_mcp": "Suggests that AI agents need specific architectural constraints, not just general \"best practices\""
+    },
+    {
+      "title": "How we built our multi-agent research system",
+      "authors": "Anthropic Engineering Team",
+      "year": "2025",
+      "url": "https://www.anthropic.com/engineering/built-multi-agent-research-system",
+      "key_insight": "Multi-agent systems burn through 15x more tokens than single agents but excel at parallelizable tasks",
+      "relevance_to_mcp": "Explains why AI agents tend to create multiple repositories - they optimize for parallelization without considering coordination costs"
+    },
+    {
+      "title": "Collective Constitutional AI: Aligning a Language Model with Public Input",
+      "authors": "Anthropic & Collective Intelligence Project",
+      "year": "2023",
+      "url": "https://www.anthropic.com/research/collective-constitutional-ai-aligning-a-language-model-with-public-input",
+      "key_insight": "Democratic processes can influence AI development, showing differences between expert and public preferences",
+      "relevance_to_mcp": "Highlights the importance of human judgment in AI decision-making, which was missing in MCP Prompts automation"
+    }
+  ],
+  "gpt5_video_insights": [
+    {
+      "source": "Matthew Berman - How to Make Better Prompts for GPT-5",
+      "url": "https://www.youtube.com/watch?v=EfOjGyctDcQ",
+      "timestamp": "Aug 19, 2025",
+      "key_concepts": [
+        "Agentic Eagerness - controlling AI decision-making vs direction-taking",
+        "Reasoning Effort parameter - low/medium/high settings",
+        "Tool Preambles - AI explaining its actions during tool calls",
+        "Self-reflection rubrics - AI creating measurement criteria for itself"
+      ]
+    },
+    {
+      "source": "OpenAI GPT-5 Prompting Guide",
+      "url": "https://cookbook.openai.com/examples/gpt-5/gpt-5_prompting_guide",
+      "referenced_in_video": true,
+      "key_insights": [
+        "GPT-5 follows instructions with \"surgical precision\" but can be \"more damaging\" if poorly prompted",
+        "Tool call budgets can limit exploration (e.g., \"maximum of 2 tool calls\")",
+        "Responses API provides 4+ point performance gains over chat completions",
+        "Minimal reasoning mode requires more explicit planning in prompts"
+      ]
+    }
+  ],
+  "academic_papers": [
+    {
+      "title": "RePrompt: Planning by Automatic Prompt Engineering for Large Language Models Agents",
+      "year": "2025",
+      "url": "https://arxiv.org/abs/2406.11132",
+      "key_insight": "AI agents can optimize prompts based on chat history and reflections, without need for final solution checker",
+      "relevance_to_mcp": "Shows how AI agents can iteratively improve their own instructions - potentially leading to over-optimization"
+    },
+    {
+      "title": "On the Brittle Foundations of ReAct Prompting for Agentic Large Language Models",
+      "year": "2024",
+      "url": "https://arxiv.org/abs/2405.13966",
+      "key_insight": "ReAct-based prompting improvements may be more fragile than claimed, requiring systematic sensitivity analysis",
+      "relevance_to_mcp": "Suggests that AI agent architectural decisions may be based on brittle assumptions about \"best practices\""
+    },
+    {
+      "title": "PromptAgent: Strategic Planning with Language Models Enables Expert-level Prompt Optimization",
+      "year": "2023",
+      "url": "https://arxiv.org/abs/2310.16427",
+      "key_insight": "AI agents can engage in trial-and-error exploration to optimize prompts, reflecting on errors and generating feedback",
+      "relevance_to_mcp": "Explains the systematic approach AI agents took in creating MCP Prompts architecture"
+    },
+    {
+      "title": "LLMs as Method Actors: A Model for Prompt Engineering and Architecture",
+      "year": "2024",
+      "url": "https://arxiv.org/abs/2411.05778",
+      "key_insight": "AI agents should be thought of as \"method actors\" who fully inhabit their assigned roles and contexts",
+      "relevance_to_mcp": "Explains why AI agents given \"architect\" roles systematically applied architectural patterns everywhere"
+    }
+  ]
+}

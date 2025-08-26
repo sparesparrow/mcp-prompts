@@ -5,9 +5,11 @@
 
 import type { z } from 'zod';
 
-import type { McpConfigSchema } from '../../../src/config.js';
+// Temporarily commenting out config import until paths are fixed
+// import type { McpConfigSchema } from '../../../src/config.js';
 
-export type McpConfig = z.infer<typeof McpConfigSchema>;
+// Temporarily commenting out config type until paths are fixed
+// export type McpConfig = z.infer<typeof McpConfigSchema>;
 
 /**
  * Variable definition for templates

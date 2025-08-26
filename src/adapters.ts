@@ -92,6 +92,34 @@ export class FileAdapter implements IPromptRepository, ISequenceRepository, IWor
     this.promptIndexPath = path.join(this.promptsDir, 'index.json');
   }
 
+  public async connect(): Promise<void> {
+    // Ensure directory structure exists
+    fs.mkdirSync(this.promptsDir, { recursive: true });
+    fs.mkdirSync(this.sequencesDir, { recursive: true });
+    fs.mkdirSync(this.workflowStatesDir, { recursive: true });
+    // Initialize index file if missing
+    if (!fs.existsSync(this.promptIndexPath)) {
+      await atomicWriteFile(this.promptIndexPath, JSON.stringify({ prompts: [] }, null, 2));
+    }
+    this.connected = true;
+  }
+
+  public async disconnect(): Promise<void> {
+    this.connected = false;
+  }
+
+  public async isConnected(): Promise<boolean> {
+    return this.connected;
+  }
+
+  public async healthCheck(): Promise<boolean> {
+    try {
+      return fs.existsSync(this.promptIndexPath);
+    } catch {
+      return false;
+    }
+  }
+
 }
 
 /**
