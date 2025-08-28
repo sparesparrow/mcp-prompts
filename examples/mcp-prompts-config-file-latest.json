@@ -5,8 +5,10 @@
       "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "STORAGE_TYPE": "file",
-        "PROMPTS_DIR": "/home/sparrow/mcp/data/prompts",
-        "LOG_LEVEL": "info"
+        "PROMPTS_DIR": "./prompts",
+        "LOG_LEVEL": "info",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
       }
     }
   }

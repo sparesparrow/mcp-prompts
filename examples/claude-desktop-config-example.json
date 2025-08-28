@@ -1,8 +1,13 @@
 {
   "mcpServers": {
-    "prompt-manager": {
-      "command": "node",
-      "args": ["/absolute/path/to/prompt-manager-mcp/build/index.js"]
+    "mcp-prompts": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
+      "env": {
+        "STORAGE_TYPE": "file",
+        "PROMPTS_DIR": "~/Documents/mcp-prompts",
+        "LOG_LEVEL": "info"
+      }
     }
   }
 }

@@ -5,7 +5,9 @@
       "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "STORAGE_TYPE": "memory",
-        "LOG_LEVEL": "debug"
+        "LOG_LEVEL": "debug",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
       }
     }
   }

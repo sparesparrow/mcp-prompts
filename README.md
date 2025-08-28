@@ -13,23 +13,12 @@
 - [Why MCP Prompts?](#why-mcp-prompts)
 - [Features](#features)
 - [Quick Start](#quick-start)
-- [Scripts & CLI Reference](#scripts--cli-reference)
-- [MCP Features & Architecture](#mcp-features--architecture)
-- [MCP TypeScript SDK Role](#mcp-typescript-sdk-role)
-- [Alternative Approaches](#alternative-approaches)
-- [Community Packages](#community-packages)
-- [End-to-End Usage: Official MCP TypeScript SDK, PostgreSQL, Inspector, and Proxy](#end-to-end-usage-official-mcp-typescript-sdk-postgresql-inspector-and-proxy)
-- [Integration with Other MCP Servers](#integration-with-other-mcp-servers)
+- [Architecture](#architecture)
+- [Development](#development)
+- [API Reference](#api-reference)
 - [Contributing](#contributing)
 - [License](#license)
 - [Support](#support)
-- [🛠️ Příklady konfigurace MCP klienta a serveru (`mcp.json`, `.env`)](#️-příklady-konfigurace-mcp-klienta-a-serveru-mcpjson-env)
-- [Hexagonální architektura v MCP-Prompts](#hexagonální-architektura-v-mcp-prompts)
-- [Architecture: Hexagonal (Ports & Adapters)](#architecture-hexagonal-ports--adapters)
-- [MCP Prompts Monorepo Build Setup](#mcp-prompts-monorepo-build-setup)
-- [TypeScript Monorepo Best Practices](#typescript-monorepo-best-practices)
-- [Troubleshooting](#troubleshooting)
-- [References](#references)
 
 ---
 
@@ -670,19 +659,7 @@ mcp-prompts/
 - [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
 - [DEV: Stop Losing Prompts – Build Your Own MCP Prompt Registry](https://dev.to/stevengonsalvez/stop-losing-prompts-build-your-own-mcp-prompt-registry-4fi1)
 
-## MCP Prompts Monorepo Build Setup
 
-## TypeScript Monorepo Best Practices
-
-- Each package has its own `tsconfig.json` extending a shared `tsconfig.options.json`.
-- The shared config enables ESM (`module: NodeNext`), strict type checking, and emits both `.js` and `.d.ts` files for all source files.
-- `emitDeclarationOnly` is **not** used, so both JavaScript and type declarations are available for downstream packages.
-- **Build order matters:**
-  1. Build `@mcp-prompts/core` first (it emits all types and JS for downstream packages).
-  2. Then build `@mcp-prompts/adapters-file` and `@mcp-prompts/adapters-memory`.
-  3. Then run `pnpm -r build` for the full monorepo.
-- The script `src/scripts/validate-prompts.ts` is excluded from the core build to avoid circular dependencies (it depends on adapters-file, which depends on core). If you need to build or run this script, do so separately after the main build.
-- All imports between packages use the built outputs (e.g., `@mcp-prompts/core/dist/interfaces.js`).
 
 ## Troubleshooting
 
@@ -724,6 +701,77 @@ pnpm run build
 - If you see errors about missing modules or types, ensure you have built `@mcp-prompts/core` first and that all `dist/` directories are up to date.
 - If you change the shared config or move files, clean all `dist/` directories and rebuild.
 
+## Architecture
+
+### Hexagonal Architecture (Ports & Adapters)
+MCP Prompts follows a clean hexagonal architecture pattern:
+
+- **Core**: Pure domain logic without infrastructure dependencies
+- **Ports**: Interfaces defined in core package
+- **Adapters**: Infrastructure implementations in adapter packages
+- **Apps**: Composition and configuration in apps folder
+
+### Directory Structure
+```
+mcp-prompts/
+├── packages/
+│   ├── core/                    # Domain logic and ports
+│   ├── @sparesparrow/           # Shared packages
+│   └── adapters-*/              # Port implementations
+├── apps/
+│   └── server/                  # MCP server application
+└── docs/                        # Documentation
+```
+
+## Development
+
+### Build Commands
+```bash
+# Build entire workspace
+pnpm run build
+
+# Development with watch mode
+pnpm run build:watch
+
+# Type checking
+pnpm run typecheck
+
+# Clean build artifacts
+pnpm run clean
+```
+
+### Package-specific Commands
+```bash
+# Core package
+pnpm -F @sparesparrow/mcp-prompts-core build
+pnpm -F @sparesparrow/mcp-prompts-core test
+
+# Adapter packages
+pnpm -F @sparesparrow/mcp-prompts-adapters-file build
+pnpm -F @sparesparrow/mcp-prompts-adapters-mdc build
+
+# Server app
+pnpm -F apps/server build
+pnpm -F apps/server test
+```
+
+### Testing
+- **Vitest** for unit tests
+- **Playwright** for e2e tests
+- **Coverage > 90%** for core packages
+- **Integration tests** for adapters
+
+## API Reference
+
+For detailed API documentation, see:
+- [API Reference](docs/04-api-reference.md)
+- [Storage Adapters](docs/03-storage-adapters.md)
+- [Templates Guide](docs/05-templates-guide.md)
+- [MCP Integration](docs/06-mcp-integration.md)
+- [Workflow Guide](docs/09-workflow-guide.md)
+
 ## References
 - [Turborepo TypeScript Monorepo Guide](https://turborepo.com/docs/guides/tools/typescript)
 - [Separate tsconfig for builds](https://www.timsanteford.com/posts/streamlining-your-next-js-builds-with-a-separate-typescript-configuration/)
+- [Hexagonal Architecture: Wikipedia](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software))
+- [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/architecture)

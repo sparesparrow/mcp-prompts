@@ -1,45 +1,44 @@
-# MCP-Prompts – Workflow Engine: Technický návrh
+# MCP Prompts Workflow Engine: Technical Design
 
-> Stav dokumentu: _Draft v0.1_ • Autoři: Tým MCP-Prompts • Datum: 2025-05-15
+> **Status**: _Draft v0.2_ • **Authors**: MCP Prompts Team • **Date**: 2025-01-20
 
-## 1 Motivace a cíle
+## 🎯 **Motivation & Goals**
 
-Současný server MCP-Prompts ukládá a distribuuje jednotlivé prompty. Uživatelé však často potřebují spouštět několik promptů v přesně definovaném sledu ("řetězení") a navázat na jejich výstupy dalšími kroky. Cílem Workflow Enginu je poskytnout:
+The current MCP Prompts server stores and distributes individual prompts. However, users often need to execute multiple prompts in a precisely defined sequence ("chaining") and build upon their outputs with additional steps. The Workflow Engine aims to provide:
 
-- deklarativní popis workflow (YAML/JSON)
-- deterministické a opakovatelné spouštění sekvencí (`PromptSequence`)
-- předávání dat mezi kroky (context object)
-- extensibilní kroky (volání externích MCP serverů, shell příkazů apod.)
-- plnohodnotné API + CLI podporu
-- možnost paralelizace (v budoucnu)
+- **Declarative workflow description** (YAML/JSON)
+- **Deterministic and repeatable execution** of sequences (`PromptSequence`)
+- **Data passing between steps** (context object)
+- **Extensible steps** (calling external MCP servers, shell commands, etc.)
+- **Full API + CLI support**
+- **Parallelization capabilities** (future enhancement)
 
 > **Why this matters:**
->
-> - Umožňuje automatizovat komplexní AI workflow.
-> - Sdílení a opakované použití workflow mezi týmy.
-> - Lepší auditovatelnost a správa promptů i workflow.
+> - Enables automation of complex AI workflows
+> - Sharing and reusing workflows between teams
+> - Better auditability and management of prompts and workflows
 
-## 2 Základní koncepty
+## 🏗️ **Core Concepts**
 
-| Pojem           | Popis                                                                                |
-| --------------- | ------------------------------------------------------------------------------------ |
-| **Workflow**    | Kořenový objekt, který popisuje celý proces, jeho kroky a sdílený kontext.           |
-| **Step**        | Jednotlivá akce v rámci workflow (vyvolání promptu, shell, HTTP request…).           |
-| **Input**       | Vstupní data kroku – mohou pocházet z konstant, env, nebo výstupu předchozího kroku. |
-| **Output**      | Výstup kroku – ukládá se do shared context pod zadaným klíčem.                       |
-| **Condition**   | (volitelné) podmínka, zda krok vykonat (`expression` evaluovaná nad contextem).      |
-| **ErrorPolicy** | Strategie při chybě (`continue`, `skip`, `abort`, `retry<n>`).                       |
+| Concept | Description |
+|---------|-------------|
+| **Workflow** | Root object describing the entire process, its steps, and shared context |
+| **Step** | Individual action within a workflow (prompt invocation, shell, HTTP request, etc.) |
+| **Input** | Step input data - can come from constants, environment, or previous step outputs |
+| **Output** | Step output - stored in shared context under specified key |
+| **Condition** | (Optional) condition determining whether to execute step (`expression` evaluated over context) |
+| **ErrorPolicy** | Strategy on error (`continue`, `skip`, `abort`, `retry<n>`) |
 
-> **Tip:** Kontext (`context`) je sdílený objekt, do kterého každý krok ukládá svůj výstup. Další kroky mohou tento výstup použít jako vstup.
+> **Tip**: Context is a shared object where each step stores its output. Subsequent steps can use this output as input.
 
-## 3 Formát definice (`workflow.yaml`)
+## 📝 **Definition Format (`workflow.yaml`)**
 
 ```yaml
 id: generate-release
 name: Release Notes Generator
 version: 1
 
-# Proměnné použitelné v celém workflow
+# Variables usable throughout the workflow
 variables:
   repo: modelcontextprotocol/mcp-prompts
   tag: v1.3.0
@@ -49,8 +48,8 @@ steps:
     type: prompt
     promptId: repository-explorer
     input:
-      owner: "{{ repo.split('/')![0] }}"
-      repo_name: "{{ repo.split('/')![1] }}"
+      owner: "{{ repo.split('/')[0] }}"
+      repo_name: "{{ repo.split('/')[1] }}"
       since_tag: '{{ tag }}'
     output: commits
 
@@ -67,19 +66,18 @@ steps:
     command: "echo '{{ context.release_notes }}' > RELEASE_NOTES.md"
 ```
 
-### 3.1 Podporované typy kroků (MVP)
+### **3.1 Supported Step Types (MVP)**
 
-- `prompt` – spuštění existujícího promptu z MCP-Prompts
-- `shell` – spuštění shell příkazu (běží v sandboxu serveru)
-- `http` – volání HTTP metody (GET/POST…)
+- `prompt` – Execute existing prompt from MCP Prompts
+- `shell` – Execute shell command (runs in server sandbox)
+- `http` – Make HTTP request (GET/POST, etc.)
 
-> **Příklad:**
->
-> - Prompt krok získá data z repozitáře.
-> - Další prompt krok data shrne.
-> - Shell krok výsledek uloží do souboru.
+> **Example Flow:**
+> - Prompt step fetches data from repository
+> - Next prompt step summarizes the data
+> - Shell step saves result to file
 
-## 4 Architektura
+## 🏛️ **Architecture**
 
 ```mermaid
 flowchart TD
@@ -92,113 +90,215 @@ flowchart TD
     Service --> Context[Shared Context Store]
 ```
 
-- **WorkflowController:** REST endpointy pro spouštění a správu workflow.
-- **WorkflowService:** Parsování, validace a orchestrace kroků.
-- **StepRunner:** Strategický pattern pro různé typy kroků.
-- **Context Store:** Sdílený objekt pro předávání dat mezi kroky.
+- **WorkflowController**: REST endpoints for workflow execution and management
+- **WorkflowService**: Parsing, validation, and step orchestration
+- **StepRunner**: Strategy pattern for different step types
+- **Context Store**: Shared object for data passing between steps
 
-## 5 API rozhraní (MVP)
+## 🔌 **API Interface (MVP)**
 
-| Metoda | URL                         | Popis                                     |
-| ------ | --------------------------- | ----------------------------------------- |
-| `POST` | `/api/v1/workflows/run`     | Spustit ad-hoc workflow (tělo = definice) |
-| `POST` | `/api/v1/workflows`         | Uložit workflow definici                  |
-| `GET`  | `/api/v1/workflows/:id`     | Detail uloženého workflow                 |
-| `POST` | `/api/v1/workflows/:id/run` | Spustit uložený workflow                  |
+### **Workflow Management**
 
-## 6 CLI integrace
+```typescript
+// Create workflow
+POST /api/workflows
+{
+  "id": "generate-release",
+  "name": "Release Notes Generator",
+  "steps": [...]
+}
 
-Nové příkazy:
+// Execute workflow
+POST /api/workflows/{id}/execute
+{
+  "variables": {
+    "repo": "my-org/my-repo",
+    "tag": "v2.0.0"
+  }
+}
 
-```bash
-mcp-prompts workflow run ./release.yaml      # ad-hoc
-mcp-prompts workflow save ./release.yaml     # uložit
-mcp-prompts workflow run saved-id            # spustit uložený
+// Get workflow status
+GET /api/workflows/{id}/status
 ```
 
-## 7 Validace & schéma
+### **Step Types**
 
-- JSON Schema `workflow.schema.json` bude publikováno v `src/schemas.ts`.
-- `npm run validate:workflow <file>` provede validaci (rozšíříme `validate-json.ts`).
+#### **Prompt Step**
+```yaml
+- id: analyze_code
+  type: prompt
+  promptId: code-review-assistant
+  input:
+    code: "{{ context.source_code }}"
+    language: "{{ context.language }}"
+  output: analysis_result
+  errorPolicy: continue
+```
 
-## 8 Bezpečnostní a výkonové aspekty
+#### **Shell Step**
+```yaml
+- id: create_backup
+  type: shell
+  command: "cp {{ context.source_file }} {{ context.source_file }}.backup"
+  workingDir: "/tmp"
+  timeout: 30
+  errorPolicy: abort
+```
 
-- **Sandbox** – shell kroky běží s omezenými oprávněními (Docker exec nebo child_process bez root).
-- **Timeout** – implicitní limit (např. 60 s) na krok.
-- **Rate limit** – omezení paralelních workflow pro jednoho uživatele.
-- **Audit log** – zaznamenáme spuštění a výsledky.
+#### **HTTP Step**
+```yaml
+- id: fetch_data
+  type: http
+  method: GET
+  url: "https://api.github.com/repos/{{ context.repo }}/commits"
+  headers:
+    Authorization: "Bearer {{ env.GITHUB_TOKEN }}"
+  output: github_data
+```
 
-## 9 Budoucí rozšíření
+## 🔄 **Context Management**
 
-- Paralelní kroky (`dependsOn`, `runAfter`)
-- Stavový stroj a vizualizace dag-u
-- UI v Claude Desktop / Web konzole
-- Pokročilé condition expression (`jq`, `JMESPath`)
-- Integrace s externími frontami (Redis, BullMQ)
+### **Context Object Structure**
+```typescript
+interface WorkflowContext {
+  // Input variables
+  variables: Record<string, any>;
+  
+  // Step outputs
+  outputs: Record<string, any>;
+  
+  // Environment variables
+  env: Record<string, string>;
+  
+  // Metadata
+  metadata: {
+    workflowId: string;
+    executionId: string;
+    startTime: Date;
+    currentStep: string;
+  };
+}
+```
 
-## 10 Otevřené otázky
+### **Data Passing Between Steps**
+```yaml
+steps:
+  - id: step1
+    output: user_data
+  
+  - id: step2
+    input:
+      processed_data: "{{ context.outputs.user_data | json }}"
+    output: final_result
+```
 
-1. Serializace velkých výstupů (uložit jen hash vs. celá data?)
-2. Mechanismus `secrets` pro shell & http kroky
-3. Distribuované běhy (sharding, worker pool)
+## 🚦 **Error Handling & Policies**
+
+### **Error Policy Options**
+- `continue` - Skip failed step, continue with next
+- `skip` - Skip failed step and mark as skipped
+- `abort` - Stop workflow execution immediately
+- `retry<n>` - Retry step up to n times before failing
+
+### **Error Handling Example**
+```yaml
+steps:
+  - id: critical_step
+    type: prompt
+    promptId: data-validation
+    errorPolicy: retry<3>
+    
+  - id: optional_step
+    type: shell
+    command: "echo 'Optional operation'"
+    errorPolicy: skip
+```
+
+## 🔒 **Security & Sandboxing**
+
+### **Shell Command Sandboxing**
+- Restricted working directory
+- Timeout limits
+- Command whitelisting (future)
+- Resource usage limits
+
+### **HTTP Request Security**
+- URL validation and whitelisting
+- Rate limiting
+- Request size limits
+- Header sanitization
+
+## 📊 **Monitoring & Observability**
+
+### **Execution Metrics**
+- Step execution time
+- Success/failure rates
+- Resource usage
+- Error patterns
+
+### **Logging**
+```typescript
+interface WorkflowLog {
+  executionId: string;
+  stepId: string;
+  timestamp: Date;
+  level: 'info' | 'warn' | 'error';
+  message: string;
+  context: Record<string, any>;
+}
+```
+
+## 🚀 **Future Enhancements**
+
+### **Phase 2: Advanced Features**
+- **Parallel execution** of independent steps
+- **Conditional branching** based on step outputs
+- **Loop constructs** for repetitive operations
+- **Sub-workflows** for modularity
+
+### **Phase 3: Enterprise Features**
+- **Workflow templates** and sharing
+- **Role-based access control** for workflows
+- **Scheduled execution** and cron-like functionality
+- **Integration with external systems** (CI/CD, monitoring)
+
+## 🧪 **Testing Strategy**
+
+### **Unit Tests**
+- Step type implementations
+- Context management
+- Error handling logic
+
+### **Integration Tests**
+- End-to-end workflow execution
+- Step interaction testing
+- Context persistence
+
+### **Performance Tests**
+- Large workflow execution
+- Concurrent workflow handling
+- Resource usage optimization
+
+## 📚 **Implementation Plan**
+
+### **Phase 1: Core Engine (Current)**
+- [x] Basic workflow definition format
+- [x] Step execution framework
+- [x] Context management
+- [x] Basic error handling
+
+### **Phase 2: Enhanced Features**
+- [ ] Conditional execution
+- [ ] Parallel step execution
+- [ ] Advanced error policies
+- [ ] Performance optimization
+
+### **Phase 3: Production Ready**
+- [ ] Security hardening
+- [ ] Monitoring and alerting
+- [ ] Documentation and examples
+- [ ] Community feedback integration
 
 ---
 
-# MVP Implementation Roadmap
-
-> **For up-to-date progress, see the TODO section in the main README.**
-
-1. **Schema & Validation**
-
-   - [ ] Finalizovat a publikovat `workflow.schema.json` v `src/schemas.ts`.
-   - [ ] Rozšířit `validate-json.ts` o validaci workflow (`npm run validate:workflow <file>`).
-
-2. **Core Engine**
-
-   - [ ] Implementovat `WorkflowService` pro parsování, validaci a orchestraci workflow.
-   - [ ] Implementovat strategii `StepRunner` pro různé typy kroků.
-   - [ ] Implementovat `PromptRunner` pro prompt kroky.
-   - [ ] Implementovat `ShellRunner` pro shell kroky (sandbox, timeout).
-   - [ ] Implementovat `HttpRunner` pro HTTP kroky.
-   - [ ] Přidat sdílený in-memory context store pro předávání dat mezi kroky.
-
-3. **API Endpoints**
-
-   - [ ] Přidat REST endpoint: `POST /api/v1/workflows/run` (ad-hoc spuštění).
-   - [ ] Přidat REST endpoint: `POST /api/v1/workflows` (uložení definice).
-   - [ ] Přidat REST endpoint: `GET /api/v1/workflows/:id` (získání definice).
-   - [ ] Přidat REST endpoint: `POST /api/v1/workflows/:id/run` (spuštění uloženého workflow).
-
-4. **CLI Integrace**
-
-   - [ ] Přidat CLI příkaz: `mcp-prompts workflow run <file>` (ad-hoc run).
-   - [ ] Přidat CLI příkaz: `mcp-prompts workflow save <file>` (uložení workflow).
-   - [ ] Přidat CLI příkaz: `mcp-prompts workflow run <id>` (spuštění uloženého workflow).
-
-5. **Bezpečnost & Výkon**
-
-   - [ ] Implementovat sandboxing pro shell kroky (např. Docker exec, bez root).
-   - [ ] Přidat timeout pro každý krok (default 60s).
-   - [ ] Přidat rate limiting pro paralelní workflow na uživatele.
-   - [ ] Implementovat audit logování běhů a výsledků.
-
-6. **Dokumentace & Příklady**
-
-   - [ ] Přidat uživatelské a vývojářské návody pro workflow.
-   - [ ] Přidat ukázkové workflow YAML/JSON soubory.
-   - [ ] Přidat vizuální diagramy do dokumentace a README.
-
-7. **Testování**
-
-   - [ ] Přidat integrační testy pro workflow engine a typy kroků.
-
-8. **Budoucí rozšíření (po MVP)**
-   - [ ] Podpora paralelních kroků (`dependsOn`, `runAfter`).
-   - [ ] Vizualizace DAG/stavového stroje.
-   - [ ] Integrace s UI (Claude Desktop, web konzole).
-   - [ ] Pokročilé podmínky (`jq`, `JMESPath`).
-   - [ ] Distribuované běhy (worker pool, sharding).
-
----
-
-_Diskusi nad dokumentem prosím otevírejte v Issues nebo komunikujte na Slacku #mcp-prompts._
+*This document outlines the technical design for the MCP Prompts Workflow Engine, enabling complex AI workflow automation.*

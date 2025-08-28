@@ -1,6 +1,7 @@
 {
   "name": "@sparesparrow/mcp-prompts-core",
   "version": "0.1.0",
+  "description": "Core domain logic for MCP Prompts Server",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -11,35 +12,69 @@
       "default": "./dist/index.js",
       "node": "./dist/index.js"
     },
-    "./addPrompt": {
-      "import": "./dist/use-cases/addPrompt.js",
-      "require": "./dist/use-cases/addPrompt.js",
-      "types": "./dist/use-cases/addPrompt.d.ts"
+    "./entities": {
+      "import": "./dist/entities/index.js",
+      "require": "./dist/entities/index.js",
+      "types": "./dist/entities/index.d.ts"
     },
-    "./getPromptById": {
-      "import": "./dist/use-cases/getPromptById.js",
-      "require": "./dist/use-cases/getPromptById.js",
-      "types": "./dist/use-cases/getPromptById.d.ts"
+    "./value-objects": {
+      "import": "./dist/value-objects/index.js",
+      "require": "./dist/value-objects/index.js",
+      "types": "./dist/value-objects/index.d.ts"
     },
-    "./listPrompts": {
-      "import": "./dist/use-cases/listPrompts.js",
-      "require": "./dist/use-cases/listPrompts.js",
-      "types": "./dist/use-cases/listPrompts.d.ts"
+    "./ports": {
+      "import": "./dist/ports/index.js",
+      "require": "./dist/ports/index.js",
+      "types": "./dist/ports/index.d.ts"
     },
-    "./updatePrompt": {
-      "import": "./dist/use-cases/updatePrompt.js",
-      "require": "./dist/use-cases/updatePrompt.js",
-      "types": "./dist/use-cases/updatePrompt.d.ts"
+    "./use-cases": {
+      "import": "./dist/use-cases/index.js",
+      "require": "./dist/use-cases/index.js",
+      "types": "./dist/use-cases/index.d.ts"
     },
-    "./deletePrompt": {
-      "import": "./dist/use-cases/deletePrompt.js",
-      "require": "./dist/use-cases/deletePrompt.js",
-      "types": "./dist/use-cases/deletePrompt.d.ts"
+    "./schemas": {
+      "import": "./dist/schemas.js",
+      "require": "./dist/schemas.js",
+      "types": "./dist/schemas.d.ts"
+    },
+    "./errors": {
+      "import": "./dist/errors.js",
+      "require": "./dist/errors.js",
+      "types": "./dist/errors.d.ts"
+    },
+    "./config": {
+      "import": "./dist/config.js",
+      "require": "./dist/config.js",
+      "types": "./dist/config.d.ts"
+    },
+    "./utils": {
+      "import": "./dist/utils.js",
+      "require": "./dist/utils.js",
+      "types": "./dist/utils.d.ts"
+    },
+    "./types": {
+      "import": "./dist/types/index.js",
+      "require": "./dist/types/index.js",
+      "types": "./dist/types/index.d.ts"
     }
   },
   "files": [
     "dist"
   ],
+  "keywords": [
+    "mcp",
+    "prompts",
+    "templates",
+    "ai",
+    "llm",
+    "model-context-protocol"
+  ],
+  "author": "sparesparrow",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparesparrow/mcp-prompts.git"
+  },
   "dependencies": {
     "@sparesparrow/mcp-prompts-catalog": "workspace:*",
     "@sparesparrow/mcp-prompts-contracts": "workspace:*",
@@ -58,5 +93,8 @@
     "clean": "rm -rf dist",
     "test": "vitest run",
     "test:watch": "vitest"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   }
 }

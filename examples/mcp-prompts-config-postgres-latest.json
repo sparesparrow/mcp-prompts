@@ -5,12 +5,10 @@
       "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "STORAGE_TYPE": "postgres",
-        "PG_HOST": "localhost",
-        "PG_PORT": "5432",
-        "PG_USER": "postgres",
-        "PG_PASSWORD": "postgres",
-        "PG_DATABASE": "mcp_prompts",
-        "LOG_LEVEL": "warn"
+        "POSTGRES_URL": "postgres://username:password@localhost:5432/mcp_prompts",
+        "LOG_LEVEL": "info",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
       }
     }
   }

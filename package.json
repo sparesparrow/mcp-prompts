@@ -36,7 +36,7 @@
     "zod": "^3.25.71"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.13.3",
+    "@modelcontextprotocol/sdk": "^1.17.2",
     "@playwright/test": "^1.53.2",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.12.9",
@@ -55,8 +55,7 @@
     "supertest": "^7.1.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
-    "vitest": "^3.2.4",
-    "zod": "^3.25.71"
+    "vitest": "^3.2.4"
   },
   "engines": {
     "node": ">=20.0.0",

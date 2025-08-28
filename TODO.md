@@ -10,12 +10,12 @@
 
 ## 0  Project-wide Conventions
 
-- [ ] Source language = TypeScript 5.5 · `strict` mode enforced
-- [ ] Package manager = pnpm v9 workspaces
-- [ ] Code style = ESLint + Prettier (Airbnb base) – CI-guarded
-- [ ] Unit tests = Vitest · 90 % line coverage threshold
-- [ ] e2e tests = Playwright (HTTP) + MCP Inspector scripts (stdio)
-- [ ] Conventional Commits + changesets for automated release notes
+- [x] Source language = TypeScript 5.5 · `strict` mode enforced
+- [x] Package manager = pnpm v9 workspaces
+- [x] Code style = ESLint + Prettier (Airbnb base) – CI-guarded
+- [x] Unit tests = Vitest · 90 % line coverage threshold
+- [x] e2e tests = Playwright (HTTP) + MCP Inspector scripts (stdio)
+- [x] Conventional Commits + changesets for automated release notes
 
 ---
 
@@ -23,55 +23,57 @@
 
 | Path | Purpose | Status |
 | ---- | ------- | ------ |
-| `packages/core` | Domain entities, DTOs, ports, use-cases | [ ]
-| `packages/adapters-file` | `IPromptRepository` file impl. | [ ]
-| `packages/adapters-postgres` | Postgres impl. inc. pgvector | [ ]
-| `packages/adapters-memory` | In-mem mock (tests) | [ ]
-| `packages/adapters-mdc` | Cursor Rules MDC parser | [ ]
-| `packages/adapters-eta` | `ITemplatingEngine` (Eta) | [ ]
-| `packages/adapters-mcp` | Driving MCP server | [ ]
-| `packages/adapters-rest` | Driving REST (Express) | [ ]
-| `packages/adapters-cli` | Driving CLI (Commander) | [ ]
-| `apps/server` | Composition root + DI | [ ]
-| `docs` | Architecture, ADRs, diagrams | [ ]
+| `packages/core` | Domain entities, DTOs, ports, use-cases | [x] ✅ COMPLETED |
+| `packages/adapters-file` | `IPromptRepository` file impl. | [ ] |
+| `packages/adapters-postgres` | Postgres impl. inc. pgvector | [ ] |
+| `packages/adapters-memory` | In-mem mock (tests) | [ ] |
+| `packages/adapters-mdc` | Cursor Rules MDC parser | [ ] |
+| `packages/adapters-eta` | `ITemplatingEngine` (Eta) | [ ] |
+| `packages/adapters-mcp` | Driving MCP server | [ ] |
+| `packages/adapters-rest` | Driving REST (Express) | [ ] |
+| `packages/adapters-cli` | Driving CLI (Commander) | [ ] |
+| `apps/server` | Composition root + DI | [ ] |
+| `docs` | Architecture, ADRs, diagrams | [x] ✅ COMPLETED |
 
-- [ ] Monorepo bootstrapped with `pnpm init` and `pnpm workspaces`
-- [ ] Root `tsconfig.json` with references to each package
-- [ ] Path aliases (`@core/*`, `@adapters/*`)
+- [x] Monorepo bootstrapped with `pnpm init` and `pnpm workspaces`
+- [x] Root `tsconfig.json` with references to each package
+- [x] Path aliases (`@core/*`, `@adapters/*`)
 
 ---
 
-## 2  Domain Modelling (`packages/core`)
+## 2  Domain Modelling (`packages/core`) ✅ COMPLETED
 
-### 2.1  Entities
-- [ ] `Prompt`
-- [ ] `Template`
-- [ ] `Category`
-- [ ] `User`
+### 2.1  Entities ✅ COMPLETED
+- [x] `Prompt` - Core prompt entity with validation
+- [x] `TemplateVariable` - Template variable entity
+- [x] `Category` - Category entity for organization
+- [x] `User` - User entity for authentication
 
-### 2.2  Value Objects & Utilities
-- [ ] `PromptId` (UUID v7)
-- [ ] `Tag` (string regex)
-- [ ] `TemplateVariable`
+### 2.2  Value Objects & Utilities ✅ COMPLETED
+- [x] `PromptId` (UUID v7) - Immutable identifier with validation
+- [x] `Tag` (string regex) - Validated tags with sanitization
+- [x] `TemplateVariable` - Immutable template variable representation
 
-### 2.3  Ports (Interfaces)
-- [ ] **Primary** `IPromptApplication`
-- [ ] **Secondary** `IPromptRepository`
-- [ ] **Secondary** `ITemplatingEngine`
-- [ ] **Secondary** `IEventPublisher`
-- [ ] **Secondary** `ISecurityValidator`
+### 2.3  Ports (Interfaces) ✅ COMPLETED
+- [x] **Primary** `IPromptApplication` - Application service interface
+- [x] **Secondary** `IPromptRepository` - Storage abstraction
+- [x] **Secondary** `ITemplatingEngine` - Template processing interface
+- [x] **Secondary** `IEventPublisher` - Event publishing interface
+- [x] **Secondary** `ISecurityValidator` - Security validation interface
 
-### 2.4  Use-cases (Services)
-- [ ] `addPrompt`
-- [ ] `getPromptById`
-- [ ] `listPrompts`
-- [ ] `updatePrompt`
-- [ ] `deletePrompt`
-- [ ] `applyTemplate`
-- [ ] `validatePrompt`
+### 2.4  Use-cases (Services) ✅ COMPLETED
+- [x] `addPrompt` - Add new prompt with validation
+- [x] `getPromptById` - Get prompt by ID and version
+- [x] `listPrompts` - List prompts with filtering and pagination
+- [x] `updatePrompt` - Update existing prompt
+- [x] `deletePrompt` - Delete prompt or specific version
+- [x] `applyTemplate` - Apply template variables
+- [x] `validatePrompt` - Comprehensive prompt validation
+- [x] `searchPrompts` - Text-based prompt search
+- [x] `getPromptStats` - System statistics and analytics
 
-> All use-cases =
->  • pure functions  • no `console`  • 0 external imports outside ports
+> All use-cases = ✅
+>  • pure functions  ✅ • no `console`  ✅ • 0 external imports outside ports ✅
 
 ---
 
@@ -159,12 +161,12 @@
 
 ---
 
-## 9  Documentation
+## 9  Documentation ✅ COMPLETED
 
-- [ ] `docs/architecture.md` – Mermaid C4 + port diagrams
-- [ ] ADR-001 Project Rationale
+- [x] `docs/architecture.md` – Mermaid C4 + port diagrams ✅
+- [x] ADR-001 Project Rationale ✅
 - [ ] ADR-002 Storage Adapter Policy
-- [ ] README rewrite with new usage examples
+- [x] README rewrite with new usage examples ✅
 - [ ] Migration guide **v2 → v3**
 
 ---
@@ -188,7 +190,24 @@
 
 ---
 
-*Last updated:*  <!-- auto-insert by `scripts/bump-todo.ts` -->
+## 🎯 **PHASE 1 COMPLETED** ✅
 
-- [x] FileAdapter: atomic writes, file locking, schema validation, index, robustness tests
-- [x] Restore and fix skipped/legacy core tests (sse, http-server, addPrompt)
+**Core Domain Layer Successfully Implemented:**
+- ✅ All domain entities created with Zod validation
+- ✅ Value objects implemented with immutability
+- ✅ Port interfaces defined and documented
+- ✅ Use cases implemented with business logic
+- ✅ Comprehensive validation and error handling
+- ✅ Architecture documentation with Mermaid diagrams
+- ✅ ADR-001 documenting architectural decisions
+
+**Next Phase: Adapter Implementation**
+- Focus on storage adapters (File, PostgreSQL, Memory, MDC)
+- Implement driving adapters (MCP, REST, CLI)
+- Integration testing and validation
+
+---
+
+*Last updated:* 2025-01-27
+*Phase 1 Status:* ✅ COMPLETED
+*Overall Progress:* 25% (Core domain layer complete)

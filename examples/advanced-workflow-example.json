@@ -1,23 +1,57 @@
-[
-  {
-    "id": "summarize",
-    "name": "Summarize Text",
-    "description": "Summarize the provided input text.",
-    "content": "Summarize the following text: {{input}}",
-    "isTemplate": true,
-    "variables": ["input"]
+{
+  "id": "code-review-workflow",
+  "name": "Advanced Code Review Workflow",
+  "version": 1,
+  "description": "Multi-step workflow for comprehensive code review and feedback generation",
+  "variables": {
+    "repository": "modelcontextprotocol/mcp-prompts",
+    "branch": "main",
+    "file_path": "src/core/prompt.service.ts"
   },
-  {
-    "id": "questions",
-    "name": "Generate Questions",
-    "description": "Generate 3 questions based on the summary.",
-    "content": "Based on this summary: {{summary}}, generate 3 questions.",
-    "isTemplate": true,
-    "variables": ["summary"]
-  }
-]
-// Usage:
-// 1. Apply 'summarize' with your input text.
-
-
-// 2. Take the output, use as 'summary' variable for 'questions'.
+  "steps": [
+    {
+      "id": "fetch_code",
+      "type": "http",
+      "method": "GET",
+      "url": "https://api.github.com/repos/{{ variables.repository }}/contents/{{ variables.file_path }}",
+      "headers": {
+        "Accept": "application/vnd.github.v3.raw",
+        "Authorization": "Bearer {{ env.GITHUB_TOKEN }}"
+      },
+      "output": "source_code",
+      "errorPolicy": "abort"
+    },
+    {
+      "id": "analyze_code",
+      "type": "prompt",
+      "promptId": "code-analyzer",
+      "input": {
+        "code": "{{ context.source_code }}",
+        "language": "typescript",
+        "framework": "node"
+      },
+      "output": "code_analysis",
+      "errorPolicy": "retry<3>"
+    },
+    {
+      "id": "generate_feedback",
+      "type": "prompt",
+      "promptId": "feedback-generator",
+      "input": {
+        "analysis": "{{ context.code_analysis }}",
+        "file_path": "{{ variables.file_path }}",
+        "repository": "{{ variables.repository }}"
+      },
+      "output": "feedback",
+      "errorPolicy": "continue"
+    },
+    {
+      "id": "save_results",
+      "type": "shell",
+      "command": "echo '{{ context.feedback }}' > review-feedback.md",
+      "workingDir": "./output",
+      "output": "file_path",
+      "errorPolicy": "skip"
+    }
+  ]
+}
