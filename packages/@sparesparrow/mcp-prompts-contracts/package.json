@@ -1,0 +1,35 @@
+{
+  "name": "@sparesparrow/mcp-prompts-contracts",
+  "version": "0.1.0",
+  "description": "Shared TypeScript types and validation schemas for MCP Prompts",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./src/schemas.js": {
+      "import": "./dist/src/schemas.js",
+      "types": "./dist/src/schemas.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "swc src -d dist --copy-files && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.63",
+    "@swc/core": "^1.3.100",
+    "typescript": "^5.5.0"
+  }
+}

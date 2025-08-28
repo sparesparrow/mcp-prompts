@@ -6,8 +6,16 @@ packages:
   - 'apps/*'
   - 'docs'
   
-  # Exclude build artifacts and cache
+  # Exclude build artifacts, cache, and temporary files
   - '!**/dist'
   - '!**/build'
   - '!**/.cache'
   - '!**/node_modules'
+  - '!**/*.tmp'
+  - '!**/*.temp'
+  - '!**/coverage'
+  - '!**/.nyc_output'
+  - '!**/.next'
+  - '!**/.nuxt'
+  - '!**/.output'
+  - '!**/.vercel'

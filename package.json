@@ -66,7 +66,8 @@
     "setup": "bash scripts/setup.sh",
     "dev": "bash scripts/dev.sh",
     "start": "node dist/index.js",
-    "build": "tsc -p tsconfig.server.json",
+    "build": "pnpm -r run build",
+    "build:watch": "pnpm -r run build:watch",
     "typecheck": "pnpm -r run typecheck",
     "clean": "pnpm -r run clean",
     "lint": "eslint . --ext .ts,.js",
@@ -79,8 +80,7 @@
     "test:watch": "vitest",
     "docs": "typedoc --out docs/api src && markdown-toc -i docs/*.md",
     "prepare": "husky install",
-    "release": "standard-version && git push --follow-tags origin main",
-    "postinstall": "npm run setup"
+    "release": "standard-version && git push --follow-tags origin main"
   },
   "pnpm": {
     "overrides": {

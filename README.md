@@ -99,9 +99,9 @@ docker-compose -f docker-compose.yml -f docker-compose.extended.yml up -d
 ```bash
 git clone https://github.com/sparesparrow/mcp-prompts.git
 cd mcp-prompts
-npm install
-npm run build
-npm start
+pnpm install
+pnpm run build
+pnpm start
 ```
 
 ### 4. Health Check
@@ -111,6 +111,44 @@ curl http://localhost:3003/health
 ```
 
 ---
+
+## Build & Development
+
+### Monorepo Build Commands
+
+```bash
+# Build all packages
+pnpm run build
+
+# Build with watch mode
+pnpm run build:watch
+
+# Type checking
+pnpm run typecheck
+
+# Clean all build artifacts
+pnpm run clean
+
+# Run tests
+pnpm run test
+
+# Lint and format
+pnpm run lint
+pnpm run format
+```
+
+### Individual Package Builds
+
+```bash
+# Build specific package
+cd packages/core && pnpm run build
+
+# Build all adapters
+pnpm --filter "./packages/adapters-*" run build
+
+# Build server app
+cd apps/server && pnpm run build
+```
 
 ## Scripts & CLI Reference
 
@@ -648,6 +686,41 @@ mcp-prompts/
 
 ## Troubleshooting
 
+### Build Issues
+
+**TypeScript Path Resolution Errors:**
+```bash
+# Clear TypeScript cache
+rm -rf **/*.tsbuildinfo
+pnpm run clean
+pnpm run build
+```
+
+**SWC Build Failures:**
+```bash
+# Ensure SWC is installed
+pnpm add -D @swc/cli @swc/core
+
+# Clean and rebuild
+pnpm run clean
+pnpm run build
+```
+
+**Workspace Dependency Issues:**
+```bash
+# Reinstall workspace dependencies
+pnpm install --force
+pnpm run build
+```
+
+**Missing Modules or Types:**
+- Ensure you have built `@mcp-prompts/core` first
+- Check that all `dist/` directories are up to date
+- If you change the shared config or move files, clean all `dist/` directories and rebuild
+
+### Runtime Issues
+
+**Common Issues:**
 - If you see errors about missing modules or types, ensure you have built `@mcp-prompts/core` first and that all `dist/` directories are up to date.
 - If you change the shared config or move files, clean all `dist/` directories and rebuild.
 

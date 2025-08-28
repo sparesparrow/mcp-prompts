@@ -3,18 +3,20 @@
   "version": "0.1.0",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
-  "type": "module",
-  "license": "MIT",
-  "private": false,
-  "dependencies": {
-    "@sparesparrow/mcp-prompts-core": "workspace:*",
-    "express": "^4.19.0"
-  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "build": "swc src -d dist --copy-files",
+    "build": "swc src -d dist --copy-files && tsc --emitDeclarationOnly --declaration --outDir dist",
     "build:watch": "swc src -d dist --watch --copy-files",
     "typecheck": "tsc --noEmit",
     "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@sparesparrow/mcp-prompts-core": "workspace:*",
+    "express": "^5.1.0",
+    "cors": "^2.8.5",
+    "helmet": "^8.1.0"
   },
   "exports": {
     ".": {

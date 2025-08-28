@@ -1,16 +1,26 @@
 {
   "name": "@sparesparrow/mcp-prompts-adapters-cli",
   "version": "0.1.0",
-  "main": "dist/cli.js",
-  "types": "dist/cli.d.ts",
-  "type": "module",
-  "license": "MIT",
-  "private": false,
-  "bin": {
-    "mcp-prompts": "dist/cli.js"
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "swc src -d dist --copy-files && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist"
   },
   "dependencies": {
     "@sparesparrow/mcp-prompts-core": "workspace:*",
-    "commander": "^11.0.0"
+    "commander": "^12.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
   }
 }

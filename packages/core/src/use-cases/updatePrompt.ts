@@ -1,6 +1,6 @@
 // Use-case: updatePrompt
 import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
-import { IPromptRepository } from '../interfaces.js';
+import { IPromptRepository } from '../ports/IPromptRepository';
 
 export async function updatePrompt(repo: IPromptRepository, id: string, version: number, data: Partial<Prompt>): Promise<Prompt> {
   // Convert metadata: null to undefined, tags: null to undefined, variables: null to undefined for type compatibility

@@ -1,113 +1,91 @@
-# MCP Prompts
-# mcp-prompts-rs/
-# mcp-prompts-contracts/
-# mcp-prompts-collection/
-# mcp-prompts-ts/
-# mcp-prompts-catalog/
-# mcp-prompts-pg/
-# mcp-prompts-aidl/
-# mcp-prompts-esp32/
-# esp32-hid-rs/
-packages/mcp-prompts-catalog/
-packages/mcp-prompts-contracts/
-packages/*/node_modules/
-apps/*/node_modules/
-
 # Dependencies
 node_modules/
-
-# Build output
-build/
-dist/
-dist-tsc/
-
-# Environment variables
-.env
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-
-# Editor directories and files
-.idea/
-.vscode/
-*.swp
-*.swo
-.DS_Store
-
-# Coverage reports
-coverage/
-.nyc_output/
-test-results/
-
-# MCP Prompts Monorepo
-
-# Node dependencies
-node_modules/
+.pnpm-store/
 
 # Build outputs
 dist/
 build/
+*.tsbuildinfo
+
+# Cache and temporary files
+.cache/
+.temp/
+*.tmp
+*.temp
+
+# Coverage reports
+coverage/
+.nyc_output/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# IDE and editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
 
 # Logs
 logs/
 *.log
 npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
 
-# Environment variables
-.env
+# Runtime data
+pids/
+*.pid
+*.seed
+*.pid.lock
 
-# Editor/IDE files
-.idea/
-.vscode/
-.DS_Store
-*.swp
-*.swo
+# Optional npm cache directory
+.npm
 
-# Coverage/test
-coverage/
-.nyc_output/
-test-results/
+# Optional eslint cache
+.eslintcache
 
-# Vendor/external code (if you vendor code, use one of these folders)
-vendor/
-external/
+# Microbundle cache
+.rpt2_cache/
+.rts2_cache_cjs/
+.rts2_cache_es/
+.rts2_cache_umd/
 
-# OS-specific
-Thumbs.db
+# Optional REPL history
+.node_repl_history
 
-# pnpm
-.pnpm-debug.log*
-
-# Temporary files
-temp*.json
-claude_desktop_config*.json
-mcp-config*.json
-
-# NPM package files
+# Output of 'npm pack'
 *.tgz
 
-# Temporary output directories
-output/
+# Yarn Integrity file
+.yarn-integrity
 
-# Docker temporary files
-.docker-*
-legacy/
+# parcel-bundler cache (https://parceljs.org/)
+.parcel-cache
 
-# Temporary files
-temp*.json
-claude_desktop_config*.json
-mcp-config*.json
+# Next.js build output
+.next
 
-# NPM package files
-*.tgz
+# Nuxt.js build output
+.nuxt
 
-# Temporary output directories
-output/
+# Storybook build outputs
+.out
+.storybook-out
 
-# Docker temporary files
-.docker-*
-
-# TypeScript build cache
-**/*.tsbuildinfo
+# Temporary folders
+tmp/
+temp/

@@ -1,0 +1,50 @@
+{
+  "name": "@sparesparrow/mcp-prompts-catalog",
+  "version": "1.0.1",
+  "description": "A curated collection of prompts and templates for the MCP ecosystem",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mcp",
+    "prompts",
+    "catalog",
+    "templates",
+    "model-context-protocol"
+  ],
+  "author": "sparesparrow",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/sparesparrow/mcp-prompts.git",
+    "directory": "packages/@sparesparrow/mcp-prompts-catalog"
+  },
+  "bugs": {
+    "url": "https://github.com/sparesparrow/mcp-prompts/issues"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#readme",
+  "scripts": {
+    "build": "swc src -d dist --copy-files && tsc --emitDeclarationOnly --declaration --outDir dist",
+    "build:watch": "swc src -d dist --watch --copy-files",
+    "typecheck": "tsc --noEmit",
+    "clean": "rm -rf dist",
+    "validate": "node scripts/validate-prompts.js"
+  },
+  "dependencies": {
+    "@sparesparrow/mcp-prompts-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.63",
+    "@swc/core": "^1.3.100",
+    "typescript": "^5.5.0"
+  }
+}

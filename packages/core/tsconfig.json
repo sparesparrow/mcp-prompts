@@ -9,7 +9,9 @@
     "sourceMap": true
   },
   "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests"],
   "references": [
-    { "path": "../@sparesparrow/mcp-prompts-contracts" }
+    { "path": "../@sparesparrow/mcp-prompts-contracts" },
+    { "path": "../@sparesparrow/mcp-prompts-catalog" }
   ]
 }

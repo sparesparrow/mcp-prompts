@@ -1,29 +1,92 @@
 // Implementace aplikační vrstvy (IPromptApplication)
-import { IPromptApplication } from '../ports/IPromptApplication';
 import { IPromptRepository } from '../ports/IPromptRepository';
-import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
-import { PromptId } from '../value-objects/PromptId';
+import { 
+  Prompt, 
+  ListPromptsOptions, 
+  TemplateVariables, 
+  ApplyTemplateResult 
+} from '@sparesparrow/mcp-prompts-contracts';
+
+export interface IPromptApplication {
+  getPrompt(id: string, version?: number): Promise<Prompt | null>;
+  addPrompt(data: Partial<Prompt>): Promise<Prompt>;
+  updatePrompt(id: string, version: number, data: Partial<Prompt>): Promise<Prompt>;
+  listPrompts(options?: ListPromptsOptions, allVersions?: boolean): Promise<Prompt[]>;
+  deletePrompt(id: string, version?: number): Promise<boolean>;
+  listPromptVersions(id: string): Promise<number[]>;
+  applyTemplate(
+    id: string,
+    variables: TemplateVariables,
+    version?: number,
+  ): Promise<ApplyTemplateResult>;
+}
 
 export class PromptApplication implements IPromptApplication {
   constructor(private readonly repo: IPromptRepository) {}
 
-  async addPrompt(prompt: Prompt): Promise<Prompt> {
-    return this.repo.add(prompt);
+  async addPrompt(data: Partial<Prompt>): Promise<Prompt> {
+    const prompt: Prompt = {
+      id: data.id || `prompt-${Date.now()}`,
+      name: data.name!,
+      content: data.content!,
+      isTemplate: data.isTemplate || false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      version: 1,
+      description: data.description,
+      category: data.category,
+      metadata: data.metadata,
+      tags: data.tags,
+      variables: data.variables
+    };
+    return this.repo.savePrompt(prompt);
   }
 
-  async getPromptById(id: PromptId): Promise<Prompt | null> {
-    return this.repo.getById(id);
+  async getPrompt(id: string, version?: number): Promise<Prompt | null> {
+    return this.repo.getPrompt(id, version);
   }
 
-  async listPrompts(): Promise<Prompt[]> {
-    return this.repo.list();
+  async listPrompts(options?: ListPromptsOptions, allVersions?: boolean): Promise<Prompt[]> {
+    return this.repo.listPrompts(options, allVersions);
   }
 
-  async updatePrompt(id: PromptId, update: Partial<Prompt>): Promise<Prompt | null> {
-    return this.repo.update(id, update);
+  async updatePrompt(id: string, version: number, data: Partial<Prompt>): Promise<Prompt> {
+    return this.repo.updatePrompt(id, version, data);
   }
 
-  async deletePrompt(id: PromptId): Promise<boolean> {
-    return this.repo.delete(id);
+  async deletePrompt(id: string, version?: number): Promise<boolean> {
+    return this.repo.deletePrompt(id, version);
+  }
+
+  async listPromptVersions(id: string): Promise<number[]> {
+    return this.repo.listPromptVersions(id);
+  }
+
+  async applyTemplate(
+    id: string,
+    variables: TemplateVariables,
+    version?: number,
+  ): Promise<ApplyTemplateResult> {
+    const prompt = await this.repo.getPrompt(id, version);
+    if (!prompt) throw new Error(`Template prompt not found: ${id} v${version ?? 'latest'}`);
+    if (!prompt.isTemplate) throw new Error(`Prompt is not a template: ${id}`);
+    
+    // Simple template replacement for now
+    let content = prompt.content;
+    for (const [key, value] of Object.entries(variables)) {
+      content = content.replace(new RegExp(`{{${key}}}`, 'g'), value);
+    }
+    
+    const remaining = content.match(/{{[^}]+}}/g);
+    const missingVariables = remaining
+      ? remaining.map(v => v.replace(/{{|}}/g, '').trim())
+      : undefined;
+      
+    return {
+      appliedVariables: variables,
+      content,
+      missingVariables,
+      originalPrompt: prompt,
+    };
   }
 }

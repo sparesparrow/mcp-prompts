@@ -4,5 +4,5 @@ import { IPromptRepository } from '../ports/IPromptRepository';
 
 export async function addPrompt(repo: IPromptRepository, prompt: Prompt): Promise<Prompt> {
   // Validace, business logika atd. může být doplněna
-  return repo.add(prompt);
+  return repo.savePrompt(prompt);
 }

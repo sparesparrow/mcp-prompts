@@ -154,54 +154,6 @@ Please provide:
         default: 'slow execution time'
       }
     ]
-  },
-  {
-    id: 'mcp-server-setup',
-    name: 'MCP Server Configuration Assistant',
-    content: `Help me set up an MCP server with the following requirements:
-
-**Server Type:** {{server_type}}
-**Language/Framework:** {{language}}
-**Features Needed:** {{features}}
-
-Please provide:
-1. **Complete setup instructions**
-2. **Required dependencies and versions**
-3. **Basic server implementation template**
-4. **Configuration examples for Claude Desktop**
-5. **Testing and validation steps**
-6. **Common troubleshooting tips**
-
-Include code examples and best practices for MCP protocol compliance.`,
-    isTemplate: true,
-    createdAt: '2024-01-01T00:00:00Z',
-    updatedAt: '2024-01-01T00:00:00Z',
-    version: 1,
-    description: 'Assists with MCP server setup and configuration',
-    category: 'MCP Integration',
-    tags: ['mcp', 'server', 'setup', 'configuration'],
-    variables: [
-      {
-        name: 'server_type',
-        description: 'Type of MCP server',
-        required: true,
-        type: 'string',
-        options: ['tools', 'resources', 'prompts', 'hybrid']
-      },
-      {
-        name: 'language',
-        description: 'Programming language or framework',
-        required: true,
-        type: 'string',
-        options: ['typescript', 'javascript', 'python', 'go', 'rust']
-      },
-      {
-        name: 'features',
-        description: 'Comma-separated list of required features',
-        required: true,
-        type: 'string'
-      }
-    ]
   }
 ];
 
