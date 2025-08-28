@@ -64,7 +64,7 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "bash scripts/dev.sh",
-    "start": "node dist/index.js",
+    "start": "cd apps/server && node dist/index.js",
     "build": "pnpm -r run build",
     "build:watch": "pnpm -r run build:watch",
     "typecheck": "pnpm -r run typecheck",
@@ -77,7 +77,7 @@
     "docker:down": "docker compose down",
     "docker:logs": "docker compose logs -f | cat",
     "test:watch": "vitest",
-    "docs": "typedoc --out docs/api src && markdown-toc -i docs/*.md",
+    "docs": "typedoc --out docs/api packages/core/src && markdown-toc -i docs/*.md",
     "prepare": "husky install",
     "release": "standard-version && git push --follow-tags origin main"
   },
