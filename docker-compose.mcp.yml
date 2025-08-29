@@ -1,0 +1,16 @@
+version: '3.8'
+
+services:
+  mcp-prompts:
+    build:
+      context: .
+      dockerfile: Dockerfile.mcp
+    container_name: mcp-prompts-server
+    environment:
+      - MODE=mcp
+      - NODE_ENV=production
+    volumes:
+      - ./data:/app/data
+    ports:
+      - "3003:3003"
+    restart: unless-stopped

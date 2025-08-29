@@ -1,153 +1,39 @@
 #!/usr/bin/env node
-console.log('Starting MCP Prompts Server...');
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
-// import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse';
-// import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp';
-import { pino } from 'pino';
-import { z } from 'zod';
-import http from 'http';
-import express from 'express';
+import { createServer } from './http-server';
+import { startMcpServer } from './mcp-server';
+import { logger } from './utils';
 
-import { adapterFactory } from './adapters.js';
-import { loadConfig } from './config.js';
-import { ElevenLabsService } from './elevenlabs-service.js';
-import { startHttpServer } from './http-server.js';
-import { PromptService } from './prompt-service.js';
-import { SequenceApplication, ISequenceRepository } from './sequence-service.js';
-import { WorkflowApplication } from './workflow-service.js';
-import { defaultTemplatingEngine } from './utils.js';
+const PORT = parseInt(process.env.PORT || '3003', 10);
+const HOST = process.env.HOST || '0.0.0.0';
+const MODE = process.env.MODE || 'http'; // 'http' or 'mcp'
 
-/**
- *
- */
 async function main() {
-  const env = loadConfig();
-  const logger = pino({
-    level: env.LOG_LEVEL || 'info',
-    ...(process.env.NODE_ENV !== 'production' && {
-      transport: {
-        options: {
-          colorize: true,
-        },
-        target: 'pino-pretty',
-      },
-    }),
-  });
-
-  const allowedStorageTypes = ['file', 'postgres', 'memory'] as const;
-  type AllowedStorageType = typeof allowedStorageTypes[number];
-  const storageType: AllowedStorageType = allowedStorageTypes.includes(env.STORAGE_TYPE as AllowedStorageType)
-    ? (env.STORAGE_TYPE as AllowedStorageType)
-    : 'file';
-  const config = {
-    ...env,
-    storage: {
-      database: env.POSTGRES_DATABASE,
-      host: env.POSTGRES_HOST,
-      maxConnections: env.POSTGRES_MAX_CONNECTIONS,
-      password: env.POSTGRES_PASSWORD,
-      port: env.POSTGRES_PORT,
-      promptsDir: env.PROMPTS_DIR,
-      ssl: env.POSTGRES_SSL,
-      type: storageType,
-      user: env.POSTGRES_USER,
-    } as {
-      database: string | undefined;
-      host: string | undefined;
-      maxConnections: number | undefined;
-      password: string | undefined;
-      port: number | undefined;
-      promptsDir: string;
-      ssl: boolean | undefined;
-      type: AllowedStorageType;
-      user: string | undefined;
-    },
-  };
-
-  const storageAdapter = adapterFactory(config, logger);
-  await storageAdapter.connect();
-
-  // Simplified startup - just get HTTP server running first
-  const promptService = null;
-  const sequenceService = null;
-  const workflowService = null;
-  const elevenLabsService = null;
-
-  const mcpServer = new McpServer({
-    name: 'mcp-prompts',
-    version: '1.3.0',
-  });
-
-    let httpServer: http.Server;
   try {
-    // Create minimal Express server with just health endpoint
-    const app = express();
-    app.use(express.json());
-    
-    // Health endpoint
-    app.get('/health', (req, res) => {
-      res.status(200).send('OK');
-    });
-    
-    // Create HTTP server
-    httpServer = http.createServer(app);
-    httpServer.listen(env.PORT, env.HOST, () => {
-      logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
-    });
-
-    logger.info(`MCP Prompts server started on ${env.HOST}:${env.PORT}`);
-
-    // Keep the event loop alive
-    const keepAlive = setInterval(() => {}, 1000);
-
-    /**
-     * Graceful shutdown handler
-     */
-    async function shutdown() {
-      logger.info('Shutting down MCP Prompts server...');
-      clearInterval(keepAlive);
-      await mcpServer.close();
-      await new Promise<void>((resolve) => {
-        if (httpServer.listening) {
-          httpServer.close(() => resolve());
-        } else {
-          resolve();
-        }
+    if (MODE === 'mcp') {
+      // Start MCP server
+      logger.info('Starting MCP Prompts server in MCP mode...');
+      await startMcpServer();
+      logger.info('MCP Prompts server started successfully');
+    } else {
+      // Start HTTP server
+      logger.info('Starting MCP Prompts server in HTTP mode...');
+      const app = await createServer();
+      
+      app.listen(PORT, HOST, () => {
+        logger.info(`🚀 MCP Prompts Server running at http://${HOST}:${PORT}`);
+        logger.info(`📚 API Documentation available at http://${HOST}:${PORT}/api-docs`);
+        logger.info(`🏥 Health check available at http://${HOST}:${PORT}/health`);
       });
-      await storageAdapter.disconnect();
-      logger.info('Server shut down gracefully.');
-      process.exit(0);
     }
-
-    // Handle process signals
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-
-    // Handle uncaught errors
-    process.on('uncaughtException', (error) => {
-      logger.error('Uncaught exception:', error);
-      shutdown().catch((err) => {
-        logger.error('Error during shutdown:', err);
-        process.exit(1);
-      });
-    });
-
-    process.on('unhandledRejection', (reason) => {
-      logger.error('Unhandled rejection:', reason);
-      shutdown().catch((err) => {
-        logger.error('Error during shutdown:', err);
-        process.exit(1);
-      });
-    });
-
   } catch (error) {
     logger.error('Failed to start server:', error);
     process.exit(1);
   }
 }
 
-main().catch(error => {
-  console.error('Failed to start server:', error);
-  process.exit(1);
-});
+if (require.main === module) {
+  main();
+}
+
+export { createServer, startMcpServer };

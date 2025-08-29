@@ -290,27 +290,6 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(express@5.1.0)
 
-  packages/mcp-prompts-catalog.local-backup-20250826143427:
-    devDependencies:
-      '@swc/cli':
-        specifier: ^0.7.7
-        version: 0.7.7(@swc/core@1.12.9)
-      '@swc/core':
-        specifier: ^1.12.9
-        version: 1.12.9
-      '@types/node':
-        specifier: ^22.16.0
-        version: 22.16.0
-      typescript:
-        specifier: ^5.8.3
-        version: 5.8.3
-
-  packages/mcp-prompts-contracts.local-backup-20250826143427:
-    devDependencies:
-      typescript:
-        specifier: ^5.0.0
-        version: 5.8.3
-
 packages:
 
   '@ampproject/remapping@2.3.0':
