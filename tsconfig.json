@@ -1,16 +1,21 @@
 {
-  "extends": "./tsconfig.options.json",
-  "files": [],
-  "references": [
-    { "path": "packages/core" },
-    { "path": "packages/adapters-file" },
-    { "path": "packages/adapters-postgres" },
-    { "path": "packages/adapters-memory" },
-    { "path": "packages/adapters-mdc" },
-    { "path": "packages/adapters-eta" },
-    { "path": "packages/adapters-mcp" },
-    { "path": "packages/adapters-rest" },
-    { "path": "packages/adapters-cli" },
-    { "path": "apps/server" }
-  ]
+  "compilerOptions": {
+    "target": "ES2020",
+    "module": "commonjs",
+    "lib": ["ES2020"],
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "cdk", "tests"]
 }
