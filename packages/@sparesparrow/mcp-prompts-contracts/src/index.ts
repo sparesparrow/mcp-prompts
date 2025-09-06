@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * @sparesparrow/mcp-prompts-contracts
  * Shared TypeScript types and validation schemas for MCP Prompts ecosystem

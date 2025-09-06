@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { startHttpServer } from './http-server.js';
 
 startHttpServer().catch(err => {

@@ -16,7 +16,7 @@ export const promptSchemas = {
   }),
   applyTemplate: z.object({
     id: z.string(),
-    variables: z.record(z.any()).default({}).optional(),
+    variables: z.record(z.any(), z.any()).default({}).optional(),
   }),
   update: z.object({
     name: z.string().nullable().optional(),
@@ -24,7 +24,7 @@ export const promptSchemas = {
     category: z.string().nullable().optional(),
     content: z.string().nullable().optional(),
     isTemplate: z.boolean().nullable().optional(),
-    metadata: z.record(z.any()).nullable().optional(),
+    metadata: z.record(z.any(),z.any()).nullable().optional(),
     tags: z.array(z.string()).nullable().optional(),
     variables: z.array(z.union([z.string(), z.object({ name: z.string() })])).nullable().optional(),
   }),

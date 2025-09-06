@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { container } from 'tsyringe';
 import { createRestServer } from '@sparesparrow/mcp-prompts-adapters-rest';
 

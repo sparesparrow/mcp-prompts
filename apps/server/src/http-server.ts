@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import express from 'express';
 import type { Request, Response, NextFunction } from 'express';
 import { addPrompt, listPrompts, getPromptById } from '@sparesparrow/mcp-prompts-core';

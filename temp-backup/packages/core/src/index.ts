@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Core entrypoint: exports domain entities, ports, and use-cases
 
 // Entities

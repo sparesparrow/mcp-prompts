@@ -1,6 +1,6 @@
 {
   "name": "mcp-prompts-aws",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "MCP Prompts with AWS backend integration",
   "main": "dist/index.js",
   "scripts": {
@@ -21,14 +21,18 @@
     "@aws-sdk/util-dynamodb": "^3.883.0",
     "@modelcontextprotocol/sdk": "^0.4.0",
     "@sparesparrow/mcp-prompt-manager": "1.1.11",
+    "@sparesparrow/mcp-prompts": "3.0.8",
     "@sparesparrow/mcp-prompts-catalog": "1.0.1",
     "@sparesparrow/mcp-prompts-contracts": "1.0.1",
+    "aws-cdk": "2.1029.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
     "helmet": "^7.2.0",
+    "mcp-prompts-aws": "link:",
     "morgan": "^1.10.1",
     "pino": "^8.21.0",
-    "winston": "^3.17.0"
+    "winston": "^3.17.0",
+    "zod": "4.1.5"
   },
   "devDependencies": {
     "@swc/cli": "^0.1.65",

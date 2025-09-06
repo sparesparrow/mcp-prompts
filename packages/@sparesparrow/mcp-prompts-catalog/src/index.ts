@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 /**
  * @sparesparrow/mcp-prompts-catalog
  * Curated prompt catalog for MCP Prompts

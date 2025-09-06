@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { PromptService } from '../core/services/prompt.service';
 
 export class McpServer {

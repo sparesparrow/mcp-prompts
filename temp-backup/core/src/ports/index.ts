@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Ports index - exports all port interfaces
 
 export * from './IPromptRepository';

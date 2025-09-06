@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Core types for the MCP Prompts system
 
 // Re-export entity types

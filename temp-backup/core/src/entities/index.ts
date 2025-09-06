@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Entities index - exports all domain entities
 
 export * from './Prompt';

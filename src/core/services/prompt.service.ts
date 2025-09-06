@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 import { IPromptRepository } from '../ports/prompt-repository.interface';
 import { ICatalogRepository } from '../ports/catalog-repository.interface';
 import { IEventBus } from '../ports/event-bus.interface';
