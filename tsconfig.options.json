@@ -16,10 +16,10 @@
     "target": "esnext",
     "paths": {
       "@sparesparrow/mcp-prompts-contracts": [
-        "packages/@sparesparrow/mcp-prompts-contracts/src"
+        "packages/@sparesparrow/mcp-prompts-contracts/dist"
       ],
       "@sparesparrow/mcp-prompts-contracts/*": [
-        "packages/@sparesparrow/mcp-prompts-contracts/src/*"
+        "packages/@sparesparrow/mcp-prompts-contracts/dist/*"
       ],
       "@sparesparrow/mcp-prompts-core": [
         "packages/core/src"

@@ -2,22 +2,16 @@
   "extends": "./tsconfig.options.json",
   "compilerOptions": {
     "outDir": "dist",
-    "rootDir": ".",
-    "declaration": false,
-    "sourceMap": false,
-    "composite": false
+    "rootDir": "src",
+    "declaration": true,
+    "sourceMap": true,
+    "composite": false,
+    "moduleResolution": "NodeNext",
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    "skipLibCheck": true
   },
-  "include": [
-    "src/**/*.ts", 
-    "packages/*/src/**/*.ts",
-    "packages/@sparesparrow/*/src/**/*.ts"
-  ],
-  "exclude": [
-    "node_modules", 
-    "dist",
-    "**/node_modules",
-    "**/dist",
-    "**/*.test.ts"
-  ]
+  "include": ["src/**/*.ts"],
+  "exclude": ["node_modules", "dist", "packages", "apps"]
 }
 
