@@ -1,9 +1,10 @@
-import { SQSClient, SendMessageCommand, ReceiveMessageCommand, DeleteMessageCommand, SendMessageBatchCommand } from '@aws-sdk/client-sqs';
+import { SQSClient, SendMessageCommand, ReceiveMessageCommand, DeleteMessageCommand } from '@aws-sdk/client-sqs';
 import { IEventBus } from '../../core/ports/event-bus.interface';
 import { PromptEvent } from '../../core/events/prompt.event';
 
 export class SQSAdapter implements IEventBus {
   private client: SQSClient;
+  private handlers: Map<string, (event: PromptEvent) => Promise<void>> = new Map();
 
   constructor(
     private queueUrl: string,
@@ -15,114 +16,85 @@ export class SQSAdapter implements IEventBus {
   async publish(event: PromptEvent): Promise<void> {
     const command = new SendMessageCommand({
       QueueUrl: this.queueUrl,
-      MessageBody: JSON.stringify({
-        eventType: event.type,
-        eventId: event.id,
-        aggregateId: event.aggregateId,
-        payload: event.payload,
-        timestamp: event.timestamp.toISOString(),
-        version: event.version
-      }),
+      MessageBody: JSON.stringify(event.toJSON()),
       MessageAttributes: {
-        eventType: {
+        EventType: {
           DataType: 'String',
-          StringValue: event.type
+          StringValue: event.type,
         },
-        aggregateId: {
+        PromptId: {
           DataType: 'String',
-          StringValue: event.aggregateId
-        }
-      }
+          StringValue: event.promptId,
+        },
+        Timestamp: {
+          DataType: 'String',
+          StringValue: event.timestamp.toISOString(),
+        },
+      },
     });
 
-    await this.client.send(command);
-  }
-
-  async publishBatch(events: PromptEvent[]): Promise<void> {
-    const entries = events.map((event, index) => ({
-      Id: `${event.id}-${index}`,
-      MessageBody: JSON.stringify({
-        eventType: event.type,
-        eventId: event.id,
-        aggregateId: event.aggregateId,
-        payload: event.payload,
-        timestamp: event.timestamp.toISOString(),
-        version: event.version
-      }),
-      MessageAttributes: {
-        eventType: {
-          DataType: 'String',
-          StringValue: event.type
-        },
-        aggregateId: {
-          DataType: 'String',
-          StringValue: event.aggregateId
-        }
-      }
-    }));
-
-    // SQS batch limit is 10 messages
-    for (let i = 0; i < entries.length; i += 10) {
-      const batch = entries.slice(i, i + 10);
-
-      const command = new SendMessageBatchCommand({
-        QueueUrl: this.queueUrl,
-        Entries: batch
-      });
-
+    try {
       await this.client.send(command);
+      console.log(`Published event: ${event.type} for prompt ${event.promptId}`);
+    } catch (error) {
+      console.error('Error publishing event to SQS:', error);
+      throw error;
     }
   }
 
-  async receiveMessages(maxMessages: number = 10): Promise<any[]> {
-    const command = new ReceiveMessageCommand({
-      QueueUrl: this.queueUrl,
-      MaxNumberOfMessages: Math.min(maxMessages, 10),
-      WaitTimeSeconds: 20, // Long polling
-      MessageAttributeNames: ['All']
-    });
-
-    const response = await this.client.send(command);
-
-    return response.Messages?.map(msg => ({
-      id: msg.MessageId,
-      receiptHandle: msg.ReceiptHandle,
-      body: JSON.parse(msg.Body || '{}'),
-      attributes: msg.MessageAttributes
-    })) || [];
+  subscribe(eventType: string, handler: (event: PromptEvent) => Promise<void>): void {
+    this.handlers.set(eventType, handler);
+    console.log(`Subscribed to event type: ${eventType}`);
   }
 
-  async deleteMessage(receiptHandle: string): Promise<void> {
-    const command = new DeleteMessageCommand({
+  async processMessages(): Promise<void> {
+    const command = new ReceiveMessageCommand({
       QueueUrl: this.queueUrl,
-      ReceiptHandle: receiptHandle
+      MaxNumberOfMessages: 10,
+      WaitTimeSeconds: 20,
+      MessageAttributeNames: ['All'],
     });
 
-    await this.client.send(command);
+    try {
+      const result = await this.client.send(command);
+
+      for (const message of result.Messages || []) {
+        try {
+          const eventData = JSON.parse(message.Body || '{}');
+          const event = PromptEvent.fromJSON(eventData);
+          
+          const handler = this.handlers.get(event.type);
+          if (handler) {
+            await handler(event);
+            console.log(`Processed event: ${event.type} for prompt ${event.promptId}`);
+          } else {
+            console.warn(`No handler found for event type: ${event.type}`);
+          }
+
+          // Delete processed message
+          await this.client.send(new DeleteMessageCommand({
+            QueueUrl: this.queueUrl,
+            ReceiptHandle: message.ReceiptHandle!,
+          }));
+
+        } catch (error) {
+          console.error('Error processing message:', error);
+          // Message will be retried or sent to DLQ based on configuration
+        }
+      }
+    } catch (error) {
+      console.error('Error receiving messages from SQS:', error);
+      throw error;
+    }
   }
 
   async enqueueIndexing(promptId: string, operation: 'create' | 'update' | 'delete'): Promise<void> {
     const event = new PromptEvent(
-      'prompt.indexing.requested',
+      operation === 'delete' ? 'prompt_deleted' : 
+      operation === 'create' ? 'prompt_created' : 'prompt_updated',
       promptId,
-      {
-        operation,
-        promptId,
-        requestedAt: new Date().toISOString()
-      }
-    );
-
-    await this.publish(event);
-  }
-
-  async enqueueCatalogSync(repoUrl: string): Promise<void> {
-    const event = new PromptEvent(
-      'catalog.sync.requested',
-      'catalog',
-      {
-        repoUrl,
-        requestedAt: new Date().toISOString()
-      }
+      new Date(),
+      { operation }
     );
 
     await this.publish(event);
@@ -130,14 +102,13 @@ export class SQSAdapter implements IEventBus {
 
   async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; details?: any }> {
     try {
-      // Try to receive messages (without waiting)
-      const command = new ReceiveMessageCommand({
+      // Simple send message test
+      const testCommand = new SendMessageCommand({
         QueueUrl: this.queueUrl,
-        MaxNumberOfMessages: 1,
-        WaitTimeSeconds: 0
+        MessageBody: JSON.stringify({ test: true, timestamp: new Date().toISOString() }),
       });
 
-      await this.client.send(command);
+      await this.client.send(testCommand);
 
       return { status: 'healthy' };
     } catch (error) {
@@ -145,8 +116,8 @@ export class SQSAdapter implements IEventBus {
         status: 'unhealthy',
         details: {
           error: error instanceof Error ? error.message : 'Unknown error',
-          queueUrl: this.queueUrl
-        }
+          queueUrl: this.queueUrl,
+        },
       };
     }
   }

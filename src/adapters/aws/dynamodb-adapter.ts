@@ -73,7 +73,7 @@ export class DynamoDBAdapter implements IPromptRepository {
 
     const result = await this.client.send(command);
 
-    return result.Items?.map(item => this.mapToPrompt(unmarshall(item))) || [];
+    return result.Items?.map((item: any) => this.mapToPrompt(unmarshall(item))) || [];
   }
 
   async findLatestVersions(limit: number = 100): Promise<Prompt[]> {
@@ -89,7 +89,7 @@ export class DynamoDBAdapter implements IPromptRepository {
 
     const result = await this.client.send(command);
 
-    return result.Items?.map(item => this.mapToPrompt(unmarshall(item))) || [];
+    return result.Items?.map((item: any) => this.mapToPrompt(unmarshall(item))) || [];
   }
 
   async search(query: string, category?: string): Promise<Prompt[]> {
@@ -115,7 +115,7 @@ export class DynamoDBAdapter implements IPromptRepository {
 
     const result = await this.client.send(command);
 
-    return result.Items?.map(item => this.mapToPrompt(unmarshall(item))) || [];
+    return result.Items?.map((item: any) => this.mapToPrompt(unmarshall(item))) || [];
   }
 
   async update(id: string, version: string, updates: Partial<Prompt>): Promise<void> {
@@ -209,7 +209,7 @@ export class DynamoDBAdapter implements IPromptRepository {
 
     const result = await this.client.send(command);
 
-    return result.Items?.map(item => unmarshall(item).version) || [];
+    return result.Items?.map((item: any) => unmarshall(item).version) || [];
   }
 
   async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; details?: any }> {

@@ -19,7 +19,7 @@ export class S3CatalogAdapter implements ICatalogRepository {
         throw new Error(`Failed to fetch catalog: ${response.statusText}`);
       }
 
-      const catalog = await response.json();
+      const catalog = await response.json() as any;
 
       // Upload catalog index to S3
       await this.uploadObject('catalog/index.json', JSON.stringify(catalog, null, 2), 'application/json');
@@ -116,7 +116,7 @@ export class S3CatalogAdapter implements ICatalogRepository {
 
     const response = await this.client.send(command);
 
-    return response.Contents?.map(obj => {
+    return response.Contents?.map((obj: any) => {
       const key = obj.Key || '';
       return key.replace(prefix, '').replace('.json', '');
     }) || [];

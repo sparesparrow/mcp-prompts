@@ -81,7 +81,7 @@ export class MetricsCollector {
         MetricData: [{
           MetricName: metricName,
           Value: value,
-          Unit: unit,
+          Unit: unit as any,
           Dimensions: dimensions,
           Timestamp: new Date()
         }]
