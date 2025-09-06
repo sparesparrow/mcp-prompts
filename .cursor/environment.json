@@ -4,7 +4,7 @@
   "install": "npm install",
   "start": "npm run dev",
   "env": {
-    "LOG_LEVEL": "info"
+    "LOG_LEVEL": "debug"
   },
   "agentCanUpdateSnapshot": true,
   "terminals": [

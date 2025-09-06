@@ -1,8 +1,15 @@
 {
   "mcpServers": {
     "mcp-prompts": {
-      "command": "node",
-      "args": ["dist/index.js"],
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts@3.0.8"],
+      "env": {
+        "MODE": "mcp"
+      }
+    },
+    "mcp-prompts-l": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "MODE": "mcp"
       }

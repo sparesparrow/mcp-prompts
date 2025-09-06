@@ -4,7 +4,7 @@
 export type { Prompt, CreatePromptParams, UpdatePromptParams } from '../entities/Prompt';
 export type { TemplateVariable, TemplateVariableInput, TemplateVariables } from '../entities/TemplateVariable';
 export type { PromptSequence, CreatePromptSequenceParams, UpdatePromptSequenceParams } from '../entities/PromptSequence';
-export type { Category, CreateCategoryParams, UpdateCategoryParams } from '../entities/Category';
+export type { Category, CreateCategoryParams, UpdateCategoryParams } from  '../entities/Category';
 export type { User, CreateUserParams, UpdateUserParams, UserCredentials, UserSession } from '../entities/User';
 
 // Re-export value object types
@@ -15,9 +15,9 @@ export type { TemplateVariable as TemplateVariableVO, TemplateVariableType } fro
 // Re-export port types
 export type { IPromptRepository } from '../ports/IPromptRepository';
 export type { IPromptApplication } from '../ports/IPromptApplication';
-export type { ITemplatingEngine } from '../ports/ITemplatingEngine';
+export type {  ITemplatingEngine } from '../types/manual-exports';
 export type { IEventPublisher } from '../ports/IEventPublisher';
-export type { ISecurityValidator } from '../ports/ISecurityValidator';
+export type { ISecurityValidator } from '../ports/ISecurityValidator'; 
 
 // Common types
 export type TemplateVariables = Record<string, string>;
