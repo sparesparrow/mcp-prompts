@@ -1,7 +1,7 @@
 {
   "name": "@sparesparrow/mcp-prompts",
   "private": false,
-  "version": "3.0.8",
+  "version": "3.0.7",
   "description": "A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP)",
   "keywords": [
     "mcp",
@@ -53,7 +53,7 @@
     "zod": "^3.25.71"
   },
   "devDependencies": {
-    "@modelcontextprotocol/sdk": "^1.17.2",
+    "@modelcontextprotocol/sdk": "^1.13.3",
     "@playwright/test": "^1.53.2",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.12.9",
@@ -108,7 +108,6 @@
     "docker:logs:mcp": "docker compose -f docker-compose.mcp.yml logs -f | cat",
     "docs": "typedoc --out docs/api src && markdown-toc -i docs/*.md",
     "release": "standard-version && git push --follow-tags origin main",
-    "prepublishOnly": "pnpm run build:clean && pnpm run test",
     "pack": "npm pack",
     "publish:dry": "npm publish --dry-run",
     "publish:patch": "npm version patch && npm publish",
