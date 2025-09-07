@@ -4,14 +4,34 @@
       "command": "npx",
       "args": ["-y", "@sparesparrow/mcp-prompts@3.0.8"],
       "env": {
-        "MODE": "mcp"
+        "MODE": "mcp",
+        "STORAGE_TYPE": "postgres",
+        "POSTGRES_URL": "postgres://postgres:postgres@localhost:5432/mcp_prompts",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
       }
     },
     "mcp-prompts-l": {
       "command": "npx",
       "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
-        "MODE": "mcp"
+        "MODE": "http",
+        "STORAGE_TYPE": "postgres",
+        "POSTGRES_URL": "postgres://postgres:postgres@localhost:5432/mcp_prompts",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
+      }
+    },
+    "mcp-prompts-p": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
+      "env": {
+        "STORAGE_TYPE": "postgres",
+        "POSTGRES_URL": "postgres://postgres:postgres@localhost:5432/mcp_prompts",
+        "LOG_LEVEL": "info",
+        "MODE": "mcp",
+        "PORT": "3003",
+        "HOST": "0.0.0.0"
       }
     }
   }
