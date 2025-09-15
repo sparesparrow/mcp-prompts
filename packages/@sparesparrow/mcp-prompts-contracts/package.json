@@ -1,6 +1,5 @@
 {
   "name": "@sparesparrow/mcp-prompts-contracts",
-<<<<<<< Updated upstream
   "version": "0.1.0",
   "description": "Shared TypeScript types and validation schemas for MCP Prompts",
   "type": "module",
@@ -34,17 +33,3 @@
     "typescript": "^5.5.0"
   }
 }
-=======
-  "version": "1.0.0",
-  "main": "dist/index.js",
-  "types": "dist/index.d.ts",
-  "scripts": {
-    "build": "tsc -p tsconfig.json",
-    "clean": "rm -rf dist"
-  },
-  "dependencies": {},
-  "devDependencies": {
-    "typescript": "^5.0.0"
-  }
-}
->>>>>>> Stashed changes

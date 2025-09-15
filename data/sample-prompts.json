@@ -1,0 +1,182 @@
+{
+  "prompts": [
+    {
+      "id": "code_review_assistant",
+      "name": "Code Review Assistant",
+      "content": "Please review this code for best practices, potential bugs, security issues, and performance improvements:\n\n```{{language}}\n{{code}}\n```\n\nFocus on:\n- Code quality and readability\n- Security vulnerabilities\n- Performance optimizations\n- Best practices for {{language}}\n- Error handling\n- Documentation",
+      "isTemplate": true,
+      "tags": ["code-review", "assistant", "development"],
+      "variables": [
+        {
+          "name": "language",
+          "description": "Programming language of the code",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "code",
+          "description": "The code to review",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "category": "development",
+        "difficulty": "intermediate",
+        "estimatedTime": "5-10 minutes"
+      }
+    },
+    {
+      "id": "documentation_writer",
+      "name": "Documentation Writer",
+      "content": "Please write comprehensive documentation for the following {{type}}:\n\n**Title:** {{title}}\n**Description:** {{description}}\n\nRequirements:\n- Clear and concise explanations\n- Code examples where applicable\n- Step-by-step instructions\n- Troubleshooting section\n- Best practices\n\nTarget audience: {{audience}}",
+      "isTemplate": true,
+      "tags": ["documentation", "writing", "technical"],
+      "variables": [
+        {
+          "name": "type",
+          "description": "Type of documentation (API, user guide, technical spec, etc.)",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "title",
+          "description": "Title of the documentation",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "description",
+          "description": "Brief description of what needs to be documented",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "audience",
+          "description": "Target audience (developers, users, administrators, etc.)",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "category": "documentation",
+        "difficulty": "beginner",
+        "estimatedTime": "10-15 minutes"
+      }
+    },
+    {
+      "id": "bug_analyzer",
+      "name": "Bug Analyzer",
+      "content": "Please analyze this bug report and provide a detailed investigation:\n\n**Bug Description:** {{bugDescription}}\n\n**Error Message:** {{errorMessage}}\n\n**Environment:** {{environment}}\n\n**Steps to Reproduce:** {{stepsToReproduce}}\n\nPlease provide:\n1. Root cause analysis\n2. Potential solutions\n3. Prevention strategies\n4. Testing recommendations\n5. Priority assessment (Low/Medium/High/Critical)",
+      "isTemplate": true,
+      "tags": ["debugging", "analysis", "troubleshooting"],
+      "variables": [
+        {
+          "name": "bugDescription",
+          "description": "Description of the bug",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "errorMessage",
+          "description": "Error message or stack trace",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "environment",
+          "description": "Environment details (OS, version, etc.)",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "stepsToReproduce",
+          "description": "Steps to reproduce the bug",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "category": "debugging",
+        "difficulty": "advanced",
+        "estimatedTime": "15-20 minutes"
+      }
+    },
+    {
+      "id": "architecture_reviewer",
+      "name": "Architecture Reviewer",
+      "content": "Please review this system architecture and provide feedback:\n\n**System Overview:** {{systemOverview}}\n\n**Architecture Diagram/Description:** {{architectureDescription}}\n\n**Requirements:** {{requirements}}\n\n**Constraints:** {{constraints}}\n\nPlease evaluate:\n1. Scalability\n2. Maintainability\n3. Security\n4. Performance\n5. Reliability\n6. Cost-effectiveness\n7. Recommendations for improvement",
+      "isTemplate": true,
+      "tags": ["architecture", "design", "review"],
+      "variables": [
+        {
+          "name": "systemOverview",
+          "description": "Overview of the system being designed",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "architectureDescription",
+          "description": "Description or diagram of the architecture",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "requirements",
+          "description": "Functional and non-functional requirements",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "constraints",
+          "description": "Technical, business, or resource constraints",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "category": "architecture",
+        "difficulty": "expert",
+        "estimatedTime": "20-30 minutes"
+      }
+    },
+    {
+      "id": "test_case_generator",
+      "name": "Test Case Generator",
+      "content": "Please generate comprehensive test cases for the following functionality:\n\n**Feature:** {{feature}}\n\n**Requirements:** {{requirements}}\n\n**Input/Output Specifications:** {{specifications}}\n\nPlease provide:\n1. Unit test cases\n2. Integration test cases\n3. Edge cases\n4. Error scenarios\n5. Performance test cases\n6. Security test cases\n\nTest framework: {{framework}}",
+      "isTemplate": true,
+      "tags": ["testing", "qa", "automation"],
+      "variables": [
+        {
+          "name": "feature",
+          "description": "Feature or functionality to test",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "requirements",
+          "description": "Functional requirements",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "specifications",
+          "description": "Input/output specifications",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "name": "framework",
+          "description": "Testing framework to use",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "metadata": {
+        "category": "testing",
+        "difficulty": "intermediate",
+        "estimatedTime": "15-25 minutes"
+      }
+    }
+  ]
+}

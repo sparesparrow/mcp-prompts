@@ -1,0 +1,14 @@
+{
+  "name": "custom-mcp-prompts",
+  "version": "1.0.0",
+  "description": "Custom MCP Prompts server with configurable environment",
+  "type": "module",
+  "scripts": {
+    "start": "node custom-server.js"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.7.0",
+    "@sparesparrow/mcp-prompts": "latest",
+    "zod": "^3.22.4"
+  }
+} 

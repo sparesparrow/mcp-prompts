@@ -89,3 +89,9 @@ pids/
 # Temporary folders
 tmp/
 temp/
+
+# Docker temporary files
+.docker-*
+
+# TypeScript build cache
+**/*.tsbuildinfo
