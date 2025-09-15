@@ -14,6 +14,7 @@
   },
   "dependencies": {
     "@sparesparrow/mcp-prompts-core": "workspace:*"
+<<<<<<< Updated upstream
   },
   "exports": {
     ".": {
@@ -21,5 +22,7 @@
       "require": "./dist/index.js",
       "types": "./dist/index.d.ts"
     }
+=======
+>>>>>>> Stashed changes
   }
 }

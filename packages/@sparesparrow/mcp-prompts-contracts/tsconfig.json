@@ -1,4 +1,5 @@
 {
+<<<<<<< Updated upstream
   "extends": "../../tsconfig.package.json",
   "compilerOptions": {
     "outDir": "dist",
@@ -7,3 +8,23 @@
   "include": ["src/**/*"],
   "exclude": ["dist", "node_modules", "tests", "**/*.test.ts"]
 }
+=======
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": [
+    "src/**/*"
+  ],
+  "references": [
+    {
+      "path": "../../core"
+    }
+  ]
+}
+>>>>>>> Stashed changes

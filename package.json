@@ -8,6 +8,7 @@
     "docs"
   ],
   "dependencies": {
+<<<<<<< Updated upstream
     "pino": "^9.7.0",
     "cors": "^2.8.5",
     "helmet": "^8.1.0",
@@ -16,6 +17,8 @@
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1",
     "uuid": "^9.0.1",
+=======
+>>>>>>> Stashed changes
     "@sparesparrow/mcp-prompts-adapters-cli": "workspace:*",
     "@sparesparrow/mcp-prompts-adapters-eta": "workspace:*",
     "@sparesparrow/mcp-prompts-adapters-file": "workspace:*",
@@ -27,6 +30,7 @@
     "@sparesparrow/mcp-prompts-catalog": "workspace:*",
     "@sparesparrow/mcp-prompts-contracts": "workspace:*",
     "@types/express": "^5.0.3",
+<<<<<<< Updated upstream
     "tsyringe": "^4.10.0",
     "axios": "^1.7.7",
     "handlebars": "^4.7.8",
@@ -37,6 +41,13 @@
   },
   "devDependencies": {
     "@modelcontextprotocol/sdk": "^1.17.2",
+=======
+    "express": "^5.1.0",
+    "tsyringe": "^4.10.0"
+  },
+  "devDependencies": {
+    "@modelcontextprotocol/sdk": "^1.13.3",
+>>>>>>> Stashed changes
     "@playwright/test": "^1.53.2",
     "@swc/cli": "^0.7.7",
     "@swc/core": "^1.12.9",
@@ -55,7 +66,12 @@
     "supertest": "^7.1.1",
     "tsx": "^4.20.3",
     "typescript": "^5.8.3",
+<<<<<<< Updated upstream
     "vitest": "^3.2.4"
+=======
+    "vitest": "^3.2.4",
+    "zod": "^3.25.71"
+>>>>>>> Stashed changes
   },
   "engines": {
     "node": ">=20.0.0",
@@ -64,7 +80,11 @@
   "scripts": {
     "setup": "bash scripts/setup.sh",
     "dev": "bash scripts/dev.sh",
+<<<<<<< Updated upstream
     "start": "cd apps/server && node dist/index.js",
+=======
+    "start": "node dist/index.js",
+>>>>>>> Stashed changes
     "build": "pnpm -r run build",
     "build:watch": "pnpm -r run build:watch",
     "typecheck": "pnpm -r run typecheck",
@@ -72,6 +92,7 @@
     "lint": "eslint . --ext .ts,.js",
     "format": "prettier --write .",
     "test": "vitest run",
+<<<<<<< Updated upstream
     "docker:build": "docker build -t mcp-prompts .",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
@@ -80,6 +101,13 @@
     "docs": "typedoc --out docs/api packages/core/src && markdown-toc -i docs/*.md",
     "prepare": "husky install",
     "release": "standard-version && git push --follow-tags origin main"
+=======
+    "test:watch": "vitest",
+    "docs": "typedoc --out docs/api src && markdown-toc -i docs/*.md",
+    "prepare": "husky install",
+    "release": "standard-version && git push --follow-tags origin main",
+    "postinstall": "npm run setup"
+>>>>>>> Stashed changes
   },
   "pnpm": {
     "overrides": {

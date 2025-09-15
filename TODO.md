@@ -192,6 +192,7 @@
 
 ## 🎯 **PHASE 1 COMPLETED** ✅
 
+<<<<<<< Updated upstream
 **Core Domain Layer Successfully Implemented:**
 - ✅ All domain entities created with Zod validation
 - ✅ Value objects implemented with immutability
@@ -211,3 +212,7 @@
 *Last updated:* 2025-01-27
 *Phase 1 Status:* ✅ COMPLETED
 *Overall Progress:* 25% (Core domain layer complete)
+=======
+- [x] FileAdapter: atomic writes, file locking, schema validation, index, robustness tests
+- [x] Restore and fix skipped/legacy core tests (sse, http-server, addPrompt)
+>>>>>>> Stashed changes

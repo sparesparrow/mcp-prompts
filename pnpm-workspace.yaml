@@ -6,11 +6,16 @@ packages:
   - 'apps/*'
   - 'docs'
   
+<<<<<<< Updated upstream
   # Exclude build artifacts, cache, and temporary files
+=======
+  # Exclude build artifacts and cache
+>>>>>>> Stashed changes
   - '!**/dist'
   - '!**/build'
   - '!**/.cache'
   - '!**/node_modules'
+<<<<<<< Updated upstream
   - '!**/*.tmp'
   - '!**/*.temp'
   - '!**/coverage'
@@ -19,3 +24,5 @@ packages:
   - '!**/.nuxt'
   - '!**/.output'
   - '!**/.vercel'
+=======
+>>>>>>> Stashed changes

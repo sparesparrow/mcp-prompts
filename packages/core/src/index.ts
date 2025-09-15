@@ -25,6 +25,7 @@ export * from './use-cases/getPromptById';
 export * from './use-cases/listPrompts';
 export * from './use-cases/updatePrompt';
 export * from './use-cases/deletePrompt';
+<<<<<<< Updated upstream
 export * from './use-cases/applyTemplate';
 export * from './use-cases/validatePrompt';
 export * from './use-cases/searchPrompts';
@@ -50,3 +51,19 @@ export * from './types';
 
 // Re-export contracts for compatibility
 export * from '@sparesparrow/mcp-prompts-contracts';
+=======
+export * from './schemas';
+export type { Prompt } from './entities/Prompt';
+export type { PromptSequence } from './entities/PromptSequence';
+export type { WorkflowExecutionState, ListPromptsOptions } from './interfaces';
+export type { IPromptRepository } from './ports/IPromptRepository';
+export type { ISequenceRepository } from './interfaces';
+export type { IPromptApplication } from './ports/IPromptApplication';
+export type { PromptId } from './value-objects/PromptId';
+export { addPrompt } from './use-cases/addPrompt';
+export { getPromptById } from './use-cases/getPromptById';
+export { listPrompts } from './use-cases/listPrompts';
+export { updatePrompt } from './use-cases/updatePrompt';
+export { deletePrompt } from './use-cases/deletePrompt';
+// ...add more as you extract
+>>>>>>> Stashed changes

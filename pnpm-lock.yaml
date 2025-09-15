@@ -37,7 +37,11 @@ importers:
         version: link:packages/adapters-rest
       '@sparesparrow/mcp-prompts-catalog':
         specifier: workspace:*
+<<<<<<< Updated upstream
         version: link:packages/@sparesparrow/mcp-prompts-catalog
+=======
+        version: link:src/core
+>>>>>>> Stashed changes
       '@sparesparrow/mcp-prompts-contracts':
         specifier: workspace:*
         version: link:packages/@sparesparrow/mcp-prompts-contracts
@@ -53,6 +57,7 @@ importers:
       express:
         specifier: ^5.1.0
         version: 5.1.0
+<<<<<<< Updated upstream
       express-rate-limit:
         specifier: ^7.4.0
         version: 7.5.1(express@5.1.0)
@@ -80,6 +85,8 @@ importers:
       swagger-ui-express:
         specifier: ^5.0.1
         version: 5.0.1(express@5.1.0)
+=======
+>>>>>>> Stashed changes
       tsyringe:
         specifier: ^4.10.0
         version: 4.10.0
@@ -150,6 +157,12 @@ importers:
       vitest:
         specifier: ^3.2.4
         version: 3.2.4(@types/node@22.16.0)(tsx@4.20.3)(yaml@2.8.0)
+<<<<<<< Updated upstream
+=======
+      zod:
+        specifier: ^3.25.71
+        version: 3.25.71
+>>>>>>> Stashed changes
 
   apps/server:
     dependencies:
@@ -179,7 +192,13 @@ importers:
         version: link:../../packages/adapters-rest
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../../packages/core
+        version: link:../../src/core
+
+  packages/@sparesparrow/mcp-prompts-contracts:
+    devDependencies:
+      typescript:
+        specifier: ^5.0.0
+        version: 5.8.3
 
   packages/@sparesparrow/mcp-prompts-catalog:
     dependencies:
@@ -217,7 +236,7 @@ importers:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
       commander:
         specifier: ^11.0.0
         version: 11.1.0
@@ -226,13 +245,13 @@ importers:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
 
   packages/adapters-file:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
       '@types/proper-lockfile':
         specifier: ^4.1.4
         version: 4.1.4
@@ -242,6 +261,12 @@ importers:
 
   packages/adapters-mcp:
     dependencies:
+<<<<<<< Updated upstream
+=======
+      '@mcp-prompts/core':
+        specifier: workspace:*
+        version: link:../../src/core
+>>>>>>> Stashed changes
       '@modelcontextprotocol/sdk':
         specifier: ^1.13.3
         version: 1.13.3
@@ -256,19 +281,19 @@ importers:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
 
   packages/adapters-memory:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
 
   packages/adapters-postgres:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
       pg:
         specifier: ^8.11.3
         version: 8.16.3
@@ -281,7 +306,7 @@ importers:
     dependencies:
       '@sparesparrow/mcp-prompts-core':
         specifier: workspace:*
-        version: link:../core
+        version: link:../../src/core
       express:
         specifier: ^4.19.0
         version: 4.21.2
@@ -289,8 +314,13 @@ importers:
   packages/core:
     dependencies:
       '@sparesparrow/mcp-prompts-catalog':
+<<<<<<< Updated upstream
         specifier: workspace:*
         version: link:../@sparesparrow/mcp-prompts-catalog
+=======
+        specifier: ^1.0.0
+        version: 1.0.0(zod@3.25.71)
+>>>>>>> Stashed changes
       '@sparesparrow/mcp-prompts-contracts':
         specifier: workspace:*
         version: link:../@sparesparrow/mcp-prompts-contracts
@@ -322,6 +352,23 @@ importers:
         specifier: ^5.0.1
         version: 5.0.1(express@5.1.0)
 
+<<<<<<< Updated upstream
+=======
+  src/core: {}
+
+  src/server:
+    dependencies:
+      '@mcp-prompts/adapters-file':
+        specifier: workspace:*
+        version: link:../../packages/adapters-file
+      '@mcp-prompts/adapters-memory':
+        specifier: workspace:*
+        version: link:../../packages/adapters-memory
+      '@mcp-prompts/core':
+        specifier: workspace:*
+        version: link:../core
+
+>>>>>>> Stashed changes
 packages:
 
   '@ampproject/remapping@2.3.0':
@@ -4591,6 +4638,14 @@ snapshots:
       openapi-types: 12.1.3
       z-schema: 5.0.5
 
+<<<<<<< Updated upstream
+=======
+  '@asteasolutions/zod-to-openapi@7.3.4(zod@3.25.71)':
+    dependencies:
+      openapi3-ts: 4.5.0
+      zod: 3.25.71
+
+>>>>>>> Stashed changes
   '@babel/code-frame@7.27.1':
     dependencies:
       '@babel/helper-validator-identifier': 7.27.1
@@ -5386,6 +5441,7 @@ snapshots:
     dependencies:
       '@sinonjs/commons': 3.0.1
 
+<<<<<<< Updated upstream
   '@swc/cli@0.1.65(@swc/core@1.12.9)':
     dependencies:
       '@mole-inc/bin-wrapper': 8.0.1
@@ -5396,6 +5452,19 @@ snapshots:
       semver: 7.7.2
       slash: 3.0.0
       source-map: 0.7.4
+=======
+  '@sparesparrow/mcp-prompts-catalog@1.0.0(zod@3.25.71)':
+    dependencies:
+      '@sparesparrow/mcp-prompts-contracts': 1.0.0(zod@3.25.71)
+    transitivePeerDependencies:
+      - zod
+
+  '@sparesparrow/mcp-prompts-contracts@1.0.0(zod@3.25.71)':
+    dependencies:
+      '@asteasolutions/zod-to-openapi': 7.3.4(zod@3.25.71)
+    transitivePeerDependencies:
+      - zod
+>>>>>>> Stashed changes
 
   '@swc/cli@0.7.7(@swc/core@1.12.9)':
     dependencies:
@@ -6380,12 +6449,15 @@ snapshots:
 
   create-require@1.1.1:
     optional: true
+<<<<<<< Updated upstream
 
   cross-spawn@5.1.0:
     dependencies:
       lru-cache: 4.1.5
       shebang-command: 1.2.0
       which: 1.3.1
+=======
+>>>>>>> Stashed changes
 
   cross-spawn@7.0.6:
     dependencies:
@@ -9195,8 +9267,11 @@ snapshots:
 
   utils-merge@1.0.1: {}
 
+<<<<<<< Updated upstream
   uuid@9.0.1: {}
 
+=======
+>>>>>>> Stashed changes
   v8-compile-cache-lib@3.0.1:
     optional: true
 

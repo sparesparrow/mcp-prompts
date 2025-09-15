@@ -1,8 +1,20 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
+<<<<<<< Updated upstream
     "outDir": "./dist", 
     "rootDir": "./src",
+=======
+    "outDir": "dist",
+    "rootDir": "src",
+    "paths": {
+      "@core/*": ["../../src/*", "../../packages/core/src/*"],
+      "@core": ["../../packages/core/src/index.ts"],
+      "@adapters-file/*": ["../../packages/adapters-file/src/*"],
+      "@adapters-memory/*": ["../../packages/adapters-memory/src/*"]
+    },
+    "baseUrl": "../../",
+>>>>>>> Stashed changes
     "composite": true,
     "declaration": true,
     "declarationMap": true,
