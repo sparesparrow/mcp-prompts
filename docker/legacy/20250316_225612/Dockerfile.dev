@@ -1,0 +1,36 @@
+# Development Dockerfile for MCP Prompts
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache curl wget bash
+
+# Create data directories with proper permissions
+RUN mkdir -p /app/data/prompts /app/data/backups /app/data/rules && \
+    chmod -R 777 /app/data
+
+# Copy health check script
+COPY docker/health-check.sh /health-check.sh
+RUN chmod +x /health-check.sh
+
+# Default environment variables
+ENV NODE_ENV=development \
+    PORT=3000 \
+    HOST=0.0.0.0 \
+    STORAGE_TYPE=file \
+    PROMPTS_DIR=/app/data/prompts \
+    BACKUPS_DIR=/app/data/backups \
+    LOG_LEVEL=debug
+
+# Health check 
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 CMD /health-check.sh
+
+# Expose ports
+EXPOSE 3000 9229
+
+# Set user
+USER node
+
+# Default command (will be overridden in docker-compose.yml)
+CMD ["npm", "run", "dev"]

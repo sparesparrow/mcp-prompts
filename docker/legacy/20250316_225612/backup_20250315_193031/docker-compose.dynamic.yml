@@ -1,0 +1,64 @@
+# Dynamic MCP servers configuration
+# Allows dynamically adding MCP servers from GitHub repositories
+
+name: mcp-prompts-dynamic
+
+services:
+  # Dynamic MCP server loader
+  mcp-dynamic:
+    image: node:20-alpine
+    container_name: mcp-dynamic
+    environment:
+      - MCP_SERVER_URLS=${MCP_SERVER_URLS:-https://github.com/modelcontextprotocol/server-memory.git}
+      - NODE_ENV=production
+    volumes:
+      - ./scripts/dynamic-loader.sh:/app/dynamic-loader.sh
+      - mcp-dynamic-servers:/servers
+    command: sh /app/dynamic-loader.sh
+    networks:
+      - mcp-dynamic-network
+    healthcheck:
+      test: ["CMD", "ls", "-la", "/servers"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+
+  # MCP Server Manager - manages multiple MCP servers
+  mcp-server-manager:
+    image: node:20-alpine
+    container_name: mcp-server-manager
+    ports:
+      - "3030:3000"
+    depends_on:
+      - mcp-dynamic
+    volumes:
+      - mcp-dynamic-servers:/servers:ro
+    environment:
+      - SERVER_PORT=3000
+      - LOG_LEVEL=info
+      - NODE_ENV=production
+    command: >
+      sh -c "cd /servers && 
+             npm install -g @modelcontextprotocol/server-manager && 
+             npx -y @modelcontextprotocol/server-manager"
+    networks:
+      - mcp-dynamic-network
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+volumes:
+  mcp-dynamic-servers:
+    name: mcp-dynamic-servers
+
+networks:
+  mcp-dynamic-network:
+    name: mcp-dynamic-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.103.0/24 

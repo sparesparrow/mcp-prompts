@@ -1,0 +1,111 @@
+# Testing environment for MCP Prompts
+# Includes test containers and monitoring
+
+name: mcp-prompts-testing
+
+services:
+  # PostgreSQL database for testing
+  postgres-test:
+    image: postgres:14-alpine
+    container_name: mcp-postgres-test
+    environment:
+      POSTGRES_USER: postgres_test
+      POSTGRES_PASSWORD: test_password
+      POSTGRES_DB: mcp_prompts_test
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres-test-data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_test"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    networks:
+      - mcp-test-network
+
+  # Unit tests runner
+  unit-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.testing
+    container_name: mcp-unit-tests
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - STORAGE_TYPE=postgres
+      - PG_HOST=postgres-test
+      - PG_PORT=5432
+      - PG_DATABASE=mcp_prompts_test
+      - PG_USER=postgres_test
+      - PG_PASSWORD=test_password
+      - PG_SSL=false
+      - TEST_MODE=unit
+    volumes:
+      - ../src:/app/src
+      - ../tests:/app/tests
+      - ../coverage:/app/coverage
+    command: npm run test:unit
+    networks:
+      - mcp-test-network
+
+  # Integration tests runner
+  integration-tests:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.testing
+    container_name: mcp-integration-tests
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - STORAGE_TYPE=postgres
+      - PG_HOST=postgres-test
+      - PG_PORT=5432
+      - PG_DATABASE=mcp_prompts_test
+      - PG_USER=postgres_test
+      - PG_PASSWORD=test_password
+      - PG_SSL=false
+      - TEST_MODE=integration
+    volumes:
+      - ../src:/app/src
+      - ../tests:/app/tests
+      - ../coverage:/app/coverage
+    command: npm run test:integration
+    networks:
+      - mcp-test-network
+
+  # Test coverage report server
+  coverage-report:
+    image: node:20-alpine
+    container_name: mcp-coverage-report
+    depends_on:
+      - unit-tests
+      - integration-tests
+    volumes:
+      - ../coverage:/app/coverage
+    working_dir: /app
+    command: npx http-server coverage/lcov-report -p 8000
+    ports:
+      - "8000:8000"
+    networks:
+      - mcp-test-network
+    profiles:
+      - with-reports
+
+volumes:
+  postgres-test-data:
+    name: mcp-postgres-test-data
+
+networks:
+  mcp-test-network:
+    name: mcp-test-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.101.0/24 

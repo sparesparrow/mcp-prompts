@@ -156,3 +156,4 @@ rm -f /tmp/mcp_session_id
 
 echo -e "${GREEN}MCP Server testing completed!${NC}"
 
+

@@ -1,0 +1,83 @@
+# PostgreSQL extension for MCP Prompts
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcp_prompts
+    ports:
+      - "5442:5432"  # External port 5442 maps to internal port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts with PostgreSQL storage
+  mcp-prompts-postgres:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=mcp_prompts
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_SSL=false
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3004
+      - HOST=0.0.0.0
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+    volumes:
+      - mcp-postgres-data:/app/data
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD-SHELL", "/health-check.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # Adminer for PostgreSQL management
+  adminer:
+    image: adminer:latest
+    container_name: mcp-adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+volumes:
+  postgres_data:
+    name: mcp-postgres-data
+  mcp-postgres-data:
+    name: mcp-prompts-postgres-data
+
+networks:
+  mcp-network:
+    name: mcp-network
+    driver: bridge
+

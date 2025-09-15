@@ -1,0 +1,29 @@
+# Testing Dockerfile for MCP Prompts
+FROM node:20-alpine AS test
+
+WORKDIR /app
+
+# Install dependencies
+RUN apk add --no-cache curl wget bash
+
+# Create necessary directories
+RUN mkdir -p /app/data/prompts /app/data/backups /app/test-results && \
+    chmod -R 777 /app/data /app/test-results
+
+# Copy source code and dependencies
+COPY package*.json ./
+COPY tsconfig.json ./
+COPY src/ ./src/
+COPY tests/ ./tests/
+
+# Install dependencies
+RUN npm ci
+
+# Default environment variables
+ENV NODE_ENV=test \
+    STORAGE_TYPE=file \
+    PROMPTS_DIR=/app/data/prompts \
+    TEST_MODE=true
+
+# Default command
+CMD ["npm", "test"]
