@@ -1,0 +1,24 @@
+# Testing Dockerfile for MCP Prompts
+# Extends the base image for running tests
+
+FROM sparesparrow/mcp-prompts-base:latest
+
+# Install additional testing tools
+RUN apk add --no-cache git
+
+# Set environment variables
+ENV NODE_ENV=test
+
+# Copy package files
+COPY package*.json ./
+RUN npm install
+
+# Copy configuration files
+COPY tsconfig.json ./
+COPY jest.config.js ./
+
+# Create coverage directory
+RUN mkdir -p coverage
+
+# Default command runs tests
+CMD ["npm", "run", "test"] 

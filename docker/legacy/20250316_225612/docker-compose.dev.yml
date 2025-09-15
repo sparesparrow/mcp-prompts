@@ -1,0 +1,84 @@
+version: '3.8'
+
+# Development environment for MCP Prompts
+# Includes hot-reloading and debugging tools
+
+name: mcp-prompts-dev
+
+services:
+  # MCP Prompts Server - Development
+  mcp-prompts-dev:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.dev
+    container_name: mcp-prompts-dev
+    environment:
+      - NODE_ENV=development
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=debug
+      - HTTP_SERVER=true
+      - PORT=3000
+      - HOST=0.0.0.0
+    volumes:
+      - ..:/app
+      - mcp-dev-data:/app/data
+      - /app/node_modules
+    ports:
+      - "3000:3000"
+      - "9229:9229" # Node.js inspector port
+    command: npm run dev
+    networks:
+      - mcp-dev-network
+
+  # PostgreSQL Database for development
+  postgres-dev:
+    image: postgres:14-alpine
+    container_name: mcp-prompts-postgres-dev
+    environment:
+      - POSTGRES_USER=mcp
+      - POSTGRES_PASSWORD=mcp_pass
+      - POSTGRES_DB=mcp_prompts
+    volumes:
+      - postgres-dev-data:/var/lib/postgresql/data
+      - ../docker/postgres/init:/docker-entrypoint-initdb.d
+    ports:
+      - "5433:5432" # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp -d mcp_prompts"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mcp-dev-network
+
+  # Adminer for PostgreSQL management
+  adminer-dev:
+    image: adminer:latest
+    container_name: mcp-adminer-dev
+    depends_on:
+      - postgres-dev
+    environment:
+      - ADMINER_DEFAULT_SERVER=postgres-dev
+    ports:
+      - "8081:8080" # Different port to avoid conflicts
+    networks:
+      - mcp-dev-network
+    profiles:
+      - with-admin
+
+volumes:
+  mcp-dev-data:
+    name: mcp-prompts-dev-data
+  postgres-dev-data:
+    name: mcp-prompts-postgres-dev-data
+
+networks:
+  mcp-dev-network:
+    name: mcp-dev-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.102.0/24
+

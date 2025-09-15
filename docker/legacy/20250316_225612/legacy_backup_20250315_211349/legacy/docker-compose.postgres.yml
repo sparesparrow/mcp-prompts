@@ -1,0 +1,76 @@
+
+name: mcp-prompts-postgres
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: mcp_prompts
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts Server with PostgreSQL Storage
+  mcp-prompts:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=postgres
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_DATABASE=mcp_prompts
+      - PG_USER=postgres
+      - PG_PASSWORD=${POSTGRES_PASSWORD:-postgres}
+      - PG_SSL=false
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+    ports:
+      - "3003:3003"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    networks:
+      - mcp-network
+
+  # Adminer for database management (optional, for development)
+  adminer:
+    image: adminer
+    container_name: mcp-adminer
+    ports:
+      - "8080:8080"
+    depends_on:
+      - postgres
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+volumes:
+  postgres-data:
+
+networks:
+  mcp-network:
+    driver: bridge 

@@ -1,0 +1,43 @@
+
+name: mcp-prompts-health-check
+
+services:
+  # MCP Prompts Server for Health Check Tests
+  mcp-prompts:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mcp-prompts-health-check
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=memory
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+      - LOG_LEVEL=debug
+    ports:
+      - "3003:3003"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+
+  # Test runner
+  test-runner:
+    build:
+      context: .
+      dockerfile: Dockerfile.test
+    container_name: mcp-health-test-runner
+    depends_on:
+      mcp-prompts:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=test
+      - TEST_DOCKER_HEALTH=true
+      - HEALTH_CHECK_URL=http://mcp-prompts:3003/health
+    command: npm test -- tests/integration/docker-health-check.test.ts
+    volumes:
+      - ./test-results:/app/test-results 

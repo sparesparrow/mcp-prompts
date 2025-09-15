@@ -1,0 +1,153 @@
+# Multiple MCP servers for integration testing
+# MCP Prompts, Memory, GitHub, Shell
+
+name: mcp-servers-integration
+
+services:
+  # MCP Prompts server with file storage
+  mcp-prompts-file:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-file
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+    volumes:
+      - mcp-prompts-data:/app/data
+    ports:
+      - "3003:3003"
+    networks:
+      - mcp-integration-network
+
+  # MCP Memory server for metadata
+  mcp-memory:
+    image: node:20-alpine
+    container_name: mcp-memory
+    working_dir: /app
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/server-memory && 
+             npx -y @modelcontextprotocol/server-memory"
+    ports:
+      - "3010:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mcp-integration-network
+
+  # MCP GitHub server for sync
+  mcp-github:
+    image: node:20-alpine
+    container_name: mcp-github
+    working_dir: /app
+    environment:
+      - GITHUB_TOKEN=${GITHUB_TOKEN:-}
+      - GITHUB_OWNER=${GITHUB_OWNER:-sparesparrow}
+      - GITHUB_REPO=${GITHUB_REPO:-mcp-prompts}
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/server-github && 
+             npx -y @modelcontextprotocol/server-github"
+    ports:
+      - "3011:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mcp-integration-network
+
+  # MCP Shell server
+  mcp-shell:
+    image: node:20-alpine
+    container_name: mcp-shell
+    command: >
+      sh -c "
+        mkdir -p /tmp/mcp-shell &&
+        cd /tmp/mcp-shell &&
+        npm init -y &&
+        npm install mcp-shell-server &&
+        npx mcp-shell-server
+      "
+    environment:
+      - ALLOW_COMMANDS=ls,cat,grep,echo,node,npm,npx
+    ports:
+      - "3006:3000"
+    networks:
+      - mcp-integration-network
+
+  # MCP Client example (can be replaced with actual client)
+  mcp-client:
+    image: node:20-alpine
+    container_name: mcp-client
+    depends_on:
+      - mcp-prompts-file
+      - mcp-memory
+      - mcp-github
+      - mcp-shell
+    command: >
+      sh -c "
+        mkdir -p /tmp/mcp-client &&
+        cd /tmp/mcp-client &&
+        npm init -y &&
+        npm install @modelcontextprotocol/client &&
+        echo 'console.log(\"MCP client ready\")' > index.js &&
+        node index.js
+      "
+    networks:
+      - mcp-integration-network
+
+  # MCP Sequential Thinking server
+  mcp-sequential-thinking:
+    image: node:20-alpine
+    container_name: mcp-sequential-thinking
+    working_dir: /app
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/server-sequential-thinking && 
+             npx -y @modelcontextprotocol/server-sequential-thinking"
+    ports:
+      - "3012:3000"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    networks:
+      - mcp-integration-network
+
+  # MCP Inspector for testing the MCP servers
+  mcp-inspector:
+    image: node:20-alpine
+    container_name: mcp-inspector
+    working_dir: /app
+    command: >
+      sh -c "npm install -g @modelcontextprotocol/inspector && 
+             npx -y @modelcontextprotocol/inspector"
+    ports:
+      - "3020:3000"
+    depends_on:
+      - mcp-memory
+      - mcp-github
+      - mcp-sequential-thinking
+    networks:
+      - mcp-integration-network
+
+volumes:
+  mcp-prompts-data:
+    name: mcp-prompts-integration-data
+
+networks:
+  mcp-integration-network:
+    name: mcp-integration-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.102.0/24 

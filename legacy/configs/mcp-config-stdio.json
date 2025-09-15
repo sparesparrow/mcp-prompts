@@ -1,0 +1,18 @@
+{
+  "servers": [
+    {
+      "id": "prompts-stdio",
+      "name": "MCP Prompts (stdio)",
+      "capabilities": ["store-prompts", "list-prompts", "search-prompts"],
+      "transport": "stdio",
+      "command": "npx @sparesparrow/mcp-prompts --stdio",
+      "env": {
+        "PROMPTS_DIR": "/home/sparrow/mcp/data/prompts",
+        "BACKUPS_DIR": "/home/sparrow/mcp/data/backups",
+        "STORAGE_TYPE": "file",
+        "ENABLE_MCP": "true"
+      },
+      "cwd": "/home/sparrow/projects/mcp-prompts"
+    }
+  ]
+} 

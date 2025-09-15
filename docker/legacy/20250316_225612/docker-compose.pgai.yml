@@ -1,0 +1,106 @@
+version: '3.8'
+
+# AI-enhanced PostgreSQL integration with pgai extension
+# This setup integrates TimescaleDB, pgai vectorizer, and Ollama
+
+name: mcp-prompts-pgai
+
+services:
+  # TimescaleDB with pgai extension
+  pgai-db:
+    image: timescale/timescaledb-ha:pg17
+    container_name: mcp-pgai-db
+    environment:
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"  # Different port to avoid conflicts
+    volumes:
+      - pgai-data:/home/postgres/pgdata/data
+    command: [ "-c", "ai.ollama_host=http://ollama:11434" ]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mcp-pgai-network
+
+  # pgai vectorizer worker
+  pgai-vectorizer:
+    image: timescale/pgai-vectorizer-worker:latest
+    container_name: mcp-pgai-vectorizer
+    environment:
+      PGAI_VECTORIZER_WORKER_DB_URL: postgres://postgres:postgres@pgai-db:5432/postgres
+      OLLAMA_HOST: http://ollama:11434
+    command: [ "--poll-interval", "5s", "--log-level", "DEBUG" ]
+    depends_on:
+      pgai-db:
+        condition: service_healthy
+    networks:
+      - mcp-pgai-network
+
+  # Ollama for local embeddings and LLM
+  ollama:
+    image: ollama/ollama
+    container_name: mcp-ollama
+    volumes:
+      - ollama-data:/root/.ollama
+    ports:
+      - "11434:11434"
+    networks:
+      - mcp-pgai-network
+
+  # MCP Prompts server with pgai integration
+  mcp-prompts-pgai:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-pgai
+    depends_on:
+      pgai-db:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=postgres
+      - PG_HOST=pgai-db
+      - PG_PORT=5432
+      - PG_DATABASE=postgres
+      - PG_USER=postgres
+      - PG_PASSWORD=postgres
+      - PG_SSL=false
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+      # Enable pgai features
+      - PGAI_ENABLED=true
+      - PGAI_EMBEDDINGS_MODEL=all-minilm  # Will use Ollama's model
+    ports:
+      - "3003:3003"
+    networks:
+      - mcp-pgai-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3003/health || exit 1"]
+
+  # Adminer for database management
+  adminer-pgai:
+    image: adminer
+    container_name: mcp-pgai-adminer
+    ports:
+      - "8082:8080"  # Different port to avoid conflicts
+    depends_on:
+      - pgai-db
+    networks:
+      - mcp-pgai-network
+    profiles:
+      - with-admin
+
+volumes:
+  pgai-data:
+    name: mcp-pgai-data
+  ollama-data:
+    name: mcp-ollama-data
+
+networks:
+  mcp-pgai-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.104.0/24 

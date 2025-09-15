@@ -145,3 +145,4 @@ echo "  -H \"Content-Type: application/json\" \\"
 echo "  -H \"Mcp-Session-Id: YOUR_SESSION_ID\" \\"
 echo "  -d '{\"jsonrpc\": \"2.0\", \"id\": 1, \"method\": \"tools/call\", \"params\": {\"name\": \"tool-name\", \"parameters\": {}}}'"
 
+

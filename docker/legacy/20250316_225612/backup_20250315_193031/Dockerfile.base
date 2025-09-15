@@ -1,0 +1,31 @@
+# Base Dockerfile for MCP Prompts
+# This serves as the foundation for all MCP Prompts images
+
+FROM node:20-alpine
+
+# Set working directory
+WORKDIR /app
+
+# Install common utilities
+RUN apk --no-cache add curl wget bash
+
+# Set environment variables
+ENV NODE_ENV=production
+
+# Create data directories with correct permissions
+RUN mkdir -p /app/data/prompts /app/data/backups /app/data/rules && \
+    touch /app/data/prompts/.keep /app/data/backups/.keep /app/data/rules/.keep && \
+    chmod -R 755 /app/data
+
+# Health check script
+COPY docker/health-check.sh /health-check.sh
+RUN chmod +x /health-check.sh
+
+# Default health check configuration
+HEALTHCHECK --interval=10s --timeout=3s --start-period=10s --retries=3 CMD /health-check.sh
+
+# Default exposed ports
+EXPOSE 3000 3003
+
+# Default command (can be overridden by derived images)
+CMD ["node", "dist/index.js"] 

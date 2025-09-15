@@ -1,0 +1,12 @@
+name: mcp-prompts-test-environment
+
+services:
+  postgres-test:
+    image: postgres:14-alpine
+    container_name: mcp-postgres-test
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcp_prompts_test
+    ports:
+      - "5432:5432" 

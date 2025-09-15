@@ -1,0 +1,194 @@
+# Master Docker Compose file for MCP Prompts
+# This file provides a base configuration
+# 
+# USAGE EXAMPLES:
+#
+# 1. Basic MCP Prompts with File Storage:
+#    docker compose up -d
+#
+# 2. Development Environment with Hot Reloading:
+#    docker compose -f docker-compose.yml -f docker/docker-compose.dev.yml up -d
+#
+# 3. Testing Environment:
+#    docker compose -f docker-compose.yml -f docker/docker-compose.test.yml up -d
+#
+# 4. Multiple MCP Servers Integration:
+#    docker compose -f docker-compose.yml -f docker/docker-compose.integration.yml up -d
+#
+# 5. Add Dynamic GitHub MCP Servers:
+#    docker compose -f docker-compose.yml -f docker/docker-compose.dynamic.yml \
+#      -e MCP_SERVER_URLS='https://github.com/modelcontextprotocol/server-memory.git,https://github.com/modelcontextprotocol/server-github.git' \
+#      up -d
+#
+# 6. With pgai PostgreSQL AI Extension:
+#    docker compose -f docker-compose.yml -f docker/docker-compose.pgai.yml up -d
+
+name: mcp-prompts
+
+services:
+  # Base image for other services to extend
+  base:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.base
+    image: sparesparrow/mcp-prompts-base:latest
+    profiles:
+      - build
+
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcp_prompts
+    ports:
+      - "5442:5432"  # External port 5442 maps to internal port 5432
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d
+      - ./docker/health-check.sh:/app/health-check.sh
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts Server with File Storage (default)
+  mcp-prompts:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.app
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+    volumes:
+      - mcp-data:/app/data
+      - ./docker/health-check.sh:/health-check.sh
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD-SHELL", "/health-check.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts Server with PostgreSQL Storage
+  mcp-postgres:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-postgres
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=postgres
+      - POSTGRES_HOST=postgres
+      - POSTGRES_PORT=5432
+      - POSTGRES_DATABASE=mcp_prompts
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_SSL=false
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=debug
+      - HTTP_SERVER=true
+      - PORT=3004
+      - HOST=0.0.0.0
+    volumes:
+      - mcp-postgres-data:/app/data
+      - ./docker/health-check.sh:/health-check.sh
+    ports:
+      - "3004:3004"
+    healthcheck:
+      test: ["CMD-SHELL", "/health-check.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts Server with MDC Storage (Cursor Rules)
+  mcp-mdc:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-mdc
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=mdc
+      - MDC_RULES_DIR=/app/data/rules
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3005
+      - HOST=0.0.0.0
+    volumes:
+      - mdc_storage:/app/data
+      - ./docker/health-check.sh:/health-check.sh
+    ports:
+      - "3005:3005"
+    healthcheck:
+      test: ["CMD-SHELL", "/health-check.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # Adminer for PostgreSQL management (optional, for development)
+  adminer:
+    image: adminer:latest
+    container_name: mcp-adminer
+    depends_on:
+      - postgres
+    ports:
+      - "8080:8080"
+    restart: unless-stopped
+    networks:
+      - mcp-network
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+    name: mcp-postgres-data
+    external: false
+  mcp-data:
+    name: mcp-prompts-data
+    external: false
+  mdc_storage:
+    name: mcp-mdc-storage
+    external: false
+  mcp-postgres-data:
+    name: mcp-prompts-postgres-data
+    external: false
+
+networks:
+  mcp-network:
+    name: mcp-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/16
+          gateway: 172.28.0.1

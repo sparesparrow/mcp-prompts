@@ -1,0 +1,73 @@
+# Core infrastructure for MCP Prompts
+# PostgreSQL database and MCP Prompts server
+
+name: mcp-prompts-core
+
+services:
+  # PostgreSQL database
+  postgres:
+    image: postgres:14-alpine
+    container_name: mcp-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: mcp_prompts
+    ports:
+      - "5442:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+  # MCP Prompts Server - Production Build
+  mcp-prompts:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+    volumes:
+      - mcp-data:/app/data
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    name: mcp-network
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 192.168.0.0/16
+          gateway: 192.168.0.1
+
+volumes:
+  postgres_data:
+    name: mcp-postgres-data
+  mcp-data:
+    name: mcp-prompts-data 
