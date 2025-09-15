@@ -1,0 +1,246 @@
+---
+description: Rules for implementing and documenting the Context Shepherd pattern for managing LLM context
+globs: ["**/DesignPatterns/Agentic/ContextShepherd.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Context Shepherd Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Context Shepherd pattern, which manages and maintains context across multiple interactions while preventing context collapse.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Context Shepherd Pattern
+**Intent**: Manage and maintain context across multiple interactions
+**Problem**: Context management challenges in LLM interactions
+**Solution**: Implementation details with context hierarchy
+```
+
+### 2. Components
+Must define:
+- Context Hierarchy Manager
+- Importance Scorer
+- Context Pruner
+- Retrieval Engine
+
+## Implementation Requirements
+
+### 1. Context Management
+```python
+class ContextShepherd:
+    def __init__(self, max_context_length: int = 4000):
+        """
+        Initialize the context shepherd.
+        
+        Args:
+            max_context_length: Maximum context length in tokens
+        """
+        self.context_hierarchy = []
+        self.max_length = max_context_length
+        self.importance_scores = {}
+
+    def add_context(self, context: str, importance_score: float) -> None:
+        """
+        Add new context with importance score.
+        
+        Args:
+            context: New context to add
+            importance_score: Importance score for prioritization
+        """
+        while self.get_total_length() + len(context) > self.max_length:
+            self.prune_least_important()
+            
+        self.context_hierarchy.append({
+            'content': context,
+            'importance': importance_score,
+            'timestamp': time.time()
+        })
+```
+
+### 2. Context Pruning
+```python
+def prune_least_important(self) -> None:
+    """Remove least important context to maintain size limits."""
+    if not self.context_hierarchy:
+        return
+        
+    # Find least important context
+    least_important = min(
+        self.context_hierarchy,
+        key=lambda x: (x['importance'], -x['timestamp'])
+    )
+    
+    # Remove it
+    self.context_hierarchy.remove(least_important)
+
+def get_total_length(self) -> int:
+    """Get total length of current context."""
+    return sum(len(item['content']) for item in self.context_hierarchy)
+```
+
+### 3. Context Retrieval
+```python
+def get_relevant_context(self, query: str) -> List[str]:
+    """
+    Get context relevant to the query.
+    
+    Args:
+        query: Query to find relevant context for
+        
+    Returns:
+        List of relevant context items
+    """
+    try:
+        # Calculate relevance scores
+        relevance_scores = self.calculate_relevance(query)
+        
+        # Return most relevant context
+        relevant_items = sorted(
+            zip(self.context_hierarchy, relevance_scores),
+            key=lambda x: x[1],
+            reverse=True
+        )
+        
+        return [item['content'] for item, _ in relevant_items[:5]]
+    except Exception as e:
+        logger.error(f"Failed to retrieve context: {str(e)}")
+        return []
+```
+
+## Validation Rules
+
+### 1. Context Management
+Must implement:
+- Size limits enforcement
+- Importance scoring
+- Timestamp tracking
+- Hierarchy maintenance
+
+### 2. Pruning Strategy
+Must include:
+- Importance-based pruning
+- Age consideration
+- Relevance checking
+- Size optimization
+
+### 3. Retrieval Quality
+Must verify:
+- Relevance accuracy
+- Response time
+- Memory efficiency
+- Context coherence
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_context_addition():
+    """Test adding context with importance scores."""
+    shepherd = ContextShepherd(max_context_length=100)
+    shepherd.add_context("test context", 0.8)
+    assert len(shepherd.context_hierarchy) == 1
+    assert shepherd.context_hierarchy[0]['importance'] == 0.8
+
+def test_context_pruning():
+    """Test context pruning when size limit exceeded."""
+    shepherd = ContextShepherd(max_context_length=20)
+    shepherd.add_context("long context string", 0.5)
+    shepherd.add_context("another string", 0.8)
+    assert len(shepherd.context_hierarchy) == 1
+    assert shepherd.context_hierarchy[0]['importance'] == 0.8
+```
+
+### 2. Integration Tests
+Must verify:
+- Memory management
+- Context relevance
+- Pruning effectiveness
+- Retrieval performance
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient pruning algorithms
+- Smart caching strategies
+- Batch processing
+- Index optimization
+
+### 2. Scaling
+- Handle large context volumes
+- Manage concurrent access
+- Implement sharding
+- Support distributed storage
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Context hierarchy
+- Pruning strategy
+- Retrieval mechanism
+- Storage approach
+
+### 2. Configuration
+Must specify:
+- Size limits
+- Scoring parameters
+- Pruning thresholds
+- Caching policies
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[New Context] --> B[Context Shepherd]
+    B --> C[Importance Scorer]
+    C --> D[Size Check]
+    D -->|Over Limit| E[Context Pruner]
+    D -->|Within Limit| F[Context Store]
+    E --> F
+    G[Query] --> H[Retrieval Engine]
+    H --> F
+    F --> I[Relevant Context]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style E fill:#e74c3c,stroke:#c0392b
+    style H fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Context management implemented
+- [ ] Pruning strategy working
+- [ ] Retrieval mechanism complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Memory tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular pruning optimization
+- Scoring improvements
+- Storage efficiency updates
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

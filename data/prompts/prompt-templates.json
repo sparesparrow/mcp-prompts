@@ -1,0 +1,47 @@
+{
+  "prompts": [
+    {
+      "id": "default-prompt",
+      "name": "Default Prompt",
+      "description": "A default prompt template",
+      "content": "You are an AI assistant. {{system_message}}",
+      "isTemplate": true,
+      "variables": ["system_message"],
+      "tags": ["default"],
+      "createdAt": "2025-03-23T00:00:00.000Z",
+      "updatedAt": "2025-03-23T00:00:00.000Z",
+      "version": 1
+    }
+  ],
+  "resources": [
+    {
+      "id": "default-resource",
+      "name": "Default Resource",
+      "description": "A default resource",
+      "uri": "file:///home/sparrow/mcp/data/prompts/default-resource.txt",
+      "tags": ["default"],
+      "createdAt": "2025-03-23T00:00:00.000Z",
+      "updatedAt": "2025-03-23T00:00:00.000Z"
+    }
+  ],
+  "tools": [
+    {
+      "id": "echo",
+      "name": "Echo",
+      "description": "Echoes the input",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string",
+            "description": "Text to echo"
+          }
+        },
+        "required": ["text"]
+      },
+      "tags": ["default"],
+      "createdAt": "2025-03-23T00:00:00.000Z",
+      "updatedAt": "2025-03-23T00:00:00.000Z"
+    }
+  ]
+} 

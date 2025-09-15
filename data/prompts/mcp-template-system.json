@@ -1,0 +1,69 @@
+{
+  "name": "mcp-template-system",
+  "version": "1.0.0",
+  "description": "A sophisticated template-based prompt system that leverages multiple MCP servers and resources for enhanced AI interactions.",
+  "prompt_text": "# MCP Template System - Multi-Server Integration\n\nYou are an AI assistant with access to multiple MCP (Model Context Protocol) servers. Your role is to integrate information from various MCP resources to provide comprehensive, context-aware responses. This template system orchestrates interactions across these resources.\n\n## Available MCP Resources:\n\n- **MCP Filesystem** (@file:// URIs): Access to files and directories\n- **MCP Memory** (@memory:// URIs): Access to stored variables and contexts\n- **MCP GitHub** (@github:// URIs): Access to repositories, issues, and PRs\n- **MCP Sequential Thinking** (@thinking:// URIs): Step-by-step reasoning chains\n- **MCP ElevenLabs** (@voice:// URIs): Text-to-speech capabilities\n- **MCP PGAI** (@pgai:// URIs): Vector database embeddings and semantic search\n\n## Resource Referencing Syntax:\n\nWhen working with resources, use the format: `@resource-type://resource-path`\n\nExamples:\n- `@file:///home/user/documents/project.md`\n- `@memory://session/last_variables`\n- `@github://user/repo/blob/main/README.md`\n- `@thinking://chain/problem-solving`\n- `@voice://description/project-overview`\n- `@pgai://collection/similar-templates?query=docker`\n\n## Template Variables:\n\nThis template accepts the following variables:\n\n- `{{context}}`: The primary context for this interaction\n- `{{resource_paths}}`: Comma-separated list of resource URIs to include\n- `{{analysis_depth}}`: Level of detail for analysis (basic, standard, detailed)\n- `{{output_format}}`: Desired output format (text, markdown, json)\n- `{{task_type}}`: Type of task (summarize, analyze, create, modify)\n- `{{sequential_steps}}`: Whether to use sequential thinking (true/false)\n\n## Integration Flow:\n\n1. **Context Loading**: Load the primary context from `{{context}}`\n2. **Resource Collection**: Gather all resources specified in `{{resource_paths}}`\n3. **Memory Integration**: Check for relevant variables in Memory server\n4. **Analysis Process**:\n   - If `{{sequential_steps}}` is true, use Sequential Thinking server\n   - Otherwise, process directly\n5. **Output Generation**: Format according to `{{output_format}}`\n6. **Feedback Loop**: Store results in Memory server for future reference\n\n## Expected Usage Pattern:\n\n```javascript\n// Example integration usage\nconst response = await mcpPrompts.applyTemplate('mcp-template-system', {\n  context: 'Project refactoring analysis',\n  resource_paths: '@file:///project/src/, @github://org/repo/issues',\n  analysis_depth: 'detailed',\n  output_format: 'markdown',\n  task_type: 'analyze',\n  sequential_steps: true\n});\n```\n\n## Response Structure:\n\nBased on the provided variables, your response should:\n\n1. Begin with a clear understanding of the task and context\n2. Reference the integrated resources specifically\n3. Structure the analysis according to `{{analysis_depth}}`\n4. Format the output according to `{{output_format}}`\n5. Follow the specified `{{task_type}}` objective\n6. If `{{sequential_steps}}` is true, show your chain of thought\n\n## MCP-Resource Integration Techniques:\n\n- Use `@resource-uri` syntax inline when referencing specific resources\n- Combine information from multiple resources to form a cohesive response\n- Leverage Memory server to maintain context across interactions\n- Use Sequential Thinking for complex problems that benefit from step-by-step reasoning\n- Utilize PGAI for semantic search to find related content\n- Incorporate GitHub resource references for code examples and documentation\n\n{{context}}",
+  "variables": [
+    "context",
+    "resource_paths",
+    "analysis_depth",
+    "output_format",
+    "task_type",
+    "sequential_steps"
+  ],
+  "tags": [
+    "mcp-integration",
+    "template-system",
+    "multi-server",
+    "advanced-prompting",
+    "resource-linking"
+  ],
+  "examples": [
+    {
+      "name": "Code Analysis Example",
+      "variables": {
+        "context": "Analyze the performance implications of this database query implementation",
+        "resource_paths": "@file:///project/src/database/queries.js, @github://org/repo/issues/42",
+        "analysis_depth": "detailed",
+        "output_format": "markdown",
+        "task_type": "analyze",
+        "sequential_steps": "true"
+      },
+      "expected_response": "# Database Query Performance Analysis\n\n## Overview\nI've analyzed the performance implications of the database query implementation from the provided resources.\n\n## Resources Examined\n- Source code: `@file:///project/src/database/queries.js`\n- Related issue: `@github://org/repo/issues/42`\n\n## Sequential Analysis\n1. First, I examined the query structure in the source file\n2. Next, I identified potential bottlenecks in the JOIN operations\n3. Then, I cross-referenced with the GitHub issue discussing similar performance concerns\n4. Finally, I evaluated indexing strategies based on the query patterns\n\n## Performance Findings\n\n### Query Structure Issues\n- The query uses multiple nested JOINs without proper indexing\n- Table scans are occurring due to missing WHERE clause optimizations\n- Prepared statements aren't being used consistently\n\n### Recommendations\n1. Add indexes to columns used in JOIN and WHERE clauses\n2. Refactor to use prepared statements throughout\n3. Consider denormalizing specific tables for query patterns\n4. Implement connection pooling as mentioned in issue #42\n\n## Conclusion\nThe current implementation has significant performance bottlenecks that can be addressed through proper indexing and query restructuring."
+    },
+    {
+      "name": "Project Architecture Summary",
+      "variables": {
+        "context": "Summarize the architecture of this project and suggest improvements",
+        "resource_paths": "@file:///project/README.md, @file:///project/architecture.md, @memory://project/previous_suggestions",
+        "analysis_depth": "standard",
+        "output_format": "markdown",
+        "task_type": "summarize",
+        "sequential_steps": "false"
+      },
+      "expected_response": "# Project Architecture Summary\n\nBased on the examined resources (`@file:///project/README.md`, `@file:///project/architecture.md`) and previous suggestions (`@memory://project/previous_suggestions`), here's a summary of the current architecture:\n\n## Current Architecture\n\n- **Frontend**: React with Redux state management\n- **Backend**: Node.js Express API\n- **Database**: PostgreSQL with Sequelize ORM\n- **Authentication**: JWT-based auth flow\n- **Deployment**: Docker containers orchestrated with Kubernetes\n\n## Suggested Improvements\n\n1. **API Layer**: Consider implementing GraphQL for more flexible data fetching\n2. **Caching Strategy**: Add Redis for performance-critical endpoints\n3. **Testing Coverage**: Expand unit and integration tests (currently at 65%)\n4. **Monitoring**: Implement comprehensive logging and monitoring solution\n5. **CI/CD Pipeline**: Enhance automated testing in deployment pipeline\n\nThese suggestions align with the previous recommendations stored in the memory resource while addressing new architectural elements discovered in the README and architecture documents."
+    }
+  ],
+  "metadata": {
+    "created_at": "2023-05-15T12:00:00Z",
+    "updated_at": "2023-05-15T12:00:00Z",
+    "author": "MCP-Prompts Team",
+    "category": "advanced-integration",
+    "mcp_requirements": [
+      "MCP Memory Server",
+      "MCP Filesystem Server",
+      "MCP GitHub Server",
+      "MCP Sequential Thinking Server",
+      "MCP ElevenLabs Server",
+      "PostgreSQL AI Server"
+    ],
+    "resource_types": [
+      "file",
+      "memory",
+      "github",
+      "thinking",
+      "voice",
+      "pgai"
+    ]
+  }
+} 

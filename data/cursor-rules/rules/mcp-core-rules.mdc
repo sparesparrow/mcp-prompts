@@ -1,0 +1,482 @@
+---
+description: Core implementation rules and guidelines for Model Context Protocol
+globs: ["src/mcp/**/*.ts"]
+---
+
+# MCP Core Implementation Rules
+
+## Client Implementation
+
+### Client Configuration
+```typescript
+interface MCPClientConfig {
+  name: string;                 // Client identifier
+  version: string;             // Client version
+  capabilities?: Capabilities; // Optional capabilities
+  options?: {
+    timeout?: number;         // Default request timeout
+    retryPolicy?: RetryPolicy; // Retry configuration
+    maxConcurrent?: number;   // Max concurrent requests
+    logLevel?: LogLevel;      // Logging configuration
+  };
+}
+
+interface RetryPolicy {
+  maxAttempts: number;
+  initialDelay: number;
+  maxDelay: number;
+  backoffFactor: number;
+  jitter?: boolean;
+}
+
+enum LogLevel {
+  DEBUG = 'debug',
+  INFO = 'info',
+  WARN = 'warn',
+  ERROR = 'error'
+}
+```
+
+### Client Implementation
+```typescript
+class MCPClient {
+  private transport: Transport;
+  private handlers: Map<string, Handler>;
+  private capabilities: Capabilities;
+  private requestQueue: RequestQueue;
+  private logger: Logger;
+
+  constructor(config: MCPClientConfig) {
+    this.validateConfig(config);
+    this.setupCapabilities(config.capabilities);
+    this.initializeHandlers();
+    this.setupRequestQueue(config.options);
+    this.configureLogging(config.options?.logLevel);
+  }
+
+  private validateConfig(config: MCPClientConfig): void {
+    if (!config.name || !config.version) {
+      throw new Error('Client name and version are required');
+    }
+    if (config.capabilities) {
+      this.validateCapabilities(config.capabilities);
+    }
+  }
+
+  private setupRequestQueue(options?: ClientOptions): void {
+    this.requestQueue = new RequestQueue({
+      maxConcurrent: options?.maxConcurrent ?? 10,
+      timeout: options?.timeout ?? 30000
+    });
+  }
+
+  async request<T>(
+    method: string,
+    params?: unknown,
+    options?: RequestOptions
+  ): Promise<T> {
+    const message = this.createRequestMessage(method, params);
+    return this.requestQueue.enqueue(
+      () => this.sendRequest<T>(message, options)
+    );
+  }
+
+  async notify(
+    method: string,
+    params?: unknown
+  ): Promise<void> {
+    const message = this.createNotificationMessage(method, params);
+    await this.transport.send(message);
+  }
+}
+```
+
+### Connection Management
+```typescript
+interface ConnectionOptions {
+  timeout?: number;
+  retryPolicy?: RetryPolicy;
+  onError?: (error: Error) => void;
+  onClose?: () => void;
+  heartbeat?: {
+    interval: number;
+    timeout: number;
+  };
+}
+
+class ConnectionManager {
+  private retryCount: number = 0;
+  private heartbeatTimer?: NodeJS.Timer;
+  private reconnectTimer?: NodeJS.Timer;
+
+  async connect(
+    transport: Transport,
+    options?: ConnectionOptions
+  ): Promise<void> {
+    try {
+      await this.negotiateCapabilities();
+      await this.initializeConnection();
+      this.setupHeartbeat(options?.heartbeat);
+      this.resetRetryCount();
+    } catch (error) {
+      await this.handleConnectionError(error, options);
+    }
+  }
+
+  private async handleConnectionError(
+    error: Error,
+    options?: ConnectionOptions
+  ): Promise<void> {
+    this.logger.error('Connection error:', error);
+    
+    if (this.shouldRetry(options?.retryPolicy)) {
+      await this.retryConnection(options);
+    } else {
+      this.handleFatalError(error);
+    }
+  }
+
+  private setupHeartbeat(
+    config?: { interval: number; timeout: number }
+  ): void {
+    if (!config) return;
+
+    this.heartbeatTimer = setInterval(async () => {
+      try {
+        await this.sendHeartbeat();
+      } catch (error) {
+        this.handleHeartbeatFailure();
+      }
+    }, config.interval);
+  }
+}
+```
+
+## Message Handling
+
+### Message Format
+```typescript
+interface Message {
+  jsonrpc: "2.0";
+  id?: string | number;
+  method?: string;
+  params?: unknown;
+  result?: unknown;
+  error?: {
+    code: number;
+    message: string;
+    data?: unknown;
+  };
+}
+
+class MessageValidator {
+  static validate(message: unknown): message is Message {
+    if (!this.hasJsonRpcVersion(message)) {
+      return false;
+    }
+
+    if (this.isRequest(message)) {
+      return this.validateRequest(message);
+    }
+
+    if (this.isResponse(message)) {
+      return this.validateResponse(message);
+    }
+
+    if (this.isNotification(message)) {
+      return this.validateNotification(message);
+    }
+
+    return false;
+  }
+}
+```
+
+### Message Processing
+```typescript
+class MessageProcessor {
+  private handlers: Map<string, Handler>;
+  private pendingRequests: Map<string | number, PendingRequest>;
+
+  async processMessage(message: Message): Promise<void> {
+    try {
+      MessageValidator.validate(message);
+      
+      if (MessageValidator.isRequest(message)) {
+        await this.processRequest(message);
+      } else if (MessageValidator.isResponse(message)) {
+        await this.processResponse(message);
+      } else if (MessageValidator.isNotification(message)) {
+        await this.processNotification(message);
+      }
+    } catch (error) {
+      this.handleProcessingError(error, message);
+    }
+  }
+}
+```
+
+## Error Handling
+
+### Error Categories
+```typescript
+enum MCPErrorCode {
+  // Protocol Errors (-32768 to -32000)
+  ParseError = -32700,
+  InvalidRequest = -32600,
+  MethodNotFound = -32601,
+  InvalidParams = -32602,
+  InternalError = -32603,
+
+  // Implementation Errors (-32000 to -31000)
+  TransportError = -32000,
+  CapabilityError = -32001,
+  ResourceError = -32002,
+  ToolError = -32003,
+  
+  // Application Errors (-31000 to -30000)
+  ValidationError = -31000,
+  AuthenticationError = -31001,
+  AuthorizationError = -31002,
+  RateLimitError = -31003,
+  ConcurrencyError = -31004
+}
+
+class MCPError extends Error {
+  constructor(
+    public code: MCPErrorCode,
+    message: string,
+    public data?: unknown,
+    public retriable: boolean = false
+  ) {
+    super(message);
+    this.name = 'MCPError';
+  }
+
+  static isRetriable(error: MCPError): boolean {
+    return error.retriable || this.isTransientError(error.code);
+  }
+
+  private static isTransientError(code: MCPErrorCode): boolean {
+    return [
+      MCPErrorCode.TransportError,
+      MCPErrorCode.RateLimitError,
+      MCPErrorCode.ConcurrencyError
+    ].includes(code);
+  }
+}
+```
+
+### Error Handler Implementation
+```typescript
+class ErrorHandler {
+  private retryManager: RetryManager;
+  private circuitBreaker: CircuitBreaker;
+  private logger: Logger;
+
+  async handleError(
+    error: Error,
+    context: ErrorContext
+  ): Promise<void> {
+    if (error instanceof MCPError) {
+      await this.handleMCPError(error, context);
+    } else {
+      await this.handleUnknownError(error, context);
+    }
+  }
+
+  private async handleMCPError(
+    error: MCPError,
+    context: ErrorContext
+  ): Promise<void> {
+    this.logger.error('MCP Error:', {
+      code: error.code,
+      message: error.message,
+      data: error.data,
+      context
+    });
+
+    if (MCPError.isRetriable(error)) {
+      await this.handleRetriableError(error, context);
+    } else {
+      await this.handleNonRetriableError(error, context);
+    }
+  }
+
+  private async handleRetriableError(
+    error: MCPError,
+    context: ErrorContext
+  ): Promise<void> {
+    if (this.circuitBreaker.isOpen()) {
+      throw new MCPError(
+        MCPErrorCode.CircuitBreakerOpen,
+        'Circuit breaker is open',
+        { originalError: error }
+      );
+    }
+
+    try {
+      await this.retryManager.retry(
+        async () => await this.executeRequest(context)
+      );
+    } catch (retryError) {
+      this.circuitBreaker.recordError();
+      throw retryError;
+    }
+  }
+}
+```
+
+## Best Practices
+
+### 1. Resource Management
+```typescript
+class ResourceManager {
+  private resources: Map<string, Resource>;
+  private locks: Map<string, Lock>;
+  private cleanupTasks: Set<CleanupTask>;
+
+  async acquireResource<T extends Resource>(
+    uri: string,
+    options?: ResourceOptions
+  ): Promise<T> {
+    const lock = await this.locks.acquire(uri);
+    try {
+      const resource = await this.loadResource<T>(uri, options);
+      this.registerCleanup(resource, lock);
+      return resource;
+    } catch (error) {
+      await lock.release();
+      throw error;
+    }
+  }
+
+  private registerCleanup(
+    resource: Resource,
+    lock: Lock
+  ): void {
+    const cleanup = new CleanupTask(async () => {
+      try {
+        await resource.dispose();
+      } finally {
+        await lock.release();
+      }
+    });
+    this.cleanupTasks.add(cleanup);
+  }
+}
+```
+
+### 2. Performance Optimization
+```typescript
+class PerformanceOptimizer {
+  private cache: Cache;
+  private batcher: RequestBatcher;
+  private rateLimiter: RateLimiter;
+
+  async optimizeRequest<T>(
+    request: Request,
+    options?: OptimizationOptions
+  ): Promise<T> {
+    // Check cache first
+    const cached = await this.cache.get(request.cacheKey);
+    if (cached) return cached;
+
+    // Apply rate limiting
+    await this.rateLimiter.acquire();
+
+    try {
+      // Batch similar requests
+      const result = await this.batcher.batch(
+        request,
+        options?.batchWindow
+      );
+
+      // Update cache
+      await this.cache.set(
+        request.cacheKey,
+        result,
+        options?.cacheTTL
+      );
+
+      return result;
+    } finally {
+      this.rateLimiter.release();
+    }
+  }
+}
+```
+
+### 3. Security Implementation
+```typescript
+class SecurityManager {
+  private validator: InputValidator;
+  private sanitizer: InputSanitizer;
+  private authManager: AuthManager;
+
+  async validateAndSecure<T>(
+    input: T,
+    context: SecurityContext
+  ): Promise<void> {
+    // Validate input
+    await this.validator.validate(input);
+
+    // Sanitize if needed
+    const sanitized = await this.sanitizer.sanitize(input);
+
+    // Check authentication
+    if (!await this.authManager.isAuthenticated(context)) {
+      throw new MCPError(
+        MCPErrorCode.AuthenticationError,
+        'Not authenticated'
+      );
+    }
+
+    // Check authorization
+    if (!await this.authManager.isAuthorized(context)) {
+      throw new MCPError(
+        MCPErrorCode.AuthorizationError,
+        'Not authorized'
+      );
+    }
+  }
+}
+```
+
+## Implementation Checklist
+
+### Setup Phase
+- [ ] Initialize client configuration
+- [ ] Setup error handling
+- [ ] Configure logging
+- [ ] Initialize security
+
+### Core Features
+- [ ] Implement message handling
+- [ ] Setup connection management
+- [ ] Configure request queuing
+- [ ] Implement retry logic
+
+### Resource Management
+- [ ] Implement resource handlers
+- [ ] Setup caching
+- [ ] Configure cleanup
+- [ ] Implement locking
+
+### Security
+- [ ] Input validation
+- [ ] Authentication
+- [ ] Authorization
+- [ ] Secure transport
+
+### Performance
+- [ ] Caching strategy
+- [ ] Request batching
+- [ ] Rate limiting
+- [ ] Connection pooling
+
+### Monitoring
+- [ ] Error tracking
+- [ ] Performance metrics
+- [ ] Health checks
+- [ ] Logging strategy 

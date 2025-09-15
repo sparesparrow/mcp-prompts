@@ -1,0 +1,248 @@
+---
+description: Rules for implementing and documenting the Chain-of-Thought Orchestrator pattern
+globs: ["**/DesignPatterns/Agentic/Chain-of-ThoughtOrchestrator.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Chain-of-Thought Orchestrator Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Chain-of-Thought Orchestrator pattern, which manages complex reasoning chains across multiple LLM calls.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Chain-of-Thought Orchestrator Pattern
+**Intent**: Manage complex reasoning chains across multiple LLM calls
+**Research Background**: Reference to papers on chain-of-thought prompting
+**Solution**: Implementation details with reasoning chain management
+```
+
+### 2. Components
+Must define:
+- Reasoning Chain Manager
+- Step Decomposer
+- Consistency Validator
+- Solution Synthesizer
+
+## Implementation Requirements
+
+### 1. Reasoning Chain Management
+```python
+class ChainOfThoughtOrchestrator:
+    def __init__(self, llm_client):
+        """
+        Initialize the orchestrator.
+        
+        Args:
+            llm_client: LLM client for generating reasoning steps
+        """
+        self.llm = llm_client
+        self.reasoning_chain = []
+        self.validation_history = []
+
+    def decompose_reasoning(self, problem: str) -> List[str]:
+        """
+        Break down complex problem into reasoning steps.
+        
+        Args:
+            problem: Complex problem to solve
+            
+        Returns:
+            List of reasoning steps
+        """
+        try:
+            steps = self.llm.generate_reasoning_steps(problem)
+            return self._validate_steps(steps)
+        except Exception as e:
+            logger.error(f"Failed to decompose reasoning: {str(e)}")
+            raise ReasoningError("Failed to decompose problem")
+```
+
+### 2. Consistency Validation
+```python
+def validate_consistency(self, reasoning: str) -> bool:
+    """
+    Validate consistency of new reasoning with previous steps.
+    
+    Args:
+        reasoning: New reasoning step to validate
+        
+    Returns:
+        bool indicating if reasoning is consistent
+    """
+    for prev_step in self.reasoning_chain:
+        if not self._check_consistency(reasoning, prev_step):
+            return False
+    return True
+
+def resolve_inconsistency(self, reasoning: str) -> str:
+    """
+    Resolve inconsistencies in reasoning.
+    
+    Args:
+        reasoning: Inconsistent reasoning to fix
+        
+    Returns:
+        Fixed reasoning
+    """
+    conflicts = self._identify_conflicts(reasoning)
+    return self.llm.resolve_conflicts(reasoning, conflicts)
+```
+
+### 3. Solution Synthesis
+```python
+def synthesize_solution(self, reasoning_chain: List[str]) -> str:
+    """
+    Synthesize final solution from reasoning chain.
+    
+    Args:
+        reasoning_chain: List of validated reasoning steps
+        
+    Returns:
+        Synthesized solution
+    """
+    try:
+        return self.llm.synthesize(
+            reasoning_chain,
+            self.validation_history
+        )
+    except Exception as e:
+        logger.error(f"Failed to synthesize solution: {str(e)}")
+        raise SynthesisError("Failed to synthesize solution")
+```
+
+## Validation Rules
+
+### 1. Reasoning Chain
+Must implement:
+- Step decomposition
+- Logical flow validation
+- Circular reasoning detection
+- Completeness checking
+
+### 2. Consistency Checks
+Must include:
+- Cross-step validation
+- Conflict detection
+- Resolution strategies
+- History tracking
+
+### 3. Solution Quality
+Must verify:
+- Logical coherence
+- Completeness
+- Relevance
+- Clarity
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_reasoning_decomposition():
+    """Test problem decomposition into steps."""
+    orchestrator = ChainOfThoughtOrchestrator(llm_client)
+    steps = orchestrator.decompose_reasoning("complex problem")
+    assert len(steps) > 0
+    assert all(isinstance(step, str) for step in steps)
+
+def test_consistency_validation():
+    """Test reasoning consistency validation."""
+    orchestrator = ChainOfThoughtOrchestrator(llm_client)
+    orchestrator.reasoning_chain = ["step1", "step2"]
+    assert orchestrator.validate_consistency("consistent step")
+    assert not orchestrator.validate_consistency("contradictory step")
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end reasoning
+- Multi-step problems
+- Error recovery
+- Solution quality
+
+## Performance Guidelines
+
+### 1. Optimization
+- Cache intermediate results
+- Implement parallel validation
+- Use async LLM calls
+- Monitor token usage
+
+### 2. Scaling
+- Handle complex problems
+- Manage long reasoning chains
+- Support concurrent orchestration
+- Implement timeouts
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Reasoning flow
+- Validation process
+- Error handling
+- Performance considerations
+
+### 2. Configuration
+Must specify:
+- LLM parameters
+- Validation thresholds
+- Timeout settings
+- Retry policies
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Problem Input] --> B[Chain Orchestrator]
+    B --> C[Step Decomposer]
+    C --> D[Reasoning Generator]
+    D --> E[Consistency Validator]
+    E -->|Valid| F[Next Step]
+    E -->|Invalid| G[Conflict Resolver]
+    G --> D
+    F --> |Complete| H[Solution Synthesizer]
+    H --> I[Final Solution]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style E fill:#e74c3c,stroke:#c0392b
+    style H fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Reasoning chain management implemented
+- [ ] Consistency validation working
+- [ ] Solution synthesis complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Edge cases covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular validation improvements
+- LLM integration updates
+- Performance optimization
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

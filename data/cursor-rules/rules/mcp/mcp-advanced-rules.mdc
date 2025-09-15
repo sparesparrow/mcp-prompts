@@ -1,0 +1,519 @@
+---
+description: Advanced MCP implementation guidelines for sampling, roots, and message patterns
+globs: ["src/mcp/**/*.ts"]
+---
+
+# MCP Advanced Implementation Rules
+
+## Sampling Implementation
+
+### Sampling Request Handler
+```typescript
+interface SamplingConfig {
+  modelPreferences?: {
+    hints?: Array<{ name?: string }>;
+    costPriority?: number;
+    speedPriority?: number;
+    intelligencePriority?: number;
+  };
+  systemPrompt?: string;
+  includeContext?: "none" | "thisServer" | "allServers";
+  temperature?: number;
+  maxTokens: number;
+  stopSequences?: string[];
+}
+
+class SamplingHandler {
+  async createMessage(messages: Anthropic.MessageParam[], config: SamplingConfig): Promise<{
+    model: string;
+    stopReason?: string;
+    role: "user" | "assistant";
+    content: {
+      type: "text" | "image";
+      text?: string;
+      data?: string;
+      mimeType?: string;
+    };
+  }> {
+    try {
+      // Initialize Anthropic client
+      const anthropic = new Anthropic({
+        apiKey: process.env.ANTHROPIC_API_KEY,
+      });
+
+      // Get model response
+      const response = await anthropic.messages.create({
+        model: "claude-3-5-sonnet-20241022",
+        max_tokens: config.maxTokens,
+        temperature: config.temperature,
+        messages,
+        system: config.systemPrompt,
+      });
+
+      return {
+        model: response.model,
+        role: "assistant",
+        content: {
+          type: "text",
+          text: response.content[0].text,
+        },
+      };
+    } catch (error) {
+      throw new Error(`Sampling failed: ${error.message}`);
+    }
+  }
+}
+```
+
+### Message Context Management
+```typescript
+class MessageContextManager {
+  private contextCache = new Map<string, any>();
+
+  async getContext(type: "thisServer" | "allServers"): Promise<any[]> {
+    if (type === "thisServer") {
+      return this.getServerContext();
+    }
+    return this.getAllServersContext();
+  }
+
+  private async getServerContext(): Promise<any[]> {
+    const context = [];
+    
+    // Add resource context
+    const resources = await this.listResources();
+    for (const resource of resources) {
+      const content = await this.readResource(resource.uri);
+      context.push({
+        type: "resource",
+        content,
+      });
+    }
+
+    // Add tool context
+    const tools = await this.listTools();
+    context.push({
+      type: "tools",
+      content: tools,
+    });
+
+    return context;
+  }
+
+  async clearContext(): Promise<void> {
+    this.contextCache.clear();
+  }
+}
+```
+
+## Roots Management
+
+### Root Configuration
+```typescript
+interface RootConfig {
+  uri: string;
+  name: string;
+  description?: string;
+}
+
+class RootManager {
+  private roots: RootConfig[] = [];
+
+  addRoot(root: RootConfig): void {
+    if (!this.isValidRootUri(root.uri)) {
+      throw new Error(`Invalid root URI: ${root.uri}`);
+    }
+    this.roots.push(root);
+  }
+
+  removeRoot(uri: string): void {
+    this.roots = this.roots.filter(root => root.uri !== uri);
+  }
+
+  getRoots(): RootConfig[] {
+    return [...this.roots];
+  }
+
+  private isValidRootUri(uri: string): boolean {
+    try {
+      new URL(uri);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+}
+```
+
+### Root-Based Resource Resolution
+```typescript
+class RootBasedResourceResolver {
+  constructor(private rootManager: RootManager) {}
+
+  async resolveResource(uri: string): Promise<string> {
+    const roots = this.rootManager.getRoots();
+    
+    for (const root of roots) {
+      if (uri.startsWith(root.uri)) {
+        return this.resolveRelativePath(root.uri, uri);
+      }
+    }
+    
+    throw new Error(`No matching root found for URI: ${uri}`);
+  }
+
+  private resolveRelativePath(rootUri: string, resourceUri: string): string {
+    return resourceUri.replace(rootUri, '').replace(/^\//, '');
+  }
+}
+```
+
+## Advanced Message Patterns
+
+### Request-Response Handler
+```typescript
+class RequestResponseHandler {
+  private pendingRequests = new Map<string, {
+    resolve: (value: any) => void;
+    reject: (error: Error) => void;
+    timeout: NodeJS.Timeout;
+  }>();
+
+  async sendRequest<T>(
+    method: string, 
+    params: any, 
+    timeoutMs: number = 30000
+  ): Promise<T> {
+    const requestId = crypto.randomUUID();
+
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        this.handleTimeout(requestId);
+      }, timeoutMs);
+
+      this.pendingRequests.set(requestId, { resolve, reject, timeout });
+
+      try {
+        this.transport.send({
+          jsonrpc: "2.0",
+          id: requestId,
+          method,
+          params,
+        });
+      } catch (error) {
+        this.cleanupRequest(requestId);
+        reject(error);
+      }
+    });
+  }
+
+  handleResponse(response: any): void {
+    const request = this.pendingRequests.get(response.id);
+    if (request) {
+      this.cleanupRequest(response.id);
+      if (response.error) {
+        request.reject(new Error(response.error.message));
+      } else {
+        request.resolve(response.result);
+      }
+    }
+  }
+
+  private handleTimeout(requestId: string): void {
+    const request = this.pendingRequests.get(requestId);
+    if (request) {
+      this.cleanupRequest(requestId);
+      request.reject(new Error("Request timeout"));
+    }
+  }
+
+  private cleanupRequest(requestId: string): void {
+    const request = this.pendingRequests.get(requestId);
+    if (request) {
+      clearTimeout(request.timeout);
+      this.pendingRequests.delete(requestId);
+    }
+  }
+}
+```
+
+### Notification Handler
+```typescript
+class NotificationHandler {
+  private subscribers = new Map<string, Set<(params: any) => void>>();
+
+  subscribe(method: string, callback: (params: any) => void): () => void {
+    if (!this.subscribers.has(method)) {
+      this.subscribers.set(method, new Set());
+    }
+    
+    this.subscribers.get(method)!.add(callback);
+    
+    return () => {
+      const callbacks = this.subscribers.get(method);
+      if (callbacks) {
+        callbacks.delete(callback);
+        if (callbacks.size === 0) {
+          this.subscribers.delete(method);
+        }
+      }
+    };
+  }
+
+  handleNotification(method: string, params: any): void {
+    const callbacks = this.subscribers.get(method);
+    if (callbacks) {
+      for (const callback of callbacks) {
+        try {
+          callback(params);
+        } catch (error) {
+          console.error(`Error in notification handler: ${error.message}`);
+        }
+      }
+    }
+  }
+}
+```
+
+### Progress Reporting
+```typescript
+class ProgressReporter {
+  private progressTokens = new Map<string, {
+    total: number;
+    current: number;
+    onProgress: (progress: number) => void;
+  }>();
+
+  createProgressToken(
+    total: number,
+    onProgress: (progress: number) => void
+  ): string {
+    const token = crypto.randomUUID();
+    this.progressTokens.set(token, {
+      total,
+      current: 0,
+      onProgress,
+    });
+    return token;
+  }
+
+  updateProgress(token: string, increment: number): void {
+    const progress = this.progressTokens.get(token);
+    if (progress) {
+      progress.current = Math.min(progress.current + increment, progress.total);
+      progress.onProgress(progress.current / progress.total);
+      
+      if (progress.current >= progress.total) {
+        this.progressTokens.delete(token);
+      }
+    }
+  }
+}
+```
+
+## Integration Patterns
+
+### Message Queue
+```typescript
+class MessageQueue {
+  private queue: Array<{
+    message: any;
+    priority: number;
+  }> = [];
+
+  enqueue(message: any, priority: number = 0): void {
+    this.queue.push({ message, priority });
+    this.queue.sort((a, b) => b.priority - a.priority);
+  }
+
+  async processQueue(
+    handler: (message: any) => Promise<void>
+  ): Promise<void> {
+    while (this.queue.length > 0) {
+      const item = this.queue.shift();
+      if (item) {
+        try {
+          await handler(item.message);
+        } catch (error) {
+          console.error(`Queue processing error: ${error.message}`);
+        }
+      }
+    }
+  }
+}
+```
+
+### Connection State Manager
+```typescript
+class ConnectionStateManager {
+  private state: "disconnected" | "connecting" | "connected" | "error" = "disconnected";
+  private listeners = new Set<(state: string) => void>();
+
+  setState(newState: typeof this.state): void {
+    this.state = newState;
+    this.notifyListeners();
+  }
+
+  getState(): typeof this.state {
+    return this.state;
+  }
+
+  addListener(callback: (state: string) => void): () => void {
+    this.listeners.add(callback);
+    return () => this.listeners.delete(callback);
+  }
+
+  private notifyListeners(): void {
+    for (const listener of this.listeners) {
+      listener(this.state);
+    }
+  }
+}
+```
+
+## Best Practices
+
+### Error Recovery
+```typescript
+class ErrorRecoveryManager {
+  private retryDelays = [1000, 2000, 5000, 10000];
+  private retryAttempts = new Map<string, number>();
+
+  async withRetry<T>(
+    operation: () => Promise<T>,
+    operationId: string
+  ): Promise<T> {
+    const attempt = this.retryAttempts.get(operationId) || 0;
+
+    try {
+      const result = await operation();
+      this.retryAttempts.delete(operationId);
+      return result;
+    } catch (error) {
+      if (attempt >= this.retryDelays.length) {
+        this.retryAttempts.delete(operationId);
+        throw error;
+      }
+
+      await new Promise(resolve => 
+        setTimeout(resolve, this.retryDelays[attempt])
+      );
+
+      this.retryAttempts.set(operationId, attempt + 1);
+      return this.withRetry(operation, operationId);
+    }
+  }
+}
+```
+
+### Resource Cleanup
+```typescript
+class ResourceCleanupManager {
+  private cleanupTasks = new Set<() => Promise<void>>();
+
+  registerCleanup(task: () => Promise<void>): void {
+    this.cleanupTasks.add(task);
+  }
+
+  async cleanup(): Promise<void> {
+    const tasks = Array.from(this.cleanupTasks);
+    this.cleanupTasks.clear();
+
+    await Promise.allSettled(tasks.map(task => task()));
+  }
+}
+```
+
+## Testing
+
+### Sampling Tests
+```typescript
+describe('SamplingHandler', () => {
+  let handler: SamplingHandler;
+
+  beforeEach(() => {
+    handler = new SamplingHandler();
+  });
+
+  test('creates message with context', async () => {
+    const result = await handler.createMessage(
+      [{ role: 'user', content: 'test' }],
+      {
+        maxTokens: 100,
+        includeContext: 'thisServer'
+      }
+    );
+
+    expect(result.model).toBeDefined();
+    expect(result.content.type).toBe('text');
+  });
+});
+```
+
+### Root Management Tests
+```typescript
+describe('RootManager', () => {
+  let manager: RootManager;
+
+  beforeEach(() => {
+    manager = new RootManager();
+  });
+
+  test('validates root URIs', () => {
+    expect(() => 
+      manager.addRoot({
+        uri: 'invalid-uri',
+        name: 'test'
+      })
+    ).toThrow();
+
+    expect(() =>
+      manager.addRoot({
+        uri: 'file:///valid/path',
+        name: 'test'
+      })
+    ).not.toThrow();
+  });
+});
+```
+
+## Performance Optimization
+
+### Message Batching
+```typescript
+class MessageBatcher {
+  private batch: any[] = [];
+  private batchTimeout: NodeJS.Timeout | null = null;
+  private maxBatchSize = 50;
+  private batchTimeoutMs = 100;
+
+  addToBatch(message: any): void {
+    this.batch.push(message);
+
+    if (this.batch.length >= this.maxBatchSize) {
+      this.flushBatch();
+    } else if (!this.batchTimeout) {
+      this.batchTimeout = setTimeout(
+        () => this.flushBatch(),
+        this.batchTimeoutMs
+      );
+    }
+  }
+
+  private async flushBatch(): Promise<void> {
+    if (this.batchTimeout) {
+      clearTimeout(this.batchTimeout);
+      this.batchTimeout = null;
+    }
+
+    const messages = [...this.batch];
+    this.batch = [];
+
+    await this.processBatch(messages);
+  }
+
+  private async processBatch(messages: any[]): Promise<void> {
+    // Process batched messages
+  }
+}
+```

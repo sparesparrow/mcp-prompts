@@ -1,0 +1,264 @@
+---
+description: Rules for implementing and documenting the Memory Cascade pattern for LLM memory management
+globs: ["**/DesignPatterns/Agentic/MemoryCascade.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Memory Cascade Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Memory Cascade pattern, which organizes different types of LLM memory in a way that mirrors human cognitive architecture.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Memory Cascade Pattern
+**Intent**: Organize different types of LLM memory in a cognitive-inspired hierarchy
+**Problem**: Different types of information require different retention strategies
+**Solution**: Implementation details with cascading memory system
+```
+
+### 2. Components
+Must define:
+- Working Memory Manager
+- Short-term Memory Store
+- Long-term Memory Store
+- Memory Router
+
+## Implementation Requirements
+
+### 1. Memory Hierarchy
+```python
+class MemoryCascade:
+    def __init__(self):
+        """Initialize the memory cascade system."""
+        self.working_memory = WorkingMemory(max_size=1000)
+        self.short_term = ShortTermMemory(max_size=10000)
+        self.long_term = LongTermMemory(vector_store=VectorDB())
+        self.router = MemoryRouter()
+
+    def process_information(self, info: Dict[str, Any]) -> None:
+        """
+        Process new information through memory cascade.
+        
+        Args:
+            info: Information to process
+        """
+        try:
+            # Route to appropriate memory store
+            memory_type = self.router.determine_memory_type(info)
+            
+            if memory_type == MemoryType.WORKING:
+                self.working_memory.store(info)
+            elif memory_type == MemoryType.SHORT_TERM:
+                self.short_term.store(info)
+            else:
+                self.long_term.store(info)
+                
+        except Exception as e:
+            logger.error(f"Failed to process information: {str(e)}")
+            raise MemoryProcessingError("Failed to process information")
+```
+
+### 2. Memory Management
+```python
+class WorkingMemory:
+    def __init__(self, max_size: int):
+        """
+        Initialize working memory.
+        
+        Args:
+            max_size: Maximum items in working memory
+        """
+        self.max_size = max_size
+        self.items = []
+        
+    def store(self, item: Dict[str, Any]) -> None:
+        """
+        Store item in working memory.
+        
+        Args:
+            item: Item to store
+        """
+        if len(self.items) >= self.max_size:
+            self._cascade_to_short_term()
+        self.items.append(item)
+        
+    def _cascade_to_short_term(self) -> None:
+        """Cascade oldest items to short-term memory."""
+        items_to_cascade = self.items[:len(self.items)//2]
+        self.items = self.items[len(self.items)//2:]
+        short_term.store_batch(items_to_cascade)
+```
+
+### 3. Memory Retrieval
+```python
+def retrieve_information(self, query: str) -> List[Dict[str, Any]]:
+    """
+    Retrieve information from appropriate memory stores.
+    
+    Args:
+        query: Query to search for
+        
+    Returns:
+        List of relevant information items
+    """
+    try:
+        # Search all memory stores
+        working_results = self.working_memory.search(query)
+        short_term_results = self.short_term.search(query)
+        long_term_results = self.long_term.search(query)
+        
+        # Combine and rank results
+        all_results = self._combine_results([
+            working_results,
+            short_term_results,
+            long_term_results
+        ])
+        
+        return self._rank_results(all_results)
+    except Exception as e:
+        logger.error(f"Failed to retrieve information: {str(e)}")
+        return []
+```
+
+## Validation Rules
+
+### 1. Memory Organization
+Must implement:
+- Clear memory boundaries
+- Cascade mechanisms
+- Size management
+- Priority handling
+
+### 2. Information Flow
+Must include:
+- Proper routing
+- Cascade triggers
+- Cleanup processes
+- Recovery mechanisms
+
+### 3. Retrieval Quality
+Must verify:
+- Search accuracy
+- Response time
+- Memory coherence
+- Result ranking
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_memory_cascade():
+    """Test memory cascade mechanisms."""
+    cascade = MemoryCascade()
+    cascade.process_information({"data": "test"})
+    assert len(cascade.working_memory.items) == 1
+    
+    # Fill working memory
+    for i in range(1000):
+        cascade.process_information({"data": f"test{i}"})
+    
+    # Verify cascade
+    assert len(cascade.working_memory.items) < 1000
+    assert len(cascade.short_term.items) > 0
+
+def test_information_retrieval():
+    """Test information retrieval across memory stores."""
+    cascade = MemoryCascade()
+    cascade.process_information({"data": "unique test"})
+    results = cascade.retrieve_information("unique test")
+    assert len(results) > 0
+    assert results[0]["data"] == "unique test"
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end processing
+- Cascade behavior
+- Retrieval performance
+- Error handling
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient memory management
+- Smart cascading
+- Indexed retrieval
+- Batch processing
+
+### 2. Scaling
+- Handle large memory volumes
+- Support concurrent access
+- Manage memory pressure
+- Implement cleanup
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Memory hierarchy
+- Cascade mechanisms
+- Retrieval process
+- Cleanup strategies
+
+### 2. Configuration
+Must specify:
+- Memory size limits
+- Cascade thresholds
+- Cleanup policies
+- Search parameters
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[New Information] --> B[Memory Router]
+    B --> C[Working Memory]
+    C -->|Cascade| D[Short-term Memory]
+    D -->|Cascade| E[Long-term Memory]
+    F[Query] --> G[Retrieval Engine]
+    G --> C & D & E
+    C & D & E -->|Results| H[Result Ranker]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style G fill:#e74c3c,stroke:#c0392b
+    style H fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Memory hierarchy implemented
+- [ ] Cascade mechanisms working
+- [ ] Retrieval system functional
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Memory tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular memory optimization
+- Cascade efficiency improvements
+- Retrieval performance updates
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

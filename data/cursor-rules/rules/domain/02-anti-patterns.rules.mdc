@@ -1,0 +1,158 @@
+---
+description: Rules for documenting and preventing common anti-patterns in AI agent development
+globs: ["**/DesignPatterns/Agentic/Anti-patterns.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Anti-patterns Documentation Rules
+
+## Overview
+These rules define specific requirements for documenting AI development anti-patterns and their solutions.
+
+## Required Sections
+
+### 1. Anti-pattern Structure
+Each anti-pattern must be documented with:
+```markdown
+### Anti-pattern Name
+**Problem**: Clear description of the issue
+**Solution**: Concrete steps to address the problem
+**Example**: Code or scenario demonstrating the issue and solution
+```
+
+### 2. Categories
+Anti-patterns must be categorized into:
+- Context Management
+- Security
+- Performance
+- Architecture
+- Implementation
+
+### 3. Validation Rules
+Each anti-pattern must include:
+- Detection methods
+- Prevention strategies
+- Recovery procedures
+
+## Code Examples
+
+### 1. Bad Practice Example
+Must show the problematic implementation:
+```python
+# BAD: Context flooding example
+def process_query(query: str, context: List[str]) -> str:
+    # Dumps all context without filtering
+    full_context = "\n".join(context)  # Could exceed token limits
+    return llm.generate(query + full_context)
+```
+
+### 2. Good Practice Example
+Must show the corrected implementation:
+```python
+# GOOD: Proper context management
+def process_query(query: str, context: List[str]) -> str:
+    # Filter and prioritize relevant context
+    relevant_context = context_manager.filter_relevant(query, context)
+    if len(relevant_context) > MAX_CONTEXT_LENGTH:
+        relevant_context = context_manager.prioritize(relevant_context)
+    return llm.generate(query + relevant_context)
+```
+
+## Implementation Guidelines
+
+### 1. Context Management
+- Implement context pruning
+- Use relevance scoring
+- Monitor token usage
+- Implement cleanup mechanisms
+
+### 2. Security
+- Validate all inputs
+- Sanitize prompts
+- Implement rate limiting
+- Use proper authentication
+
+### 3. Performance
+- Cache responses appropriately
+- Implement timeouts
+- Monitor resource usage
+- Use async where appropriate
+
+### 4. Architecture
+- Maintain separation of concerns
+- Implement proper error handling
+- Use appropriate design patterns
+- Follow SOLID principles
+
+## Testing Requirements
+
+### 1. Anti-pattern Tests
+Must include tests that:
+- Verify anti-pattern detection
+- Validate prevention mechanisms
+- Test recovery procedures
+
+Example:
+```python
+def test_context_flooding_prevention():
+    """Test that context flooding is prevented."""
+    large_context = ["context"] * 1000
+    result = process_query("test", large_context)
+    assert len(result.context) <= MAX_CONTEXT_LENGTH
+```
+
+### 2. Security Tests
+Must include:
+- Prompt injection tests
+- Memory leakage tests
+- Authentication tests
+- Rate limiting tests
+
+## Documentation Guidelines
+
+### 1. Examples
+- Include real-world scenarios
+- Show before/after implementations
+- Provide performance metrics
+- Document security implications
+
+### 2. Solutions
+- Provide step-by-step remediation
+- Include code snippets
+- Reference related patterns
+- List alternative approaches
+
+## Validation Checklist
+
+1. Structure
+- [ ] Each anti-pattern has Problem/Solution sections
+- [ ] Code examples show bad and good practices
+- [ ] Implementation guidelines are provided
+- [ ] Testing requirements are specified
+
+2. Content
+- [ ] Clear problem description
+- [ ] Concrete solution steps
+- [ ] Working code examples
+- [ ] Comprehensive tests
+
+3. Security
+- [ ] Input validation covered
+- [ ] Authentication addressed
+- [ ] Rate limiting discussed
+- [ ] Error handling specified
+
+## Review Process
+
+1. Documentation Review
+- Verify all sections are complete
+- Check code examples work
+- Validate security measures
+- Confirm testing coverage
+
+2. Implementation Review
+- Test anti-pattern detection
+- Verify prevention mechanisms
+- Validate recovery procedures
+- Check performance impact 

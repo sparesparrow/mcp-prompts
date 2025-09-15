@@ -1,0 +1,269 @@
+---
+description: Rules for implementing and documenting the Knowledge Graph Augmenter pattern for LLMs
+globs: ["**/DesignPatterns/Agentic/KnowledgeGraphAugmenter.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Knowledge Graph Augmenter Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Knowledge Graph Augmenter pattern, which enhances LLM responses with structured knowledge graph information.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Knowledge Graph Augmenter Pattern
+**Intent**: Enhance LLM responses with structured knowledge graph information
+**Research Background**: Reference to papers on knowledge graphs and LLMs
+**Solution**: Implementation details with graph integration
+```
+
+### 2. Components
+Must define:
+- Graph Query Engine
+- Context Augmenter
+- Response Enhancer
+- Knowledge Manager
+
+## Implementation Requirements
+
+### 1. Graph Integration
+```python
+class KnowledgeGraphAugmenter:
+    def __init__(self, knowledge_graph, llm_client):
+        """
+        Initialize the knowledge graph augmenter.
+        
+        Args:
+            knowledge_graph: Knowledge graph interface
+            llm_client: LLM client for response generation
+        """
+        self.graph = knowledge_graph
+        self.llm = llm_client
+        self.cache = {}
+
+    def query_graph(self, query: str) -> List[Dict]:
+        """
+        Query knowledge graph for relevant nodes.
+        
+        Args:
+            query: Query to find relevant knowledge
+            
+        Returns:
+            List of relevant graph nodes
+        """
+        try:
+            # Check cache first
+            cache_key = self._generate_cache_key(query)
+            if cache_key in self.cache:
+                return self.cache[cache_key]
+            
+            # Query graph
+            nodes = self.graph.semantic_search(query)
+            
+            # Cache results
+            self.cache[cache_key] = nodes
+            return nodes
+        except Exception as e:
+            logger.error(f"Failed to query graph: {str(e)}")
+            raise GraphQueryError("Failed to query knowledge graph")
+```
+
+### 2. Context Augmentation
+```python
+def create_augmented_context(
+    self,
+    initial_response: str,
+    relevant_nodes: List[Dict]
+) -> str:
+    """
+    Create augmented context from graph nodes.
+    
+    Args:
+        initial_response: Initial LLM response
+        relevant_nodes: Relevant knowledge graph nodes
+        
+    Returns:
+        Augmented context string
+    """
+    try:
+        # Extract relevant information
+        knowledge = self._extract_knowledge(relevant_nodes)
+        
+        # Create augmented context
+        return self._combine_knowledge(
+            initial_response,
+            knowledge,
+            max_length=self.max_context_length
+        )
+    except Exception as e:
+        logger.error(f"Failed to augment context: {str(e)}")
+        raise AugmentationError("Failed to create augmented context")
+```
+
+### 3. Response Enhancement
+```python
+def enhance_response(self, query: str, initial_response: str) -> str:
+    """
+    Enhance response with knowledge graph information.
+    
+    Args:
+        query: Original query
+        initial_response: Initial LLM response
+        
+    Returns:
+        Enhanced response
+    """
+    try:
+        # Query graph
+        relevant_nodes = self.query_graph(query)
+        
+        # Create augmented context
+        augmented_context = self.create_augmented_context(
+            initial_response,
+            relevant_nodes
+        )
+        
+        # Generate enhanced response
+        return self.llm.generate_with_context(
+            query,
+            augmented_context
+        )
+    except Exception as e:
+        logger.error(f"Failed to enhance response: {str(e)}")
+        return initial_response  # Fallback to initial response
+```
+
+## Validation Rules
+
+### 1. Graph Integration
+Must implement:
+- Semantic search
+- Node relevance scoring
+- Cache management
+- Error handling
+
+### 2. Context Management
+Must include:
+- Knowledge extraction
+- Context combination
+- Size limitations
+- Relevance filtering
+
+### 3. Response Quality
+Must verify:
+- Knowledge accuracy
+- Response coherence
+- Information integration
+- Fallback handling
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_graph_query():
+    """Test knowledge graph querying."""
+    augmenter = KnowledgeGraphAugmenter(graph, llm_client)
+    nodes = augmenter.query_graph("test query")
+    assert len(nodes) > 0
+    assert all('id' in node for node in nodes)
+
+def test_context_augmentation():
+    """Test context augmentation with graph knowledge."""
+    augmenter = KnowledgeGraphAugmenter(graph, llm_client)
+    nodes = [{'id': 1, 'content': 'test knowledge'}]
+    context = augmenter.create_augmented_context("initial", nodes)
+    assert len(context) > len("initial")
+    assert "test knowledge" in context
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end enhancement
+- Cache effectiveness
+- Error recovery
+- Response quality
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient graph queries
+- Smart caching
+- Batch processing
+- Memory management
+
+### 2. Scaling
+- Handle large graphs
+- Support concurrent queries
+- Manage cache size
+- Implement timeouts
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Graph integration
+- Query processing
+- Context augmentation
+- Response enhancement
+
+### 2. Configuration
+Must specify:
+- Graph parameters
+- Cache settings
+- Timeout limits
+- Fallback policies
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Query] --> B[Knowledge Graph Augmenter]
+    B --> C[Graph Query Engine]
+    C --> D[Knowledge Graph]
+    D --> E[Context Augmenter]
+    F[Initial Response] --> E
+    E --> G[Response Enhancer]
+    G --> H[Enhanced Response]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style E fill:#e74c3c,stroke:#c0392b
+    style G fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Graph integration complete
+- [ ] Context augmentation working
+- [ ] Response enhancement functional
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Cache tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular graph optimization
+- Cache efficiency improvements
+- Query performance updates
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

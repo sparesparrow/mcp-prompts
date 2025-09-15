@@ -1,0 +1,427 @@
+---
+description: Guidelines for implementing MCP clients in Podman Desktop extensions with Node.js
+globs: ["src/**/*.ts", "src/mcp/**/*.ts"]
+---
+
+# MCP Client Implementation Rules
+
+## Project Structure
+
+### Directory Organization
+```
+src/
+├── extension.ts
+├── mcp/
+│   ├── client.ts
+│   ├── types.ts
+│   └── utils/
+│       ├── config.ts
+│       └── tools.ts
+└── webview/
+    └── components/
+        └── mcp-interface.tsx
+```
+
+## Dependencies Setup
+
+### Required Packages
+```json
+{
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "latest",
+    "@anthropic-ai/sdk": "latest",
+    "dotenv": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "typescript": "latest"
+  }
+}
+```
+
+## MCP Client Implementation
+
+### Client Class Structure
+```typescript
+import { Client } from "@modelcontextprotocol/sdk/client/index.js";
+import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import Anthropic from "@anthropic-ai/sdk";
+import * as podmanDesktopAPI from '@podman-desktop/api';
+
+interface MCPClientConfig {
+  name?: string;
+  version?: string;
+  extensionContext: podmanDesktopAPI.ExtensionContext;
+}
+
+export class MCPClient {
+  private client: Client | null = null;
+  private anthropic: Anthropic;
+  private transport: StdioClientTransport | null = null;
+  private extensionContext: podmanDesktopAPI.ExtensionContext;
+
+  constructor(config: MCPClientConfig) {
+    this.anthropic = new Anthropic({
+      apiKey: process.env.ANTHROPIC_API_KEY,
+    });
+    this.extensionContext = config.extensionContext;
+  }
+
+  // Implementation methods below...
+}
+```
+
+### Server Connection Management
+```typescript
+async connectToServer(serverScriptPath: string): Promise<void> {
+  try {
+    const isPython = serverScriptPath.endsWith(".py");
+    const isJs = serverScriptPath.endsWith(".js");
+
+    if (!isPython && !isJs) {
+      throw new Error("Server script must be a .py or .js file");
+    }
+
+    const command = isPython ? "python" : "node";
+    
+    // Create transport
+    this.transport = new StdioClientTransport({
+      command,
+      args: [serverScriptPath],
+    });
+
+    // Initialize client
+    this.client = new Client(
+      {
+        name: "podman-desktop-mcp-client",
+        version: "1.0.0",
+      },
+      {
+        capabilities: {},
+      }
+    );
+
+    await this.client.connect(this.transport);
+
+    // Log connection in Podman Desktop
+    await podmanDesktopAPI.window.showInformationMessage(
+      `Connected to MCP server: ${serverScriptPath}`
+    );
+  } catch (error) {
+    await podmanDesktopAPI.window.showErrorMessage(
+      `Failed to connect to MCP server: ${error.message}`
+    );
+    throw error;
+  }
+}
+```
+
+### Query Processing
+```typescript
+async processQuery(query: string): Promise<string> {
+  if (!this.client) {
+    throw new Error("Client not connected");
+  }
+
+  try {
+    // Initialize messages array
+    let messages: Anthropic.MessageParam[] = [
+      {
+        role: "user",
+        content: query,
+      },
+    ];
+
+    // Get available tools
+    const toolsResponse = await this.client.request(
+      { method: "tools/list" },
+      ListToolsResultSchema
+    );
+
+    const availableTools = this.formatTools(toolsResponse.tools);
+    const finalText: string[] = [];
+
+    // Get initial response
+    let currentResponse = await this.anthropic.messages.create({
+      model: "claude-3-5-sonnet-20241022",
+      max_tokens: 1000,
+      messages,
+      tools: availableTools,
+    });
+
+    // Process response and handle tool calls
+    while (true) {
+      const processed = await this.processResponse(currentResponse, messages);
+      
+      if (!processed.continuationNeeded) {
+        finalText.push(processed.text);
+        break;
+      }
+
+      finalText.push(processed.text);
+      messages = processed.updatedMessages;
+      currentResponse = processed.nextResponse;
+    }
+
+    return finalText.join("\n");
+  } catch (error) {
+    await podmanDesktopAPI.window.showErrorMessage(
+      `Query processing failed: ${error.message}`
+    );
+    throw error;
+  }
+}
+```
+
+### Tool Execution
+```typescript
+private async executeTool(
+  toolName: string, 
+  toolArgs: any, 
+  toolUseId: string
+): Promise<{
+  result: any;
+  messages: Anthropic.MessageParam[];
+}> {
+  try {
+    const result = await this.client!.request(
+      {
+        method: "tools/call",
+        params: {
+          name: toolName,
+          arguments: toolArgs,
+        },
+      },
+      CallToolResultSchema
+    );
+
+    // Format messages for Claude
+    const messages: Anthropic.MessageParam[] = [
+      {
+        role: "user",
+        content: [
+          {
+            type: "tool_result",
+            tool_use_id: toolUseId,
+            content: [
+              { type: "text", text: JSON.stringify(result.content) },
+            ],
+          },
+        ],
+      },
+    ];
+
+    return { result, messages };
+  } catch (error) {
+    await podmanDesktopAPI.window.showErrorMessage(
+      `Tool execution failed: ${error.message}`
+    );
+    throw error;
+  }
+}
+```
+
+### Resource Cleanup
+```typescript
+async cleanup(): Promise<void> {
+  try {
+    if (this.transport) {
+      await this.transport.close();
+    }
+    this.client = null;
+    this.transport = null;
+  } catch (error) {
+    console.error('Cleanup error:', error);
+  }
+}
+```
+
+## Integration with Podman Desktop
+
+### Extension Activation
+```typescript
+export async function activate(context: podmanDesktopAPI.ExtensionContext): Promise<void> {
+  // Create MCP client
+  const mcpClient = new MCPClient({
+    name: 'podman-desktop-mcp',
+    version: '1.0.0',
+    extensionContext: context,
+  });
+
+  // Register command to connect to server
+  const connectCommand = podmanDesktopAPI.commands.registerCommand(
+    'mcp.connect',
+    async () => {
+      const serverPath = await podmanDesktopAPI.window.showInputBox({
+        prompt: 'Enter path to MCP server script',
+        placeHolder: 'e.g., /path/to/server.py',
+      });
+
+      if (serverPath) {
+        await mcpClient.connectToServer(serverPath);
+      }
+    }
+  );
+
+  // Register command for queries
+  const queryCommand = podmanDesktopAPI.commands.registerCommand(
+    'mcp.query',
+    async () => {
+      const query = await podmanDesktopAPI.window.showInputBox({
+        prompt: 'Enter your query',
+        placeHolder: 'What would you like to know?',
+      });
+
+      if (query) {
+        const response = await mcpClient.processQuery(query);
+        await podmanDesktopAPI.window.showInformationMessage(response);
+      }
+    }
+  );
+
+  // Add to extension context
+  context.subscriptions.push(connectCommand, queryCommand);
+}
+```
+
+### Webview Integration
+```typescript
+export class MCPWebviewProvider implements podmanDesktopAPI.WebviewViewProvider {
+  private mcpClient: MCPClient;
+
+  constructor(mcpClient: MCPClient) {
+    this.mcpClient = mcpClient;
+  }
+
+  async resolveWebviewView(
+    webviewView: podmanDesktopAPI.WebviewView
+  ): Promise<void> {
+    webviewView.webview.options = {
+      enableScripts: true,
+    };
+
+    // Handle messages from webview
+    webviewView.webview.onDidReceiveMessage(async message => {
+      switch (message.type) {
+        case 'query':
+          try {
+            const response = await this.mcpClient.processQuery(message.text);
+            webviewView.webview.postMessage({
+              type: 'response',
+              text: response,
+            });
+          } catch (error) {
+            webviewView.webview.postMessage({
+              type: 'error',
+              text: error.message,
+            });
+          }
+          break;
+      }
+    });
+
+    // Set initial HTML content
+    webviewView.webview.html = getWebviewContent();
+  }
+}
+```
+
+## Best Practices
+
+### Error Handling
+- Use try-catch blocks for all async operations
+- Provide meaningful error messages through Podman Desktop UI
+- Handle connection failures gracefully
+```typescript
+try {
+  await operation();
+} catch (error) {
+  await podmanDesktopAPI.window.showErrorMessage(
+    `Operation failed: ${error.message}`
+  );
+  // Log error for debugging
+  console.error('Detailed error:', error);
+}
+```
+
+### Resource Management
+- Clean up resources when extension is deactivated
+- Monitor memory usage for long-running operations
+- Handle connection timeouts
+```typescript
+export function deactivate(): void {
+  if (mcpClient) {
+    mcpClient.cleanup()
+      .catch(error => console.error('Cleanup error:', error));
+  }
+}
+```
+
+### Security
+- Store API keys securely
+- Validate server paths
+- Sanitize input/output
+```typescript
+// Validate server path
+function isValidServerPath(path: string): boolean {
+  return /\.(js|py)$/.test(path) && 
+         !path.includes('..') && 
+         !path.includes('~');
+}
+```
+
+### Performance
+- Cache tool listings
+- Implement request timeouts
+- Monitor resource usage
+```typescript
+private async getCachedTools(): Promise<any[]> {
+  if (this.cachedTools && Date.now() - this.lastToolsFetch < 300000) {
+    return this.cachedTools;
+  }
+  
+  const response = await this.client!.request(
+    { method: "tools/list" },
+    ListToolsResultSchema
+  );
+  
+  this.cachedTools = response.tools;
+  this.lastToolsFetch = Date.now();
+  return this.cachedTools;
+}
+```
+
+## Testing
+
+### Unit Tests
+```typescript
+describe('MCPClient', () => {
+  let client: MCPClient;
+  let mockContext: podmanDesktopAPI.ExtensionContext;
+
+  beforeEach(() => {
+    mockContext = {
+      subscriptions: [],
+    } as any;
+    
+    client = new MCPClient({
+      extensionContext: mockContext,
+    });
+  });
+
+  test('connects to server', async () => {
+    await expect(client.connectToServer('./valid-server.js'))
+      .resolves.not.toThrow();
+  });
+});
+```
+
+### Integration Tests
+```typescript
+describe('MCP Integration', () => {
+  test('processes query with tools', async () => {
+    const response = await client.processQuery('test query');
+    expect(response).toContain('result');
+  });
+});
+```

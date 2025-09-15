@@ -1,0 +1,321 @@
+// mcp.fbs
+
+namespace mcp.fb;
+
+file_identifier "MCPP";
+file_extension "mcp";
+
+/// The sender or recipient of messages and data in a conversation.
+enum Role : byte {
+  User = 0,      // Represents the human user in the conversation
+  Assistant = 1  // Represents the AI assistant in the conversation
+}
+
+/// The severity of a log message, mapping to syslog message severities (RFC-5424)
+enum LoggingLevel : byte {
+  Debug = 0,     // Detailed debug information
+  Info = 1,      // General operational information
+  Notice = 2,    // Normal but significant events
+  Warning = 3,   // Warning conditions
+  Error = 4,     // Error conditions
+  Critical = 5,  // Critical conditions
+  Alert = 6,     // Action must be taken immediately
+  Emergency = 7  // System is unusable
+}
+
+/// A uniquely identifying ID for a request in JSON-RPC
+struct RequestId {
+  id: uint64;  // Numeric identifier for the request
+}
+
+/// Describes the name and version of an MCP implementation
+table Implementation {
+  name: string (required);    // Name of the implementation
+  version: string (required); // Version of the implementation
+}
+
+/// Capabilities a client may support. Known capabilities are defined here,
+/// but this is not a closed set: any client can define its own additional capabilities
+table ClientCapabilities {
+  experimental: [Capability];       // Experimental, non-standard capabilities
+  roots: RootsCapability;          // Support for root URI listings
+  sampling: SamplingCapability;    // Support for LLM sampling
+}
+
+/// Capabilities that a server may support. Known capabilities are defined here,
+/// but this is not a closed set: any server can define its own additional capabilities
+table ServerCapabilities {
+  experimental: [Capability];      // Experimental, non-standard capabilities
+  logging: bool;                   // Support for server logging
+  prompts: PromptsCapability;      // Support for prompt templates
+  resources: ResourcesCapability;  // Support for resource access
+  tools: ToolsCapability;         // Support for tool execution
+}
+
+/// A generic capability with name and value
+table Capability {
+  name: string (required);  // Name of the capability
+  value: string;           // JSON-encoded value of the capability
+}
+
+/// Support for roots functionality in clients
+table RootsCapability {
+  list_changed: bool = false;  // Whether the client supports notifications for root list changes
+}
+
+/// Support for LLM sampling in clients
+table SamplingCapability {
+  // Presence indicates sampling support
+}
+
+/// Server capability for prompt template management
+table PromptsCapability {
+  list_changed: bool = false;  // Support for prompt list change notifications
+}
+
+/// Server capability for resource management
+table ResourcesCapability {
+  subscribe: bool = false;     // Support for resource update subscriptions
+  list_changed: bool = false;  // Support for resource list change notifications
+}
+
+/// Server capability for tool management
+table ToolsCapability {
+  list_changed: bool = false;  // Support for tool list change notifications
+}
+
+/// Represents the different types of messages in the protocol
+union MessageType {
+  Request,      // A request expecting a response
+  Response,     // A successful response to a request
+  Notification, // A one-way notification
+  Error         // An error response
+}
+
+/// The base message type for all MCP communication
+table Message {
+  type: MessageType (required);  // The type of message
+}
+
+/// A request that expects a response
+table Request {
+  jsonrpc: string = "2.0" (required);  // JSON-RPC version
+  id: RequestId (required);            // Request identifier
+  method: string (required);           // Method to invoke
+  params: string;                      // JSON-encoded parameters
+  meta: Metadata;                      // Optional metadata
+}
+
+/// A successful response to a request
+table Response {
+  jsonrpc: string = "2.0" (required);  // JSON-RPC version
+  id: RequestId (required);            // Matching request identifier
+  result: string (required);           // JSON-encoded result
+  meta: Metadata;                      // Optional metadata
+}
+
+/// A one-way notification that doesn't expect a response
+table Notification {
+  jsonrpc: string = "2.0" (required);  // JSON-RPC version
+  method: string (required);           // Notification method
+  params: string;                      // JSON-encoded parameters
+  meta: Metadata;                      // Optional metadata
+}
+
+/// A response indicating an error occurred
+table Error {
+  jsonrpc: string = "2.0" (required);  // JSON-RPC version
+  id: RequestId (required);            // Matching request identifier
+  code: int (required);                // Error code
+  message: string (required);          // Error message
+  data: string;                        // Additional error details
+}
+
+/// Additional metadata for messages
+table Metadata {
+  progress_token: string;              // Token for progress tracking
+  additional_data: string;             // Additional JSON-encoded metadata
+}
+
+/// Different types of content that can be sent/received
+union Content {
+  TextContent,       // Text content
+  ImageContent,      // Image content
+  EmbeddedResource  // Embedded resource content
+}
+
+/// Text provided to or from an LLM
+table TextContent {
+  type: string = "text" (required);  // Content type identifier
+  text: string (required);           // The text content
+  annotations: Annotations;          // Optional annotations
+}
+
+/// An image provided to or from an LLM
+table ImageContent {
+  type: string = "image" (required);  // Content type identifier
+  data: [ubyte] (required);          // Raw image data
+  mime_type: string (required);       // MIME type of the image
+  annotations: Annotations;           // Optional annotations
+}
+
+/// A resource embedded into a message
+table EmbeddedResource {
+  type: string = "resource" (required);     // Content type identifier
+  resource: ResourceContents (required);    // The resource contents
+  annotations: Annotations;                 // Optional annotations
+}
+
+/// Optional annotations for content
+table Annotations {
+  audience: [Role];    // Intended audience for the content
+  priority: float;     // Importance (0.0 to 1.0)
+}
+
+/// A known resource that the server is capable of reading
+table Resource {
+  uri: string (required);      // Unique identifier for the resource
+  name: string (required);     // Human-readable name
+  description: string;         // Optional description of what this resource represents
+  mime_type: string;          // MIME type of the resource if known
+  annotations: Annotations;    // Optional annotations for the resource
+}
+
+/// A template description for resources available on the server using URI templates (RFC 6570)
+table ResourceTemplate {
+  uri_template: string (required);  // URI template for constructing resource URIs
+  name: string (required);          // Human-readable name for the template
+  description: string;              // Description of what this template is for
+  mime_type: string;               // MIME type for all resources matching this template
+  annotations: Annotations;         // Optional annotations
+}
+
+/// The contents of a specific resource
+table ResourceContents {
+  uri: string (required);     // The URI of this resource
+  mime_type: string;          // MIME type if known
+  content: ResourceData;      // The actual content data
+}
+
+/// Different types of resource content
+union ResourceData {
+  TextResourceData,    // Text-based resource content
+  BlobResourceData     // Binary resource content
+}
+
+/// Text-based resource content
+table TextResourceData {
+  text: string (required);    // The text content of the resource
+}
+
+/// Binary resource content
+table BlobResourceData {
+  blob: [ubyte] (required);   // Base64-encoded binary data
+}
+
+/// Definition for a tool the client can call
+table Tool {
+  name: string (required);            // Name of the tool
+  description: string;                // Human-readable description
+  input_schema: string (required);    // JSON Schema defining expected parameters
+}
+
+/// A tool invocation request with arguments
+table ToolCall {
+  name: string (required);     // Name of the tool to call
+  arguments: string;           // JSON-encoded arguments
+  is_error: bool = false;      // Whether the call resulted in an error
+}
+
+/// A prompt or prompt template that the server offers
+table Prompt {
+  name: string (required);     // Name of the prompt/template
+  description: string;         // Optional description
+  arguments: [PromptArgument]; // Arguments the prompt accepts
+}
+
+/// Describes an argument that a prompt can accept
+table PromptArgument {
+  name: string (required);     // Name of the argument
+  description: string;         // Human-readable description
+  required: bool = false;      // Whether this argument must be provided
+}
+
+/// A message returned as part of a prompt
+table PromptMessage {
+  role: Role (required);       // Role (user/assistant)
+  content: Content (required); // The message content
+}
+
+/// Server preferences for model selection during sampling
+table ModelPreferences {
+  hints: [ModelHint];           // Optional model selection hints
+  cost_priority: float;         // Priority for minimizing cost (0.0-1.0)
+  speed_priority: float;        // Priority for minimizing latency (0.0-1.0)
+  intelligence_priority: float; // Priority for model capabilities (0.0-1.0)
+}
+
+/// Hints for model selection
+table ModelHint {
+  name: string;    // Suggested model name/family
+}
+
+/// A message for LLM sampling
+table SamplingMessage {
+  role: Role (required);       // Role (user/assistant)
+  content: Content (required); // The message content
+  model: string;              // Name of model that generated the message
+  stop_reason: string;        // Reason why sampling stopped
+}
+
+/// Available transport types
+union TransportType {
+  StdioTransport,     // Standard input/output transport
+  SSETransport        // Server-Sent Events transport
+}
+
+/// Base transport configuration
+table Transport {
+  type: TransportType (required);  // Type of transport
+}
+
+/// Configuration for stdio transport
+table StdioTransport {
+  buffer_size: uint32 = 8192;     // Buffer size for I/O operations
+}
+
+/// Configuration for SSE transport
+table SSETransport {
+  url: string (required);         // SSE endpoint URL
+  headers: [Header];              // Optional HTTP headers
+  reconnect_time: uint32 = 3000;  // Reconnection delay in milliseconds
+}
+
+/// HTTP header key-value pair
+table Header {
+  key: string (required);    // Header name
+  value: string (required);  // Header value
+}
+
+/// Represents a root directory or file that the server can operate on
+table Root {
+  uri: string (required);    // URI identifying the root (must start with file://)
+  name: string;              // Optional human-readable name
+}
+
+/// Request sent from client to server for initialization
+table InitializeRequest {
+  protocol_version: string (required);        // Latest supported protocol version
+  capabilities: ClientCapabilities (required); // Client capabilities
+  client_info: Implementation (required);      // Client implementation info
+}
+
+/// Server's response to initialization request
+table InitializeResponse {
+  protocol_version: string (required);         // Selected protocol version
+  capabilities: ServerCapabilities (required);  // Server capabilities
+  server_info: Implementation (required);       // Server implementation info
+  instructions: string;                        // Optional usage instructions
+}
+
+root_type Message;

@@ -1,0 +1,262 @@
+---
+description: Rules for implementing and documenting the Goal Decomposer pattern for breaking down complex tasks
+globs: ["**/DesignPatterns/Agentic/GoalDecomposer.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Goal Decomposer Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Goal Decomposer pattern, which breaks down high-level tasks into manageable sub-tasks.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Goal Decomposer Pattern
+**Intent**: Break down high-level tasks into manageable sub-tasks
+**Problem**: Complex tasks requiring multiple steps and different types of reasoning
+**Solution**: Implementation details with task decomposition and orchestration
+```
+
+### 2. Components
+Must define:
+- Task Analyzer
+- Dependency Graph Builder
+- Execution Planner
+- Progress Tracker
+
+## Implementation Requirements
+
+### 1. Task Analysis
+```python
+class GoalDecomposer:
+    def __init__(self, llm_client):
+        """
+        Initialize the goal decomposer.
+        
+        Args:
+            llm_client: LLM client for task analysis
+        """
+        self.llm = llm_client
+        self.task_tree = []
+        self.execution_plan = None
+
+    def analyze_task(self, high_level_goal: str) -> Dict[str, Any]:
+        """
+        Analyze high-level goal and identify components.
+        
+        Args:
+            high_level_goal: Complex task to decompose
+            
+        Returns:
+            Dict containing task analysis results
+        """
+        try:
+            # Analyze task requirements
+            requirements = self.llm.analyze_requirements(high_level_goal)
+            
+            # Identify necessary tools and resources
+            tools = self.identify_required_tools(requirements)
+            
+            return {
+                'requirements': requirements,
+                'tools': tools,
+                'estimated_complexity': self.estimate_complexity(requirements)
+            }
+        except Exception as e:
+            logger.error(f"Task analysis failed: {str(e)}")
+            raise TaskAnalysisError("Failed to analyze task")
+```
+
+### 2. Dependency Graph
+```python
+def build_dependency_graph(self, subtasks: List[Dict]) -> nx.DiGraph:
+    """
+    Create dependency graph from subtasks.
+    
+    Args:
+        subtasks: List of subtask definitions
+        
+    Returns:
+        NetworkX DiGraph representing task dependencies
+    """
+    graph = nx.DiGraph()
+    
+    # Add all tasks
+    for task in subtasks:
+        graph.add_node(
+            task['id'],
+            name=task['name'],
+            requirements=task['requirements']
+        )
+    
+    # Add dependencies
+    for task in subtasks:
+        for dep in task.get('dependencies', []):
+            graph.add_edge(dep, task['id'])
+            
+    return graph
+```
+
+### 3. Execution Planning
+```python
+def create_execution_plan(self, task_graph: nx.DiGraph) -> List[str]:
+    """
+    Generate execution plan from task graph.
+    
+    Args:
+        task_graph: Dependency graph of tasks
+        
+    Returns:
+        Ordered list of task IDs for execution
+    """
+    try:
+        # Validate graph is acyclic
+        if not nx.is_directed_acyclic_graph(task_graph):
+            raise ValueError("Task graph contains cycles")
+            
+        # Create execution order
+        execution_order = list(nx.topological_sort(task_graph))
+        
+        # Annotate with estimated durations
+        return self.annotate_execution_plan(execution_order)
+    except Exception as e:
+        logger.error(f"Failed to create execution plan: {str(e)}")
+        raise PlanningError("Failed to create execution plan")
+```
+
+## Validation Rules
+
+### 1. Task Analysis
+Must implement:
+- Requirement identification
+- Tool selection
+- Complexity estimation
+- Resource assessment
+
+### 2. Dependency Management
+Must include:
+- Cycle detection
+- Prerequisite validation
+- Resource conflict checking
+- Priority assignment
+
+### 3. Execution Planning
+Must verify:
+- Plan feasibility
+- Resource availability
+- Timeline estimation
+- Error recovery paths
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_task_analysis():
+    """Test high-level task analysis."""
+    decomposer = GoalDecomposer(llm_client)
+    analysis = decomposer.analyze_task("complex task description")
+    assert 'requirements' in analysis
+    assert 'tools' in analysis
+    assert 'estimated_complexity' in analysis
+
+def test_dependency_graph():
+    """Test dependency graph creation and validation."""
+    decomposer = GoalDecomposer(llm_client)
+    subtasks = [
+        {'id': '1', 'name': 'Task 1', 'requirements': []},
+        {'id': '2', 'name': 'Task 2', 'requirements': [], 'dependencies': ['1']}
+    ]
+    graph = decomposer.build_dependency_graph(subtasks)
+    assert nx.is_directed_acyclic_graph(graph)
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end decomposition
+- Plan execution
+- Resource management
+- Error handling
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient graph algorithms
+- Caching of analyses
+- Parallel subtask execution
+- Resource pooling
+
+### 2. Scaling
+- Handle complex task trees
+- Support concurrent decomposition
+- Manage resource constraints
+- Implement timeouts
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Decomposition strategy
+- Dependency management
+- Execution planning
+- Progress tracking
+
+### 2. Configuration
+Must specify:
+- Analysis parameters
+- Resource limits
+- Timeout settings
+- Recovery policies
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[High-Level Goal] --> B[Goal Decomposer]
+    B --> C[Task Analyzer]
+    C --> D[Dependency Graph Builder]
+    D --> E[Execution Planner]
+    E --> F[Progress Tracker]
+    F -->|Feedback| B
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style D fill:#e74c3c,stroke:#c0392b
+    style E fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Task analysis implemented
+- [ ] Dependency graph working
+- [ ] Execution planning complete
+- [ ] Progress tracking functional
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Resource tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular algorithm optimization
+- Graph processing improvements
+- Resource management updates
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

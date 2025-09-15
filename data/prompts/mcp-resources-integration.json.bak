@@ -1,0 +1,321 @@
+{
+  "id": "mcp-resources-integration",
+  "name": "MCP Resources Integration Guide",
+  "description": "A comprehensive guide to working with and integrating resources across multiple MCP servers",
+  "content": "# MCP Resources Integration Guide
+
+You are an expert on the Model Context Protocol (MCP) ecosystem, specializing in resource integration across multiple MCP servers. Your task is to assist with {{integration_task}} by explaining how to leverage the resources/list method and integrate multiple data sources.
+
+## Understanding MCP Resources
+
+Resources in the MCP ecosystem are named data objects that can be referenced and accessed across different MCP servers. They enable:
+
+1. **Cross-server data access**: Retrieving and using data from multiple specialized servers
+2. **Contextual enrichment**: Adding relevant information to prompt templates
+3. **Dynamic content generation**: Creating outputs based on up-to-date information
+4. **Workflow orchestration**: Coordinating complex operations involving multiple data sources
+
+## The `resources/list` Method
+
+The `resources/list` method is a powerful capability that enables discovery and exploration of available contextual data sources. It can be used to:
+
+- **Discover available resources**: List all accessible data sources across connected MCP servers
+- **Filter resources by type**: Find specific kinds of resources (files, database records, API results)
+- **Explore metadata**: View descriptions, timestamps, and other metadata about available resources
+- **Support dynamic workflows**: Enable applications to adapt based on available context
+
+### Basic Usage
+
+```
+// Example: Listing all available resources
+{
+  \"method\": \"resources/list\",
+  \"params\": {}
+}
+
+// Example: Filtering resources by prefix
+{
+  \"method\": \"resources/list\",
+  \"params\": {
+    \"prefix\": \"github://\"
+  }
+}
+```
+
+## Integrating Resources from Different MCP Servers
+
+### Available Resource Types by Server
+
+| Server Type | Resource Prefix | Example URI | Description |
+|-------------|----------------|-------------|-------------|
+| GitHub | github:// | github://owner/repo/path/to/file | Repository files and metadata |
+| Filesystem | file:// | file:///path/to/local/file | Local file system access |
+| PostgreSQL | postgres:// | postgres://database/table/record | Database records and query results |
+| Memory | memory:// | memory://session/key | Stored session context |
+| Web | https:// | https://api.example.com/data | Web content and API responses |
+| {{custom_server}} | {{custom_prefix}} | {{custom_example}} | {{custom_description}} |
+
+### Resource Integration Patterns
+
+#### 1. Chain of Resources Pattern
+Connect multiple resources sequentially, where the output of one resource operation becomes the input for the next:
+
+```
+// Step 1: Retrieve configuration from GitHub
+const config = await getResource('github://org/repo/config.json');
+
+// Step 2: Use config to query database
+const queryResults = await getResource(`postgres://database/table?query=${config.queryParams}`);
+
+// Step 3: Process results and store in memory
+await setResource('memory://session/processed_data', processData(queryResults));
+```
+
+#### 2. Aggregation Pattern
+Combine data from multiple resources to create a comprehensive context:
+
+```
+// Collect data from multiple sources
+const codebase = await getResource('github://org/repo/src');
+const documentation = await getResource('file:///local/docs');
+const issueTracking = await getResource('https://issues.example.com/api/project');
+
+// Combine into unified context
+const projectContext = {
+  code: codebase,
+  docs: documentation,
+  issues: issueTracking
+};
+```
+
+#### 3. Template Enrichment Pattern
+Use resources to populate template variables dynamically:
+
+```
+// Retrieve template
+const template = await getResource('prompts://templates/analysis');
+
+// Gather contextual data
+const repoStats = await getResource('github://org/repo/stats');
+const performanceData = await getResource('postgres://metrics/performance');
+
+// Apply template with resource data
+const enrichedPrompt = applyTemplate(template, {
+  project_metrics: repoStats,
+  performance_insights: performanceData
+});
+```
+
+## Implementation Guidelines for {{integration_task}}
+
+### Step 1: Resource Discovery
+First, use the resources/list method to discover what data sources are available:
+
+```javascript
+// Example resources/list implementation
+async function discoverResources() {
+  const resources = await callMCP({
+    method: 'resources/list',
+    params: {}
+  });
+  
+  console.log('Available resources:', resources);
+  return resources;
+}
+```
+
+### Step 2: Resource Access Patterns
+Implement standardized patterns for accessing different resource types:
+
+```javascript
+// Example resource access function
+async function getResource(uri) {
+  const serverType = getServerTypeFromUri(uri);
+  
+  const response = await callMCP({
+    server: serverType,
+    method: 'resources/get',
+    params: { uri }
+  });
+  
+  return response.data;
+}
+```
+
+### Step 3: Resource Integration
+Combine resources using the appropriate integration pattern for your use case:
+
+{{integration_code}}
+
+### Step 4: Error Handling and Fallbacks
+Implement robust error handling for cases where resources may be unavailable:
+
+```javascript
+try {
+  const resource = await getResource('github://org/repo/file.json');
+  // Process resource
+} catch (error) {
+  console.error('Error accessing resource:', error);
+  // Use fallback resource or strategy
+  const fallbackResource = await getResource('file:///local/fallback.json');
+}
+```
+
+## Best Practices for Resource Integration
+
+1. **Cache appropriately**: Some resources may be expensive to fetch repeatedly
+2. **Handle failures gracefully**: Use fallbacks when resources are unavailable
+3. **Consider resource formats**: Different servers may return different data structures
+4. **Manage dependencies**: Be mindful of resource dependencies and potential circular references
+5. **Document resource usage**: Make resource URIs and usage patterns explicit
+6. **Security awareness**: Consider access control implications when sharing resources
+{{additional_practices}}
+
+## Implementation Examples for Common Scenarios
+
+### Example 1: Project Analysis Dashboard
+Combine code repository statistics, issue tracking, and documentation:
+
+```javascript
+async function buildProjectDashboard() {
+  // Discover available resources
+  const resources = await discoverResources();
+  
+  // Check if required resources are available
+  const hasGitHub = resources.some(r => r.startsWith('github://'));
+  const hasIssues = resources.some(r => r.startsWith('https://issues.'));
+  
+  // Gather data from available sources
+  const repoData = hasGitHub ? 
+    await getResource('github://org/project/stats') : 
+    { error: 'GitHub data unavailable' };
+    
+  const issueData = hasIssues ?
+    await getResource('https://issues.example.com/api/project/stats') :
+    { error: 'Issue tracker unavailable' };
+    
+  // Combine into unified dashboard data
+  return {
+    code_metrics: repoData,
+    issue_metrics: issueData,
+    timestamp: new Date().toISOString()
+  };
+}
+```
+
+### Example 2: Dynamic Document Generation
+Generate documentation by combining templates with real-time data:
+
+```javascript
+async function generateDocumentation() {
+  // Get document template
+  const template = await getResource('prompts://templates/documentation');
+  
+  // Gather data from multiple sources
+  const apiSchema = await getResource('file:///api/schema.json');
+  const usageStats = await getResource('postgres://analytics/api_usage');
+  const exampleCode = await getResource('github://org/examples/api');
+  
+  // Generate documentation
+  return applyTemplate(template, {
+    schema: apiSchema,
+    usage: usageStats,
+    examples: exampleCode
+  });
+}
+```
+
+### Example 3: {{custom_example_name}}
+{{custom_example_description}}
+
+```javascript
+{{custom_example_code}}
+```
+
+## Resources/List Method in Action
+
+The resources/list method serves multiple important functions:
+
+1. **Discovery and Exploration**: Clients can discover what contextual resources are available
+2. **Workflow Orchestration**: Automated workflows can determine which resources to use
+3. **Enhanced UI/UX**: User interfaces can show available resources for selection
+4. **Integration with External Services**: Bridge between clients and external data sources
+
+Example implementation of a resource explorer using resources/list:
+
+```javascript
+async function exploreResources(prefix = '') {
+  const resources = await callMCP({
+    method: 'resources/list',
+    params: { prefix }
+  });
+  
+  // Group resources by type
+  const resourcesByType = resources.reduce((groups, uri) => {
+    const type = uri.split('://')[0];
+    if (!groups[type]) groups[type] = [];
+    groups[type].push(uri);
+    return groups;
+  }, {});
+  
+  // Display available resources by type
+  for (const [type, uris] of Object.entries(resourcesByType)) {
+    console.log(`${type} resources (${uris.length}):`);
+    uris.forEach(uri => console.log(`  - ${uri}`));
+  }
+  
+  return resourcesByType;
+}
+```
+
+## Conclusion
+
+Effective integration of resources across MCP servers is a powerful pattern that enables complex workflows, rich contextual awareness, and dynamic content generation. By understanding the resources/list method and implementing appropriate integration patterns, you can leverage the full potential of the MCP ecosystem for {{integration_task}}.
+
+What specific aspect of MCP resource integration would you like to explore further?",
+  "isTemplate": true,
+  "variables": [
+    "integration_task",
+    "custom_server",
+    "custom_prefix",
+    "custom_example",
+    "custom_description",
+    "integration_code",
+    "additional_practices",
+    "custom_example_name",
+    "custom_example_description",
+    "custom_example_code"
+  ],
+  "tags": [
+    "mcp",
+    "resources",
+    "integration",
+    "advanced",
+    "multi-server",
+    "template"
+  ],
+  "createdAt": "2025-03-15T16:00:00.000Z",
+  "updatedAt": "2025-03-15T16:00:00.000Z",
+  "version": 1,
+  "metadata": {
+    "recommended_servers": [
+      "github",
+      "filesystem",
+      "postgres",
+      "memory",
+      "prompts"
+    ],
+    "example_variables": {
+      "integration_task": "building a comprehensive project analysis tool",
+      "custom_server": "TimeSeries",
+      "custom_prefix": "timeseries://",
+      "custom_example": "timeseries://metrics/cpu-usage/7d",
+      "custom_description": "Historical time-series data for metrics and monitoring",
+      "integration_code": "async function integrateProjectAnalysis() {\n  // Get repository information\n  const repoInfo = await getResource('github://org/repo/info');\n  \n  // Fetch relevant code files based on repo structure\n  const codeFiles = await Promise.all(\n    repoInfo.main_modules.map(module => \n      getResource(`github://org/repo/src/${module}`)\n    )\n  );\n  \n  // Get database schema information\n  const dbSchema = await getResource('postgres://database/information_schema');\n  \n  // Combine everything into a unified context\n  const projectContext = {\n    repository: repoInfo,\n    code_modules: codeFiles,\n    database_structure: dbSchema,\n    analysis_timestamp: new Date().toISOString()\n  };\n  \n  // Store the combined context in memory for future reference\n  await setResource('memory://session/project_context', projectContext);\n  \n  return projectContext;\n}",
+      "additional_practices": "7. **Version awareness**: Consider resource version compatibility\n8. **Performance tracking**: Monitor resource access patterns and optimize frequent operations\n9. **Scope limitation**: Only access resources directly relevant to the current task\n10. **Progressive enhancement**: Design systems that work with minimal resources but enhance capabilities when more are available",
+      "custom_example_name": "Cross-Server Data Validation",
+      "custom_example_description": "Validate data consistency across different storage systems by comparing repositories, databases, and local files:",
+      "custom_example_code": "async function validateDataConsistency() {\n  // Get configuration schema from repository\n  const configSchema = await getResource('github://org/repo/schema/config.json');\n  \n  // Get actual configurations from database\n  const dbConfigs = await getResource('postgres://app/configurations');\n  \n  // Get local configuration files\n  const localConfigs = await getResource('file:///app/config/');\n  \n  // Compare configurations across systems\n  const validationResults = {\n    schema_valid: validateAgainstSchema(dbConfigs, configSchema),\n    db_local_match: compareConfigurations(dbConfigs, localConfigs),\n    mismatches: findMismatches(dbConfigs, localConfigs, configSchema)\n  };\n  \n  // Store validation results in memory\n  await setResource('memory://validation/config_results', validationResults);\n  \n  return validationResults;\n}"
+    }
+  }
+} 

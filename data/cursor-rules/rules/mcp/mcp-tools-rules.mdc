@@ -1,0 +1,412 @@
+---
+description: Guidelines for implementing MCP tools in Podman Desktop extensions
+globs: ["src/mcp/tools/**/*.ts", "src/mcp/tools/**/*.tsx"]
+---
+
+# MCP Tools Implementation Rules
+
+## Tool Structure
+
+### Tool Definition
+```typescript
+// src/mcp/tools/types.ts
+interface MCPTool {
+  name: string;
+  description: string;
+  inputSchema: {
+    type: "object";
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+// src/mcp/tools/registry.ts
+class ToolRegistry {
+  private tools: Map<string, MCPTool> = new Map();
+
+  registerTool(tool: MCPTool): void {
+    this.tools.set(tool.name, tool);
+  }
+
+  getTool(name: string): MCPTool | undefined {
+    return this.tools.get(name);
+  }
+
+  listTools(): MCPTool[] {
+    return Array.from(this.tools.values());
+  }
+}
+```
+
+### Basic Tool Implementation
+```typescript
+// src/mcp/tools/container-tools.ts
+import { ToolRegistry } from './registry';
+
+export function registerContainerTools(registry: ToolRegistry): void {
+  registry.registerTool({
+    name: 'container.list',
+    description: 'List all containers',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        showAll: {
+          type: 'boolean',
+          description: 'Include stopped containers'
+        },
+        filters: {
+          type: 'object',
+          description: 'Container filters'
+        }
+      }
+    }
+  });
+
+  registry.registerTool({
+    name: 'container.start',
+    description: 'Start a container',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        containerId: {
+          type: 'string',
+          description: 'ID of the container to start'
+        }
+      },
+      required: ['containerId']
+    }
+  });
+}
+```
+
+## Tool Execution
+
+### Tool Handler Implementation
+```typescript
+// src/mcp/tools/handlers/container-handlers.ts
+import * as podmanDesktopAPI from '@podman-desktop/api';
+
+export class ContainerToolHandlers {
+  async handleList(args: { showAll?: boolean; filters?: Record<string, unknown> }): Promise<string> {
+    try {
+      // Implementation using Podman Desktop API
+      const containers = await podmanDesktopAPI.containerEngine.listContainers({
+        all: args.showAll,
+        filters: args.filters
+      });
+      
+      return JSON.stringify(containers);
+    } catch (error) {
+      throw new Error(`Failed to list containers: ${error.message}`);
+    }
+  }
+
+  async handleStart(args: { containerId: string }): Promise<string> {
+    try {
+      await podmanDesktopAPI.containerEngine.startContainer(args.containerId);
+      return 'Container started successfully';
+    } catch (error) {
+      throw new Error(`Failed to start container: ${error.message}`);
+    }
+  }
+}
+```
+
+### Integration with MCP Server
+```typescript
+// src/mcp/server.ts
+import { Server } from "@modelcontextprotocol/sdk/server";
+import { ToolRegistry } from './tools/registry';
+import { ContainerToolHandlers } from './tools/handlers/container-handlers';
+
+export class MCPServer {
+  private server: Server;
+  private toolRegistry: ToolRegistry;
+  private containerHandlers: ContainerToolHandlers;
+
+  constructor() {
+    this.server = new Server({
+      name: "podman-desktop-mcp",
+      version: "1.0.0"
+    }, {
+      capabilities: {
+        tools: {}
+      }
+    });
+
+    this.toolRegistry = new ToolRegistry();
+    this.containerHandlers = new ContainerToolHandlers();
+
+    this.setupTools();
+  }
+
+  private setupTools(): void {
+    // Handle tool listing
+    this.server.setRequestHandler(ListToolsRequestSchema, async () => {
+      return {
+        tools: this.toolRegistry.listTools()
+      };
+    });
+
+    // Handle tool execution
+    this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
+      const tool = this.toolRegistry.getTool(request.params.name);
+      if (!tool) {
+        throw new Error(`Tool not found: ${request.params.name}`);
+      }
+
+      try {
+        let result: string;
+        switch (request.params.name) {
+          case 'container.list':
+            result = await this.containerHandlers.handleList(request.params.arguments);
+            break;
+          case 'container.start':
+            result = await this.containerHandlers.handleStart(request.params.arguments);
+            break;
+          default:
+            throw new Error(`Unhandled tool: ${request.params.name}`);
+        }
+
+        return {
+          content: [{
+            type: "text",
+            text: result
+          }]
+        };
+      } catch (error) {
+        return {
+          isError: true,
+          content: [{
+            type: "text",
+            text: `Error: ${error.message}`
+          }]
+        };
+      }
+    });
+  }
+}
+```
+
+## Error Handling
+
+### Tool-Specific Errors
+```typescript
+// src/mcp/tools/errors.ts
+export class ToolExecutionError extends Error {
+  constructor(
+    message: string,
+    public readonly toolName: string,
+    public readonly cause?: Error
+  ) {
+    super(message);
+    this.name = 'ToolExecutionError';
+  }
+}
+
+export class ToolValidationError extends Error {
+  constructor(
+    message: string,
+    public readonly toolName: string,
+    public readonly validation: Record<string, string[]>
+  ) {
+    super(message);
+    this.name = 'ToolValidationError';
+  }
+}
+```
+
+### Input Validation
+```typescript
+// src/mcp/tools/validation.ts
+import Ajv from 'ajv';
+
+export class ToolValidator {
+  private ajv: Ajv;
+
+  constructor() {
+    this.ajv = new Ajv({
+      allErrors: true,
+      strict: true
+    });
+  }
+
+  validateToolInput(tool: MCPTool, input: unknown): void {
+    const validate = this.ajv.compile(tool.inputSchema);
+    if (!validate(input)) {
+      throw new ToolValidationError(
+        'Invalid tool input',
+        tool.name,
+        this.formatValidationErrors(validate.errors)
+      );
+    }
+  }
+
+  private formatValidationErrors(errors: Ajv.ErrorObject[] | null): Record<string, string[]> {
+    const formatted: Record<string, string[]> = {};
+    if (!errors) return formatted;
+
+    for (const error of errors) {
+      const path = error.instancePath.slice(1) || 'root';
+      if (!formatted[path]) {
+        formatted[path] = [];
+      }
+      formatted[path].push(error.message || 'Invalid value');
+    }
+
+    return formatted;
+  }
+}
+```
+
+## Best Practices
+
+### Tool Organization
+```typescript
+// src/mcp/tools/groups/system.ts
+// Group related tools together
+export const SystemTools = {
+  info: {
+    name: 'system.info',
+    description: 'Get system information',
+    inputSchema: {
+      type: 'object',
+      properties: {}
+    }
+  },
+  
+  stats: {
+    name: 'system.stats',
+    description: 'Get system resource usage',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        interval: {
+          type: 'number',
+          description: 'Sampling interval in seconds'
+        }
+      }
+    }
+  }
+};
+
+// Register tools by group
+export function registerSystemTools(registry: ToolRegistry): void {
+  Object.values(SystemTools).forEach(tool => registry.registerTool(tool));
+}
+```
+
+### Progress Reporting
+```typescript
+// src/mcp/tools/progress.ts
+export class ToolProgress {
+  constructor(private toolName: string) {}
+
+  async report(progress: number, message: string): Promise<void> {
+    await podmanDesktopAPI.window.withProgress(
+      {
+        location: podmanDesktopAPI.ProgressLocation.Notification,
+        title: `Tool: ${this.toolName}`,
+        cancellable: false
+      },
+      async (progress) => {
+        progress.report({
+          increment: progress,
+          message: message
+        });
+      }
+    );
+  }
+}
+
+// Usage in handlers
+async function longRunningTool(): Promise<void> {
+  const progress = new ToolProgress('long-operation');
+  await progress.report(0, 'Starting operation...');
+  // ... do work ...
+  await progress.report(50, 'Processing...');
+  // ... do more work ...
+  await progress.report(100, 'Complete!');
+}
+```
+
+### Logging and Monitoring
+```typescript
+// src/mcp/tools/logging.ts
+export class ToolLogger {
+  private static formatMessage(toolName: string, message: string): string {
+    return `[Tool: ${toolName}] ${message}`;
+  }
+
+  static logToolExecution(toolName: string, args: unknown): void {
+    console.log(this.formatMessage(toolName, `Executing with args: ${JSON.stringify(args)}`));
+  }
+
+  static logToolError(toolName: string, error: Error): void {
+    console.error(this.formatMessage(toolName, `Error: ${error.message}`));
+    console.error(error.stack);
+  }
+
+  static logToolMetrics(toolName: string, duration: number): void {
+    console.log(this.formatMessage(toolName, `Execution time: ${duration}ms`));
+  }
+}
+```
+
+## Testing Tools
+
+### Unit Tests
+```typescript
+// src/mcp/tools/__tests__/container-tools.test.ts
+describe('Container Tools', () => {
+  let registry: ToolRegistry;
+  let handlers: ContainerToolHandlers;
+
+  beforeEach(() => {
+    registry = new ToolRegistry();
+    handlers = new ContainerToolHandlers();
+  });
+
+  test('list containers tool is registered', () => {
+    registerContainerTools(registry);
+    const tool = registry.getTool('container.list');
+    expect(tool).toBeDefined();
+    expect(tool?.inputSchema).toBeDefined();
+  });
+
+  test('container list handler returns containers', async () => {
+    const result = await handlers.handleList({ showAll: true });
+    expect(JSON.parse(result)).toBeInstanceOf(Array);
+  });
+});
+```
+
+### Integration Tests
+```typescript
+// src/mcp/tools/__tests__/integration.test.ts
+describe('MCP Server Tool Integration', () => {
+  let server: MCPServer;
+
+  beforeAll(async () => {
+    server = new MCPServer();
+    await server.start();
+  });
+
+  afterAll(async () => {
+    await server.stop();
+  });
+
+  test('executes container list tool', async () => {
+    const response = await server.executeRequest({
+      method: 'tools/call',
+      params: {
+        name: 'container.list',
+        arguments: { showAll: true }
+      }
+    });
+
+    expect(response.isError).toBeFalsy();
+    expect(response.content[0].type).toBe('text');
+  });
+});
+```

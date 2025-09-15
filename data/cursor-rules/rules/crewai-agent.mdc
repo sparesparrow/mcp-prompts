@@ -1,0 +1,153 @@
+---
+description: Standards for developing CrewAI agents and workflows
+globs: ["**/crewai/**/*.{py,ts}", "**/agents/**/*.{py,ts}"]
+priority: 35
+dependencies: ["01-base-agentic.mdc", "03-composer-agent.mdc"]
+---
+
+# CrewAI Agent Development Standards
+
+## Core Principles
+
+### Agent Architecture
+- Define clear agent roles and responsibilities
+- Implement proper tool integration
+- Configure memory and state management
+
+### Workflow Design
+- Structure agent interactions
+- Define clear communication protocols
+- Implement proper error handling
+
+### Resource Management
+- Handle API keys and credentials securely
+- Manage memory and computational resources
+- Implement proper cleanup mechanisms
+
+## Code Standards
+
+### Agent Definition
+```python
+# Good: Structured agent definition
+class ResearchAgent(Agent):
+    def __init__(self, config: AgentConfig):
+        self.role = "Research Specialist"
+        self.goal = "Conduct thorough research and provide accurate information"
+        self.tools = self.setup_tools(config.allowed_tools)
+        self.memory = self.configure_memory(config.memory_settings)
+        self.validate_configuration()
+
+    def setup_tools(self, allowed_tools: List[str]) -> List[Tool]:
+        return [self.get_validated_tool(tool) for tool in allowed_tools]
+
+    def validate_configuration(self):
+        if not self.role or not self.goal:
+            raise AgentConfigError("Agent must have role and goal defined")
+
+# Bad: Unstructured agent
+class BadAgent:
+    def __init__(self): # ❌ Missing configuration and validation
+        self.tools = ["search", "analyze"]
+```
+
+### Workflow Implementation
+```python
+# Good: Proper workflow management
+class ResearchWorkflow:
+    def __init__(self, agents: List[Agent], config: WorkflowConfig):
+        self.agents = self.validate_agents(agents)
+        self.config = self.validate_config(config)
+        self.memory_manager = MemoryManager(config.memory_settings)
+
+    async def execute(self, task: Task) -> Result:
+        try:
+            plan = await self.create_execution_plan(task)
+            result = await self.execute_with_agents(plan)
+            return await self.validate_result(result)
+        except WorkflowError as e:
+            await self.handle_workflow_error(e)
+            raise
+
+# Bad: Poor workflow management
+class BadWorkflow:
+    def run(self, task): # ❌ No error handling or validation
+        return self.agent.process(task)
+```
+
+### Memory Management
+```python
+# Good: Structured memory handling
+class MemoryManager:
+    def __init__(self, config: MemoryConfig):
+        self.validate_config(config)
+        self.storage = self.initialize_storage(config)
+        self.cleanup_scheduler = self.setup_cleanup(config)
+
+    async def store(self, key: str, data: Any) -> None:
+        await self.validate_data(data)
+        await self.storage.set(key, data)
+        await self.schedule_cleanup(key)
+
+# Bad: Unsafe memory handling
+class BadMemory:
+    def save(self, data): # ❌ No validation or cleanup
+        self.data.append(data)
+```
+
+## Validation Rules
+
+```python
+const CrewAIRules = {
+    # Ensure proper agent configuration
+    agentConfiguration: {
+        pattern: /class.*Agent.*{.*validate_configuration/,
+        message: "Implement proper agent configuration validation"
+    },
+    
+    # Check workflow error handling
+    workflowErrorHandling: {
+        pattern: /try.*{.*}.*catch.*{.*handle_workflow_error/,
+        message: "Implement proper workflow error handling"
+    },
+    
+    # Verify memory management
+    memoryManagement: {
+        pattern: /class.*Memory.*{.*cleanup|validate/,
+        message: "Implement proper memory management"
+    }
+}
+```
+
+## Best Practices
+
+1. Agent Design
+   - Clear role definition
+   - Proper tool integration
+   - Memory management
+
+2. Workflow Management
+   - Error handling
+   - Progress tracking
+   - Resource cleanup
+
+3. Security
+   - API key management
+   - Data validation
+   - Access control
+
+## Security Considerations
+
+1. Credential Management
+   - Secure API key storage
+   - Proper environment variables
+   - Access control implementation
+
+2. Data Protection
+   - Input validation
+   - Output sanitization
+   - Memory cleanup
+
+3. Resource Control
+   - Rate limiting
+   - Memory limits
+   - Compute restrictions 

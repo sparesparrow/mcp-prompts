@@ -1,0 +1,306 @@
+---
+description: Rules for implementing and documenting the Coding Agent pattern
+globs: ["**/DesignPatterns/Domain/CodingAgent.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Coding Agent Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Coding Agent pattern, which enables autonomous problem-solving in software development tasks.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Coding Agent Pattern
+**Intent**: Enable autonomous code modification and problem-solving
+**Problem**: Complex coding tasks require understanding multiple files and contexts
+**Solution**: Implementation details with code analysis and modification
+```
+
+### 2. Components
+Must define:
+- Code Analyzer
+- Change Planner
+- Code Modifier
+- Test Runner
+
+## Implementation Requirements
+
+### 1. Code Analysis
+```python
+class CodingAgent:
+    def __init__(
+        self,
+        llm_client,
+        workspace: CodeWorkspace,
+        test_runner: TestRunner
+    ):
+        """
+        Initialize the coding agent.
+        
+        Args:
+            llm_client: LLM for code analysis
+            workspace: Code workspace interface
+            test_runner: Test execution interface
+        """
+        self.llm = llm_client
+        self.workspace = workspace
+        self.test_runner = test_runner
+        self.change_history = []
+
+    def analyze_task(self, task_description: str) -> Dict[str, Any]:
+        """
+        Analyze coding task requirements.
+        
+        Args:
+            task_description: Description of the task
+            
+        Returns:
+            Analysis results
+        """
+        try:
+            # Understand task requirements
+            requirements = self._parse_requirements(task_description)
+            
+            # Analyze codebase
+            affected_files = self._identify_affected_files(requirements)
+            
+            # Create change plan
+            change_plan = self._create_change_plan(
+                requirements,
+                affected_files
+            )
+            
+            return {
+                'requirements': requirements,
+                'affected_files': affected_files,
+                'change_plan': change_plan
+            }
+        except Exception as e:
+            logger.error(f"Task analysis failed: {str(e)}")
+            raise AnalysisError("Failed to analyze task")
+```
+
+### 2. Code Modification
+```python
+def apply_changes(
+    self,
+    change_plan: Dict[str, Any]
+) -> List[str]:
+    """
+    Apply planned code changes.
+    
+    Args:
+        change_plan: Planned changes
+        
+    Returns:
+        List of modified files
+    """
+    try:
+        modified_files = []
+        
+        # Apply changes in dependency order
+        for change in change_plan['changes']:
+            file_path = change['file']
+            
+            # Read current content
+            current_content = self.workspace.read_file(file_path)
+            
+            # Apply modification
+            new_content = self._apply_modification(
+                current_content,
+                change['modification']
+            )
+            
+            # Write changes
+            self.workspace.write_file(file_path, new_content)
+            modified_files.append(file_path)
+            
+            # Record change
+            self.change_history.append({
+                'file': file_path,
+                'change': change,
+                'timestamp': time.time()
+            })
+            
+        return modified_files
+    except Exception as e:
+        logger.error(f"Change application failed: {str(e)}")
+        self._revert_changes()  # Revert on failure
+        raise ModificationError("Failed to apply changes")
+```
+
+### 3. Test Verification
+```python
+def verify_changes(
+    self,
+    modified_files: List[str]
+) -> bool:
+    """
+    Verify changes through testing.
+    
+    Args:
+        modified_files: List of modified files
+        
+    Returns:
+        bool indicating if changes pass tests
+    """
+    try:
+        # Run tests
+        test_results = self.test_runner.run_tests(modified_files)
+        
+        # Analyze results
+        passed = self._analyze_test_results(test_results)
+        
+        if not passed:
+            # Record failure
+            self._record_test_failure(test_results)
+            
+            # Attempt fix if possible
+            if self._can_fix_failures(test_results):
+                return self._fix_and_retry(test_results)
+                
+        return passed
+    except Exception as e:
+        logger.error(f"Test verification failed: {str(e)}")
+        return False
+```
+
+## Validation Rules
+
+### 1. Code Analysis
+Must implement:
+- Task parsing
+- Code understanding
+- Dependency analysis
+- Change planning
+
+### 2. Code Changes
+Must include:
+- Change validation
+- Dependency ordering
+- Error handling
+- Rollback support
+
+### 3. Testing
+Must verify:
+- Code correctness
+- Test coverage
+- Performance impact
+- Integration issues
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_task_analysis():
+    """Test coding task analysis."""
+    agent = CodingAgent(llm_client, workspace, test_runner)
+    analysis = agent.analyze_task("Fix bug in login")
+    assert 'requirements' in analysis
+    assert 'affected_files' in analysis
+    assert 'change_plan' in analysis
+
+def test_change_application():
+    """Test code change application."""
+    agent = CodingAgent(llm_client, workspace, test_runner)
+    modified = agent.apply_changes({
+        'changes': [
+            {'file': 'test.py', 'modification': 'fix'}
+        ]
+    })
+    assert len(modified) == 1
+    assert modified[0] == 'test.py'
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end changes
+- Test execution
+- Rollback functionality
+- Performance impact
+
+## Performance Guidelines
+
+### 1. Optimization
+- Fast analysis
+- Efficient changes
+- Smart testing
+- Resource management
+
+### 2. Scaling
+- Handle large codebases
+- Manage dependencies
+- Control test scope
+- Implement timeouts
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Analysis process
+- Change strategy
+- Test integration
+- Error handling
+
+### 2. Configuration
+Must specify:
+- Analysis settings
+- Change limits
+- Test criteria
+- Timeout settings
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Task Description] --> B[Code Analyzer]
+    B --> C[Change Planner]
+    C --> D[Code Modifier]
+    D --> E[Test Runner]
+    E -->|Pass| F[Complete]
+    E -->|Fail| G[Fix Attempt]
+    G --> D
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style D fill:#e74c3c,stroke:#c0392b
+    style E fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Code analysis implemented
+- [ ] Change application working
+- [ ] Test verification complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Change tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular analysis improvements
+- Change strategy updates
+- Test optimization
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update change patterns
+- Maintain test guide
+- Document new features 

@@ -1,0 +1,17 @@
+{
+  "id": "task-list-helper-8ithy",
+  "name": "Task List Helper",
+  "content": "Please create a prioritized task list based on the following requirements:\n\n{{requirements}}",
+  "isTemplate": true,
+  "createdAt": "2025-03-15T18:44:49.128Z",
+  "updatedAt": "2025-03-15T18:44:49.128Z",
+  "version": 1,
+  "description": "A basic prompt to help organize and prioritize tasks",
+  "variables": [
+    "requirements"
+  ],
+  "tags": [
+    "productivity",
+    "planning"
+  ]
+}
