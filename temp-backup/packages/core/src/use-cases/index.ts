@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // Use Cases index - exports all business logic use cases
 
 export * from './addPrompt';

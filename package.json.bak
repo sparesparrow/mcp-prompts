@@ -1,0 +1,69 @@
+
+
+
+{
+  "name": "mcp-prompts-aws",
+  "version": "1.0.2",
+  "description": "MCP Prompts with AWS backend integration",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc && swc src -d dist",
+    "dev": "nodemon --exec ts-node src/index.ts",
+    "test": "jest",
+    "deploy": "./scripts/deploy-aws.sh",
+    "cleanup": "./scripts/cleanup-aws.sh",
+    "cdk:deploy": "cd cdk && cdk deploy --all",
+    "cdk:destroy": "cd cdk && cdk destroy --all"
+  },
+  "dependencies": {
+    "@aws-sdk/client-cloudwatch": "^3.883.0",
+    "@aws-sdk/client-dynamodb": "^3.883.0",
+    "@aws-sdk/client-s3": "^3.883.0",
+    "@aws-sdk/client-sqs": "^3.883.0",
+    "@aws-sdk/types": "3.862.0",
+    "@aws-sdk/util-dynamodb": "^3.883.0",
+    "@modelcontextprotocol/sdk": "^0.4.0",
+    "@sparesparrow/mcp-prompt-manager": "1.1.11",
+    "@sparesparrow/mcp-prompts": "3.0.8",
+    "@sparesparrow/mcp-prompts-catalog": "1.0.1",
+    "@sparesparrow/mcp-prompts-contracts": "1.0.1",
+    "aws-cdk": "2.1029.0",
+    "cors": "^2.8.5",
+    "express": "^4.21.2",
+    "helmet": "^7.2.0",
+    "mcp-prompts-aws": "link:",
+    "morgan": "^1.10.1",
+    "pino": "^8.21.0",
+    "winston": "^3.17.0",
+    "zod": "4.1.5"
+  },
+  "devDependencies": {
+    "@swc/cli": "^0.1.65",
+    "@swc/core": "^1.13.5",
+    "@types/aws-lambda": "^8.10.152",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^4.17.23",
+    "@types/jest": "^29.5.14",
+    "@types/morgan": "^1.9.10",
+    "@types/node": "^20.19.13",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.2",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
+
+
+
+
+
+
+
+
+
+
+
+

@@ -6,10 +6,10 @@
 import type { z } from 'zod';
 
 // Temporarily commenting out config import until paths are fixed
-// import type { McpConfigSchema } from '../../../src/config.js';
+import type { ServerCapabilitiesSchema  } from '@modelcontextprotocol/sdk/types' ;
 
 // Temporarily commenting out config type until paths are fixed
-// export type McpConfig = z.infer<typeof McpConfigSchema>;
+export type McpConfig = z.infer<typeof ServerCapabilitiesSchema>;
 
 /**
  * Variable definition for templates
@@ -521,7 +521,7 @@ export interface AudioGenerationOptions {
 }
 
 export interface AudioGenerationResult {
-  audioData: Buffer;
+  audioData: string;
   metadata: {
     duration: number;
     wordCount: number;

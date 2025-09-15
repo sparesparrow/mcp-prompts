@@ -1,5 +1,5 @@
 // Use-case: addPrompt
-import { Prompt } from '@sparesparrow/mcp-prompts-contracts';
+import { Prompt } from '../entities/Prompt';
 import { IPromptRepository } from '../ports/IPromptRepository';
 
 export async function addPrompt(repo: IPromptRepository, prompt: Prompt): Promise<Prompt> {

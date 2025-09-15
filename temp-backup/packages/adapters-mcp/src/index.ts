@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 // TEMPORARY WORKAROUND: Unblock typechecking for MCP SDK
 // @ts-ignore
 import { MCPServer } from '@modelcontextprotocol/sdk';

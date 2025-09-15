@@ -1,386 +1,309 @@
-# MCP Prompts Server
+# MCP-Prompts AWS Deployment
 
-A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP).
+A production-ready AWS deployment of the MCP-Prompts ecosystem using serverless architecture with S3, SQS, and DynamoDB.
 
-## 🚀 Features
+## 🏗️ Architecture
 
-### Dual Mode Operation
-- **HTTP Mode** - Traditional REST API server
-- **MCP Mode** - Model Context Protocol server for AI assistants
+This implementation follows the hexagonal architecture pattern and deploys to AWS using:
 
-### MCP Tools (7 Available)
-1. **`add_prompt`** - Add new prompts to collection
-2. **`get_prompt`** - Retrieve prompts by ID
-3. **`list_prompts`** - List prompts with filtering
-4. **`update_prompt`** - Update existing prompts
-5. **`delete_prompt`** - Remove prompts
-6. **`apply_template`** - Apply variables to template prompts
-7. **`get_stats`** - Get prompt statistics
+- **AWS Lambda** - Serverless compute for MCP server and processing
+- **API Gateway** - RESTful API endpoints with CORS support  
+- **DynamoDB** - NoSQL database for prompt metadata and caching
+- **S3** - Object storage for prompt catalog and static assets
+- **SQS** - Message queuing for asynchronous processing
+- **CloudFront** - Global CDN for performance optimization
+- **CloudWatch** - Monitoring, logging, and metrics
 
-### Pre-loaded Templates
-- Code Review Assistant
-- Documentation Writer
-- Bug Analyzer
-- Architecture Reviewer
-- Test Case Generator
-
-## 📦 Installation
-
-```bash
-npm install @sparesparrow/mcp-prompts
-```
-
-## 🎯 Quick Start
-
-### HTTP Mode
-```bash
-# Start HTTP server
-npm start
-# or
-MODE=http node dist/index.js
-
-# Server runs on http://localhost:3003
-# API docs: http://localhost:3003/api-docs
-# Health check: http://localhost:3003/health
-```
-
-### MCP Mode
-```bash
-# Start MCP server
-MODE=mcp node dist/index.js
-# or
-npm run start:mcp
-```
-
-## 🔧 Cursor Integration
-
-1. **Configure Cursor MCP:**
-   Add to `.cursor/mcp.json`:
-   ```json
-   {
-     "mcpServers": {
-       "mcp-prompts": {
-         "command": "node",
-         "args": ["dist/index.js"],
-         "env": {
-           "MODE": "mcp"
-         }
-       }
-     }
-   }
-   ```
-
-2. **Restart Cursor** to load the MCP server
-
-3. **Use in Cursor:**
-   - The MCP tools will be available in Cursor's AI assistant
-   - You can ask Cursor to manage prompts using natural language
-
-## 🐳 Docker Support
-
-### Build MCP Docker Image
-```bash
-pnpm run docker:build:mcp
-```
-
-### Run with Docker Compose
-```bash
-pnpm run docker:up:mcp
-```
-
-### View Logs
-```bash
-pnpm run docker:logs:mcp
-```
-
-## 📚 Documentation
-
-- **[MCP_README.md](MCP_README.md)** - Comprehensive MCP usage guide
-- **[API Documentation](docs/)** - Full API reference
-- **[Examples](examples/)** - Usage examples and configurations
-
-## 🛠 Development
+## 🚀 Quick Start
 
 ### Prerequisites
-- Node.js >= 20.0.0
-- pnpm >= 9.0.0
 
-### Setup
-```bash
-# Install dependencies
+- Node.js 18+ and PNPM
+- AWS CLI configured with appropriate permissions
+- AWS CDK CLI (`npm install -g aws-cdk`)
+
+### One-Command Deployment
+
+Deploy everything to AWS
+
+```
+./scripts/deploy-aws.sh
+
+```
+
+### Manual Deployment
+
+Install dependencies
+```
 pnpm install
-
-# Build the project
+```
+Build project
+```
 pnpm run build
+```
+Deploy infrastructure
+```
+cd cdk
+pnpm install
+cdk bootstrap
+cdk deploy --all
+```
 
-# Start development server
+## 🔧 Configuration
+
+### Environment Variables
+
+AWS Configuration
+
+```
+AWS_REGION=us-east-1
+AWS_ACCOUNT_ID=123456789012
+```
+DynamoDB Tables
+```
+PROMPTS_TABLE=mcp-prompts
+SESSIONS_TABLE=mcp-sessions
+```
+S3 Buckets
+```
+PROMPTS_BUCKET=mcp-prompts-catalog-{account}-{region}
+```
+SQS Queues
+```
+PROCESSING_QUEUE=mcp-prompts-processing
+CATALOG_SYNC_QUEUE=mcp-catalog-sync
+```
+Application
+```
+NODE_ENV=production
+LOG_LEVEL=info
+
+```
+
+### AWS Permissions
+
+The deployment creates minimal IAM roles with these permissions:
+
+- **Lambda Execution Role**: CloudWatch Logs, VPC (if needed)
+- **API Gateway Role**: Lambda invoke permissions
+- **DynamoDB**: Read/write access to prompt tables
+- **S3**: Read/write access to catalog bucket
+- **SQS**: Send/receive/delete messages
+- **CloudWatch**: PutMetricData permissions
+
+## 📊 API Endpoints
+
+### Health & Status
+- `GET /health` - Service health check
+- `GET /mcp` - MCP capabilities
+
+### Prompts Management
+- `GET /v1/prompts` - List prompts (supports ?category= and ?limit=)
+- `POST /v1/prompts` - Create new prompt
+- `GET /v1/prompts/{id}` - Get specific prompt
+- `PUT /v1/prompts/{id}` - Update prompt
+- `DELETE /v1/prompts/{id}` - Delete prompt
+- `POST /v1/prompts/{id}/apply` - Apply template variables
+
+### MCP Tools
+- `GET /mcp/tools` - List available MCP tools
+- `POST /mcp/tools` - Execute MCP tool
+
+## 🔍 Monitoring
+
+### CloudWatch Metrics
+
+The deployment automatically creates custom metrics:
+
+- **PromptAccessCount** - Prompt usage by ID and category
+- **OperationLatency** - API response times
+- **ApiSuccess/ApiError** - Success/error rates by endpoint
+- **ProcessingLatency** - Background processing times
+- **PromptCreated/Updated/Deleted** - CRUD operation counts
+
+### CloudWatch Dashboards
+
+After deployment, create dashboards to monitor:
+
+1. **API Performance** - Latency, throughput, error rates
+2. **DynamoDB Metrics** - Read/write capacity, throttles
+3. **Lambda Metrics** - Duration, errors, concurrency
+4. **S3 Usage** - Requests, data transfer, storage
+
+### Alarms
+
+Set up CloudWatch alarms for:
+
+- API error rate > 5%
+- Average latency > 1000ms
+- DynamoDB throttling events
+- Lambda error rate > 1%
+- SQS dead letter queue messages
+
+## 💰 Cost Optimization
+
+### AWS Free Tier Usage
+
+This deployment is optimized for AWS Free Tier:
+
+- **Lambda**: 1M requests/month free
+- **DynamoDB**: 25GB storage + 25 RCU/WCU free
+- **S3**: 5GB storage + 20K GET + 2K PUT requests free
+- **API Gateway**: 1M requests/month free
+- **CloudWatch**: Basic monitoring free
+
+### Estimated Monthly Costs
+
+For moderate usage (beyond free tier):
+
+| Service | Usage | Monthly Cost |
+|---------|-------|--------------|
+| Lambda | 2M requests | ~$4.00 |
+| DynamoDB | 50GB + 100 RCU/WCU | ~$15.00 |
+| S3 | 20GB storage | ~$0.50 |
+| API Gateway | 2M requests | ~$7.00 |
+| CloudWatch | Standard monitoring | ~$3.00 |
+| **Total** | | **~$29.50** |
+
+### Cost Reduction Tips
+
+1. **Use DynamoDB On-Demand** for unpredictable workloads
+2. **Enable S3 Intelligent Tiering** for automatic cost optimization
+3. **Set up Lambda Provisioned Concurrency** only for critical functions
+4. **Use CloudWatch Logs retention policies** to control log storage costs
+5. **Monitor and right-size Lambda memory** allocation
+
+## 🔒 Security
+
+### Network Security
+- **VPC Endpoints** for private AWS service access
+- **Security Groups** restricting Lambda network access
+- **WAF** protection for API Gateway (optional)
+
+### Data Security
+- **Encryption at rest** for DynamoDB and S3
+- **Encryption in transit** via HTTPS/TLS
+- **IAM roles** following least-privilege principle
+- **API Gateway authentication** via Cognito (optional)
+
+### Secrets Management
+- **AWS Systems Manager Parameter Store** for configuration
+- **AWS Secrets Manager** for sensitive data
+- **Environment variables** for Lambda configuration
+
+## 🧪 Testing
+
+### Local Testing
+
+Run unit tests
+```
+pnpm test
+Test with local DynamoDB
+```
+docker run -p 8000:8000 amazon/dynamodb-local
+export DYNAMODB_ENDPOINT=http://localhost:8000
 pnpm run dev
 ```
 
-### Available Scripts
-```bash
-# Build
-pnpm run build
-pnpm run build:clean
+### Integration Testing
 
-# Start servers
-pnpm run start          # Default mode
-pnpm run start:http     # HTTP mode
-pnpm run start:mcp      # MCP mode
-
-# Docker
-pnpm run docker:build:mcp
-pnpm run docker:up:mcp
-pnpm run docker:down:mcp
-
-# Testing
-pnpm run test
-pnpm run test:watch
-
-# Linting & Formatting
-pnpm run lint
-pnpm run format
+Test deployed API
+```
+curl https://your-api-gateway-url/health
+```
+Test prompt creation
+```
+curl -X POST https://your-api-gateway-url/v1/prompts
+-H "Content-Type: application/json"
+-d '{"name": "test", "template": "Hello {{name}}", "category": "greeting"}'
 ```
 
-## 📊 Project Structure
+## 🚨 Troubleshooting
 
+### Common Issues
+
+1. **403 Access Denied**
+   - Check IAM permissions
+   - Verify resource policies
+   - Check VPC configuration if using private subnets
+
+2. **Lambda Timeout**
+   - Increase timeout in CDK stack
+   - Optimize cold start performance
+   - Check DynamoDB/S3 connection latency
+
+3. **DynamoDB Throttling**
+   - Switch to On-Demand billing
+   - Optimize partition key distribution
+   - Implement exponential backoff
+
+4. **High Costs**
+   - Review CloudWatch cost analysis
+   - Optimize Lambda memory allocation
+   - Implement S3 lifecycle policies
+   - Review DynamoDB read/write patterns
+
+### Debug Commands
+
+Check Lambda logs
 ```
-mcp-prompts/
-├── src/
-│   ├── index.ts           # Main entry point
-│   ├── mcp-server.ts      # MCP server implementation
-│   ├── http-server.ts     # HTTP server implementation
-│   └── utils.ts           # Utility functions
-├── data/
-│   └── sample-prompts.json # Pre-loaded templates
-├── dist/                  # Compiled output
-├── docs/                  # Documentation
-├── examples/              # Usage examples
-└── docker/                # Docker configurations
+aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/McpPromptsStack"
 ```
-
-## 🔍 Testing
-
-### MCP Server Testing
-```bash
-# Test MCP server functionality
-node test-mcp-complete.js
+Check DynamoDB table
 ```
-
-### HTTP Server Testing
-```bash
-# Start HTTP server
-pnpm run start:http
-
-<<<<<<< HEAD
-
-=======
-# Test endpoints
-curl http://localhost:3003/health
-curl http://localhost:3003/api-docs
+aws dynamodb describe-table --table-name mcp-prompts
 ```
-
-## 📈 Usage Examples
-
-### Using MCP Tools
-
-#### List All Prompts
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "list_prompts",
-    "arguments": {}
-  }
-}
+Check S3 bucket
+```
+aws s3 ls s3://your-bucket-name --recursive
+```
+Check SQS queue
+```
+aws sqs get-queue-attributes --queue-url your-queue-url --attribute-names All
 ```
 
-<<<<<<< HEAD
-### Build Issues
+## 🔄 CI/CD Pipeline
 
-**TypeScript Path Resolution Errors:**
-```bash
-# Clear TypeScript cache
-rm -rf **/*.tsbuildinfo
-pnpm run clean
-pnpm run build
+### GitHub Actions Workflow
+
+```
+name: Deploy to AWS
+on:
+push:
+branches: [main]
+
+jobs:
+deploy:
+runs-on: ubuntu-latest
+steps:
+- uses: actions/checkout@v3
+- uses: actions/setup-node@v3
+with:
+node-version: '18'
+- run: pnpm install
+- run: pnpm run build
+- run: pnpm run deploy
+env:
+AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+
 ```
 
-**SWC Build Failures:**
-```bash
-# Ensure SWC is installed
-pnpm add -D @swc/cli @swc/core
+## 📚 Further Reading
 
-# Clean and rebuild
-pnpm run clean
-pnpm run build
-```
-
-**Workspace Dependency Issues:**
-```bash
-# Reinstall workspace dependencies
-pnpm install --force
-pnpm run build
-```
-
-**Missing Modules or Types:**
-- Ensure you have built `@mcp-prompts/core` first
-- Check that all `dist/` directories are up to date
-- If you change the shared config or move files, clean all `dist/` directories and rebuild
-
-### Runtime Issues
-
-**Common Issues:**
-- If you see errors about missing modules or types, ensure you have built `@mcp-prompts/core` first and that all `dist/` directories are up to date.
-- If you change the shared config or move files, clean all `dist/` directories and rebuild.
-
-## Architecture
-
-### Hexagonal Architecture (Ports & Adapters)
-MCP Prompts follows a clean hexagonal architecture pattern:
-
-- **Core**: Pure domain logic without infrastructure dependencies
-- **Ports**: Interfaces defined in core package
-- **Adapters**: Infrastructure implementations in adapter packages
-- **Apps**: Composition and configuration in apps folder
-
-### Directory Structure
-```
-mcp-prompts/
-├── packages/
-│   ├── core/                    # Domain logic and ports
-│   ├── @sparesparrow/           # Shared packages
-│   └── adapters-*/              # Port implementations
-├── apps/
-│   └── server/                  # MCP server application
-└── docs/                        # Documentation
-```
-
-## Development
-
-### Build Commands
-```bash
-# Build entire workspace
-pnpm run build
-
-# Development with watch mode
-pnpm run build:watch
-
-# Type checking
-pnpm run typecheck
-
-# Clean build artifacts
-pnpm run clean
-```
-
-### Package-specific Commands
-```bash
-# Core package
-pnpm -F @sparesparrow/mcp-prompts-core build
-pnpm -F @sparesparrow/mcp-prompts-core test
-
-# Adapter packages
-pnpm -F @sparesparrow/mcp-prompts-adapters-file build
-pnpm -F @sparesparrow/mcp-prompts-adapters-mdc build
-
-# Server app
-pnpm -F apps/server build
-pnpm -F apps/server test
-```
-
-### Testing
-- **Vitest** for unit tests
-- **Playwright** for e2e tests
-- **Coverage > 90%** for core packages
-- **Integration tests** for adapters
-
-## API Reference
-
-For detailed API documentation, see:
-- [API Reference](docs/04-api-reference.md)
-- [Storage Adapters](docs/03-storage-adapters.md)
-- [Templates Guide](docs/05-templates-guide.md)
-- [MCP Integration](docs/06-mcp-integration.md)
-- [Workflow Guide](docs/09-workflow-guide.md)
-
-## References
-- [Turborepo TypeScript Monorepo Guide](https://turborepo.com/docs/guides/tools/typescript)
-- [Separate tsconfig for builds](https://www.timsanteford.com/posts/streamlining-your-next-js-builds-with-a-separate-typescript-configuration/)
-- [Hexagonal Architecture: Wikipedia](https://en.wikipedia.org/wiki/Hexagonal_architecture_(software))
-- [MCP Specification](https://modelcontextprotocol.io/specification/2025-06-18/architecture)
-=======
-#### Apply Template
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "apply_template",
-    "arguments": {
-      "id": "code_review_assistant",
-      "variables": {
-        "language": "JavaScript",
-        "code": "function hello() { console.log('Hello World'); }"
-      }
-    }
-  }
-}
-```
-
-#### Add New Prompt
-```json
-{
-  "method": "tools/call",
-  "params": {
-    "name": "add_prompt",
-    "arguments": {
-      "name": "My Custom Prompt",
-      "content": "This is a custom prompt for {{subject}}",
-      "isTemplate": true,
-      "tags": ["custom", "example"],
-      "variables": [
-        {
-          "name": "subject",
-          "description": "The subject to process",
-          "required": true,
-          "type": "string"
-        }
-      ]
-    }
-  }
-}
-```
-
-## 🌟 Features
-
-- **Template Variables** - Use `{{variable}}` syntax for dynamic content
-- **Tag System** - Organize prompts with tags for easy filtering
-- **Metadata Support** - Add categories, difficulty, time estimates
-- **Version Control** - Track prompt versions and changes
-- **Error Handling** - Comprehensive error handling and logging
-- **TypeScript** - Full TypeScript support with type definitions
-- **Docker Ready** - Containerized deployment support
+- [AWS CDK Documentation](https://docs.aws.amazon.com/cdk/)
+- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
+- [Lambda Performance Optimization](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
+- [API Gateway Throttling](https://docs.aws.amazon.com/apigateway/latest/developerguide/api-gateway-request-throttling.html)
 
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
-3. Implement your changes
-4. Add tests if applicable
+3. Make your changes
+4. Test thoroughly
 5. Submit a pull request
 
 ## 📄 License
 
-MIT License - see [LICENSE](LICENSE) file for details.
-
-## 🆘 Support
-
-- **Issues:** [GitHub Issues](https://github.com/sparesparrow/mcp-prompts/issues)
-- **Documentation:** [MCP_README.md](MCP_README.md)
-- **Examples:** [examples/](examples/)
-
----
-
-**Version:** 3.0.8  
-**Status:** ✅ Production Ready  
-**MCP Support:** ✅ Full Implementation  
-**Cursor Integration:** ✅ Ready
+MIT License - see LICENSE file for details.
