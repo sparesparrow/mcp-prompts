@@ -1,0 +1,314 @@
+---
+description: Rules for implementing and documenting the Customer Support Agent pattern
+globs: ["**/DesignPatterns/Domain/CustomerSupportAgent.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Customer Support Agent Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Customer Support Agent pattern, which combines chatbot interfaces with enhanced tool integration capabilities for customer support.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Customer Support Agent Pattern
+**Intent**: Enable sophisticated customer support through conversation and tool integration
+**Problem**: Traditional chatbots lack access to necessary data and actions
+**Solution**: Implementation details with tool integration and conversation flow
+```
+
+### 2. Components
+Must define:
+- Conversation Manager
+- Tool Integrator
+- Knowledge Base
+- Action Handler
+
+## Implementation Requirements
+
+### 1. Conversation Management
+```python
+class CustomerSupportAgent:
+    def __init__(
+        self,
+        llm_client,
+        tools: Dict[str, Any],
+        knowledge_base: KnowledgeBase
+    ):
+        """
+        Initialize the customer support agent.
+        
+        Args:
+            llm_client: LLM for conversation
+            tools: Dict mapping tool names to handlers
+            knowledge_base: Knowledge base interface
+        """
+        self.llm = llm_client
+        self.tools = tools
+        self.kb = knowledge_base
+        self.conversation_history = []
+        self.metrics = SupportMetrics()
+
+    def handle_message(self, message: str) -> str:
+        """
+        Process customer message and generate response.
+        
+        Args:
+            message: Customer message
+            
+        Returns:
+            Agent response
+        """
+        try:
+            # Add to conversation history
+            self.conversation_history.append({
+                'role': 'user',
+                'content': message,
+                'timestamp': time.time()
+            })
+            
+            # Analyze intent
+            intent = self._analyze_intent(message)
+            
+            # Get relevant knowledge
+            knowledge = self.kb.search(message)
+            
+            # Generate response
+            response = self._generate_response(
+                message,
+                intent,
+                knowledge
+            )
+            
+            # Record response
+            self.conversation_history.append({
+                'role': 'assistant',
+                'content': response,
+                'timestamp': time.time()
+            })
+            
+            return response
+        except Exception as e:
+            logger.error(f"Message handling failed: {str(e)}")
+            return self._generate_fallback_response()
+```
+
+### 2. Tool Integration
+```python
+def execute_tool_action(
+    self,
+    tool_name: str,
+    params: Dict[str, Any]
+) -> Any:
+    """
+    Execute tool action with parameters.
+    
+    Args:
+        tool_name: Name of tool to execute
+        params: Tool parameters
+        
+    Returns:
+        Tool execution result
+    """
+    try:
+        # Validate tool exists
+        if tool_name not in self.tools:
+            raise ToolError(f"Unknown tool: {tool_name}")
+            
+        # Get tool handler
+        tool = self.tools[tool_name]
+        
+        # Validate parameters
+        if not self._validate_tool_params(tool, params):
+            raise ValidationError("Invalid tool parameters")
+            
+        # Execute tool
+        result = tool.execute(params)
+        
+        # Record metrics
+        self.metrics.record_tool_usage(
+            tool_name,
+            success=True
+        )
+        
+        return result
+    except Exception as e:
+        logger.error(f"Tool execution failed: {str(e)}")
+        self.metrics.record_tool_usage(
+            tool_name,
+            success=False
+        )
+        raise ToolExecutionError(f"Failed to execute {tool_name}")
+```
+
+### 3. Resolution Tracking
+```python
+def track_resolution(
+    self,
+    conversation_id: str,
+    resolved: bool,
+    feedback: Dict[str, Any] = None
+) -> None:
+    """
+    Track conversation resolution status.
+    
+    Args:
+        conversation_id: Conversation identifier
+        resolved: Whether issue was resolved
+        feedback: Optional customer feedback
+    """
+    try:
+        # Record resolution
+        resolution = {
+            'conversation_id': conversation_id,
+            'resolved': resolved,
+            'timestamp': time.time(),
+            'feedback': feedback or {}
+        }
+        
+        # Update metrics
+        self.metrics.record_resolution(resolution)
+        
+        # Store resolution data
+        self._store_resolution_data(resolution)
+        
+    except Exception as e:
+        logger.error(f"Resolution tracking failed: {str(e)}")
+        raise TrackingError("Failed to track resolution")
+```
+
+## Validation Rules
+
+### 1. Conversation Quality
+Must implement:
+- Intent analysis
+- Context tracking
+- Knowledge integration
+- Response generation
+
+### 2. Tool Integration
+Must include:
+- Tool validation
+- Parameter checking
+- Error handling
+- Usage tracking
+
+### 3. Resolution Tracking
+Must verify:
+- Status tracking
+- Feedback collection
+- Metrics calculation
+- Data storage
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_message_handling():
+    """Test customer message processing."""
+    agent = CustomerSupportAgent(llm_client, tools, kb)
+    response = agent.handle_message("test message")
+    assert response is not None
+    assert len(agent.conversation_history) == 2
+
+def test_tool_execution():
+    """Test tool action execution."""
+    agent = CustomerSupportAgent(llm_client, tools, kb)
+    result = agent.execute_tool_action(
+        "refund",
+        {"order_id": "123"}
+    )
+    assert result is not None
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end conversations
+- Tool interactions
+- Resolution tracking
+- Performance metrics
+
+## Performance Guidelines
+
+### 1. Optimization
+- Fast response times
+- Efficient tool usage
+- Smart caching
+- Resource management
+
+### 2. Scaling
+- Handle many users
+- Manage conversations
+- Balance load
+- Control costs
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Conversation flow
+- Tool integration
+- Knowledge access
+- Metrics tracking
+
+### 2. Configuration
+Must specify:
+- Tool settings
+- Knowledge sources
+- Response templates
+- Metric thresholds
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Customer Message] --> B[Conversation Manager]
+    B --> C[Intent Analyzer]
+    C --> D[Knowledge Base]
+    C --> E[Tool Selector]
+    D & E --> F[Response Generator]
+    E --> G[Tool Actions]
+    F --> H[Customer Response]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style C fill:#e74c3c,stroke:#c0392b
+    style F fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Conversation handling implemented
+- [ ] Tool integration working
+- [ ] Resolution tracking complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Resolution tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular response tuning
+- Tool updates
+- Performance optimization
+- Error handling improvements
+
+2. Documentation Updates
+- Keep examples current
+- Update tool guides
+- Maintain metrics guide
+- Document new features 

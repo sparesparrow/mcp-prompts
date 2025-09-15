@@ -1,0 +1,268 @@
+---
+description: Rules for implementing and documenting the Interactive Learning pattern for LLMs
+globs: ["**/DesignPatterns/Agentic/InteractiveLearning.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Interactive Learning Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Interactive Learning pattern, which enables LLMs to learn from user interactions and feedback during runtime.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Interactive Learning Pattern
+**Intent**: Enable runtime learning from user interactions and feedback
+**Research Background**: Reference to papers on interactive learning
+**Solution**: Implementation details with feedback incorporation
+```
+
+### 2. Components
+Must define:
+- Feedback Collector
+- Learning Signal Extractor
+- Pattern Updater
+- Response Generator
+
+## Implementation Requirements
+
+### 1. Feedback Collection
+```python
+class InteractiveLearner:
+    def __init__(self, llm_client, feedback_store):
+        """
+        Initialize the interactive learner.
+        
+        Args:
+            llm_client: LLM client for response generation
+            feedback_store: Storage for feedback patterns
+        """
+        self.llm = llm_client
+        self.feedback_store = feedback_store
+        self.learning_rate = 0.1
+
+    def collect_feedback(self, interaction: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Collect and process user feedback.
+        
+        Args:
+            interaction: Dictionary containing interaction details
+            
+        Returns:
+            Processed feedback data
+        """
+        try:
+            # Extract feedback signals
+            explicit_feedback = interaction.get('explicit_feedback', {})
+            implicit_feedback = self.extract_implicit_feedback(interaction)
+            
+            return {
+                'explicit': explicit_feedback,
+                'implicit': implicit_feedback,
+                'context': interaction.get('context', {}),
+                'timestamp': time.time()
+            }
+        except Exception as e:
+            logger.error(f"Failed to collect feedback: {str(e)}")
+            raise FeedbackError("Failed to collect feedback")
+```
+
+### 2. Learning Signal Extraction
+```python
+def extract_learning_signals(self, feedback: Dict[str, Any]) -> List[Dict]:
+    """
+    Extract learning signals from feedback.
+    
+    Args:
+        feedback: Processed feedback data
+        
+    Returns:
+        List of learning signals
+    """
+    signals = []
+    
+    # Process explicit feedback
+    if 'rating' in feedback['explicit']:
+        signals.append({
+            'type': 'rating',
+            'value': feedback['explicit']['rating'],
+            'weight': 1.0
+        })
+        
+    # Process implicit feedback
+    if 'user_engagement' in feedback['implicit']:
+        signals.append({
+            'type': 'engagement',
+            'value': feedback['implicit']['user_engagement'],
+            'weight': 0.5
+        })
+        
+    return signals
+```
+
+### 3. Pattern Updates
+```python
+def update_patterns(self, signals: List[Dict]) -> None:
+    """
+    Update interaction patterns based on learning signals.
+    
+    Args:
+        signals: List of learning signals
+    """
+    try:
+        for signal in signals:
+            pattern = self.extract_pattern(signal)
+            current_weight = self.feedback_store.get_weight(pattern)
+            
+            # Update pattern weight
+            new_weight = current_weight + (
+                self.learning_rate * signal['weight'] * signal['value']
+            )
+            
+            self.feedback_store.update_pattern(pattern, new_weight)
+    except Exception as e:
+        logger.error(f"Failed to update patterns: {str(e)}")
+        raise UpdateError("Failed to update patterns")
+```
+
+## Validation Rules
+
+### 1. Feedback Processing
+Must implement:
+- Explicit feedback handling
+- Implicit feedback detection
+- Context preservation
+- Temporal tracking
+
+### 2. Learning Mechanisms
+Must include:
+- Signal extraction
+- Weight updates
+- Pattern recognition
+- Confidence scoring
+
+### 3. Response Generation
+Must verify:
+- Pattern application
+- Confidence thresholds
+- Fallback mechanisms
+- Improvement metrics
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_feedback_collection():
+    """Test feedback collection and processing."""
+    learner = InteractiveLearner(llm_client, feedback_store)
+    interaction = {
+        'explicit_feedback': {'rating': 0.8},
+        'context': {'query': 'test'}
+    }
+    feedback = learner.collect_feedback(interaction)
+    assert 'explicit' in feedback
+    assert 'implicit' in feedback
+    assert 'timestamp' in feedback
+
+def test_pattern_updates():
+    """Test pattern weight updates."""
+    learner = InteractiveLearner(llm_client, feedback_store)
+    signals = [{'type': 'rating', 'value': 1.0, 'weight': 1.0}]
+    initial_weight = learner.feedback_store.get_weight('test_pattern')
+    learner.update_patterns(signals)
+    new_weight = learner.feedback_store.get_weight('test_pattern')
+    assert new_weight > initial_weight
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end learning
+- Pattern persistence
+- Response improvement
+- Error handling
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient pattern storage
+- Batch updates
+- Caching strategies
+- Memory management
+
+### 2. Scaling
+- Handle high interaction volumes
+- Support concurrent learning
+- Manage pattern growth
+- Implement pruning
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Learning process
+- Pattern storage
+- Update mechanisms
+- Response generation
+
+### 2. Configuration
+Must specify:
+- Learning parameters
+- Feedback weights
+- Update thresholds
+- Storage policies
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[User Interaction] --> B[Interactive Learner]
+    B --> C[Feedback Collector]
+    C --> D[Signal Extractor]
+    D --> E[Pattern Updater]
+    E --> F[Feedback Store]
+    G[Query] --> H[Response Generator]
+    H --> F
+    F --> I[Enhanced Response]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style D fill:#e74c3c,stroke:#c0392b
+    style H fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Feedback collection implemented
+- [ ] Signal extraction working
+- [ ] Pattern updates complete
+- [ ] Response generation improved
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Learning metrics tracked
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular pattern optimization
+- Learning rate tuning
+- Storage efficiency updates
+- Error handling refinement
+
+2. Documentation Updates
+- Keep examples current
+- Update learning metrics
+- Maintain troubleshooting guide
+- Document new features 

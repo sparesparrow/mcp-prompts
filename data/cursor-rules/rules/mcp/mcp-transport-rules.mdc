@@ -1,0 +1,356 @@
+---
+description: Transport implementation rules and guidelines for Model Context Protocol
+globs: ["src/mcp/**/transport/**/*.ts"]
+---
+
+# MCP Transport Implementation Rules
+
+## Transport Interface
+
+### Base Transport Interface
+```typescript
+interface Transport {
+  connect(): Promise<void>;
+  disconnect(): Promise<void>;
+  send(message: Message): Promise<void>;
+  onMessage(handler: MessageHandler): void;
+  onError(handler: ErrorHandler): void;
+  onClose(handler: CloseHandler): void;
+  isConnected(): boolean;
+  getStats(): TransportStats;
+}
+
+interface TransportStats {
+  connected: boolean;
+  messagesSent: number;
+  messagesReceived: number;
+  lastMessageTime?: Date;
+  errors: number;
+  reconnects: number;
+  latency: number;
+}
+
+type MessageHandler = (message: Message) => Promise<void>;
+type ErrorHandler = (error: Error) => void;
+type CloseHandler = (code: number, reason: string) => void;
+```
+
+### Transport Options
+```typescript
+interface TransportOptions {
+  timeout?: number;
+  maxRetries?: number;
+  retryDelay?: number;
+  maxMessageSize?: number;
+  compression?: boolean;
+  keepAlive?: boolean;
+  bufferSize?: number;
+  monitoring?: {
+    enabled: boolean;
+    interval: number;
+    metrics: string[];
+  };
+}
+```
+
+## Stdio Transport
+
+### Implementation
+```typescript
+class StdioTransport implements Transport {
+  private process: ChildProcess;
+  private messageQueue: Queue<Message>;
+  private handlers: Set<MessageHandler>;
+  private errorHandlers: Set<ErrorHandler>;
+  private closeHandlers: Set<CloseHandler>;
+  private connected: boolean = false;
+  private stats: TransportStats;
+
+  constructor(
+    private command: string,
+    private args: string[],
+    private options: TransportOptions = {}
+  ) {
+    this.initializeStats();
+    this.setupMessageQueue();
+  }
+
+  async connect(): Promise<void> {
+    try {
+      this.process = spawn(this.command, this.args);
+      this.setupProcessHandlers();
+      await this.waitForReady();
+      this.connected = true;
+    } catch (error) {
+      throw new TransportError(
+        'Failed to connect stdio transport',
+        { cause: error }
+      );
+    }
+  }
+
+  private setupProcessHandlers(): void {
+    this.process.stdout.on('data', this.handleStdout.bind(this));
+    this.process.stderr.on('data', this.handleStderr.bind(this));
+    this.process.on('error', this.handleError.bind(this));
+    this.process.on('close', this.handleClose.bind(this));
+  }
+
+  async send(message: Message): Promise<void> {
+    if (!this.connected) {
+      throw new TransportError('Transport not connected');
+    }
+
+    try {
+      const data = JSON.stringify(message);
+      if (data.length > this.options.maxMessageSize!) {
+        throw new TransportError('Message too large');
+      }
+
+      await this.messageQueue.enqueue(async () => {
+        this.process.stdin.write(data + '\n');
+        this.stats.messagesSent++;
+      });
+    } catch (error) {
+      throw new TransportError(
+        'Failed to send message',
+        { cause: error }
+      );
+    }
+  }
+}
+```
+
+## SSE Transport
+
+### Implementation
+```typescript
+class SSETransport implements Transport {
+  private eventSource?: EventSource;
+  private messageQueue: Queue<Message>;
+  private reconnectAttempts: number = 0;
+  private stats: TransportStats;
+
+  constructor(
+    private url: URL,
+    private options: TransportOptions = {}
+  ) {
+    this.initializeStats();
+    this.setupMessageQueue();
+  }
+
+  async connect(): Promise<void> {
+    try {
+      this.eventSource = new EventSource(this.url.toString());
+      await this.setupEventHandlers();
+      this.startMonitoring();
+    } catch (error) {
+      throw new TransportError(
+        'Failed to connect SSE transport',
+        { cause: error }
+      );
+    }
+  }
+
+  private setupEventHandlers(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, this.options.timeout);
+
+      this.eventSource!.onopen = () => {
+        clearTimeout(timeout);
+        this.connected = true;
+        this.reconnectAttempts = 0;
+        resolve();
+      };
+
+      this.eventSource!.onerror = (error) => {
+        clearTimeout(timeout);
+        this.handleError(error);
+      };
+
+      this.eventSource!.onmessage = (event) => {
+        this.handleMessage(event);
+      };
+    });
+  }
+
+  private startMonitoring(): void {
+    if (!this.options.monitoring?.enabled) return;
+
+    setInterval(() => {
+      this.updateStats();
+      this.checkHealth();
+    }, this.options.monitoring.interval);
+  }
+}
+```
+
+## WebSocket Transport
+
+### Implementation
+```typescript
+class WebSocketTransport implements Transport {
+  private ws?: WebSocket;
+  private messageQueue: Queue<Message>;
+  private pingInterval?: NodeJS.Timer;
+  private stats: TransportStats;
+
+  constructor(
+    private url: URL,
+    private options: TransportOptions = {}
+  ) {
+    this.initializeStats();
+    this.setupMessageQueue();
+  }
+
+  async connect(): Promise<void> {
+    try {
+      this.ws = new WebSocket(this.url.toString());
+      await this.setupWebSocketHandlers();
+      this.setupPing();
+      this.startMonitoring();
+    } catch (error) {
+      throw new TransportError(
+        'Failed to connect WebSocket transport',
+        { cause: error }
+      );
+    }
+  }
+
+  private setupWebSocketHandlers(): Promise<void> {
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error('Connection timeout'));
+      }, this.options.timeout);
+
+      this.ws!.onopen = () => {
+        clearTimeout(timeout);
+        this.connected = true;
+        resolve();
+      };
+
+      this.ws!.onclose = (event) => {
+        this.handleClose(event.code, event.reason);
+      };
+
+      this.ws!.onerror = (error) => {
+        this.handleError(error);
+      };
+
+      this.ws!.onmessage = (event) => {
+        this.handleMessage(event);
+      };
+    });
+  }
+
+  private setupPing(): void {
+    if (!this.options.keepAlive) return;
+
+    this.pingInterval = setInterval(() => {
+      if (this.isConnected()) {
+        this.ws!.send('ping');
+      }
+    }, 30000);
+  }
+}
+```
+
+## Transport Factory
+
+### Implementation
+```typescript
+class TransportFactory {
+  static create(
+    type: 'stdio' | 'sse' | 'websocket',
+    config: TransportConfig,
+    options?: TransportOptions
+  ): Transport {
+    switch (type) {
+      case 'stdio':
+        return new StdioTransport(
+          config.command,
+          config.args,
+          options
+        );
+      case 'sse':
+        return new SSETransport(
+          new URL(config.url),
+          options
+        );
+      case 'websocket':
+        return new WebSocketTransport(
+          new URL(config.url),
+          options
+        );
+      default:
+        throw new Error(`Unsupported transport type: ${type}`);
+    }
+  }
+}
+```
+
+## Best Practices
+
+### 1. Connection Management
+- Implement proper connection lifecycle
+- Handle reconnection gracefully
+- Monitor connection health
+- Implement proper cleanup
+
+### 2. Message Handling
+- Validate message format
+- Handle message ordering
+- Implement proper queuing
+- Handle backpressure
+
+### 3. Error Handling
+- Implement proper error propagation
+- Handle transport-specific errors
+- Implement retry logic
+- Monitor error rates
+
+### 4. Performance
+- Implement message batching
+- Use compression when appropriate
+- Monitor transport metrics
+- Optimize buffer sizes
+
+### 5. Security
+- Validate message sources
+- Implement proper authentication
+- Secure transport layer
+- Handle sensitive data
+
+## Implementation Checklist
+
+### Setup
+- [ ] Choose appropriate transport type
+- [ ] Configure transport options
+- [ ] Setup monitoring
+- [ ] Configure security
+
+### Core Features
+- [ ] Implement connection handling
+- [ ] Setup message processing
+- [ ] Configure error handling
+- [ ] Implement reconnection logic
+
+### Monitoring
+- [ ] Setup performance metrics
+- [ ] Configure health checks
+- [ ] Implement logging
+- [ ] Setup alerts
+
+### Security
+- [ ] Implement authentication
+- [ ] Configure encryption
+- [ ] Setup access control
+- [ ] Handle sensitive data
+
+### Testing
+- [ ] Unit tests
+- [ ] Integration tests
+- [ ] Performance tests
+- [ ] Security tests 

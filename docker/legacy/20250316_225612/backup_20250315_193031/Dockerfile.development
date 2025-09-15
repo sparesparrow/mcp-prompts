@@ -1,0 +1,24 @@
+# Development Dockerfile for MCP Prompts
+# Extends the base image for development purposes
+
+FROM sparesparrow/mcp-prompts-base:latest
+
+# Install additional development tools
+RUN apk add --no-cache git
+
+# Set environment variables
+ENV NODE_ENV=development
+
+# Copy package files
+COPY package*.json ./
+RUN npm install
+
+# Copy configuration files
+COPY tsconfig.json ./
+COPY jest.config.js ./
+
+# Expose debug port
+EXPOSE 9229
+
+# Use nodemon for hot reloading with typescript
+CMD ["npm", "run", "dev:watch"] 

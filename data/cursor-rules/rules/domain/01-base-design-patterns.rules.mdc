@@ -1,0 +1,428 @@
+---
+description: Base rules and guidelines for design pattern documentation
+globs: ["**/DesignPatterns/**/*.md", "**/DesignPatterns/**/*.html"]
+priority: 10
+dependencies: []
+---
+
+# Base Design Pattern Rules
+
+## Overview
+These rules define the base structure and requirements for all design pattern documentation files.
+
+## Required Sections
+
+### 1. Pattern Metadata
+Each design pattern file must include:
+- Pattern name and category
+- Intent/Purpose
+- Problem it solves
+- Solution overview
+- Research background (if applicable)
+
+Example:
+```markdown
+### Pattern Name
+**Intent**: Brief description of the pattern's purpose
+**Problem**: What issue does this pattern address
+**Solution**: How the pattern solves the problem
+```
+
+### 2. Code Examples
+All implementation examples must:
+- Use clear, descriptive variable names
+- Include error handling
+- Have proper documentation
+- Follow language-specific best practices
+
+Example:
+```python
+class PatternImplementation:
+    """
+    Implementation of the design pattern.
+    
+    Attributes:
+        attribute_name: Description of the attribute
+    """
+    def __init__(self):
+        self.validate_configuration()
+        
+    def validate_configuration(self):
+        """Validates the configuration before initialization."""
+        try:
+            # Validation logic
+            pass
+        except Exception as e:
+            raise ConfigurationError(f"Invalid configuration: {str(e)}")
+```
+
+### 3. Diagrams
+If the pattern includes diagrams:
+- Must use Mermaid syntax
+- Should follow consistent styling
+- Must include clear labels and relationships
+
+Example:
+```mermaid
+graph TD
+    A[Component A] --> B[Component B]
+    B --> C[Component C]
+    style A fill:#2ecc71,stroke:#27ae60
+    style B fill:#3498db,stroke:#2980b9
+    style C fill:#e74c3c,stroke:#c0392b
+```
+
+### 4. Implementation Guidelines
+Must include:
+- Best practices
+- Common pitfalls to avoid
+- Performance considerations
+- Security implications (if applicable)
+
+### 5. Testing Guidelines
+Should specify:
+- Unit test requirements
+- Integration test scenarios
+- Performance test criteria (if applicable)
+
+## Validation Rules
+
+1. File Structure
+```regex
+^---\s*\n(.*\n)*---\s*\n\n# [^\n]+\n\n## Overview
+```
+
+2. Code Blocks
+```regex
+^```[a-z]+\n[\s\S]*?\n```$
+```
+
+3. Mermaid Diagrams
+```regex
+^```mermaid\n[\s\S]*?\n```$
+```
+
+## Style Guidelines
+
+1. Headers
+- Use ATX-style headers (#)
+- Maximum of 3 levels deep
+- Include a space after #
+
+2. Code
+- Indent with 4 spaces
+- Use consistent naming conventions
+- Include type hints in Python code
+
+3. Lists
+- Use - for unordered lists
+- Use 1. for ordered lists
+- Maintain consistent indentation
+
+## Common Patterns
+
+1. Error Handling
+```python
+try:
+    # Operation
+    pass
+except SpecificException as e:
+    # Handle specific error
+    raise CustomError(f"Operation failed: {str(e)}")
+except Exception as e:
+    # Handle unexpected errors
+    logger.error(f"Unexpected error: {str(e)}")
+    raise
+```
+
+2. Configuration Validation
+```python
+def validate_config(config: Dict[str, Any]) -> bool:
+    """
+    Validates configuration parameters.
+    
+    Args:
+        config: Configuration dictionary
+        
+    Returns:
+        bool: True if valid, raises exception if invalid
+    """
+    required_fields = ['field1', 'field2']
+    for field in required_fields:
+        if field not in config:
+            raise ConfigurationError(f"Missing required field: {field}")
+    return True
+```
+
+## Integration Guidelines
+
+1. Documentation Links
+- Link to related patterns
+- Reference external resources
+- Include version compatibility information
+
+2. Testing Requirements
+- Unit tests for core functionality
+- Integration tests for pattern interactions
+- Performance benchmarks for critical operations
+
+3. Security Considerations
+- Input validation
+- Error handling
+- Resource cleanup
+- Authentication/Authorization (if applicable)
+
+## Error Handling Guidelines
+
+### 1. Exception Hierarchy
+Must implement a clear exception hierarchy:
+```python
+class AgentError(Exception):
+    """Base class for agent-related exceptions."""
+    pass
+
+class ValidationError(AgentError):
+    """Raised when validation fails."""
+    pass
+
+class ProcessingError(AgentError):
+    """Raised when processing fails."""
+    pass
+
+class ResourceError(AgentError):
+    """Raised when resource access fails."""
+    pass
+```
+
+### 2. Error Recovery Patterns
+Must implement the following recovery patterns:
+
+```python
+def safe_process_with_fallback(func):
+    """Decorator for safe processing with fallback."""
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except ValidationError:
+            logger.warning("Validation failed, using fallback")
+            return fallback_handler(*args, **kwargs)
+        except ProcessingError:
+            logger.error("Processing failed, attempting recovery")
+            return recovery_handler(*args, **kwargs)
+        except Exception as e:
+            logger.critical(f"Unexpected error: {str(e)}")
+            raise
+    return wrapper
+```
+
+### 3. Error Logging
+Must implement comprehensive error logging:
+```python
+def log_error(error: Exception, context: Dict[str, Any]) -> None:
+    """
+    Log error with context.
+    
+    Args:
+        error: The exception that occurred
+        context: Additional context about the error
+    """
+    logger.error(
+        f"Error: {str(error)}",
+        extra={
+            'error_type': type(error).__name__,
+            'context': context,
+            'timestamp': time.time()
+        }
+    )
+```
+
+## Testing Requirements
+
+### 1. Unit Testing Framework
+Must implement comprehensive unit tests:
+```python
+class TestBasePattern(unittest.TestCase):
+    """Base test class for pattern testing."""
+    
+    def setUp(self):
+        """Set up test environment."""
+        self.pattern = PatternImplementation()
+        self.test_data = self.load_test_data()
+    
+    def test_validation(self):
+        """Test input validation."""
+        with self.assertRaises(ValidationError):
+            self.pattern.validate_input(invalid_data)
+    
+    def test_processing(self):
+        """Test main processing logic."""
+        result = self.pattern.process(valid_data)
+        self.assertIsNotNone(result)
+        self.assertTrue(self.validate_result(result))
+    
+    def test_error_handling(self):
+        """Test error handling mechanisms."""
+        with self.assertRaises(ProcessingError):
+            self.pattern.process(error_inducing_data)
+```
+
+### 2. Integration Testing
+Must implement integration tests:
+```python
+class TestPatternIntegration(unittest.TestCase):
+    """Integration tests for pattern."""
+    
+    def setUp(self):
+        """Set up integration test environment."""
+        self.system = IntegratedSystem()
+        self.pattern = PatternImplementation()
+    
+    def test_end_to_end(self):
+        """Test end-to-end pattern integration."""
+        input_data = self.generate_test_data()
+        result = self.system.process_with_pattern(
+            self.pattern,
+            input_data
+        )
+        self.validate_integration(result)
+```
+
+### 3. Performance Testing
+Must implement performance tests:
+```python
+class TestPatternPerformance(unittest.TestCase):
+    """Performance tests for pattern."""
+    
+    def setUp(self):
+        """Set up performance test environment."""
+        self.pattern = PatternImplementation()
+        self.large_dataset = self.generate_large_dataset()
+    
+    def test_processing_time(self):
+        """Test processing time constraints."""
+        start_time = time.time()
+        result = self.pattern.process(self.large_dataset)
+        processing_time = time.time() - start_time
+        self.assertLess(processing_time, MAX_PROCESSING_TIME)
+    
+    def test_memory_usage(self):
+        """Test memory usage constraints."""
+        memory_tracker = MemoryTracker()
+        with memory_tracker:
+            self.pattern.process(self.large_dataset)
+        self.assertLess(
+            memory_tracker.peak_usage,
+            MAX_MEMORY_USAGE
+        )
+```
+
+## Validation Rules
+
+### 1. Code Quality
+Must pass the following checks:
+- Pylint score >= 9.0
+- Coverage >= 90%
+- Cyclomatic complexity <= 10
+- Documentation coverage 100%
+
+### 2. Performance Metrics
+Must meet the following criteria:
+- Response time <= 200ms
+- Memory usage <= 512MB
+- CPU usage <= 50%
+- Error rate <= 0.1%
+
+### 3. Security Requirements
+Must implement:
+- Input sanitization
+- Output validation
+- Resource limits
+- Access controls
+
+## Documentation Requirements
+
+### 1. API Documentation
+Must include:
+```python
+class PatternImplementation:
+    """
+    Implementation of the design pattern.
+    
+    Attributes:
+        attribute_name (type): Description
+        
+    Example:
+        >>> pattern = PatternImplementation()
+        >>> result = pattern.process(input_data)
+        >>> assert result.is_valid()
+    """
+    
+    def process(self, input_data: Dict[str, Any]) -> Result:
+        """
+        Process input data using the pattern.
+        
+        Args:
+            input_data: Input data to process
+            
+        Returns:
+            Result object containing processed data
+            
+        Raises:
+            ValidationError: If input validation fails
+            ProcessingError: If processing fails
+        """
+        pass
+```
+
+### 2. Error Documentation
+Must document all error conditions:
+```python
+def handle_error(error: Exception) -> None:
+    """
+    Handle specific error conditions.
+    
+    Args:
+        error: The exception to handle
+        
+    Error Conditions:
+        - ValidationError: Invalid input format
+        - ProcessingError: Processing pipeline failure
+        - ResourceError: Resource unavailable
+        
+    Recovery Steps:
+        1. Log error details
+        2. Attempt automatic recovery
+        3. Notify monitoring system
+        4. Fall back to safe state
+    """
+    pass
+```
+
+## Maintenance Guidelines
+
+### 1. Code Review Checklist
+- [ ] Error handling implemented
+- [ ] Tests cover error cases
+- [ ] Documentation complete
+- [ ] Performance metrics met
+
+### 2. Deployment Checklist
+- [ ] All tests passing
+- [ ] Error monitoring configured
+- [ ] Metrics collection enabled
+- [ ] Backup/recovery tested
+
+### 3. Version Control
+- Clear commit messages
+- Semantic versioning
+- Changelog updates
+
+### 4. Documentation Updates
+- Keep examples current
+- Update diagrams as needed
+- Maintain compatibility information
+
+### 5. Review Process
+- Code review requirements
+- Documentation review checklist
+- Testing verification steps 

@@ -1,0 +1,120 @@
+version: '3.8'
+
+# Testing environment for MCP Prompts
+# Includes test database and CI/CD friendly configuration
+
+name: mcp-prompts-test
+
+services:
+  # MCP Prompts Server - Testing
+  mcp-prompts-test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    container_name: mcp-prompts-test
+    environment:
+      - NODE_ENV=test
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=debug
+      - TEST_MODE=true
+    volumes:
+      - mcp-test-data:/app/data
+      - ../test-results:/app/test-results
+    command: npm test
+    networks:
+      - mcp-test-network
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+
+  # PostgreSQL for testing
+  postgres-test:
+    image: postgres:14-alpine
+    container_name: mcp-prompts-postgres-test
+    environment:
+      - POSTGRES_USER=mcp_test
+      - POSTGRES_PASSWORD=mcp_test
+      - POSTGRES_DB=mcp_prompts_test
+    tmpfs:
+      - /var/lib/postgresql/data # Using tmpfs for faster tests and clean state
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mcp_test -d mcp_prompts_test"]
+      interval: 1s
+      timeout: 2s
+      retries: 10
+      start_period: 2s
+    networks:
+      - mcp-test-network
+
+  # Integration tests for MCP multi-server
+  mcp-integration-test:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.test
+    container_name: mcp-integration-test
+    environment:
+      - NODE_ENV=test
+      - STORAGE_TYPE=file
+      - TEST_MODE=true
+      - TEST_SUITE=integration
+      - MEMORY_SERVER_URL=http://mcp-memory-test:3000
+      - GITHUB_SERVER_URL=http://mcp-github-test:3000
+      - FILESYSTEM_SERVER_URL=http://mcp-filesystem-test:3000
+    command: npm run test:integration
+    networks:
+      - mcp-test-network
+    depends_on:
+      - mcp-memory-test
+      - mcp-github-test
+      - mcp-filesystem-test
+    profiles:
+      - integration-tests
+
+  # MCP Memory Server for testing
+  mcp-memory-test:
+    image: node:20-alpine
+    container_name: mcp-memory-test
+    command: npx -y @modelcontextprotocol/server-memory
+    networks:
+      - mcp-test-network
+    profiles:
+      - integration-tests
+
+  # MCP GitHub Server for testing
+  mcp-github-test:
+    image: node:20-alpine
+    container_name: mcp-github-test
+    command: npx -y @modelcontextprotocol/server-github
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=test-token
+    networks:
+      - mcp-test-network
+    profiles:
+      - integration-tests
+
+  # MCP Filesystem Server for testing
+  mcp-filesystem-test:
+    image: node:20-alpine
+    container_name: mcp-filesystem-test
+    command: npx -y @modelcontextprotocol/server-filesystem /workspace
+    volumes:
+      - ./workspace:/workspace
+    networks:
+      - mcp-test-network
+    profiles:
+      - integration-tests
+
+volumes:
+  mcp-test-data:
+    name: mcp-prompts-test-data
+
+networks:
+  mcp-test-network:
+    name: mcp-test-network
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.103.0/24
+

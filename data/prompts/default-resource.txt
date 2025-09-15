@@ -1,0 +1,19 @@
+Simfony is the frontend to Simplicity, a next-generation alternative to Bitcoin Script that enables advanced contract logic while maintaining security and efficiency.
+
+ You own Simfony’s Rust-based language development. You work on building, improving, and refining Simfony as a smart contract language.  You build and deploy Simfony on the Liquid Blockchain.
+    You Implement smart contracts. You’ll recreate existing Bitcoin Script functionality in Simfony and extend functionality using Simplicity, making contracts more expressive and powerful.
+You have:
+    Expertise in Rust.
+    Deep understanding of Bitcoin’s scripting model. You have a strong knowledge of Bitcoin Script, Taproot, Schnorr signatures, SegWit, Miniscript, and Confidential Transactions.
+    Experience with smart contract development, time-locked contracts (HTLCs, vaults, inheritance-based transfers), multi-signature setups, or covenant-based mechanisms.
+    Comfortable working with Bitcoin’s developer tooling. Experience with Bitcoin Core, CLI tools, test environments (Testnet, Regtest), and security testing tools like fuzz testing.
+    Problem solver. You enjoy tackling difficult programming challenges and designing creative solutions for complex problems.
+    A builder’s mindset. You don’t just write code, you design systems that solve real problems.
+    Clear communicator. You can explain complex technical ideas simply, write thorough documentation, and work well with a team.
+    Comfortable with an education component. At least X% of this role involves documentation, teaching, and developer advocacy, helping others understand and build with Simfony.
+    Strong grasp of WebAssembly (WASM). Experience working with low-level execution environments or blockchain virtual machines is helpful.
+    Familiarity with other blockchain ecosystems and smart contract platforms. You know about Ethereum (Solidity), Web3, DeFi, DAOs, Bridges, and Oracles, and understand the use cases people are seeking.
+    Experience using and deploying production-grade smart contracts. You’ve seen the challenges, MEV risks, DoS attacks, and syntax errors.
+    Experience in Haskell, or other functional languages is a plus.
+    Knowledge of alternative smart contract paradigms. Familiarity with ZK-proofs, rollups, or novel execution models is a plus.
+    Familiarity with low-level cryptographic libraries. Understanding elliptic curve cryptography, signature schemes, and hash-based cryptographic structures can be beneficial.

@@ -1,0 +1,132 @@
+---
+description: Rules for documenting and guiding the development of effective agents, including design principles, best practices, and workflow integration guidelines
+globs: ["**/DesignPatterns/Agentic/Building_Effective_Agents.md"]
+priority: 40
+dependencies: ["01-base-design-patterns.rules.mdc"]
+---
+
+# Building Effective Agents Rules
+
+## Overview
+This file defines rules, design principles, best practices, and workflow integration guidelines for building effective AI agents. These guidelines help ensure that agents are built with simplicity, transparency, robust error handling, and proper tool integration.
+
+## Design Principles
+
+- **Simplicity**: Agents should be as simple as possible. Avoid over-engineering; use straightforward workflows and modular components.
+- **Transparency**: The planning and decision-making process of the agent should be clear. Document planning steps and reasoning paths.
+- **Modularity**: Build agents using composable patterns (e.g., prompt chaining, routing, evaluator-optimizer). This allows replacing or upgrading components easily.
+- **Iterative Feedback**: Incorporate feedback loops (e.g., reflection loops) to continuously improve output quality.
+- **Robustness**: Agents should include fallback mechanisms, error handling, and security guardrails (e.g., prompt injection guard) to ensure reliable operation.
+
+## Best Practices
+
+- **Start Small**: Begin with a simple agent implementation using a basic augmented LLM. Only add more advanced patterns when needed.
+- **Document as You Go**: Use inline documentation within the agent's code and maintain versioned documentation alongside the codebase.
+- **Test Rigorously**: Implement unit and integration tests for each component. Testing validates assumptions and improves maintainability.
+- **Use Metric-driven Evaluation**: Incorporate success criteria and quality metrics to assess prompt outputs and agent performance.
+- **Maintain Consistency**: Follow the common structure established in the base rules, including clear headers, code examples, and diagrams.
+
+## Workflow Integration Guidelines
+
+- **Prompt Chaining**: Break tasks into sequential steps where each LLM call builds on the previous one. Document the chain flow, intermediate outputs, and gate validations.
+- **Routing and Orchestration**: Define clear routing workflows that direct different types of queries to specialized processors. Ensure results are integrated and fallback paths are documented.
+- **Evaluator-Optimizer Feedback Loop**: Implement an iterative process where the agent self-assesses and improves its responses. Track iterations and quality scores.
+- **Memory Management**: Use patterns like Context Shepherd and Memory Cascade to maintain a relevant and efficient context without overloading the agent.
+- **Tool Integration**: Clearly document how external tools are integrated. Ensure each tool call is transparent and verifiable through tests and diagrams.
+
+## Prompt Examples for Cursor Composer
+
+Below are sample prompts for Cursor Composer (or Chat) that include a cursor rule and their expected outcomes. These prompts help verify that the agent design guidelines are followed:
+
+### Example 1: Simple Augmented Agent
+
+**Prompt:**
+```
+[Cursor Rule] Build a simple effective agent that uses an augmented LLM. The agent should first retrieve context using Context Shepherd, then call a tool to perform a minor task (e.g., data retrieval), and finally combine the results in a clear, concise response.
+```
+
+**Expected Result:**
+- The agent architecture must show a clear separation between context management, tool integration, and response generation.
+- Diagrams should capture a flow where context retrieval leads to a tool call and then a final response is synthesized.
+- The response should include a section detailing the LLM's planning steps.
+
+### Example 2: Iterative Reflection
+
+**Prompt:**
+```
+[Cursor Rule] Implement a reflection loop in the agent's workflow. The agent should generate an initial response, evaluate its quality, and if below a threshold, iterate with improvements. Include metrics for convergence.
+```
+
+**Expected Result:**
+- The agent's improvement history should show multiple iterations until the quality score exceeds the threshold.
+- The output must clearly detail each iteration with quality scores and feedback.
+- Diagrams and test cases should demonstrate the iterative improvement cycle.
+
+### Example 3: Multi-Modal Integration
+
+**Prompt:**
+```
+[Cursor Rule] Create an agent that processes multi-modal inputs (e.g., text and images). The agent should process each modality independently and then synthesize a unified response. Ensure proper conversion and error handling.
+```
+
+**Expected Result:**
+- The architectural diagram must display distinct modality processors and a synthesis component, following the Multi-Modal Coordinator guidelines.
+- The agent's response should include evidence of modality conversion where necessary.
+- Tests should confirm that each modality's output is correctly integrated into the final response.
+
+### Example 4: Routing Workflow Integration
+
+**Prompt:**
+```
+[Cursor Rule] Develop an agent that uses a routing workflow to direct different types of queries to specialized processing modules. The agent should classify input, select a route, and return a coherent, context-aware response.
+```
+
+**Expected Result:**
+- The routing mechanism must correctly classify queries and invoke the designated processing module.
+- The agent should fall back to a default route if the classification confidence is low.
+- Documentation should include diagrams that illustrate the routing process and validation rules.
+
+## Testing and Verification
+
+To verify that all rules work as expected, run your integrated testing framework on the new rules file along with the other agent rules. The test results should be captured in a new document "test-results.mdc" in the same directory. This file should include summaries and diffs where applicable.
+
+For example:
+```
+[Cursor Rule Test] Verify that Building_Effective_Agents.rules.mdc rules conform to the specifications. Expected: All sections present; test cases pass; diagrams render correctly.
+```
+
+**Expected Test Output:**
+- All sections (Design Principles, Best Practices, Workflow Integration Guidelines, and Prompt Examples) are present.
+- Unit tests and integration tests pass for each individual rule file.
+- The test-results.mdc document should list each rule file tested along with status success and any warnings.
+
+## Directory Structure
+
+The following structure should be maintained in the repository under `cursor-rules/.cursor/rules/`:
+
+```
+cursor-rules/
+└── .cursor/
+    └── rules/
+         ├── 01-base-design-patterns.rules.mdc
+         ├── 02-anti-patterns.rules.mdc
+         ├── 03-attention-router.rules.mdc
+         ├── 04-chain-of-thought-orchestrator.rules.mdc
+         ├── 05-context-shepherd.rules.mdc
+         ├── 06-goal-decomposer.rules.mdc
+         ├── 07-interactive-learning.rules.mdc
+         ├── 08-knowledge-graph-augmenter.rules.mdc
+         ├── 09-memory-cascade.rules.mdc
+         ├── 10-multi-modal-coordinator.rules.mdc
+         ├── 11-prompt-injection-guard.rules.mdc
+         ├── 12-reflection-loop.rules.mdc
+         ├── 13-response-cache.rules.mdc
+         ├── 14-prompt-chaining-workflow.rules.mdc
+         ├── 15-routing-workflow.rules.mdc
+         ├── 16-parallelization-workflow.rules.mdc
+         ├── 17-orchestrator-workers.rules.mdc
+         ├── 18-evaluator-optimizer.rules.mdc
+         └── Building_Effective_Agents.rules.mdc
+```
+
+All rule files must follow the .mdc extension and the documented format for integration with the CI/CD pipeline and Cursor Composer. 

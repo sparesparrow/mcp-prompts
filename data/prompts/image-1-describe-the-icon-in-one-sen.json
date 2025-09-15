@@ -1,0 +1,14 @@
+{
+  "id": "image-1-describe-the-icon-in-one-sen",
+  "name": "<|image_1|>\ndescribe the icon in one sen...",
+  "description": "<|image_1|>\ndescribe the icon in one sentence",
+  "content": "<|image_1|>\ndescribe the icon in one sentence",
+  "isTemplate": false,
+  "tags": [
+    "ai",
+    "productivity"
+  ],
+  "createdAt": "2025-03-05T03:37:30.298Z",
+  "updatedAt": "2025-03-05T03:41:11.312Z",
+  "version": 1
+}

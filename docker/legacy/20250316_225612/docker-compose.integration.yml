@@ -1,0 +1,114 @@
+version: '3.8'
+
+# Integration with multiple MCP servers
+# This file extends the base configuration with additional MCP servers
+
+name: mcp-integration
+
+services:
+  # MCP Prompts Server - Core service
+  mcp-prompts:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-core
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3000
+      - HOST=0.0.0.0
+      # Enable integration with other servers
+      - ENABLE_INTEGRATION=true
+      - MEMORY_SERVER_URL=http://mcp-memory:3000
+      - GITHUB_SERVER_URL=http://mcp-github:3000
+      - FILESYSTEM_SERVER_URL=http://mcp-filesystem:3000
+    volumes:
+      - mcp-data:/app/data
+    ports:
+      - "3000:3000"
+    networks:
+      - mcp-network
+    depends_on:
+      - mcp-memory
+      - mcp-github
+      - mcp-filesystem
+
+  # MCP Memory Server
+  mcp-memory:
+    image: node:20-alpine
+    container_name: mcp-memory
+    command: npx -y @modelcontextprotocol/server-memory
+    ports:
+      - "3001:3000"
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # MCP GitHub Server
+  mcp-github:
+    image: node:20-alpine
+    container_name: mcp-github
+    command: npx -y @modelcontextprotocol/server-github
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_TOKEN:-}
+    ports:
+      - "3002:3000"
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # MCP Filesystem Server
+  mcp-filesystem:
+    image: node:20-alpine
+    container_name: mcp-filesystem
+    command: npx -y @modelcontextprotocol/server-filesystem /workspace
+    volumes:
+      - ./workspace:/workspace
+    ports:
+      - "3003:3000"
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # MCP Sequential Thinking (optional)
+  mcp-sequential-thinking:
+    image: node:20-alpine
+    container_name: mcp-sequential-thinking
+    command: npx -y @modelcontextprotocol/server-sequential-thinking
+    ports:
+      - "3004:3000"
+    networks:
+      - mcp-network
+    profiles:
+      - with-thinking
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/health || exit 1"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+volumes:
+  mcp-data:
+    name: mcp-integration-data
+  workspace:
+    name: mcp-workspace-data
+
+networks:
+  mcp-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 192.168.101.0/24

@@ -1,0 +1,561 @@
+
+---
+description: Advanced integration patterns and features for MCP implementation in Podman Desktop extensions
+globs: ["src/mcp/**/*.ts", "src/integration/**/*.ts"]
+---
+
+# MCP Integration and Advanced Feature Rules
+
+## Multi-Server Integration
+
+### Server Manager```typescript
+class MCPServerManager {
+  private servers = new Map<string, {
+    client: Client;
+    transport: Transport;
+    capabilities: Set<string>;
+  }>();
+
+  async connectServer(config: {
+    id: string;
+    path: string;
+    type: 'stdio' | 'sse';
+    capabilities: string[];
+  }): Promise<void> {
+    const client = new Client({
+      name: `podman-desktop-${config.id}`,
+      version: '1.0.0'
+    }, {
+      capabilities: this.buildCapabilities(config.capabilities)
+    });
+
+    const transport = await this.createTransport(config);
+    await client.connect(transport);
+
+    this.servers.set(config.id, {
+      client,
+      transport,
+      capabilities: new Set(config.capabilities)
+    });
+  }
+
+  private buildCapabilities(capabilities: string[]): Record<string, unknown> {
+    return capabilities.reduce((acc, cap) => ({
+      ...acc,
+      [cap]: {}
+    }), {});
+  }
+
+  async aggregateToolResults(
+    toolName: string, 
+    args: any
+  ): Promise<Array<{ serverId: string; result: any }>> {
+    const results = [];
+    for (const [serverId, server] of this.servers.entries()) {
+      if (server.capabilities.has('tools')) {
+        try {
+          const result = await server.client.request(
+            {
+              method: 'tools/call',
+              params: { name: toolName, arguments: args }
+            },
+            CallToolResultSchema
+          );
+          results.push({ serverId, result });
+        } catch (error) {
+          console.error(`Error from server ${serverId}:`, error);
+        }
+      }
+    }
+    return results;
+  }
+}
+```
+
+## Advanced Resource Handling
+
+### Resource Streaming
+```typescript
+class ResourceStreamer {
+  private subscribers = new Map<string, Set<(content: any) => void>>();
+  private pollingIntervals = new Map<string, NodeJS.Timer>();
+
+  async subscribeToResource(
+    uri: string,
+    onUpdate: (content: any) => void,
+    options: {
+      pollInterval?: number;
+      immediate?: boolean;
+    } = {}
+  ): Promise<() => void> {
+    if (!this.subscribers.has(uri)) {
+      this.subscribers.set(uri, new Set());
+    }
+    
+    const subscribers = this.subscribers.get(uri)!;
+    subscribers.add(onUpdate);
+
+    if (options.immediate) {
+      try {
+        const content = await this.fetchResource(uri);
+        onUpdate(content);
+      } catch (error) {
+        console.error(`Initial fetch failed for ${uri}:`, error);
+      }
+    }
+
+    if (options.pollInterval && !this.pollingIntervals.has(uri)) {
+      const interval = setInterval(async () => {
+        try {
+          const content = await this.fetchResource(uri);
+          for (const subscriber of subscribers) {
+            subscriber(content);
+          }
+        } catch (error) {
+          console.error(`Polling failed for ${uri}:`, error);
+        }
+      }, options.pollInterval);
+
+      this.pollingIntervals.set(uri, interval);
+    }
+
+    return () => {
+      subscribers.delete(onUpdate);
+      if (subscribers.size === 0) {
+        const interval = this.pollingIntervals.get(uri);
+        if (interval) {
+          clearInterval(interval);
+          this.pollingIntervals.delete(uri);
+        }
+        this.subscribers.delete(uri);
+      }
+    };
+  }
+}
+```
+
+### Resource Caching
+```typescript
+interface CacheEntry<T> {
+  data: T;
+  timestamp: number;
+  ttl: number;
+}
+
+class ResourceCache {
+  private cache = new Map<string, CacheEntry<any>>();
+  private fetchPromises = new Map<string, Promise<any>>();
+
+  async getResource<T>(
+    uri: string,
+    fetcher: () => Promise<T>,
+    options: {
+      ttl?: number;
+      forceFetch?: boolean;
+    } = {}
+  ): Promise<T> {
+    const ttl = options.ttl ?? 5000;
+    const cached = this.cache.get(uri);
+
+    if (!options.forceFetch && 
+        cached && 
+        Date.now() - cached.timestamp < cached.ttl) {
+      return cached.data;
+    }
+
+    // Deduplicate in-flight requests
+    let fetchPromise = this.fetchPromises.get(uri);
+    if (!fetchPromise) {
+      fetchPromise = fetcher().then(data => {
+        this.cache.set(uri, {
+          data,
+          timestamp: Date.now(),
+          ttl
+        });
+        this.fetchPromises.delete(uri);
+        return data;
+      }).catch(error => {
+        this.fetchPromises.delete(uri);
+        throw error;
+      });
+      this.fetchPromises.set(uri, fetchPromise);
+    }
+
+    return fetchPromise;
+  }
+
+  invalidate(uri: string): void {
+    this.cache.delete(uri);
+  }
+
+  invalidatePattern(pattern: RegExp): void {
+    for (const uri of this.cache.keys()) {
+      if (pattern.test(uri)) {
+        this.cache.delete(uri);
+      }
+    }
+  }
+}
+```
+
+## Prompt Chain Management
+
+### Prompt Chain Executor
+```typescript
+interface PromptChainStep {
+  prompt: string;
+  tools?: string[];
+  requiresHumanInput?: boolean;
+  condition?: (context: any) => boolean;
+}
+
+class PromptChainExecutor {
+  private context: Record<string, any> = {};
+
+  async executeChain(
+    steps: PromptChainStep[],
+    initialContext: Record<string, any> = {}
+  ): Promise<Record<string, any>> {
+    this.context = { ...initialContext };
+
+    for (const step of steps) {
+      if (step.condition && !step.condition(this.context)) {
+        continue;
+      }
+
+      if (step.requiresHumanInput) {
+        const input = await this.requestHumanInput(step.prompt);
+        this.context.humanInput = input;
+      }
+
+      const response = await this.executeSingleStep(step);
+      this.context = {
+        ...this.context,
+        ...response
+      };
+    }
+
+    return this.context;
+  }
+
+  private async executeSingleStep(
+    step: PromptChainStep
+  ): Promise<Record<string, any>> {
+    const messages = [{
+      role: 'user',
+      content: this.interpolatePrompt(step.prompt)
+    }];
+
+    let toolResults = {};
+    if (step.tools) {
+      toolResults = await this.executeTools(step.tools);
+    }
+
+    return {
+      ...toolResults,
+      stepResult: await this.sample(messages)
+    };
+  }
+
+  private interpolatePrompt(prompt: string): string {
+    return prompt.replace(/\${(\w+)}/g, (_, key) => 
+      this.context[key] ?? `\${${key}}`
+    );
+  }
+}
+```
+
+## Advanced Tool Patterns
+
+### Tool Composition
+```typescript
+class ToolComposer {
+  private toolRegistry = new Map<string, {
+    handler: (args: any) => Promise<any>;
+    dependencies?: string[];
+  }>();
+
+  registerTool(
+    name: string,
+    handler: (args: any) => Promise<any>,
+    dependencies?: string[]
+  ): void {
+    this.toolRegistry.set(name, { handler, dependencies });
+  }
+
+  async executeTool(name: string, args: any): Promise<any> {
+    const tool = this.toolRegistry.get(name);
+    if (!tool) {
+      throw new Error(`Tool not found: ${name}`);
+    }
+
+    if (tool.dependencies) {
+      for (const dep of tool.dependencies) {
+        if (!this.toolRegistry.has(dep)) {
+          throw new Error(`Missing dependency: ${dep}`);
+        }
+      }
+    }
+
+    return tool.handler(args);
+  }
+
+  composeTool(
+    name: string,
+    steps: Array<{
+      tool: string;
+      argsMapper: (context: any) => any;
+      resultMapper?: (result: any) => any;
+    }>
+  ): void {
+    this.registerTool(name, async (initialArgs) => {
+      let context = { input: initialArgs };
+
+      for (const step of steps) {
+        const args = step.argsMapper(context);
+        const result = await this.executeTool(step.tool, args);
+        context = {
+          ...context,
+          [step.tool]: step.resultMapper ? step.resultMapper(result) : result
+        };
+      }
+
+      return context;
+    });
+  }
+}
+```
+
+### Tool Rate Limiting
+```typescript
+interface RateLimitConfig {
+  maxRequests: number;
+  windowMs: number;
+  fairShare?: boolean;
+}
+
+class ToolRateLimiter {
+  private requests = new Map<string, Array<number>>();
+  private queues = new Map<string, Array<() => Promise<void>>>();
+
+  constructor(private config: RateLimitConfig) {}
+
+  async executeWithLimit<T>(
+    toolName: string,
+    execution: () => Promise<T>
+  ): Promise<T> {
+    await this.waitForAvailability(toolName);
+    
+    try {
+      return await execution();
+    } finally {
+      this.recordExecution(toolName);
+    }
+  }
+
+  private async waitForAvailability(toolName: string): Promise<void> {
+    if (this.hasAvailableSlot(toolName)) {
+      return;
+    }
+
+    return new Promise((resolve) => {
+      if (!this.queues.has(toolName)) {
+        this.queues.set(toolName, []);
+      }
+      this.queues.get(toolName)!.push(resolve);
+    });
+  }
+
+  private hasAvailableSlot(toolName: string): boolean {
+    const now = Date.now();
+    const requests = this.requests.get(toolName) || [];
+    
+    // Clean up old requests
+    const validRequests = requests.filter(
+      time => now - time < this.config.windowMs
+    );
+    this.requests.set(toolName, validRequests);
+
+    return validRequests.length < this.config.maxRequests;
+  }
+
+  private recordExecution(toolName: string): void {
+    if (!this.requests.has(toolName)) {
+      this.requests.set(toolName, []);
+    }
+    this.requests.get(toolName)!.push(Date.now());
+
+    // Process queue if any
+    setTimeout(() => this.processQueue(toolName), this.config.windowMs);
+  }
+
+  private processQueue(toolName: string): void {
+    const queue = this.queues.get(toolName);
+    if (!queue || queue.length === 0) return;
+
+    while (queue.length > 0 && this.hasAvailableSlot(toolName)) {
+      const next = queue.shift();
+      if (next) next();
+    }
+  }
+}
+```
+
+## Advanced Message Patterns
+
+### Batch Operation Handler
+```typescript
+class BatchOperationHandler {
+  async executeBatch<T>(
+    operations: Array<() => Promise<T>>,
+    options: {
+      maxConcurrent?: number;
+      timeoutMs?: number;
+      retries?: number;
+      onProgress?: (completed: number, total: number) => void;
+    } = {}
+  ): Promise<Array<T | Error>> {
+    const {
+      maxConcurrent = 5,
+      timeoutMs = 30000,
+      retries = 2,
+      onProgress
+    } = options;
+
+    const results: Array<T | Error> = [];
+    let completed = 0;
+
+    const executeWithTimeout = async (
+      operation: () => Promise<T>,
+      index: number
+    ): Promise<void> => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const result = await Promise.race([
+            operation(),
+            new Promise((_, reject) => 
+              setTimeout(() => reject(new Error('Timeout')), timeoutMs)
+            )
+          ]);
+
+          results[index] = result;
+          break;
+        } catch (error) {
+          if (attempt === retries) {
+            results[index] = error as Error;
+          }
+        }
+      }
+
+      completed++;
+      onProgress?.(completed, operations.length);
+    };
+
+    for (let i = 0; i < operations.length; i += maxConcurrent) {
+      const batch = operations.slice(i, i + maxConcurrent);
+      await Promise.all(
+        batch.map((op, idx) => executeWithTimeout(op, i + idx))
+      );
+    }
+
+    return results;
+  }
+}
+```
+
+### Message Transformation Pipeline
+```typescript
+interface MessageTransformer {
+  transform(message: any): Promise<any>;
+}
+
+class MessagePipeline {
+  private transformers: MessageTransformer[] = [];
+
+  addTransformer(transformer: MessageTransformer): void {
+    this.transformers.push(transformer);
+  }
+
+  async process(message: any): Promise<any> {
+    let result = message;
+    
+    for (const transformer of this.transformers) {
+      try {
+        result = await transformer.transform(result);
+      } catch (error) {
+        console.error('Transform error:', error);
+        throw error;
+      }
+    }
+
+    return result;
+  }
+}
+
+// Example transformers
+class ValidationTransformer implements MessageTransformer {
+  constructor(private schema: any) {}
+
+  async transform(message: any): Promise<any> {
+    // Validate message against schema
+    return message;
+  }
+}
+
+class EnrichmentTransformer implements MessageTransformer {
+  async transform(message: any): Promise<any> {
+    // Add additional context/data
+    return {
+      ...message,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+```
+
+## Extension Integration
+
+### MCP Extension Manager
+```typescript
+class MCPExtensionManager {
+  private extensions = new Map<string, {
+    activate: () => Promise<void>;
+    deactivate: () => Promise<void>;
+    capabilities: string[];
+  }>();
+
+  registerExtension(
+    id: string,
+    extension: {
+      activate: () => Promise<void>;
+      deactivate: () => Promise<void>;
+      capabilities: string[];
+    }
+  ): void {
+    this.extensions.set(id, extension);
+  }
+
+  async activateExtension(id: string): Promise<void> {
+    const extension = this.extensions.get(id);
+    if (!extension) {
+      throw new Error(`Extension not found: ${id}`);
+    }
+
+    await extension.activate();
+  }
+
+  getExtensionCapabilities(id: string): string[] {
+    return this.extensions.get(id)?.capabilities || [];
+  }
+
+  async deactivateAll(): Promise<void> {
+    const deactivations = Array.from(this.extensions.values())
+      .map(ext => ext.deactivate());
+    await Promise.all(deactivations);
+  }
+}
+```
+
+## Testing
+
+### Mock Transport

@@ -1,0 +1,267 @@
+---
+description: Rules for implementing and documenting the Prompt Injection Guard pattern for LLM security
+globs: ["**/DesignPatterns/Agentic/PromptInjectionGuard.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Prompt Injection Guard Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Prompt Injection Guard pattern, which protects against malicious prompt injection attacks while maintaining functionality.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Prompt Injection Guard Pattern
+**Intent**: Protect against prompt injection attacks while maintaining functionality
+**Research Background**: Reference to papers on prompt injection security
+**Solution**: Implementation details with input validation and sanitization
+```
+
+### 2. Components
+Must define:
+- Input Sanitizer
+- Prompt Validator
+- Security Monitor
+- Recovery Handler
+
+## Implementation Requirements
+
+### 1. Input Sanitization
+```python
+class PromptInjectionGuard:
+    def __init__(self):
+        """Initialize the prompt injection guard."""
+        self.sanitizers = []
+        self.validators = []
+        self.security_monitor = SecurityMonitor()
+        self.blocked_patterns = set()
+
+    def sanitize_input(self, user_input: str) -> str:
+        """
+        Sanitize user input to prevent injection attacks.
+        
+        Args:
+            user_input: Raw user input
+            
+        Returns:
+            Sanitized input string
+        """
+        try:
+            # Apply all sanitizers
+            sanitized = user_input
+            for sanitizer in self.sanitizers:
+                sanitized = sanitizer.clean(sanitized)
+                
+            # Verify sanitization
+            if not self._verify_sanitization(sanitized):
+                raise SecurityException("Sanitization failed")
+                
+            return sanitized
+        except Exception as e:
+            logger.error(f"Input sanitization failed: {str(e)}")
+            raise SanitizationError("Failed to sanitize input")
+```
+
+### 2. Prompt Validation
+```python
+def validate_prompt(self, system_prompt: str, user_input: str) -> bool:
+    """
+    Validate combined prompt for security.
+    
+    Args:
+        system_prompt: System prompt template
+        user_input: Sanitized user input
+        
+    Returns:
+        bool indicating if prompt is safe
+    """
+    try:
+        # Combine prompts
+        combined = self._combine_prompts(system_prompt, user_input)
+        
+        # Check for known attack patterns
+        if self._contains_attack_pattern(combined):
+            return False
+            
+        # Run all validators
+        for validator in self.validators:
+            if not validator.check(combined):
+                return False
+                
+        return True
+    except Exception as e:
+        logger.error(f"Prompt validation failed: {str(e)}")
+        return False
+```
+
+### 3. Security Monitoring
+```python
+def monitor_interaction(
+    self,
+    prompt: str,
+    response: str,
+    metadata: Dict[str, Any]
+) -> None:
+    """
+    Monitor interaction for security issues.
+    
+    Args:
+        prompt: Combined prompt
+        response: LLM response
+        metadata: Interaction metadata
+    """
+    try:
+        # Record interaction
+        self.security_monitor.record_interaction(
+            prompt=prompt,
+            response=response,
+            metadata=metadata
+        )
+        
+        # Analyze for potential threats
+        threats = self.security_monitor.analyze_threats(
+            prompt,
+            response
+        )
+        
+        # Update security measures
+        if threats:
+            self._update_security_measures(threats)
+            
+    except Exception as e:
+        logger.error(f"Security monitoring failed: {str(e)}")
+        raise MonitoringError("Failed to monitor interaction")
+```
+
+## Validation Rules
+
+### 1. Input Protection
+Must implement:
+- Pattern matching
+- Character filtering
+- Length validation
+- Format verification
+
+### 2. Security Checks
+Must include:
+- Attack detection
+- Boundary validation
+- Context isolation
+- Access control
+
+### 3. Monitoring
+Must verify:
+- Interaction logging
+- Threat detection
+- Pattern learning
+- Alert generation
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_input_sanitization():
+    """Test input sanitization against known attacks."""
+    guard = PromptInjectionGuard()
+    malicious_input = "Ignore previous instructions..."
+    sanitized = guard.sanitize_input(malicious_input)
+    assert guard.validate_prompt(system_prompt, sanitized)
+
+def test_attack_detection():
+    """Test detection of injection attacks."""
+    guard = PromptInjectionGuard()
+    attack_prompt = "SYSTEM: Override security..."
+    assert not guard.validate_prompt(system_prompt, attack_prompt)
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end protection
+- Real-world attacks
+- Performance impact
+- Recovery behavior
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient validation
+- Quick sanitization
+- Smart monitoring
+- Resource management
+
+### 2. Scaling
+- Handle high volume
+- Support concurrent checks
+- Manage rule updates
+- Implement caching
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Security layers
+- Validation flow
+- Monitoring system
+- Recovery procedures
+
+### 2. Configuration
+Must specify:
+- Security rules
+- Validation parameters
+- Monitoring settings
+- Alert thresholds
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[User Input] --> B[Input Sanitizer]
+    B --> C[Pattern Matcher]
+    C --> D[Prompt Validator]
+    D --> E[Security Monitor]
+    E -->|Safe| F[LLM Processing]
+    E -->|Unsafe| G[Recovery Handler]
+    G --> H[Security Alert]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style D fill:#e74c3c,stroke:#c0392b
+    style E fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Input sanitization implemented
+- [ ] Prompt validation working
+- [ ] Security monitoring active
+- [ ] Recovery handling robust
+
+2. Testing
+- [ ] Security tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Attack scenarios covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular security updates
+- Pattern list maintenance
+- Monitoring improvements
+- Recovery refinements
+
+2. Documentation Updates
+- Keep attack examples current
+- Update security measures
+- Maintain incident response guide
+- Document new threats 

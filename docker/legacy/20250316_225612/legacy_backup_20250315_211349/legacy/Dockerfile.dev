@@ -1,0 +1,23 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install dependencies
+COPY package*.json ./
+RUN npm install
+
+# Copy configuration files
+COPY tsconfig.json ./
+COPY jest.config.js ./
+
+# Create data directories
+RUN mkdir -p data/prompts data/backups
+
+# Set environment variables
+ENV NODE_ENV=development
+
+# Expose the default port
+EXPOSE 3003
+
+# Use nodemon for hot reloading
+CMD ["npx", "nodemon", "--exec", "node", "--experimental-vm-modules", "./src/index.js"] 

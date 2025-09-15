@@ -1,0 +1,278 @@
+---
+description: Rules for implementing and documenting the Routing workflow pattern
+globs: ["**/DesignPatterns/Workflows/Routing.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Routing Workflow Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Routing workflow pattern, which classifies input and directs it to specialized followup tasks.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Routing Workflow Pattern
+**Intent**: Classify and route inputs to specialized processors
+**Problem**: Different inputs require different processing approaches
+**Solution**: Implementation details with input classification and routing
+```
+
+### 2. Components
+Must define:
+- Input Classifier
+- Route Selector
+- Task Processors
+- Output Aggregator
+
+## Implementation Requirements
+
+### 1. Input Classification
+```python
+class InputRouter:
+    def __init__(self, llm_client, processors: Dict[str, Any]):
+        """
+        Initialize the input router.
+        
+        Args:
+            llm_client: LLM client for classification
+            processors: Dict mapping task types to processors
+        """
+        self.llm = llm_client
+        self.processors = processors
+        self.routes = {}
+        self.stats = RoutingStats()
+
+    def classify_input(self, input_data: str) -> str:
+        """
+        Classify input to determine appropriate route.
+        
+        Args:
+            input_data: Input to classify
+            
+        Returns:
+            Classification label
+        """
+        try:
+            # Generate classification prompt
+            prompt = self._create_classification_prompt(input_data)
+            
+            # Get classification from LLM
+            classification = self.llm.classify(prompt)
+            
+            # Validate classification
+            if not self._is_valid_classification(classification):
+                raise ClassificationError(
+                    f"Invalid classification: {classification}"
+                )
+                
+            return classification
+        except Exception as e:
+            logger.error(f"Classification failed: {str(e)}")
+            raise RoutingError("Failed to classify input")
+```
+
+### 2. Route Selection
+```python
+def select_route(
+    self,
+    classification: str,
+    input_data: str
+) -> Callable:
+    """
+    Select appropriate processor route.
+    
+    Args:
+        classification: Input classification
+        input_data: Original input data
+        
+    Returns:
+        Selected processor function
+    """
+    try:
+        # Get processor for classification
+        if classification not in self.processors:
+            raise RouteError(f"No processor for {classification}")
+            
+        processor = self.processors[classification]
+        
+        # Validate processor availability
+        if not self._is_processor_available(processor):
+            raise ProcessorError("Selected processor unavailable")
+            
+        return processor
+    except Exception as e:
+        logger.error(f"Route selection failed: {str(e)}")
+        return self.processors['default']  # Fallback to default
+```
+
+### 3. Task Processing
+```python
+def process_input(self, input_data: str) -> Any:
+    """
+    Process input through appropriate route.
+    
+    Args:
+        input_data: Input to process
+        
+    Returns:
+        Processed result
+    """
+    try:
+        # Classify input
+        classification = self.classify_input(input_data)
+        
+        # Select route
+        processor = self.select_route(classification, input_data)
+        
+        # Process input
+        result = processor(input_data)
+        
+        # Record statistics
+        self.stats.record_processing(
+            classification,
+            success=True
+        )
+        
+        return result
+    except Exception as e:
+        logger.error(f"Processing failed: {str(e)}")
+        self.stats.record_processing(
+            classification,
+            success=False
+        )
+        raise ProcessingError("Failed to process input")
+```
+
+## Validation Rules
+
+### 1. Classification
+Must implement:
+- Input validation
+- Label verification
+- Confidence scoring
+- Error handling
+
+### 2. Route Management
+Must include:
+- Processor validation
+- Availability checking
+- Load balancing
+- Fallback handling
+
+### 3. Processing Quality
+Must verify:
+- Result validity
+- Error recovery
+- Performance metrics
+- Output quality
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_classification():
+    """Test input classification."""
+    router = InputRouter(llm_client, processors)
+    classification = router.classify_input("test input")
+    assert classification in router.processors
+
+def test_route_selection():
+    """Test route selection and processing."""
+    router = InputRouter(llm_client, processors)
+    processor = router.select_route("test_type", "test input")
+    assert callable(processor)
+    result = processor("test input")
+    assert result is not None
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end routing
+- Processor integration
+- Error handling
+- Performance metrics
+
+## Performance Guidelines
+
+### 1. Optimization
+- Fast classification
+- Efficient routing
+- Smart caching
+- Resource management
+
+### 2. Scaling
+- Handle high volume
+- Support multiple routes
+- Balance load
+- Manage resources
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Classification system
+- Routing logic
+- Processing flow
+- Error handling
+
+### 2. Configuration
+Must specify:
+- Processor settings
+- Route definitions
+- Fallback policies
+- Timeout limits
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Input] --> B[Input Classifier]
+    B --> C{Route Selector}
+    C -->|Type A| D[Processor A]
+    C -->|Type B| E[Processor B]
+    C -->|Type C| F[Processor C]
+    D & E & F --> G[Output Aggregator]
+    C -->|Unknown| H[Default Processor]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style C fill:#e74c3c,stroke:#c0392b
+    style G fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Classification implemented
+- [ ] Route selection working
+- [ ] Processing complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Route tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular route optimization
+- Processor updates
+- Performance tuning
+- Error handling improvements
+
+2. Documentation Updates
+- Keep examples current
+- Update route patterns
+- Maintain processor guide
+- Document new features 

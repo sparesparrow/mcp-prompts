@@ -1,0 +1,67 @@
+{
+  "version": "1.0.0",
+  "servers": {
+    "github-analyzer": {
+      "runtime": "python",
+      "command": "python",
+      "args": ["-m", "analyzer.server"],
+      "env": {
+        "GITHUB_TOKEN": "$GITHUB_TOKEN",
+        "MCP_LOG_LEVEL": "info",
+        "MCP_SECURITY_LEVEL": "strict"
+      },
+      "capabilities": {
+        "tools": {
+          "listChanged": true
+        },
+        "resources": {
+          "subscribe": true,
+          "listChanged": true
+        },
+        "logging": {}
+      },
+      "patterns": [
+        {
+          "description": "Analyze GitHub repository",
+          "match": "analyze (gh|github) repo\\s+(?<url>https://github.com/[\\w-]+/[\\w-]+)",
+          "tool": "analyze_project",
+          "args": {
+            "repo_url": "${url}"
+          }
+        },
+        {
+          "description": "Get repository security status",
+          "match": "check security for\\s+(?<url>https://github.com/[\\w-]+/[\\w-]+)",
+          "tool": "security_check",
+          "args": {
+            "repo_url": "${url}"
+          }
+        }
+      ],
+      "security": {
+        "allowedHosts": ["github.com", "api.github.com"],
+        "requiredScopes": ["repo", "read:packages"],
+        "tokenValidation": {
+          "pattern": "^gh[ps]_[A-Za-z0-9_]{36,251}$",
+          "scopes": ["repo"]
+        }
+      },
+      "validation": {
+        "schema": "./schema.json",
+        "strictMode": true
+      }
+    }
+  },
+  "client": {
+    "timeout": 30000,
+    "retryStrategy": {
+      "attempts": 3,
+      "backoff": "exponential",
+      "initialDelay": 1000
+    },
+    "security": {
+      "validateServerIdentity": true,
+      "requireSecureTransport": true
+    }
+  }
+}

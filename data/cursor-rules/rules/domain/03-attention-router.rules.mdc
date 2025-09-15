@@ -1,0 +1,216 @@
+---
+description: Rules for implementing and documenting the Attention Router pattern for AI agents
+globs: ["**/DesignPatterns/Agentic/AttentionRouter.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Attention Router Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Attention Router pattern, which manages routing of queries to appropriate processing paths.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Attention Router Pattern
+**Intent**: Describe the routing mechanism and its purpose
+**Research Background**: Reference relevant papers and research
+**Solution**: Implementation details with attention scoring
+```
+
+### 2. Components
+Must define:
+- Attention Calculator
+- Route Selector
+- Processor Registry
+- Output Integrator
+
+## Implementation Requirements
+
+### 1. Attention Scoring
+```python
+class AttentionRouter:
+    def calculate_attention_scores(self, query: str) -> Dict[str, float]:
+        """
+        Calculate attention scores for different processors.
+        
+        Args:
+            query: The input query to route
+            
+        Returns:
+            Dict mapping processor names to attention scores
+        """
+        scores = {}
+        for processor in self.processors:
+            scores[processor.name] = self._compute_score(query, processor)
+        return scores
+```
+
+### 2. Route Selection
+```python
+def route_query(self, query: str) -> Union[str, List[str]]:
+    """
+    Route query to appropriate processor(s).
+    
+    Args:
+        query: Input query
+        
+    Returns:
+        Processor name(s) to handle the query
+    """
+    scores = self.calculate_attention_scores(query)
+    if max(scores.values()) > self.threshold:
+        return max(scores.items(), key=lambda x: x[1])[0]
+    return [k for k, v in scores.items() if v > self.min_threshold]
+```
+
+### 3. Multi-processor Handling
+```python
+def process_with_multiple(self, query: str, processors: List[str]) -> str:
+    """
+    Process query with multiple processors and combine results.
+    
+    Args:
+        query: Input query
+        processors: List of processor names
+        
+    Returns:
+        Combined response from all processors
+    """
+    results = []
+    for proc in processors:
+        results.append(self.processors[proc].process(query))
+    return self.output_integrator.combine(results)
+```
+
+## Validation Rules
+
+### 1. Attention Calculation
+Must implement:
+- Semantic similarity scoring
+- Historical performance weighting
+- Confidence thresholds
+- Score normalization
+
+### 2. Route Selection
+Must include:
+- Threshold-based routing
+- Multi-processor support
+- Fallback mechanisms
+- Load balancing
+
+### 3. Output Integration
+Must handle:
+- Result aggregation
+- Conflict resolution
+- Quality scoring
+- Response formatting
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_attention_scoring():
+    """Test attention score calculation."""
+    router = AttentionRouter(processors=[proc1, proc2])
+    scores = router.calculate_attention_scores("test query")
+    assert len(scores) == 2
+    assert all(0 <= score <= 1 for score in scores.values())
+
+def test_route_selection():
+    """Test route selection logic."""
+    router = AttentionRouter(threshold=0.8)
+    route = router.route_query("test query")
+    assert isinstance(route, (str, list))
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end routing
+- Multi-processor scenarios
+- Error handling
+- Performance metrics
+
+## Performance Guidelines
+
+### 1. Optimization
+- Cache attention scores
+- Implement parallel processing
+- Use async operations
+- Monitor resource usage
+
+### 2. Scaling
+- Support processor pools
+- Implement load balancing
+- Handle concurrent requests
+- Manage resource allocation
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Component interactions
+- Data flow
+- Scaling approach
+- Error handling
+
+### 2. Configuration
+Must specify:
+- Threshold settings
+- Processor registration
+- Integration options
+- Performance tuning
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Query Input] --> B[Attention Router]
+    B --> C[Score Calculator]
+    C --> D[Route Selector]
+    D --> E[Processor 1]
+    D --> F[Processor 2]
+    E & F --> G[Output Integrator]
+    G --> H[Final Response]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style C fill:#3498db,stroke:#2980b9
+    style D fill:#e74c3c,stroke:#c0392b
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Attention scoring implemented
+- [ ] Route selection logic complete
+- [ ] Multi-processor handling working
+- [ ] Output integration functional
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Error scenarios covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular performance optimization
+- Processor pool management
+- Configuration tuning
+- Error handling improvements
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain troubleshooting guide
+- Document new features 

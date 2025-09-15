@@ -1,0 +1,14 @@
+{
+  "id": "generate-different-types-of-questions-ab",
+  "name": "Generate different types of questions ab...",
+  "description": "Generate different types of questions about the given text",
+  "content": "Generate different types of questions about the given text. Each question must be on a new line. Do not include empty lines or blank questions.",
+  "isTemplate": false,
+  "tags": [
+    "ai",
+    "productivity"
+  ],
+  "createdAt": "2025-03-05T03:37:30.295Z",
+  "updatedAt": "2025-03-05T03:41:11.302Z",
+  "version": 1
+}

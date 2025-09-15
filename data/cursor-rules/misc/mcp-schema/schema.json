@@ -1,0 +1,105 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "required": ["project_analysis"],
+  "properties": {
+    "project_analysis": {
+      "type": "object",
+      "required": [
+        "name",
+        "frameworks",
+        "languages",
+        "security_requirements",
+        "dependencies",
+        "testing"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "frameworks": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "languages": {
+          "type": "object",
+          "patternProperties": {
+            "^[a-zA-Z]+$": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            }
+          }
+        },
+        "security_requirements": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["name", "level", "details"],
+            "properties": {
+              "name": {
+                "enum": [
+                  "container-isolation",
+                  "model-input-sanitization",
+                  "api-auth",
+                  "secrets-management",
+                  "dependency-scanning",
+                  "code-signing"
+                ]
+              },
+              "level": {
+                "enum": ["required", "recommended", "optional"]
+              },
+              "details": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "dependencies": {
+          "type": "object",
+          "properties": {
+            "runtime": {
+              "type": "object",
+              "patternProperties": {
+                ".*": {
+                  "type": "string",
+                  "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9\\.]+)?$"
+                }
+              }
+            },
+            "development": {
+              "type": "object",
+              "patternProperties": {
+                ".*": {
+                  "type": "string",
+                  "pattern": "^\\d+\\.\\d+\\.\\d+(-[a-zA-Z0-9\\.]+)?$"
+                }
+              }
+            }
+          }
+        },
+        "testing": {
+          "type": "object",
+          "required": ["framework", "coverage", "level"],
+          "properties": {
+            "framework": {
+              "type": "string"
+            },
+            "coverage": {
+              "type": "number",
+              "minimum": 0,
+              "maximum": 100
+            },
+            "level": {
+              "enum": ["minimal", "basic", "moderate", "strict"]
+            }
+          }
+        }
+      }
+    }
+  }
+}

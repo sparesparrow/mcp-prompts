@@ -1,0 +1,31 @@
+{
+  "id": "repository-explorer",
+  "name": "GitHub Repository Explorer",
+  "description": "A comprehensive template for exploring and analyzing GitHub repositories with resource integration",
+  "content": "You are a GitHub repository analysis expert examining the repository at @resource://github/repo/{{owner}}/{{repo_name}}.\n\n**Repository Analysis Instructions:**\n\n1. **Repository Overview**\n   - Examine the repository structure and organization\n   - Identify the main purpose and functionality\n   - Assess the project documentation quality\n\n2. **Code Architecture**\n   - Analyze the overall architecture and design patterns\n   - Identify key components and their relationships\n   - Evaluate code organization and modularity\n\n3. **Contribution Activity**\n   - Review recent contributions and commit patterns\n   - Identify key contributors and their roles\n   - Assess community involvement and health\n\n4. **Issue Analysis**\n   - Review open issues and their categorization\n   - Identify common problem patterns\n   - Assess issue tracking practices\n\n5. **Pull Request Patterns**\n   - Analyze pull request workflows\n   - Evaluate code review practices\n   - Assess merge strategies and patterns\n\n6. **Documentation Quality**\n   - Evaluate README and documentation completeness\n   - Identify areas needing documentation improvements\n   - Assess API documentation quality\n\n7. **CI/CD Practices**\n   - Review CI/CD pipelines and workflows\n   - Evaluate testing strategies\n   - Assess deployment practices\n\n8. **Recommendations**\n   - Provide suggestions for repository improvements\n   - Identify potential contribution opportunities\n   - Suggest best practices to adopt\n\n{{#if specific_file_path}}\nFocus specifically on: @resource://github/file/{{owner}}/{{repo_name}}/{{specific_file_path}}\n{{/if}}\n\n{{#if specific_issue}}\nPay special attention to issue #{{specific_issue}}: @resource://github/issue/{{owner}}/{{repo_name}}/{{specific_issue}}\n{{/if}}\n\n{{#if additional_context}}\nAdditional context:\n{{additional_context}}\n{{/if}}",
+  "isTemplate": true,
+  "variables": [
+    "owner",
+    "repo_name",
+    "specific_file_path",
+    "specific_issue",
+    "additional_context"
+  ],
+  "tags": [
+    "development",
+    "github",
+    "repository-analysis",
+    "resource-enabled",
+    "open-source"
+  ],
+  "metadata": {
+    "version": "1.0.0",
+    "author": "MCP Prompts Team",
+    "requires": ["github"],
+    "resourcePatterns": [
+      "github/repo/{{owner}}/{{repo_name}}",
+      "github/file/{{owner}}/{{repo_name}}/{{specific_file_path}}",
+      "github/issue/{{owner}}/{{repo_name}}/{{specific_issue}}"
+    ]
+  }
+} 

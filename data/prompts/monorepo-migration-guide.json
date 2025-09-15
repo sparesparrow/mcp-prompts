@@ -1,0 +1,29 @@
+{
+  "id": "monorepo-migration-guide",
+  "name": "Monorepo Migration and Code Organization Guide",
+  "description": "A template for guiding the migration of code into a monorepo structure with best practices for TypeScript interfaces, Docker configuration, and CI/CD workflows",
+  "content": "# Monorepo Migration and Code Organization Guide for {{project_name}}\n\n## Overview\n\nThis guide outlines the process for migrating {{project_type}} codebases into a monorepo structure while adhering to best practices for code organization, interface consolidation, containerization, and CI/CD workflows.\n\n## Interface Consolidation\n\n### TypeScript Interfaces Unification\n\n1. Create a centralized interfaces directory:\n   ```bash\n   mkdir -p src/interfaces\n   ```\n\n2. Consolidate related interfaces into a single file to reduce fragmentation:\n   - Group interfaces by domain/purpose\n   - Maintain consistent naming conventions\n   - Document each interface with JSDoc comments\n   - Export all interfaces from a single entry point `index.ts`\n\n3. Example unified interface structure:\n   ```typescript\n   /**\n    * Core domain interfaces\n    */\n   export interface {{primary_interface_name}} {\n     id: string;\n     name: string;\n     // Additional properties...\n   }\n\n   /**\n    * Service interfaces\n    */\n   export interface {{service_interface_name}} {\n     // Service methods...\n   }\n\n   /**\n    * Storage adapters\n    */\n   export interface StorageAdapter {\n     // Storage operations...\n   }\n   ```\n\n## Docker Configuration\n\n### Dockerfile Best Practices\n\n1. Use multi-stage builds for better efficiency:\n   ```dockerfile\n   # Build stage\n   FROM node:{{node_version}}-alpine AS build\n   WORKDIR /app\n   COPY package*.json ./\n   RUN npm ci\n   COPY . .\n   RUN npm run build\n\n   # Production stage\n   FROM node:{{node_version}}-alpine\n   WORKDIR /app\n   COPY --from=build /app/build ./build\n   # Additional configuration...\n   ```\n\n2. Set appropriate environment variables\n3. Use non-root users for security\n4. Implement health checks\n5. Add proper LABEL metadata\n6. Configure volumes for persistent data\n\n### Docker Compose\n\n1. Base configuration for core functionality:\n   ```yaml\n   services:\n     {{service_name}}:\n       build: .\n       volumes:\n         - ./data:/app/data\n       environment:\n         - NODE_ENV=production\n         # Additional environment variables...\n   ```\n\n2. Extended configurations for additional functionality (database, etc.)\n3. Development-specific configurations\n\n## GitHub Workflows\n\n### Essential CI/CD Workflows\n\n1. Main CI workflow for testing and linting\n2. Build and publish workflow for releases\n3. Containerized testing workflow\n\n### Workflow Structure\n\n```yaml\nname: {{workflow_name}}\n\non:\n  push:\n    branches: [main]\n  pull_request:\n    branches: [main]\n\njobs:\n  test:\n    runs-on: ubuntu-latest\n    # Job configuration...\n\n  build:\n    needs: [test]\n    # Build configuration...\n```\n\n## Containerized Testing\n\nImplement containerized testing to ensure consistent environments:\n\n1. Create test-specific Dockerfiles\n2. Set up Docker networks for integrated tests\n3. Use Docker Compose for multi-container testing scenarios\n4. Implement proper cleanup procedures\n\n## DevContainer Configuration\n\nProvide consistent development environments:\n\n```json\n{\n  \"name\": \"{{project_name}} Dev Environment\",\n  \"build\": {\n    \"dockerfile\": \"../Dockerfile\",\n    \"context\": \"..\"\n  },\n  \"customizations\": {\n    \"vscode\": {\n      \"extensions\": [\n        \"dbaeumer.vscode-eslint\",\n        \"esbenp.prettier-vscode\"\n        // Additional extensions...\n      ]\n    }\n  }\n}\n```\n\n## Implementation Strategy\n\n1. Create a feature branch for interface consolidation\n2. Migrate interfaces in stages, testing thoroughly\n3. Add Docker and CI configurations\n4. Validate with containerized tests\n5. Create comprehensive documentation\n\n## Technical Considerations\n\n{{technical_considerations}}\n",
+  "isTemplate": true,
+  "variables": [
+    "project_name",
+    "project_type",
+    "primary_interface_name",
+    "service_interface_name",
+    "node_version",
+    "service_name",
+    "workflow_name",
+    "technical_considerations"
+  ],
+  "tags": [
+    "development",
+    "monorepo",
+    "typescript",
+    "docker",
+    "ci-cd",
+    "migration"
+  ],
+  "category": "development",
+  "createdAt": "2024-08-08T15:30:00.000Z",
+  "updatedAt": "2024-08-08T15:30:00.000Z",
+  "version": 1
+} 

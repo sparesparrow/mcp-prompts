@@ -1,0 +1,276 @@
+---
+description: Rules for implementing and documenting the Response Cache pattern for LLM optimization
+globs: ["**/DesignPatterns/Agentic/ResponseCache.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Response Cache Pattern Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Response Cache pattern, which optimizes response time and resource usage through intelligent caching.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Response Cache Pattern
+**Intent**: Optimize response time and resource usage through caching
+**Problem**: Repeated LLM calls are expensive and slow
+**Solution**: Implementation details with intelligent caching
+```
+
+### 2. Components
+Must define:
+- Cache Manager
+- Query Hasher
+- Invalidation Monitor
+- Storage Backend
+
+## Implementation Requirements
+
+### 1. Cache Management
+```python
+class ResponseCache:
+    def __init__(self, ttl: int = 3600, max_size: int = 10000):
+        """
+        Initialize the response cache.
+        
+        Args:
+            ttl: Time-to-live in seconds
+            max_size: Maximum number of cached items
+        """
+        self.cache = {}
+        self.ttl = ttl
+        self.max_size = max_size
+        self.stats = CacheStats()
+
+    def get_response(self, query: str) -> Optional[str]:
+        """
+        Get cached response for query.
+        
+        Args:
+            query: Query string
+            
+        Returns:
+            Cached response if available and valid
+        """
+        try:
+            # Generate cache key
+            query_hash = self._generate_hash(query)
+            
+            # Check cache
+            if query_hash in self.cache:
+                entry = self.cache[query_hash]
+                if self._is_valid(entry):
+                    self.stats.record_hit()
+                    return entry['response']
+                    
+            self.stats.record_miss()
+            return None
+        except Exception as e:
+            logger.error(f"Cache retrieval failed: {str(e)}")
+            return None
+```
+
+### 2. Cache Storage
+```python
+def store_response(
+    self,
+    query: str,
+    response: str,
+    metadata: Dict[str, Any] = None
+) -> None:
+    """
+    Store response in cache.
+    
+    Args:
+        query: Query string
+        response: Response to cache
+        metadata: Optional metadata for cache entry
+    """
+    try:
+        # Generate cache key
+        query_hash = self._generate_hash(query)
+        
+        # Create cache entry
+        entry = {
+            'response': response,
+            'timestamp': time.time(),
+            'metadata': metadata or {},
+            'access_count': 0
+        }
+        
+        # Manage cache size
+        if len(self.cache) >= self.max_size:
+            self._evict_entries()
+            
+        # Store entry
+        self.cache[query_hash] = entry
+        self.stats.record_store()
+        
+    except Exception as e:
+        logger.error(f"Cache storage failed: {str(e)}")
+        raise CacheError("Failed to store response")
+```
+
+### 3. Cache Maintenance
+```python
+def maintain_cache(self) -> None:
+    """Perform cache maintenance operations."""
+    try:
+        # Remove expired entries
+        current_time = time.time()
+        expired = [
+            key for key, entry in self.cache.items()
+            if current_time - entry['timestamp'] > self.ttl
+        ]
+        for key in expired:
+            del self.cache[key]
+            
+        # Update statistics
+        self.stats.record_maintenance(len(expired))
+        
+        # Optimize storage if needed
+        if self.stats.should_optimize():
+            self._optimize_storage()
+            
+    except Exception as e:
+        logger.error(f"Cache maintenance failed: {str(e)}")
+        raise MaintenanceError("Failed to maintain cache")
+```
+
+## Validation Rules
+
+### 1. Cache Operations
+Must implement:
+- Key generation
+- Entry validation
+- Size management
+- Statistics tracking
+
+### 2. Storage Management
+Must include:
+- Eviction policies
+- Size limits
+- TTL enforcement
+- Optimization strategies
+
+### 3. Performance Metrics
+Must verify:
+- Hit rates
+- Response times
+- Memory usage
+- Cache efficiency
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_cache_operations():
+    """Test basic cache operations."""
+    cache = ResponseCache(ttl=60)
+    cache.store_response("test query", "test response")
+    response = cache.get_response("test query")
+    assert response == "test response"
+    assert cache.stats.hit_count == 1
+
+def test_cache_eviction():
+    """Test cache eviction policies."""
+    cache = ResponseCache(max_size=2)
+    cache.store_response("query1", "response1")
+    cache.store_response("query2", "response2")
+    cache.store_response("query3", "response3")
+    assert len(cache.cache) == 2
+    assert "query1" not in cache.cache
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end caching
+- Concurrent access
+- Memory limits
+- Error handling
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient hashing
+- Quick validation
+- Smart eviction
+- Memory management
+
+### 2. Scaling
+- Handle high load
+- Support distribution
+- Manage memory
+- Implement sharding
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Caching strategy
+- Storage approach
+- Maintenance process
+- Monitoring system
+
+### 2. Configuration
+Must specify:
+- TTL settings
+- Size limits
+- Eviction policies
+- Optimization parameters
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Query] --> B[Cache Manager]
+    B --> C{Cache Hit?}
+    C -->|Yes| D[Return Cached]
+    C -->|No| E[LLM Processing]
+    E --> F[Store Response]
+    F --> G[Return Fresh]
+    H[Maintenance] --> I[Invalidation Monitor]
+    I --> J[Eviction Manager]
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style C fill:#e74c3c,stroke:#c0392b
+    style F fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Cache operations implemented
+- [ ] Storage management working
+- [ ] Maintenance system complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Memory tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular performance tuning
+- Storage optimization
+- Statistics refinement
+- Error handling improvements
+
+2. Documentation Updates
+- Keep examples current
+- Update performance metrics
+- Maintain tuning guide
+- Document new features 

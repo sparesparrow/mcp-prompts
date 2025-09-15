@@ -1,0 +1,40 @@
+# SSE (Server-Sent Events) configuration for MCP Prompts
+
+services:
+  # MCP Prompts Server with SSE support
+  mcp-prompts-sse:
+    image: sparesparrow/mcp-prompts:latest
+    container_name: mcp-prompts-sse
+    environment:
+      - NODE_ENV=production
+      - STORAGE_TYPE=file
+      - PROMPTS_DIR=/app/data/prompts
+      - BACKUPS_DIR=/app/data/backups
+      - LOG_LEVEL=info
+      - HTTP_SERVER=true
+      - PORT=3003
+      - HOST=0.0.0.0
+      - ENABLE_SSE=true  # Enable Server-Sent Events
+      - SSE_PATH=/events  # SSE endpoint path
+      - CORS_ORIGIN=*  # CORS settings for SSE
+    volumes:
+      - mcp-sse-data:/app/data
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD-SHELL", "/health-check.sh"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - mcp-network
+
+volumes:
+  mcp-sse-data:
+    name: mcp-prompts-sse-data 
+
+networks:
+  mcp-network:
+    name: mcp-network
+    driver: bridge 

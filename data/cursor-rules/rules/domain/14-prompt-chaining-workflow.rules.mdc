@@ -1,0 +1,274 @@
+---
+description: Rules for implementing and documenting the Prompt Chaining workflow pattern
+globs: ["**/DesignPatterns/Workflows/PromptChaining.md"]
+priority: 20
+dependencies: ["01-base-design-patterns.rules.md"]
+---
+
+# Prompt Chaining Workflow Rules
+
+## Overview
+These rules define requirements for implementing and documenting the Prompt Chaining workflow, which decomposes tasks into a sequence of steps where each LLM call processes the output of the previous one.
+
+## Required Sections
+
+### 1. Pattern Structure
+Must include:
+```markdown
+### Prompt Chaining Workflow
+**Intent**: Decompose tasks into sequential LLM processing steps
+**Problem**: Complex tasks requiring multiple processing stages
+**Solution**: Implementation details with sequential processing
+```
+
+### 2. Components
+Must define:
+- Chain Manager
+- Step Processor
+- Gate Validator
+- Output Aggregator
+
+## Implementation Requirements
+
+### 1. Chain Management
+```python
+class PromptChain:
+    def __init__(self, llm_client):
+        """
+        Initialize the prompt chain.
+        
+        Args:
+            llm_client: LLM client for processing steps
+        """
+        self.llm = llm_client
+        self.steps = []
+        self.gates = {}
+        self.results = []
+
+    def add_step(
+        self,
+        prompt_template: str,
+        gate: Optional[Callable] = None
+    ) -> None:
+        """
+        Add processing step to chain.
+        
+        Args:
+            prompt_template: Template for step prompt
+            gate: Optional validation function
+        """
+        step_id = len(self.steps)
+        self.steps.append({
+            'id': step_id,
+            'template': prompt_template,
+            'requires_gate': gate is not None
+        })
+        if gate:
+            self.gates[step_id] = gate
+```
+
+### 2. Step Processing
+```python
+def process_step(
+    self,
+    step_id: int,
+    previous_output: str
+) -> str:
+    """
+    Process single chain step.
+    
+    Args:
+        step_id: Step identifier
+        previous_output: Output from previous step
+        
+    Returns:
+        Processed output
+    """
+    try:
+        # Get step configuration
+        step = self.steps[step_id]
+        
+        # Format prompt with previous output
+        prompt = step['template'].format(
+            previous_output=previous_output
+        )
+        
+        # Process with LLM
+        output = self.llm.generate(prompt)
+        
+        # Validate if gate exists
+        if step['requires_gate']:
+            if not self.gates[step_id](output):
+                raise GateValidationError(
+                    f"Step {step_id} failed validation"
+                )
+                
+        return output
+    except Exception as e:
+        logger.error(f"Step processing failed: {str(e)}")
+        raise ProcessingError(f"Failed to process step {step_id}")
+```
+
+### 3. Chain Execution
+```python
+def execute_chain(self, initial_input: str) -> str:
+    """
+    Execute complete prompt chain.
+    
+    Args:
+        initial_input: Initial input to chain
+        
+    Returns:
+        Final chain output
+    """
+    try:
+        current_output = initial_input
+        self.results = [initial_input]
+        
+        # Process each step
+        for step_id in range(len(self.steps)):
+            current_output = self.process_step(
+                step_id,
+                current_output
+            )
+            self.results.append(current_output)
+            
+        return current_output
+    except Exception as e:
+        logger.error(f"Chain execution failed: {str(e)}")
+        raise ChainError("Failed to execute prompt chain")
+```
+
+## Validation Rules
+
+### 1. Chain Structure
+Must implement:
+- Step validation
+- Gate checking
+- Dependency tracking
+- Error handling
+
+### 2. Processing Flow
+Must include:
+- Input validation
+- Output verification
+- Progress tracking
+- Recovery mechanisms
+
+### 3. Output Quality
+Must verify:
+- Step coherence
+- Gate compliance
+- Chain completion
+- Result quality
+
+## Testing Requirements
+
+### 1. Unit Tests
+```python
+def test_chain_execution():
+    """Test complete chain execution."""
+    chain = PromptChain(llm_client)
+    chain.add_step("Summarize: {previous_output}")
+    chain.add_step("Translate to French: {previous_output}")
+    result = chain.execute_chain("Test input text")
+    assert len(chain.results) == 3  # input + 2 steps
+
+def test_gate_validation():
+    """Test gate validation in chain."""
+    def length_gate(output: str) -> bool:
+        return len(output) < 100
+        
+    chain = PromptChain(llm_client)
+    chain.add_step("Generate long text", gate=length_gate)
+    with pytest.raises(GateValidationError):
+        chain.execute_chain("Test input")
+```
+
+### 2. Integration Tests
+Must verify:
+- End-to-end processing
+- Gate functionality
+- Error recovery
+- Output quality
+
+## Performance Guidelines
+
+### 1. Optimization
+- Efficient processing
+- Smart validation
+- Result caching
+- Resource management
+
+### 2. Scaling
+- Handle long chains
+- Support parallelization
+- Manage resources
+- Implement timeouts
+
+## Documentation Requirements
+
+### 1. Architecture
+Must document:
+- Chain structure
+- Processing flow
+- Gate system
+- Error handling
+
+### 2. Configuration
+Must specify:
+- Step templates
+- Gate conditions
+- Validation rules
+- Timeout settings
+
+### 3. Diagrams
+Must include:
+```mermaid
+graph TD
+    A[Initial Input] --> B[Step 1]
+    B --> C{Gate 1}
+    C -->|Pass| D[Step 2]
+    C -->|Fail| E[Error Handler]
+    D --> F{Gate 2}
+    F -->|Pass| G[Final Output]
+    F -->|Fail| E
+    
+    style B fill:#2ecc71,stroke:#27ae60
+    style C,F fill:#e74c3c,stroke:#c0392b
+    style D fill:#3498db,stroke:#2980b9
+```
+
+## Review Checklist
+
+1. Implementation
+- [ ] Chain management implemented
+- [ ] Step processing working
+- [ ] Gate validation complete
+- [ ] Error handling robust
+
+2. Testing
+- [ ] Unit tests passing
+- [ ] Integration tests complete
+- [ ] Performance benchmarks run
+- [ ] Gate tests covered
+
+3. Documentation
+- [ ] Architecture documented
+- [ ] Configuration guide complete
+- [ ] Diagrams included
+- [ ] Examples provided
+
+## Maintenance Guidelines
+
+1. Code Updates
+- Regular step optimization
+- Gate refinement
+- Performance tuning
+- Error handling improvements
+
+2. Documentation Updates
+- Keep examples current
+- Update chain patterns
+- Maintain gate guide
+- Document new features 

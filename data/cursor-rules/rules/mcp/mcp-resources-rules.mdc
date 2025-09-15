@@ -1,0 +1,108 @@
+---
+description: Guidelines for implementing MCP resources in Podman Desktop extensions
+globs: ["src/mcp/resources/**/*.ts", "src/mcp/resources/**/*.tsx"]
+---
+
+# MCP Resources Implementation Rules
+
+## Resource Structure
+
+### Resource Types
+```typescript
+// src/mcp/resources/types.ts
+interface MCPResource {
+  uri: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+
+interface MCPResourceContent {
+  uri: string;
+  mimeType?: string;
+  text?: string;
+  blob?: string; // base64 encoded
+}
+
+interface MCPResourceTemplate {
+  uriTemplate: string;
+  name: string;
+  description?: string;
+  mimeType?: string;
+}
+```
+
+### Resource Registry
+```typescript
+// src/mcp/resources/registry.ts
+export class ResourceRegistry {
+  private resources: Map<string, MCPResource> = new Map();
+  private templates: Map<string, MCPResourceTemplate> = new Map();
+  private subscriptions: Map<string, Set<(content: MCPResourceContent) => void>> = new Map();
+
+  registerResource(resource: MCPResource): void {
+    this.resources.set(resource.uri, resource);
+  }
+
+  registerTemplate(template: MCPResourceTemplate): void {
+    this.templates.set(template.uriTemplate, template);
+  }
+
+  subscribe(uri: string, callback: (content: MCPResourceContent) => void): () => void {
+    if (!this.subscriptions.has(uri)) {
+      this.subscriptions.set(uri, new Set());
+    }
+    this.subscriptions.get(uri)!.add(callback);
+
+    return () => {
+      this.subscriptions.get(uri)?.delete(callback);
+    };
+  }
+
+  notifySubscribers(uri: string, content: MCPResourceContent): void {
+    this.subscriptions.get(uri)?.forEach(callback => callback(content));
+  }
+}
+```
+
+## Resource Providers
+
+### Base Provider Interface
+```typescript
+// src/mcp/resources/providers/base.ts
+export interface ResourceProvider {
+  getResource(uri: string): Promise<MCPResource>;
+  getContent(uri: string): Promise<MCPResourceContent>;
+  listResources(): Promise<MCPResource[]>;
+  supportsURI(uri: string): boolean;
+}
+```
+
+### File System Provider
+```typescript
+// src/mcp/resources/providers/filesystem.ts
+import * as podmanDesktopAPI from '@podman-desktop/api';
+import * as path from 'path';
+
+export class FileSystemProvider implements ResourceProvider {
+  private getFileType(filePath: string): string {
+    const ext = path.extname(filePath).toLowerCase();
+    const mimeTypes: Record<string, string> = {
+      '.txt': 'text/plain',
+      '.json': 'application/json',
+      '.yml': 'application/yaml',
+      '.yaml': 'application/yaml',
+      '.md': 'text/markdown',
+      '.png': 'image/png',
+      '.jpg': 'image/jpeg',
+      '.jpeg': 'image/jpeg'
+    };
+    return mimeTypes[ext] || 'application/octet-stream';
+  }
+
+  async getResource(uri: string): Promise<MCPResource> {
+    const filePath = uri.replace('file://', '');
+    return {
+      uri,
+      name: path.basename(filePath),
+      mimeType: this.getFileType(filePath

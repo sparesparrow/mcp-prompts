@@ -1,0 +1,166 @@
+---
+description: Standards for implementing Mermaid diagram generation tools
+globs: ["**/mermaid/**/*.{ts,js,py}", "**/diagrams/**/*.{ts,js,py}"]
+priority: 37
+dependencies: ["02-typescript.mdc"]
+---
+
+# Mermaid Diagram Generator Standards
+
+## Core Principles
+
+### Diagram Architecture
+- Support multiple diagram types
+- Implement proper syntax validation
+- Enable customizable styling
+
+### Generation Flow
+- Validate input specifications
+- Support incremental generation
+- Implement proper error handling
+
+### Output Management
+- Generate valid Mermaid syntax
+- Support multiple output formats
+- Implement proper formatting
+
+## Code Standards
+
+### Generator Implementation
+```typescript
+// Good: Structured diagram generator
+class MermaidGenerator implements DiagramGenerator {
+    private validators: Map<DiagramType, Validator>;
+    private formatters: Map<DiagramType, Formatter>;
+
+    async generate(spec: DiagramSpec): Promise<string> {
+        await this.validateSpec(spec);
+        const diagram = await this.createDiagram(spec);
+        return this.formatOutput(diagram);
+    }
+
+    private async validateSpec(spec: DiagramSpec): Promise<void> {
+        const validator = this.validators.get(spec.type);
+        if (!validator) {
+            throw new ValidationError(`No validator for type: ${spec.type}`);
+        }
+        await validator.validate(spec);
+    }
+}
+
+// Bad: Unstructured generator
+class BadGenerator {
+    generate(input: any) { // ❌ No validation or typing
+        return this.createDiagram(input);
+    }
+}
+```
+
+### Syntax Management
+```typescript
+// Good: Proper syntax handling
+class SyntaxManager {
+    async validateSyntax(diagram: Diagram): Promise<void> {
+        const parser = this.getParser(diagram.type);
+        const ast = await parser.parse(diagram.content);
+        await this.validateAst(ast);
+    }
+
+    private async validateAst(ast: DiagramAST): Promise<void> {
+        const validator = new AstValidator(this.rules);
+        const issues = await validator.validate(ast);
+        if (issues.length > 0) {
+            throw new SyntaxError(this.formatIssues(issues));
+        }
+    }
+}
+
+// Bad: Simple syntax check
+class BadSyntax {
+    check(content: string) { // ❌ No proper parsing
+        return content.includes('graph');
+    }
+}
+```
+
+### Style Management
+```typescript
+// Good: Structured style handling
+class StyleManager {
+    async applyStyles(diagram: Diagram, styles: Styles): Promise<Diagram> {
+        const validated = await this.validateStyles(styles);
+        const themed = await this.applyTheme(diagram, validated);
+        return this.optimizeStyles(themed);
+    }
+
+    private async validateStyles(styles: Styles): Promise<ValidatedStyles> {
+        const validator = new StyleValidator(this.themeRules);
+        return validator.validate(styles);
+    }
+}
+
+// Bad: Direct style application
+class BadStyles {
+    apply(diagram: string, styles: any) { // ❌ No validation
+        return diagram + styles;
+    }
+}
+```
+
+## Validation Rules
+
+```typescript
+const MermaidRules = {
+    // Ensure proper diagram validation
+    diagramValidation: {
+        pattern: /validate.*Spec|validate.*Diagram/,
+        message: "Implement proper diagram validation"
+    },
+    
+    // Check syntax handling
+    syntaxHandling: {
+        pattern: /class.*Syntax.*{.*parse|validate/,
+        message: "Implement proper syntax parsing and validation"
+    },
+    
+    // Verify style management
+    styleManagement: {
+        pattern: /validate.*Styles|apply.*Theme/,
+        message: "Implement proper style validation and theming"
+    }
+};
+```
+
+## Best Practices
+
+1. Diagram Design
+   - Clear structure definition
+   - Proper syntax validation
+   - Style consistency
+
+2. Generation Process
+   - Input validation
+   - Incremental building
+   - Error handling
+
+3. Output Management
+   - Format validation
+   - Style optimization
+   - Error reporting
+
+## Security Considerations
+
+1. Input Validation
+   - Syntax validation
+   - Size limits
+   - Content sanitization
+
+2. Processing Security
+   - Resource limits
+   - Timeout handling
+   - Memory management
+
+3. Output Protection
+   - Format validation
+   - Size verification
+   - Content escaping 
