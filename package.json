@@ -66,6 +66,7 @@
     "@aws-sdk/client-dynamodb": "^3.883.0",
     "@aws-sdk/client-s3": "^3.883.0",
     "@aws-sdk/client-sqs": "^3.883.0",
+    "@aws-sdk/credential-providers": "3.896.0",
     "@aws-sdk/util-dynamodb": "^3.883.0",
     "@modelcontextprotocol/sdk": "^1.13.3",
     "commander": "^12.0.0",
