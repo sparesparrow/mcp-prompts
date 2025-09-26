@@ -10,6 +10,7 @@ import * as iam from 'aws-cdk-lib/aws-iam';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as logs from 'aws-cdk-lib/aws-logs';
+import { SqsEventSource } from 'aws-cdk-lib/aws-lambda-event-sources';
 import { Construct } from 'constructs';
 
 export class McpPromptsStack extends cdk.Stack {
@@ -46,19 +47,20 @@ export class McpPromptsStack extends cdk.Stack {
       sortKey: { name: 'version', type: dynamodb.AttributeType.STRING },
       billingMode: dynamodb.BillingMode.PAY_PER_REQUEST,
       pointInTimeRecovery: true,
-      globalSecondaryIndexes: [
-        {
-          indexName: 'category-index',
-          partitionKey: { name: 'category', type: dynamodb.AttributeType.STRING },
-          sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING }
-        },
-        {
-          indexName: 'latest-version-index',
-          partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
-          sortKey: { name: 'is_latest', type: dynamodb.AttributeType.STRING }
-        }
-      ],
       stream: dynamodb.StreamViewType.NEW_AND_OLD_IMAGES
+    });
+
+    // Add Global Secondary Indexes
+    promptsTable.addGlobalSecondaryIndex({
+      indexName: 'category-index',
+      partitionKey: { name: 'category', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'created_at', type: dynamodb.AttributeType.STRING }
+    });
+
+    promptsTable.addGlobalSecondaryIndex({
+      indexName: 'latest-version-index',
+      partitionKey: { name: 'id', type: dynamodb.AttributeType.STRING },
+      sortKey: { name: 'is_latest', type: dynamodb.AttributeType.STRING }
     });
 
     // DynamoDB Table for sessions and caching
@@ -212,11 +214,11 @@ export class McpPromptsStack extends cdk.Stack {
     });
 
     // Event source mappings
-    processingLambda.addEventSource(new lambda.SqsEventSource(processingQueue, {
+    processingLambda.addEventSource(new SqsEventSource(processingQueue, {
       batchSize: 10
     }));
 
-    catalogSyncLambda.addEventSource(new lambda.SqsEventSource(catalogSyncQueue, {
+    catalogSyncLambda.addEventSource(new SqsEventSource(catalogSyncQueue, {
       batchSize: 1
     }));
 

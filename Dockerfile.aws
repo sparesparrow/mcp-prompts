@@ -1,0 +1,68 @@
+# Multi-stage build for AWS-integrated MCP Prompts
+FROM node:20-alpine AS builder
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies
+RUN pnpm install --no-frozen-lockfile
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN pnpm run build
+
+# Production stage
+FROM node:20-alpine AS production
+
+# Install pnpm
+RUN npm install -g pnpm
+
+# Create app user
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mcp-prompts -u 1001
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN pnpm install --prod --no-frozen-lockfile && pnpm store prune
+
+# Copy built application from builder stage
+COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
+COPY --from=builder --chown=mcp-prompts:nodejs /app/examples ./examples
+COPY --from=builder --chown=mcp-prompts:nodejs /app/scripts ./scripts
+
+# Create data directory
+RUN mkdir -p /app/data && chown mcp-prompts:nodejs /app/data
+
+# Switch to non-root user
+USER mcp-prompts
+
+# Expose port
+EXPOSE 3000
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3000, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
+
+# Default environment variables
+ENV NODE_ENV=production
+ENV MODE=mcp
+ENV PORT=3000
+ENV HOST=0.0.0.0
+ENV LOG_LEVEL=info
+
+# Start the application
+ENTRYPOINT ["node", "dist/cli.js"]
+CMD ["start"]

@@ -77,10 +77,9 @@ export class DynamoDBAdapter implements IPromptRepository {
   }
 
   async findLatestVersions(limit: number = 100): Promise<Prompt[]> {
-    const command = new QueryCommand({
+    const command = new ScanCommand({
       TableName: this.tableName,
-      IndexName: 'latest-version-index',
-      KeyConditionExpression: 'is_latest = :is_latest',
+      FilterExpression: 'is_latest = :is_latest',
       ExpressionAttributeValues: marshall({
         ':is_latest': 'true'
       }),

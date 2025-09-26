@@ -95,3 +95,4 @@ temp/
 
 # TypeScript build cache
 **/*.tsbuildinfo
+cdk/cdk.out/

@@ -9,6 +9,6 @@
     "loose": false
   },
   "module": {
-    "type": "es6"
+    "type": "commonjs"
   }
 } 

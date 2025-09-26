@@ -1,16 +1,19 @@
-version: '3.8'
-
 services:
   mcp-prompts:
     build:
       context: .
       dockerfile: Dockerfile.mcp
-    container_name: mcp-prompts-server
     environment:
       - MODE=mcp
       - NODE_ENV=production
     volumes:
       - ./data:/app/data
+    # MCP servers typically don't need exposed ports for stdio communication
+    # but we can expose for health checks if needed
     ports:
       - "3003:3003"
-    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "process.exit(0)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
