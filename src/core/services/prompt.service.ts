@@ -5,6 +5,7 @@ import { ICatalogRepository } from '../ports/catalog-repository.interface';
 import { IEventBus } from '../ports/event-bus.interface';
 import { Prompt } from '../entities/prompt.entity';
 import { PromptEvent } from '../events/prompt.event';
+import { ValidationError, NotFoundError } from '../errors/custom-errors';
 
 export class PromptService {
   constructor(
@@ -14,9 +15,16 @@ export class PromptService {
   ) {}
 
   async createPrompt(data: any): Promise<Prompt> {
+    if (!data.name || typeof data.name !== 'string' || data.name.trim() === '') {
+      throw new ValidationError('Prompt name is required and must be a non-empty string');
+    }
+    if (!data.template || typeof data.template !== 'string' || data.template.trim() === '') {
+      throw new ValidationError('Prompt template is required and must be a non-empty string');
+    }
+
     const prompt = new Prompt(
       data.id || this.generateId(),
-      data.name,
+      data.name.trim(),
       data.description || '',
       data.template,
       data.category || 'general',
@@ -54,9 +62,20 @@ export class PromptService {
   }
 
   async updatePrompt(id: string, data: any): Promise<Prompt> {
+    if (!id || typeof id !== 'string' || id.trim() === '') {
+      throw new ValidationError('Prompt ID is required and must be a non-empty string');
+    }
+
     const existingPrompt = await this.promptRepository.findById(id);
     if (!existingPrompt) {
-      throw new Error('Prompt not found');
+      throw new NotFoundError(`Prompt with ID ${id} not found`);
+    }
+
+    if (data.name && (typeof data.name !== 'string' || data.name.trim() === '')) {
+      throw new ValidationError('Prompt name must be a non-empty string');
+    }
+    if (data.template && (typeof data.template !== 'string' || data.template.trim() === '')) {
+      throw new ValidationError('Prompt template must be a non-empty string');
     }
 
     const updatedPrompt = new Prompt(
@@ -86,9 +105,13 @@ export class PromptService {
   }
 
   async deletePrompt(id: string): Promise<void> {
+    if (!id || typeof id !== 'string' || id.trim() === '') {
+      throw new ValidationError('Prompt ID is required and must be a non-empty string');
+    }
+
     const existingPrompt = await this.promptRepository.findById(id);
     if (!existingPrompt) {
-      throw new Error('Prompt not found');
+      throw new NotFoundError(`Prompt with ID ${id} not found`);
     }
 
     await this.promptRepository.delete(id);

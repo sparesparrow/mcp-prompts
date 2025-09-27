@@ -5,6 +5,7 @@ import { SQSAdapter } from '../adapters/aws/sqs-adapter';
 import { PromptService } from '../core/services/prompt.service';
 import { McpServer } from '../mcp/mcp-server';
 import { MetricsCollector } from '../monitoring/cloudwatch-metrics';
+import { ValidationError, NotFoundError, ConflictError, InternalServerError } from '../core/errors/custom-errors';
 
 // Initialize adapters
 const promptRepository = new DynamoDBAdapter(process.env.PROMPTS_TABLE!);
@@ -15,6 +16,36 @@ const metricsCollector = new MetricsCollector();
 // Initialize services
 const promptService = new PromptService(promptRepository, catalogRepository, eventBus);
 const mcpServer = new McpServer(promptService);
+
+// Helper function to create error responses
+function createErrorResponse(error: any): { statusCode: number; body: string } {
+  let statusCode = 500;
+  let message = 'Internal server error';
+
+  if (error instanceof ValidationError) {
+    statusCode = 400;
+    message = error.message;
+  } else if (error instanceof NotFoundError) {
+    statusCode = 404;
+    message = error.message;
+  } else if (error instanceof ConflictError) {
+    statusCode = 409;
+    message = error.message;
+  } else if (error instanceof InternalServerError) {
+    statusCode = 500;
+    message = error.message;
+  } else if (error.message) {
+    message = error.message;
+  }
+
+  return {
+    statusCode,
+    body: JSON.stringify({
+      error: message,
+      type: error.name || 'UnknownError'
+    })
+  };
+}
 
 export const handler: APIGatewayProxyHandler = async (event, context): Promise<APIGatewayProxyResult> => {
   const startTime = Date.now();
@@ -78,20 +109,20 @@ export const handler: APIGatewayProxyHandler = async (event, context): Promise<A
   } catch (error) {
     console.error('Lambda error:', error);
 
+    const errorResponse = createErrorResponse(error);
     const latency = Date.now() - startTime;
     await metricsCollector.recordLatency(event.path, latency);
-    await metricsCollector.recordApiError(event.path, 500);
+    await metricsCollector.recordApiError(event.path, errorResponse.statusCode);
 
     return {
-      statusCode: 500,
+      statusCode: errorResponse.statusCode,
       headers: {
         'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token',
+        'Access-Control-Allow-Methods': 'GET,POST,PUT,DELETE,OPTIONS',
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        error: 'Internal server error',
-        message: error instanceof Error ? error.message : 'Unknown error'
-      })
+      body: errorResponse.body
     };
   }
 };
