@@ -1,13 +1,191 @@
 {
   "name": "MCP Prompts Development Environment",
+  "description": "Comprehensive development environment for MCP Prompts - a robust server for managing prompts and templates with AWS integration",
   "user": "sparesparrow",
+  "version": "3.11.0",
   "install": "pnpm install",
   "start": "pnpm run dev",
   "env": {
-    "LOG_LEVEL": "debug"
+    "NODE_ENV": "development",
+    "LOG_LEVEL": "debug",
+    "STORAGE_TYPE": "memory",
+    "PORT": "3000",
+    "HOST": "0.0.0.0",
+    "MODE": "http",
+    "PROMPTS_DIR": "./data",
+    "AWS_REGION": "eu-north-1",
+    "AWS_PROFILE": "default",
+    "CDK_DEFAULT_REGION": "eu-north-1",
+    "CDK_DEFAULT_ACCOUNT": "",
+    "STRIPE_SECRET_KEY": "",
+    "STRIPE_WEBHOOK_SECRET": ""
   },
   "build": {
     "context": ".",
-    "dockerfile": "Dockerfile"
+    "dockerfile": "Dockerfile",
+    "dockerfile:mcp": "Dockerfile.mcp",
+    "dockerfile:aws": "Dockerfile.aws",
+    "dockerfile:simple": "Dockerfile.simple"
+  },
+  "scripts": {
+    "dev": "pnpm run dev",
+    "dev:watch": "pnpm run dev",
+    "build": "pnpm run build",
+    "build:clean": "pnpm run build:clean",
+    "clean": "pnpm run clean",
+    "test": "pnpm test",
+    "test:watch": "pnpm test:watch",
+    "start": "pnpm run start",
+    "start:http": "pnpm run start:http",
+    "start:mcp": "pnpm run start:mcp",
+    "docker:build": "pnpm run docker:build",
+    "docker:build:mcp": "pnpm run docker:build:mcp",
+    "deploy": "pnpm run deploy",
+    "deploy:aws": "./scripts/deploy-aws-enhanced.sh",
+    "deploy:docker": "./scripts/deploy-docker.sh",
+    "cleanup": "pnpm run cleanup",
+    "cdk:deploy": "pnpm run cdk:deploy",
+    "cdk:destroy": "pnpm run cdk:destroy",
+    "publish:dry": "pnpm run publish:dry",
+    "publish:patch": "pnpm run publish:patch",
+    "publish:minor": "pnpm run publish:minor",
+    "publish:major": "pnpm run publish:major"
+  },
+  "aws": {
+    "region": "eu-north-1",
+    "stackName": "McpPromptsStack",
+    "apiUrl": "https://jaqwv7shwc.execute-api.eu-north-1.amazonaws.com/prod/",
+    "services": {
+      "dynamodb": {
+        "tableName": "mcp-prompts-table",
+        "region": "eu-north-1"
+      },
+      "s3": {
+        "bucketName": "mcp-prompts-storage",
+        "region": "eu-north-1"
+      },
+      "lambda": {
+        "functionName": "mcp-prompts-lambda",
+        "region": "eu-north-1"
+      },
+      "cloudwatch": {
+        "logGroup": "/aws/lambda/mcp-prompts-lambda",
+        "region": "eu-north-1"
+      }
+    }
+  },
+  "docker": {
+    "compose": {
+      "default": "docker-compose.yml",
+      "mcp": "docker-compose.mcp.yml"
+    },
+    "services": {
+      "mcp-prompts": {
+        "port": "3003",
+        "healthcheck": "http://localhost:3003/health",
+        "volumes": ["./data:/app/data"]
+      }
+    }
+  },
+  "mcp": {
+    "inspector": {
+      "config": "mcp-inspector-config.json",
+      "port": 4000,
+      "servers": {
+        "aws-mcp-prompts": {
+          "command": "npx",
+          "args": ["@sparesparrow/mcp-prompts"],
+          "env": {
+            "STORAGE_TYPE": "aws",
+            "AWS_REGION": "eu-north-1",
+            "LOG_LEVEL": "debug"
+          }
+        },
+        "local-mcp-prompts": {
+          "command": "npx",
+          "args": ["@sparesparrow/mcp-prompts"],
+          "env": {
+            "STORAGE_TYPE": "memory",
+            "LOG_LEVEL": "debug"
+          }
+        }
+      }
+    }
+  },
+  "testing": {
+    "framework": "vitest",
+    "config": "vitest.config.ts",
+    "watch": true,
+    "coverage": false,
+    "scripts": {
+      "test": "vitest run",
+      "test:watch": "vitest",
+      "test:ui": "vitest --ui"
+    }
+  },
+  "monitoring": {
+    "healthcheck": "http://localhost:3000/health",
+    "metrics": {
+      "enabled": true,
+      "endpoint": "/metrics"
+    },
+    "logging": {
+      "level": "debug",
+      "format": "json",
+      "transport": "pino-pretty"
+    }
+  },
+  "development": {
+    "hotReload": true,
+    "nodemon": {
+      "config": "nodemon.json",
+      "watch": ["src/**/*"],
+      "ext": "ts,js,json"
+    },
+    "typescript": {
+      "config": "tsconfig.json",
+      "strict": true,
+      "sourceMap": true,
+      "declaration": true
+    }
+  },
+  "workspace": {
+    "recommendedExtensions": [
+      "ms-vscode.vscode-typescript-next",
+      "bradlc.vscode-tailwindcss",
+      "esbenp.prettier-vscode",
+      "ms-vscode.vscode-eslint",
+      "ms-vscode.vscode-json",
+      "redhat.vscode-yaml",
+      "ms-azuretools.vscode-docker",
+      "amazonwebservices.aws-toolkit-vscode",
+      "ms-vscode.vscode-node-azure-pack"
+    ],
+    "settings": {
+      "typescript.preferences.importModuleSpecifier": "relative",
+      "typescript.suggest.autoImports": true,
+      "typescript.updateImportsOnFileMove.enabled": "always",
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+        "source.fixAll.eslint": "explicit"
+      },
+      "files.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.git": true,
+        "**/.DS_Store": true
+      }
+    }
+  },
+  "paths": {
+    "src": "./src",
+    "dist": "./dist",
+    "data": "./data",
+    "scripts": "./scripts",
+    "docs": "./docs",
+    "examples": "./examples",
+    "packages": "./packages",
+    "apps": "./apps",
+    "cdk": "./cdk"
   }
 }
