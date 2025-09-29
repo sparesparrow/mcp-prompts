@@ -11,6 +11,9 @@ importers:
       '@aws-sdk/client-cloudwatch':
         specifier: ^3.883.0
         version: 3.896.0
+      '@aws-sdk/client-cognito-identity-provider':
+        specifier: ^3.887.0
+        version: 3.896.0
       '@aws-sdk/client-dynamodb':
         specifier: ^3.883.0
         version: 3.896.0
@@ -23,8 +26,11 @@ importers:
       '@aws-sdk/credential-providers':
         specifier: 3.896.0
         version: 3.896.0
-      '@aws-sdk/util-dynamodb':
+      '@aws-sdk/lib-dynamodb':
         specifier: ^3.883.0
+        version: 3.896.0(@aws-sdk/client-dynamodb@3.896.0)
+      '@aws-sdk/util-dynamodb':
+        specifier: 3.896.0
         version: 3.896.0(@aws-sdk/client-dynamodb@3.896.0)
       '@modelcontextprotocol/sdk':
         specifier: ^1.13.3
@@ -283,6 +289,10 @@ packages:
     resolution: {integrity: sha512-DZ5C1WXjQcDhiPHxEHeZHMSsc6DChNGdWM4tu/HX0dkX15hTc1g925Y7fpYJa4XXPrU77ivYkZgbITz5PLp+8A==}
     engines: {node: '>=18.0.0'}
 
+  '@aws-sdk/client-cognito-identity-provider@3.896.0':
+    resolution: {integrity: sha512-02Az7e91MJYxJ8rJYIaNwg2Zrp6z6FhRTS5feDx0H4TafMNFS5VMYF+igad6VGpjE3Q7YEkkC2I3YJOitBsUag==}
+    engines: {node: '>=18.0.0'}
+
   '@aws-sdk/client-cognito-identity@3.896.0':
     resolution: {integrity: sha512-W1q+Csw5WKeJIeWsE9U3FCBLfLEZQ5Wkrk+Owf/TVAk9tObW8KrTjMxrJOpB1kcLXIGs0xyL8x0u86pOHy2Ryw==}
     engines: {node: '>=18.0.0'}
@@ -346,6 +356,12 @@ packages:
   '@aws-sdk/endpoint-cache@3.893.0':
     resolution: {integrity: sha512-KSwTfyLZyNLszz5f/yoLC+LC+CRKpeJii/+zVAy7JUOQsKhSykiRUPYUx7o2Sdc4oJfqqUl26A/jSttKYnYtAA==}
     engines: {node: '>=18.0.0'}
+
+  '@aws-sdk/lib-dynamodb@3.896.0':
+    resolution: {integrity: sha512-PVYBwRo1iZnDIh19YSB8qRs3Rzk6/Wi7WM2m2EdWo/QySfBXIR2Bqieqz/PehjZf8PVSZtDOKOCYVv+Agvtj4w==}
+    engines: {node: '>=18.0.0'}
+    peerDependencies:
+      '@aws-sdk/client-dynamodb': ^3.896.0
 
   '@aws-sdk/middleware-bucket-endpoint@3.893.0':
     resolution: {integrity: sha512-H+wMAoFC73T7M54OFIezdHXR9/lH8TZ3Cx1C3MEBb2ctlzQrVCd8LX8zmOtcGYC8plrRwV+8rNPe0FMqecLRew==}
@@ -2843,6 +2859,50 @@ snapshots:
     transitivePeerDependencies:
       - aws-crt
 
+  '@aws-sdk/client-cognito-identity-provider@3.896.0':
+    dependencies:
+      '@aws-crypto/sha256-browser': 5.2.0
+      '@aws-crypto/sha256-js': 5.2.0
+      '@aws-sdk/core': 3.896.0
+      '@aws-sdk/credential-provider-node': 3.896.0
+      '@aws-sdk/middleware-host-header': 3.893.0
+      '@aws-sdk/middleware-logger': 3.893.0
+      '@aws-sdk/middleware-recursion-detection': 3.893.0
+      '@aws-sdk/middleware-user-agent': 3.896.0
+      '@aws-sdk/region-config-resolver': 3.893.0
+      '@aws-sdk/types': 3.893.0
+      '@aws-sdk/util-endpoints': 3.895.0
+      '@aws-sdk/util-user-agent-browser': 3.893.0
+      '@aws-sdk/util-user-agent-node': 3.896.0
+      '@smithy/config-resolver': 4.2.2
+      '@smithy/core': 3.12.0
+      '@smithy/fetch-http-handler': 5.2.1
+      '@smithy/hash-node': 4.1.1
+      '@smithy/invalid-dependency': 4.1.1
+      '@smithy/middleware-content-length': 4.1.1
+      '@smithy/middleware-endpoint': 4.2.4
+      '@smithy/middleware-retry': 4.3.0
+      '@smithy/middleware-serde': 4.1.1
+      '@smithy/middleware-stack': 4.1.1
+      '@smithy/node-config-provider': 4.2.2
+      '@smithy/node-http-handler': 4.2.1
+      '@smithy/protocol-http': 5.2.1
+      '@smithy/smithy-client': 4.6.4
+      '@smithy/types': 4.5.0
+      '@smithy/url-parser': 4.1.1
+      '@smithy/util-base64': 4.1.0
+      '@smithy/util-body-length-browser': 4.1.0
+      '@smithy/util-body-length-node': 4.1.0
+      '@smithy/util-defaults-mode-browser': 4.1.4
+      '@smithy/util-defaults-mode-node': 4.1.4
+      '@smithy/util-endpoints': 3.1.2
+      '@smithy/util-middleware': 4.1.1
+      '@smithy/util-retry': 4.1.2
+      '@smithy/util-utf8': 4.1.0
+      tslib: 2.8.1
+    transitivePeerDependencies:
+      - aws-crt
+
   '@aws-sdk/client-cognito-identity@3.896.0':
     dependencies:
       '@aws-crypto/sha256-browser': 5.2.0
@@ -3228,6 +3288,16 @@ snapshots:
   '@aws-sdk/endpoint-cache@3.893.0':
     dependencies:
       mnemonist: 0.38.3
+      tslib: 2.8.1
+
+  '@aws-sdk/lib-dynamodb@3.896.0(@aws-sdk/client-dynamodb@3.896.0)':
+    dependencies:
+      '@aws-sdk/client-dynamodb': 3.896.0
+      '@aws-sdk/core': 3.896.0
+      '@aws-sdk/util-dynamodb': 3.896.0(@aws-sdk/client-dynamodb@3.896.0)
+      '@smithy/core': 3.12.0
+      '@smithy/smithy-client': 4.6.4
+      '@smithy/types': 4.5.0
       tslib: 2.8.1
 
   '@aws-sdk/middleware-bucket-endpoint@3.893.0':
