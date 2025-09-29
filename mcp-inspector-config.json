@@ -1,0 +1,21 @@
+{
+  "mcpServers": {
+    "aws-mcp-prompts": {
+      "command": "npx",
+      "args": ["@sparesparrow/mcp-prompts"],
+      "env": {
+        "STORAGE_TYPE": "aws",
+        "AWS_REGION": "eu-north-1",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "local-mcp-prompts": {
+      "command": "npx",
+      "args": ["@sparesparrow/mcp-prompts"],
+      "env": {
+        "STORAGE_TYPE": "memory",
+        "LOG_LEVEL": "debug"
+      }
+    }
+  }
+}
