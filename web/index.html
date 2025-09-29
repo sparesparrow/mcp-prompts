@@ -1,0 +1,139 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Prompts - AI Prompt Management</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>MCP Prompts</h1>
+            <nav id="nav">
+                <button id="loginBtn" onclick="showLoginModal()">Login</button>
+                <button id="registerBtn" onclick="showRegisterModal()">Register</button>
+                <button id="userMenu" style="display: none;" onclick="toggleUserMenu()">
+                    <span id="userEmail"></span>
+                </button>
+                <div id="userDropdown" class="dropdown-menu">
+                    <a href="#" onclick="showProfile()">Profile</a>
+                    <a href="#" onclick="showSubscription()">Subscription</a>
+                    <a href="#" onclick="logout()">Logout</a>
+                </div>
+            </nav>
+        </header>
+
+        <main>
+            <div id="welcome" class="welcome-section">
+                <h2>Welcome to MCP Prompts</h2>
+                <p>Discover, create, and manage AI prompts with our powerful platform.</p>
+                <div class="features">
+                    <div class="feature">
+                        <h3>Public Prompts</h3>
+                        <p>Access a curated collection of high-quality prompts</p>
+                    </div>
+                    <div class="feature">
+                        <h3>Slash Commands</h3>
+                        <p>Use quick commands like "/code-review" to apply templates instantly</p>
+                    </div>
+                    <div class="feature">
+                        <h3>Premium Features</h3>
+                        <p>Upload custom prompts and access premium templates</p>
+                    </div>
+                </div>
+            </div>
+
+            <div id="dashboard" style="display: none;">
+                <div class="dashboard-grid">
+                    <aside class="sidebar">
+                        <h3>Quick Actions</h3>
+                        <div class="slash-commands">
+                            <input type="text" id="commandInput" placeholder="Type a slash command..." oninput="suggestCommands()">
+                            <div id="commandSuggestions" class="suggestions"></div>
+                        </div>
+                        <button onclick="showPrompts()">Browse Prompts</button>
+                        <button onclick="showMyPrompts()" id="myPromptsBtn">My Prompts</button>
+                        <button onclick="showUploadModal()" id="uploadBtn">Upload Prompt</button>
+                    </aside>
+
+                    <div class="main-content">
+                        <div id="promptsList" class="prompts-grid">
+                            <!-- Prompts will be loaded here -->
+                        </div>
+
+                        <div id="promptDetail" style="display: none;">
+                            <div class="prompt-header">
+                                <h3 id="promptTitle"></h3>
+                                <button onclick="applyPrompt()" id="applyBtn">Apply Template</button>
+                            </div>
+                            <div id="promptContent" class="prompt-content"></div>
+                            <div id="promptVariables" class="variables-form"></div>
+                        </div>
+
+                        <div id="slashCommandResult" style="display: none;">
+                            <h3>Command Result</h3>
+                            <pre id="commandOutput"></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- Modals -->
+    <div id="loginModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('loginModal')">&times;</span>
+            <h2>Login</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Email" required>
+                <input type="password" id="loginPassword" placeholder="Password" required>
+                <button type="submit">Login</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="registerModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('registerModal')">&times;</span>
+            <h2>Register</h2>
+            <form id="registerForm">
+                <input type="email" id="registerEmail" placeholder="Email" required>
+                <input type="password" id="registerPassword" placeholder="Password" required>
+                <button type="submit">Register</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="uploadModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('uploadModal')">&times;</span>
+            <h2>Upload Prompt</h2>
+            <form id="uploadForm">
+                <input type="text" id="promptName" placeholder="Prompt Name" required>
+                <textarea id="promptContent" placeholder="Prompt Content" required></textarea>
+                <input type="text" id="promptCategory" placeholder="Category">
+                <input type="text" id="promptTags" placeholder="Tags (comma-separated)">
+                <label>
+                    <input type="checkbox" id="isTemplate"> Is Template
+                </label>
+                <button type="submit">Upload</button>
+            </form>
+        </div>
+    </div>
+
+    <div id="subscriptionModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal('subscriptionModal')">&times;</span>
+            <h2>Subscription Plans</h2>
+            <div id="plansList" class="plans-grid">
+                <!-- Plans will be loaded here -->
+            </div>
+        </div>
+    </div>
+
+    <script src="https://js.stripe.com/v3/"></script>
+    <script src="app.js"></script>
+</body>
+</html>

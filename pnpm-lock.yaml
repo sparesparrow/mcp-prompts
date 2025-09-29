@@ -50,6 +50,9 @@ importers:
       pino-pretty:
         specifier: ^10.3.1
         version: 10.3.1
+      stripe:
+        specifier: ^14.25.0
+        version: 14.25.0
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
@@ -2460,6 +2463,10 @@ packages:
   strip-outer@2.0.0:
     resolution: {integrity: sha512-A21Xsm1XzUkK0qK1ZrytDUvqsQWict2Cykhvi0fBQntGG5JSprESasEyV1EZ/4CiR5WB5KjzLTrP/bO37B0wPg==}
     engines: {node: ^12.20.0 || ^14.13.1 || >=16.0.0}
+
+  stripe@14.25.0:
+    resolution: {integrity: sha512-wQS3GNMofCXwH8TSje8E1SE8zr6ODiGtHQgPtO95p9Mb4FhKC9jvXR2NUTpZ9ZINlckJcFidCmaTFV4P6vsb9g==}
+    engines: {node: '>=12.*'}
 
   strnum@2.1.1:
     resolution: {integrity: sha512-7ZvoFTiCnGxBtDqJ//Cu6fWtZtc7Y3x+QOirG15wztbdngGSkht27o2pyGWrVy0b4WAy3jbKmnoK6g5VlVNUUw==}
@@ -5597,6 +5604,11 @@ snapshots:
       js-tokens: 9.0.1
 
   strip-outer@2.0.0: {}
+
+  stripe@14.25.0:
+    dependencies:
+      '@types/node': 20.19.17
+      qs: 6.14.0
 
   strnum@2.1.1: {}
 

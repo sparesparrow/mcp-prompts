@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MCP Prompts - AI Prompt Management</title>
+    <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+    <nav class="navbar">
+        <div class="nav-container">
+            <h1 class="nav-title">MCP Prompts</h1>
+            <div class="nav-auth" id="navAuth">
+                <button id="loginBtn" class="btn btn-secondary">Login</button>
+                <button id="registerBtn" class="btn btn-primary">Sign Up</button>
+            </div>
+            <div class="nav-user" id="navUser" style="display: none;">
+                <span id="userEmail"></span>
+                <button id="logoutBtn" class="btn btn-secondary">Logout</button>
+            </div>
+        </div>
+    </nav>
+
+    <main class="container">
+        <!-- Auth Modals -->
+        <div id="authModal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div id="authContent">
+                    <!-- Login/Register forms will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Landing Page for Anonymous Users -->
+        <section id="landingSection" class="hero">
+            <h2>Supercharge Your AI Workflow</h2>
+            <p>Manage, version, and share AI prompts with our powerful MCP server. Access thousands of community prompts or create your own.</p>
+            <div class="hero-features">
+                <div class="feature">
+                    <h3>🚀 Quick Access</h3>
+                    <p>Use slash commands like "/code-review" or "/bug-analyzer" for instant prompt application</p>
+                </div>
+                <div class="feature">
+                    <h3>📚 Rich Library</h3>
+                    <p>Access a curated collection of prompts for development, writing, analysis, and more</p>
+                </div>
+                <div class="feature">
+                    <h3>🔒 Premium Features</h3>
+                    <p>Upgrade to premium for unlimited prompt creation and exclusive content</p>
+                </div>
+            </div>
+            <button id="getStartedBtn" class="btn btn-primary btn-large">Get Started</button>
+        </section>
+
+        <!-- Dashboard for Authenticated Users -->
+        <section id="dashboardSection" style="display: none;">
+            <div class="dashboard-header">
+                <h2>Welcome back!</h2>
+                <div class="subscription-status" id="subscriptionStatus">
+                    <!-- Subscription status will be shown here -->
+                </div>
+            </div>
+
+            <div class="dashboard-grid">
+                <!-- Prompts Section -->
+                <div class="dashboard-card">
+                    <h3>📝 Your Prompts</h3>
+                    <div id="userPrompts">
+                        <p>Loading your prompts...</p>
+                    </div>
+                    <button id="createPromptBtn" class="btn btn-primary">Create New Prompt</button>
+                </div>
+
+                <!-- Browse Prompts -->
+                <div class="dashboard-card">
+                    <h3>🔍 Browse Prompts</h3>
+                    <div class="search-bar">
+                        <input type="text" id="promptSearch" placeholder="Search prompts...">
+                        <select id="categoryFilter">
+                            <option value="">All Categories</option>
+                            <option value="development">Development</option>
+                            <option value="writing">Writing</option>
+                            <option value="analysis">Analysis</option>
+                            <option value="productivity">Productivity</option>
+                        </select>
+                    </div>
+                    <div id="publicPrompts">
+                        <p>Loading prompts...</p>
+                    </div>
+                </div>
+
+                <!-- Slash Commands -->
+                <div class="dashboard-card">
+                    <h3>⚡ Slash Commands</h3>
+                    <div class="slash-commands">
+                        <input type="text" id="slashCommandInput" placeholder="Type a slash command...">
+                        <div id="commandSuggestions"></div>
+                        <button id="executeCommandBtn" class="btn btn-secondary">Execute</button>
+                    </div>
+                    <div id="commandResult"></div>
+                </div>
+
+                <!-- Subscription Management -->
+                <div class="dashboard-card">
+                    <h3>💎 Subscription</h3>
+                    <div id="subscriptionInfo">
+                        <!-- Subscription details will be shown here -->
+                    </div>
+                    <div id="upgradeSection" style="display: none;">
+                        <h4>Upgrade to Premium</h4>
+                        <div id="pricingPlans"></div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Prompt Modal -->
+    <div id="promptModal" class="modal" style="display: none;">
+        <div class="modal-content large-modal">
+            <span class="close">&times;</span>
+            <h3 id="promptModalTitle">Create New Prompt</h3>
+            <form id="promptForm">
+                <div class="form-group">
+                    <label for="promptName">Name</label>
+                    <input type="text" id="promptName" required>
+                </div>
+                <div class="form-group">
+                    <label for="promptContent">Content</label>
+                    <textarea id="promptContent" rows="10" required></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="promptCategory">Category</label>
+                    <select id="promptCategory">
+                        <option value="general">General</option>
+                        <option value="development">Development</option>
+                        <option value="writing">Writing</option>
+                        <option value="analysis">Analysis</option>
+                        <option value="productivity">Productivity</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="promptTags">Tags (comma-separated)</label>
+                    <input type="text" id="promptTags" placeholder="e.g., code-review, assistant, development">
+                </div>
+                <div class="form-group">
+                    <label class="checkbox-label">
+                        <input type="checkbox" id="isTemplate"> This is a template prompt
+                    </label>
+                </div>
+                <div class="form-group" id="variablesGroup" style="display: none;">
+                    <label for="promptVariables">Template Variables (JSON)</label>
+                    <textarea id="promptVariables" rows="3" placeholder='{"language": "JavaScript", "code": "your code here"}'></textarea>
+                </div>
+                <button type="submit" class="btn btn-primary">Save Prompt</button>
+            </form>
+        </div>
+    </div>
+
+    <script src="/app.js"></script>
+</body>
+</html>

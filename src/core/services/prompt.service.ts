@@ -7,6 +7,12 @@ import { Prompt } from '../entities/prompt.entity';
 import { PromptEvent } from '../events/prompt.event';
 import { ValidationError, NotFoundError } from '../errors/custom-errors';
 
+interface UserContext {
+  userId?: string;
+  subscriptionTier?: 'free' | 'premium';
+  email?: string;
+}
+
 export class PromptService {
   constructor(
     private promptRepository: IPromptRepository,
@@ -127,8 +133,11 @@ export class PromptService {
     return await this.promptRepository.findByCategory(category, limit);
   }
 
-  async getLatestPrompts(limit: number = 100): Promise<Prompt[]> {
-    return await this.promptRepository.findLatestVersions(limit);
+  async getLatestPrompts(limit: number = 100, userContext?: UserContext): Promise<Prompt[]> {
+    const allPrompts = await this.promptRepository.findLatestVersions(limit * 2); // Get more to filter
+
+    // Filter prompts based on user access
+    return allPrompts.filter(prompt => this.hasAccessToPrompt(prompt, userContext)).slice(0, limit);
   }
 
   async searchPrompts(query: string, category?: string): Promise<Prompt[]> {
@@ -156,6 +165,51 @@ export class PromptService {
     // This would sync prompts from the catalog repository
     // Implementation depends on catalog structure
     console.log('Syncing prompts from catalog...');
+  }
+
+  // Access control methods
+  hasAccessToPrompt(prompt: Prompt, userContext?: UserContext): boolean {
+    // If no user context, only allow public prompts
+    if (!userContext) {
+      return (prompt as any).access_level === 'public' || !(prompt as any).access_level;
+    }
+
+    const accessLevel = (prompt as any).access_level || 'public';
+
+    switch (accessLevel) {
+      case 'public':
+        return true;
+      case 'premium':
+        return userContext.subscriptionTier === 'premium';
+      case 'private':
+        return (prompt as any).author_id === userContext.userId;
+      default:
+        return false;
+    }
+  }
+
+  canCreatePrompt(userContext?: UserContext): boolean {
+    if (!userContext) return false;
+
+    // Free users have limited uploads, premium users have unlimited
+    return userContext.subscriptionTier === 'premium';
+  }
+
+  canUploadPrompt(userContext?: UserContext, currentUploadCount: number = 0): boolean {
+    if (!userContext) return false;
+
+    if (userContext.subscriptionTier === 'premium') return true;
+    if (userContext.subscriptionTier === 'free') return currentUploadCount < 5;
+
+    return false;
+  }
+
+  getRateLimit(userContext?: UserContext): { requests: number; windowMs: number } {
+    if (!userContext || userContext.subscriptionTier === 'free') {
+      return { requests: 100, windowMs: 60 * 60 * 1000 }; // 100 requests per hour
+    } else {
+      return { requests: 1000, windowMs: 60 * 60 * 1000 }; // 1000 requests per hour
+    }
   }
 
   private generateId(): string {
