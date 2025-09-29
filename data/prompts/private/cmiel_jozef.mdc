@@ -1,0 +1,13 @@
+# Jozef Cmiel Coding Style Rules
+
+## Commit Messages
+- Short messages like "repair", "repairs", "final", "transitionSwipe changes and datatable changes"
+- Focus on UI component fixes and repairs
+
+## Code Style
+- Rename components and remove spaces for consistency
+- Handle datatable and swipe transitions
+
+## Development Approach
+- Fix and repair frontend components iteratively
+- Manage user profile and interface features

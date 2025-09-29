@@ -284,7 +284,7 @@ async function startServer() {
           const promptData = {
             ...req.body,
             author_id: userContext.userId,
-            access_level: userContext.subscriptionTier === 'premium' ? 'premium' : 'private'
+            access_level: req.body.access_level || (userContext.subscriptionTier === 'premium' ? 'premium' : 'private')
           };
 
           const prompt = await promptService.createPrompt(promptData);

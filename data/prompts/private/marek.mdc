@@ -1,0 +1,15 @@
+# Karel Marek Coding Style Rules
+
+## Commit Messages
+- Use concise messages like "Better", "Bugfix for reading filter of undefined", "Proxy validation fail fix"
+- Focus on improvements, bug fixes, and validation
+- Often involve proxy certificates, OpenVPN, and configuration validation
+
+## Code Style
+- Emphasize proxy validation, certificate handling, and frozen objects
+- Handle merge conflicts and reviews effectively
+- Focus on network and security features
+
+## Development Approach
+- Prioritize fixing bugs and improving functionality
+- Work on complex features like OpenVPN integration and proxy validation

@@ -1,0 +1,13 @@
+# jcmiel Coding Style Rules
+
+## Commit Messages
+- Short, informal messages like "key is not a very good props", "more uploadLocators", "eslint", "fixed button", "some progress"
+- Indicate incremental changes and fixes
+
+## Code Style
+- Focus on frontend/UI improvements, ESLint fixes, and upload functionality
+- Make small, progressive updates
+
+## Development Approach
+- Emphasize quick fixes and enhancements in web interfaces
+- Handle merges and upgrades iteratively

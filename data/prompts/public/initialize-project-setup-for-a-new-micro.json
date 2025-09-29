@@ -1,0 +1,14 @@
+{
+  "id": "initialize-project-setup-for-a-new-micro",
+  "name": "Initialize project setup for a new micro...",
+  "description": "Initialize project setup for a new microservice",
+  "content": "Initialize project setup for a new microservice",
+  "isTemplate": false,
+  "tags": [
+    "ai",
+    "productivity"
+  ],
+  "createdAt": "2025-03-05T03:37:30.295Z",
+  "updatedAt": "2025-03-05T03:41:11.320Z",
+  "version": 1
+}

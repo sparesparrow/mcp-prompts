@@ -72,9 +72,6 @@ export class McpPromptsStack extends cdk.Stack {
         requireUppercase: true,
         requireDigits: true,
         requireSymbols: false
-      },
-      emailSettings: {
-        from: 'noreply@mcp-prompts.com'
       }
     });
 

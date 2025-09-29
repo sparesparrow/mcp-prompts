@@ -1,0 +1,18 @@
+# Jaromir Navratil Coding Style Rules
+
+## Commit Messages
+- Use descriptive messages for merges and fixes, often in Czech or English
+- Examples: "Merge branch 'fix-add-to-cluster' into 'develop'", "removed duplicite logging", "Apply 1 suggestion(s) to 1 file(s)"
+- Focus on integration, bug fixes, and release management
+
+## Code Style
+- Handle complex features like DHCP relay, GPG import, async module reloading
+- Emphasize proper logging and avoiding duplicates
+- Thorough approach to system-level features and configuration
+- Ensure stability in network and service-related code
+
+## Development Approach
+- Manage merges and releases carefully
+- Focus on enterprise features: networking, security, configuration
+- Pay attention to suggestions and code reviews
+- Maintain high-quality, production-ready code

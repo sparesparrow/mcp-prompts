@@ -1,0 +1,13 @@
+# Antonin Seidl Coding Style Rules
+
+## Commit Messages
+- Descriptive for additions and fixes: "Add influx.conf to install", "Fix merge problems with develop", "Add docs Fix some join errors Error handling"
+- Combine multiple changes in one message
+
+## Code Style
+- Work on database queries, InfluxDB integration, error handling
+- Focus on data conversion and socket communication
+
+## Development Approach
+- Implement data querying and storage features
+- Handle merge conflicts and add documentation

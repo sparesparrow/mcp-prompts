@@ -24,6 +24,8 @@ export class DynamoDBAdapter implements IPromptRepository {
       category: prompt.category,
       tags: prompt.tags,
       variables: prompt.variables,
+      access_level: prompt.accessLevel,
+      author_id: prompt.authorId || 'system',
       created_at: prompt.createdAt.toISOString(),
       updated_at: prompt.updatedAt.toISOString(),
       is_latest: prompt.isLatest ? 'true' : 'false',
@@ -246,7 +248,9 @@ export class DynamoDBAdapter implements IPromptRepository {
       new Date(item.created_at),
       new Date(item.updated_at),
       item.is_latest === 'true',
-      item.metadata || {}
+      item.metadata || {},
+      item.access_level || 'public',
+      item.author_id
     );
   }
 }

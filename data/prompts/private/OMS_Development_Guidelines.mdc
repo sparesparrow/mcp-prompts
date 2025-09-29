@@ -1,0 +1,569 @@
+# OMS Aerospace Development Guidelines
+
+This document contains the coding standards, architectural patterns, and development practices extracted from the OMS (Onboard Maintenance System) codebase - a safety-critical aerospace/avionics system.
+
+## 1. Dependency Management
+
+### Conan Configuration Rules
+
+**Rule: Use Specific Version Pinning**
+All dependencies must specify exact versions to ensure reproducible builds.
+
+```python
+# ✅ CORRECT: Specific versions
+build_requires = [
+    'sqlite-tools/3.39.2.0',
+    'FlatBuffers/2.0.0',
+    'honeywell_gtest/1.8.1a'
+]
+
+# ❌ WRONG: Version ranges or latest
+build_requires = [
+    'sqlite-tools/3.*',  # Too broad
+    'FlatBuffers/latest'  # Non-deterministic
+]
+```
+
+**Rule: Conditional Dependencies Based on Build Target**
+Runtime dependencies should be conditional based on product type and target platform.
+
+```python
+def requirements(self):
+    if self.options.bin.value == "False":
+        self.requires('PLATFORM_ABSTRACTION_LAYER/VERSION')
+        if self.options.product_type.value == 'HW_TARGET':
+            self.requires('HW_SPECIFIC_DEPS/VERSION')
+        elif self.options.product_type.value == 'SIMULATION':
+            self.requires('SIMULATION_DEPS/VERSION')
+```
+
+**Rule: Modular Build Configurations**
+Define separate build configurations for different targets (HW, Simulation, Desktop).
+
+```python
+build_configurations = {
+    'HW-dbg': {
+        'name': 'HW-dbg',
+        'cfg_files': ['Config/Target/*.cfg']
+    },
+    'ASE-dbg': {
+        'name': 'ASE-dbg',
+        'cfg_files': ['Config/Desktop/*.cfg']
+    }
+}
+```
+
+## 2. Code Style and Naming Conventions
+
+### File Structure Rules
+
+**Rule: Standard Header Format**
+All header files must follow the company proprietary notice format.
+
+```cpp
+//!
+//|DATA_RIGHTS:  [COMPANY] CONFIDENTIAL & PROPRIETARY
+//|              THIS WORK CONTAINS VALUABLE CONFIDENTIAL AND PROPRIETARY
+//|              INFORMATION. DISCLOSURE, USE OR REPRODUCTION OUTSIDE OF
+//|              [COMPANY] INTERNATIONAL, INC. IS PROHIBITED EXCEPT AS
+//|              AUTHORIZED IN WRITING. THIS UNPUBLISHED WORK IS PROTECTED BY
+//|              THE LAWS OF THE UNITED STATES AND OTHER COUNTRIES.
+//!
+
+#ifndef [GUARD_NAME]_H
+#define [GUARD_NAME]_H
+
+#pragma once
+```
+
+**Rule: Include Order**
+Headers must be included in this specific order:
+
+```cpp
+// 1. Standard library headers
+#include <memory>
+#include <vector>
+#include <string>
+
+// 2. Third-party library headers
+#include "eastl/vector.h"
+#include "flatbuffers/flatbuffers.h"
+
+// 3. Local project headers
+#include "Component.h"
+#include "LocalHeader.h"
+```
+
+### Naming Convention Rules
+
+**Rule: Class and Type Naming**
+Use PascalCase for all class names and type definitions.
+
+```cpp
+// ✅ CORRECT
+class MessageQueue;
+class SEAL_OMS_Component;
+struct SessionData;
+
+// ❌ WRONG
+class message_queue;
+class Messagequeue;
+```
+
+**Rule: Method Naming**
+Methods use PascalCase with descriptive names.
+
+```cpp
+// ✅ CORRECT
+void Initialize_component();
+DataBuffer Receive_message();
+bool Is_connection_valid();
+
+// ❌ WRONG
+void initialize_component();
+void receiveMessage();
+bool valid();
+```
+
+**Rule: Variable Naming**
+Variables use snake_case with descriptive suffixes indicating purpose.
+
+```cpp
+// ✅ CORRECT
+MS_memory_store* memory_store_p;
+const Basic_identity& instance_name_r;
+uint32_t buffer_size_u32;
+
+// ❌ WRONG
+MS_memory_store* mem;
+const Basic_identity& name;
+uint32_t size;
+```
+
+### Documentation Rules
+
+**Rule: Method Documentation**
+All public methods must have comprehensive Doxygen-style documentation.
+
+```cpp
+/////////////////////////////////////////////////////////////////////////////
+//METHOD NAME     : Initialize_component
+//DESCRIPTION     : Perform component initialization sequence
+//PRE-CONDITIONS  : Component memory allocated, dependencies available
+//POST-CONDITIONS : Component ready for operation
+//PARAMETERS      : None
+//RETURN          : void
+//EXAMPLES        : N/A
+//THROWS          : ComponentInitializationException on failure
+/////////////////////////////////////////////////////////////////////////////
+void Initialize_component();
+```
+
+## 3. Architecture Patterns
+
+### Component Architecture Rules
+
+**Rule: Interface-Based Design**
+All major components must be designed around abstract interfaces.
+
+```cpp
+// ✅ CORRECT: Interface first
+class IMessageQueue
+{
+public:
+    virtual ~IMessageQueue() = default;
+    virtual DataBuffer recv(const IPattern<DataBuffer>& pattern) = 0;
+    virtual int32_t send(const IBuffer& message) = 0;
+};
+
+// Implementation follows
+class ConcreteMessageQueue : public IMessageQueue
+{
+    // Implementation
+};
+```
+
+**Rule: Factory Pattern for Components**
+Components must use factory pattern for instantiation.
+
+```cpp
+#define DECLARE_COMPONENT_FACTORY(FACTORY_CLASS, COMPONENT_CLASS) \
+    friend class FACTORY_CLASS; \
+    static COMPONENT_CLASS* create_instance(...)
+
+class SEAL_OMS_Component : public SEAL_component
+{
+    DECLARE_COMPONENT_FACTORY(ComponentFactory, SEAL_OMS_Component);
+};
+```
+
+### Layered Architecture Rules
+
+**Rule: Clear Layer Separation**
+Maintain strict separation between architectural layers.
+
+```
+Applications/     # Application-specific logic
+├── Cmcf/        # CMCF application
+├── Tcrf/        # TCRF application
+└── Shared/      # Cross-application utilities
+
+Maintenance/      # Maintenance and monitoring logic
+Shared/          # Core shared components
+SharedUtil/      # Utility functions
+```
+
+**Rule: DAO Pattern for Data Access**
+All database and persistent storage access through DAO (Data Access Object) pattern.
+
+```cpp
+class IFaultHistoryDao
+{
+public:
+    virtual std::vector<FaultRecord> get_faults(const DateRange& range) = 0;
+    virtual void insert_fault(const FaultRecord& fault) = 0;
+};
+
+class FaultHistoryDaoImpl : public IFaultHistoryDao
+{
+    // Database implementation
+};
+```
+
+## 4. RTOS and Concurrency Patterns
+
+### OS Abstraction Rules
+
+**Rule: Platform-Independent OS Services**
+All OS services accessed through abstraction layers.
+
+```cpp
+// Osal/mutex - Platform abstraction header
+#pragma once
+
+#if (DEOS653P1 || ASE_BUILD)
+#include <DeosSpecific/mutex>
+#elif _WIN32
+#include <WindowsSpecific/mutex>
+#endif
+```
+
+**Rule: RTOS Implementation Standards**
+RTOS-specific implementations follow standard C++ interfaces.
+
+```cpp
+// DeosSpecific/mutex
+namespace std
+{
+class mutex
+{
+public:
+    mutex() noexcept
+    {
+        Semaphore_create("", 1, 1, &semaphore);
+    }
+
+    void lock()
+    {
+        Semaphore_wait(semaphore, Semaphore::INFINITE_WAIT_e);
+    }
+
+    bool try_lock()
+    {
+        return Semaphore_wait(semaphore, 0);
+    }
+
+    void unlock()
+    {
+        Semaphore_release(semaphore);
+    }
+
+private:
+    mutable void* semaphore{nullptr};
+};
+}
+```
+
+### Message Queue Rules
+
+**Rule: Session-Based Communication**
+All inter-task communication through session-managed message queues.
+
+```cpp
+struct Session
+{
+    SessionId id;
+    SessionType type;
+    bool terminated{false};
+
+    friend bool operator<(const Session& lhs, const Session& rhs)
+    {
+        return std::tie(lhs.id, lhs.type) < std::tie(rhs.id, rhs.type);
+    }
+};
+
+class IMsgChannel
+{
+public:
+    virtual bool send(const DataBufferView& msg) = 0;
+    virtual bool recv(DataBufferView& msg) = 0;
+    virtual void addSession(const Session& session) = 0;
+    virtual void removeSession(const Session& session) = 0;
+};
+```
+
+## 5. Memory Management Rules
+
+**Rule: Custom Allocators for Critical Components**
+Safety-critical components use custom memory allocators.
+
+```cpp
+class ComponentEntry
+{
+public:
+    ComponentEntry(MS_memory_store* mem_store)
+        : memory_store(mem_store)
+    {
+        const int32_t dynamic_heap_size = 65 * 1024 * 1024;
+        auto* dynamic_heap = static_cast<uint8_t*>(
+            mem_store->custom_allocate(dynamic_heap_size));
+        heapCreate(dynamic_heap, dynamic_heap_size,
+                  strategyDynamic, threadSafe);
+    }
+};
+```
+
+**Rule: RAII Pattern for Resource Management**
+All resources managed through RAII (Resource Acquisition Is Initialization).
+
+```cpp
+class ScopedMutexLock
+{
+public:
+    explicit ScopedMutexLock(std::mutex& m) : mutex_ref(m)
+    {
+        mutex_ref.lock();
+    }
+
+    ~ScopedMutexLock()
+    {
+        mutex_ref.unlock();
+    }
+
+    // Prevent copying
+    ScopedMutexLock(const ScopedMutexLock&) = delete;
+    ScopedMutexLock& operator=(const ScopedMutexLock&) = delete;
+
+private:
+    std::mutex& mutex_ref;
+};
+```
+
+## 6. Error Handling and Safety Rules
+
+**Rule: Comprehensive Error Reporting**
+All operations must report errors with detailed context.
+
+```cpp
+enum class ErrorCode
+{
+    SUCCESS = 0,
+    INVALID_PARAMETER = 1,
+    RESOURCE_UNAVAILABLE = 2,
+    TIMEOUT = 3
+};
+
+struct Result
+{
+    ErrorCode code;
+    std::string message;
+    std::optional<ErrorContext> context;
+};
+
+Result Component::initialize()
+{
+    if (!validate_prerequisites())
+    {
+        return {ErrorCode::INVALID_PARAMETER,
+                "Prerequisites not met for initialization",
+                create_error_context()};
+    }
+    // ... initialization logic
+    return {ErrorCode::SUCCESS, "Initialization successful"};
+}
+```
+
+**Rule: FMEA Integration**
+All components must integrate with Failure Mode and Effects Analysis.
+
+```cpp
+class ComponentFmea
+{
+public:
+    static constexpr uint32_t INITIALIZATION_FAILED = 0x0001;
+    static constexpr uint32_t MEMORY_ALLOCATION_FAILED = 0x0002;
+    static constexpr uint32_t COMMUNICATION_LOST = 0x0004;
+
+    void report_failure(uint32_t failure_code,
+                       const std::string& description)
+    {
+        // Report to FMEA system
+        fmea_system.report(failure_code, description);
+    }
+};
+```
+
+## 7. Build System Rules
+
+### Project Organization Rules
+
+**Rule: Modular Project Structure**
+Each major component has its own Visual Studio project.
+
+```
+_Build/Projects/
+├── Cmcf.vcxproj          # CMCF application
+├── Tcrf.vcxproj          # TCRF application
+├── EvaluationAlgorithms.vcxproj  # Algorithm library
+├── OmsUnitTests.vcxproj  # Unit tests
+└── Utilities.vcxproj     # Utility tools
+```
+
+**Rule: Source File Grouping**
+Source files organized by functional area within projects.
+
+```xml
+<ItemGroup>
+    <!-- Application entry point -->
+    <ClCompile Include="..\..\Applications\Cmcf\CmcfEntry.cpp" />
+
+    <!-- Data Access Objects -->
+    <ClCompile Include="..\..\Applications\Cmcf\Dao\*.cpp" />
+
+    <!-- Initialization components -->
+    <ClCompile Include="..\..\Applications\Cmcf\Initialization\*.cpp" />
+
+    <!-- Maintenance components -->
+    <ClCompile Include="..\..\Maintenance\*.cpp" />
+</ItemGroup>
+```
+
+## 8. Testing and Quality Assurance Rules
+
+**Rule: Unit Test Coverage**
+All classes must have corresponding unit tests.
+
+```
+Tests/OmsUnitTests/
+├── ComponentNameTests.cpp
+├── DaoTests.cpp
+├── MessageQueueTests.cpp
+└── main.cpp
+```
+
+**Rule: Mock Objects for Dependencies**
+Complex dependencies must be mocked for unit testing.
+
+```cpp
+class MockMessageQueue : public IMessageQueue
+{
+public:
+    MOCK_METHOD(DataBuffer, recv, (const IPattern<DataBuffer>&), (override));
+    MOCK_METHOD(int32_t, send, (const IBuffer&), (override));
+    MOCK_METHOD(bool, isOk, (), (const, override));
+};
+```
+
+## 9. Version Control and Development Workflow Rules
+
+**Rule: Branch Naming Convention**
+Feature branches follow specific naming patterns.
+
+```
+feature/OMS-123-add-fault-detection
+bugfix/OMS-456-fix-memory-leak
+hotfix/OMS-789-critical-safety-fix
+```
+
+**Rule: Commit Message Standards**
+Commits must follow structured format.
+
+```
+feat: add fault history persistence (OMS-123)
+
+- Implement database schema for fault records
+- Add DAO layer for fault CRUD operations
+- Update component initialization sequence
+
+Fixes: OMS-123
+Reviewed-by: @safety-engineer
+```
+
+## 10. Security and Safety Rules
+
+**Rule: Input Validation**
+All external inputs must be validated.
+
+```cpp
+Result Component::process_command(const Command& cmd)
+{
+    // Validate input parameters
+    if (!is_valid_command_id(cmd.id))
+    {
+        return {ErrorCode::INVALID_PARAMETER,
+                "Invalid command ID received"};
+    }
+
+    if (cmd.data.size() > MAX_COMMAND_SIZE)
+    {
+        return {ErrorCode::INVALID_PARAMETER,
+                "Command data exceeds maximum size"};
+    }
+
+    // Process validated command
+    return execute_command(cmd);
+}
+```
+
+**Rule: Secure Memory Handling**
+Sensitive data must be properly handled and cleared.
+
+```cpp
+class SecureBuffer
+{
+public:
+    SecureBuffer(size_t size) : buffer(new uint8_t[size]), size(size) {}
+
+    ~SecureBuffer()
+    {
+        // Securely clear memory before deallocation
+        memset(buffer, 0, size);
+        delete[] buffer;
+    }
+
+private:
+    uint8_t* buffer;
+    size_t size;
+};
+```
+
+---
+
+## Application Guidelines
+
+These rules are specifically tailored for safety-critical aerospace/avionics systems development. All code must adhere to DO-178C standards where applicable, and maintain the highest levels of reliability and safety.
+
+### Enforcement
+
+- **Automated Checks**: Use clang-tidy, cppcheck, and custom tools for rule enforcement
+- **Code Reviews**: Required for all changes with focus on safety and standards compliance
+- **Continuous Integration**: Automated builds and tests on all platforms
+- **Documentation**: All rules must be documented and regularly reviewed
+
+### Exceptions
+
+Exceptions to these rules require:
+1. Technical justification
+2. Safety analysis impact assessment
+3. Approval from system safety engineer
+4. Documentation in design records

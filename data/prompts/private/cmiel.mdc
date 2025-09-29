@@ -1,0 +1,13 @@
+# Józef Ćmiel Coding Style Rules
+
+## Commit Messages
+- Primarily merge commits like "Merge branch 'bugfix-networkinterfaces' into 'develop'"
+- Focus on integrating branches and releases
+
+## Code Style
+- Specialize in branch management and network interface fixes
+- Handle upgrades and cluster-related features
+
+## Development Approach
+- Coordinate merges for bug fixes and feature branches
+- Ensure smooth integration of network and system updates

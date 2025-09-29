@@ -40,7 +40,9 @@ export class PromptService {
       new Date(),
       new Date(),
       true,
-      data.metadata || {}
+      data.metadata || {},
+      data.access_level || 'public',
+      data.author_id
     );
 
     await this.promptRepository.save(prompt);
@@ -96,7 +98,9 @@ export class PromptService {
       existingPrompt.createdAt,
       new Date(),
       existingPrompt.isLatest,
-      { ...existingPrompt.metadata, ...data.metadata }
+      { ...existingPrompt.metadata, ...data.metadata },
+      data.access_level || existingPrompt.accessLevel,
+      data.author_id || existingPrompt.authorId
     );
 
     await this.promptRepository.save(updatedPrompt);
@@ -171,10 +175,10 @@ export class PromptService {
   hasAccessToPrompt(prompt: Prompt, userContext?: UserContext): boolean {
     // If no user context, only allow public prompts
     if (!userContext) {
-      return (prompt as any).access_level === 'public' || !(prompt as any).access_level;
+      return prompt.accessLevel === 'public';
     }
 
-    const accessLevel = (prompt as any).access_level || 'public';
+    const accessLevel = prompt.accessLevel || 'public';
 
     switch (accessLevel) {
       case 'public':
@@ -182,7 +186,7 @@ export class PromptService {
       case 'premium':
         return userContext.subscriptionTier === 'premium';
       case 'private':
-        return (prompt as any).author_id === userContext.userId;
+        return prompt.authorId === userContext.userId;
       default:
         return false;
     }

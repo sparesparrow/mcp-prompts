@@ -1,0 +1,17 @@
+# Vojtech Spacek Coding Style Rules
+
+## Commit Messages
+- Use short, casual commit messages that reflect immediate fixes or tests
+- Examples: "compile ok", "fix compile error", "make_shared wtf", "testmain fix"
+- Focus on pragmatic, quick resolutions rather than detailed descriptions
+
+## Code Style
+- Prioritize getting code to compile and run quickly
+- Use modern C++ features like `make_shared` when appropriate
+- Focus on testing and fixing unhandled cases
+- Keep changes minimal and targeted to resolve immediate issues
+
+## Development Approach
+- Emphasize rapid iteration and testing
+- Handle compilation errors and basic functionality first
+- Use short, informal communication in commits

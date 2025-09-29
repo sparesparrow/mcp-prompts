@@ -11,7 +11,9 @@ export class Prompt {
     public readonly createdAt: Date = new Date(),
     public readonly updatedAt: Date = new Date(),
     public readonly isLatest: boolean = true,
-    public readonly metadata: Record<string, any> = {}
+    public readonly metadata: Record<string, any> = {},
+    public readonly accessLevel: string = 'public',
+    public readonly authorId?: string
   ) {}
 
   public toJSON(): any {
@@ -27,7 +29,9 @@ export class Prompt {
       createdAt: this.createdAt.toISOString(),
       updatedAt: this.updatedAt.toISOString(),
       isLatest: this.isLatest,
-      metadata: this.metadata
+      metadata: this.metadata,
+      accessLevel: this.accessLevel,
+      authorId: this.authorId
     };
   }
 }

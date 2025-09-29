@@ -5,260 +5,217 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
-  release:
-    types: [ published ]
 
 env:
-  NODE_VERSION: '20'
+  NODE_VERSION: '18'
   PNPM_VERSION: '8'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # Test and Build Job
-  test-and-build:
+  test:
+    name: Test
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        storage-type: [memory, file, postgres, aws]
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: Setup PNPM
-      uses: pnpm/action-setup@v2
-      with:
-        version: ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-    - name: Get PNPM store directory
-      shell: bash
-      run: |
-        echo "STORE_PATH=$(pnpm store path --silent)" >> $GITHUB_ENV
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-    - name: Setup PNPM cache
-      uses: actions/cache@v3
-      with:
-        path: ${{ env.STORE_PATH }}
-        key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-        restore-keys: |
-          ${{ runner.os }}-pnpm-store-
+      - name: Build application
+        run: pnpm run build
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      - name: Run tests
+        run: pnpm run test
 
-    - name: Lint code
-      run: pnpm run lint
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist-files
+          path: dist/
 
-    - name: Type check
-      run: pnpm run type-check
-
-    - name: Run tests
-      run: pnpm run test
-      env:
-        STORAGE_TYPE: ${{ matrix.storage-type }}
-
-    - name: Build project
-      run: pnpm run build
-
-    - name: Upload build artifacts
-      uses: actions/upload-artifact@v3
-      with:
-        name: build-artifacts-${{ matrix.storage-type }}
-        path: dist/
-
-  # Security Scan Job
   security-scan:
+    name: Security Scan
     runs-on: ubuntu-latest
-    needs: test-and-build
-    
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        scan-type: 'fs'
-        scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-results.sarif'
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-  # Docker Build and Push Job
-  docker-build:
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run security audit
+        run: pnpm audit --audit-level moderate
+
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript-typescript
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  deploy-staging:
+    name: Deploy to Staging
     runs-on: ubuntu-latest
-    needs: [test-and-build, security-scan]
-    if: github.event_name == 'push' || github.event_name == 'release'
-    
-    strategy:
-      matrix:
-        storage-type: [memory, file, postgres, aws]
-    
+    needs: [test, security-scan]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment: staging
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: Setup PNPM
-      uses: pnpm/action-setup@v2
-      with:
-        version: ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID_STAGING }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY_STAGING }}
+          aws-region: ${{ secrets.AWS_REGION_STAGING }}
 
-    - name: Build project
-      run: pnpm run build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-    - name: Set up Docker Buildx
-      uses: docker/setup-buildx-action@v3
+      - name: Build application
+        run: pnpm run build
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Deploy to AWS (Staging)
+        run: |
+          cd cdk
+          cdk deploy --all --require-approval never --context environment=staging
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=raw,value=${{ matrix.storage-type }}
+      - name: Deploy Lambda functions
+        run: ./scripts/deploy-aws.sh
 
-    - name: Build and push Docker image
-      uses: docker/build-push-action@v5
-      with:
-        context: .
-        file: ./Dockerfile.${{ matrix.storage-type }}
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-
-    - name: Run Trivy vulnerability scanner on image
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.storage-type }}
-        format: 'sarif'
-        output: 'trivy-image-results.sarif'
-
-    - name: Upload Trivy image scan results
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-image-results.sarif'
-
-  # AWS Deployment Job
-  deploy-aws:
+  deploy-production:
+    name: Deploy to Production
     runs-on: ubuntu-latest
-    needs: [test-and-build, security-scan]
+    needs: [test, security-scan]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment: production-aws
-    
+    environment: production
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Configure AWS credentials
-      uses: aws-actions/configure-aws-credentials@v4
-      with:
-        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-        aws-region: ${{ secrets.AWS_REGION }}
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
+      - name: Setup pnpm
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
-    - name: Setup PNPM
-      uses: pnpm/action-setup@v2
-      with:
-        version: ${{ env.PNPM_VERSION }}
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: ${{ env.PNPM_VERSION }}
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
-    - name: Build project
-      run: pnpm run build
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
-    - name: Deploy to AWS
-      run: ./scripts/deploy-aws-enhanced.sh
-      env:
-        AWS_REGION: ${{ secrets.AWS_REGION }}
-        AWS_PROFILE: default
+      - name: Build application
+        run: pnpm run build
 
-    - name: Run health check
-      run: |
-        sleep 30
-        ./scripts/health-check-aws.sh
+      - name: Deploy infrastructure to AWS
+        run: |
+          cd cdk
+          cdk deploy --all --require-approval never
 
-  # NPM Publish Job
-  publish-npm:
+      - name: Deploy Lambda functions
+        run: ./scripts/deploy-aws.sh
+
+      - name: Deploy web interface
+        run: ./scripts/deploy-web.sh ${{ secrets.WEB_BUCKET_NAME }}
+
+      - name: Run health check
+        run: |
+          API_URL=$(cd cdk && cdk describe McpPromptsStack | jq -r '.McpPromptsStack.ApiGatewayUrl')
+          echo "API URL: $API_URL"
+          curl -f "$API_URL/health" || exit 1
+
+      - name: Create deployment notification
+        uses: actions/github-script@v7
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: `🚀 **Production deployment completed successfully!**\n\nAPI: ${{ steps.api-url.outputs.url }}\nWeb: ${{ steps.web-url.outputs.url }}`
+            })
+
+  release:
+    name: Create Release
     runs-on: ubuntu-latest
-    needs: [test-and-build, security-scan]
-    if: github.event_name == 'release'
-    environment: production-npm
-    
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, 'release:')
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        registry-url: 'https://registry.npmjs.org'
+      - name: Extract version
+        id: version
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
 
-    - name: Setup PNPM
-      uses: pnpm/action-setup@v2
-      with:
-        version: ${{ env.PNPM_VERSION }}
+      - name: Create GitHub release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          release_name: Release v${{ steps.version.outputs.version }}
+          body: |
+            ## What's new in v${{ steps.version.outputs.version }}
 
-    - name: Install dependencies
-      run: pnpm install --frozen-lockfile
+            ### Features
+            - Subscription management with Stripe integration
+            - Slash commands for quick prompt execution
+            - Modern web interface for user management
+            - Rate limiting and access control
 
-    - name: Build project
-      run: pnpm run build
+            ### Improvements
+            - Enhanced AWS infrastructure with Cognito authentication
+            - Improved error handling and logging
+            - Better TypeScript types and validation
 
-    - name: Publish to NPM
-      run: npm publish
-      env:
-        NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-  # Notification Job
-  notify:
-    runs-on: ubuntu-latest
-    needs: [test-and-build, security-scan, docker-build]
-    if: always()
-    
-    steps:
-    - name: Notify deployment status
-      uses: 8398a7/action-slack@v3
-      with:
-        status: ${{ job.status }}
-        channel: '#deployments'
-        webhook_url: ${{ secrets.SLACK_WEBHOOK }}
-      if: always()
+          draft: false
+          prerelease: false
