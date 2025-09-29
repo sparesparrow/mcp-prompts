@@ -11,6 +11,9 @@ A robust, extensible server for managing, versioning, and serving prompts and te
 - **🔍 Advanced Querying**: Filter by category, tags, and metadata
 - **📊 Version Control**: Complete prompt versioning and history
 - **🔐 Enterprise Security**: IAM, VPC, and encryption support
+- **💳 Subscription Management**: Free and premium tiers with Stripe integration
+- **🎯 Slash Commands**: Quick prompt execution with commands like "/code-review"
+- **🌐 Web Interface**: Modern web app for prompt management and user accounts
 - **📈 Monitoring**: CloudWatch metrics and comprehensive logging
 - **🧪 Testing**: Full test suite with local development support
 
@@ -50,6 +53,48 @@ STORAGE_TYPE=postgres pnpm run dev
 ```bash
 # One-command AWS deployment
 ./scripts/deploy-aws-enhanced.sh
+```
+
+### 🎯 New Features
+
+#### Subscription Management
+- **Free Tier**: Access to 5 public prompts, basic features
+- **Premium Tier**: Unlimited access, upload custom prompts, advanced features
+- **Stripe Integration**: Secure payment processing with webhooks
+
+#### Slash Commands
+Execute prompts quickly using slash commands:
+```
+/code-review - Review code for best practices
+/bug-analyzer - Analyze bug reports
+/documentation - Generate documentation
+```
+
+#### Web Interface
+Modern web application for:
+- User registration and login
+- Prompt browsing and management
+- Subscription management
+- Slash command execution
+
+### 🚀 Complete Deployment
+
+```bash
+# 1. Deploy infrastructure
+cd cdk && cdk deploy --all
+
+# 2. Build application
+pnpm run build
+
+# 3. Deploy Lambda functions
+./scripts/deploy-aws.sh
+
+# 4. Deploy web interface
+./scripts/deploy-web.sh <web-bucket-name>
+
+# 5. Configure Stripe (optional)
+export STRIPE_SECRET_KEY=sk_test_...
+export STRIPE_WEBHOOK_SECRET=whsec_...
 ```
 
 ## 📋 Table of Contents
