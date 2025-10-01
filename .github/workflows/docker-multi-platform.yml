@@ -16,7 +16,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        storage-type: [memory, file, postgres, aws]
+        variant: [default, mcp, aws, simple]
         platform: [linux/amd64, linux/arm64]
     
     steps:
@@ -44,13 +44,13 @@ jobs:
           type=semver,pattern={{version}}
           type=semver,pattern={{major}}.{{minor}}
           type=raw,value=latest,enable={{is_default_branch}}
-          type=raw,value=${{ matrix.storage-type }}
+          type=raw,value=${{ matrix.variant }}
 
     - name: Build and push Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
-        file: ./Dockerfile.${{ matrix.storage-type }}
+        file: ./Dockerfile${{ matrix.variant != 'default' && format('.{0}', matrix.variant) || '' }}
         platforms: ${{ matrix.platform }}
         push: true
         tags: ${{ steps.meta.outputs.tags }}
@@ -63,7 +63,7 @@ jobs:
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
       with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.storage-type }}
+        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}
         format: 'sarif'
         output: 'trivy-results.sarif'
 

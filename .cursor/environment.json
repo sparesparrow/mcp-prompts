@@ -149,14 +149,14 @@
   },
   "workspace": {
     "recommendedExtensions": [
-      "ms-vscode.vscode-typescript-next",
-      "bradlc.vscode-tailwindcss",
       "esbenp.prettier-vscode",
-      "ms-vscode.vscode-eslint",
-      "ms-vscode.vscode-json",
-      "redhat.vscode-yaml",
+      "dbaeumer.vscode-eslint",
+      "ms-vscode.vscode-typescript-next",
+      "@biomejs/biome",
       "ms-azuretools.vscode-docker",
       "amazonwebservices.aws-toolkit-vscode",
+      "ms-vscode.vscode-json",
+      "redhat.vscode-yaml",
       "ms-vscode.vscode-node-azure-pack"
     ],
     "settings": {
@@ -167,11 +167,27 @@
       "editor.codeActionsOnSave": {
         "source.fixAll.eslint": "explicit"
       },
+      "eslint.experimental.useFlatConfig": true,
+      "npm.packageManager": "pnpm",
       "files.exclude": {
         "**/node_modules": true,
         "**/dist": true,
+        "**/.turbo": true,
         "**/.git": true,
-        "**/.DS_Store": true
+        "**/.DS_Store": true,
+        "**/cdk.out": true
+      },
+      "search.exclude": {
+        "**/node_modules": true,
+        "**/dist": true,
+        "**/.turbo": true,
+        "**/cdk.out": true
+      },
+      "files.watcherExclude": {
+        "**/node_modules/**": true,
+        "**/dist/**": true,
+        "**/.turbo/**": true,
+        "**/cdk.out/**": true
       }
     }
   },
