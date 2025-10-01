@@ -177,7 +177,7 @@ run_test "ECS log group exists" \
     "aws logs describe-log-groups --log-group-name-prefix '/aws/ecs/mcp-prompts' --query 'logGroups[0].logGroupName' --output text | grep -q 'mcp-prompts'"
 
 run_test "Lambda log group exists" \
-    "aws logs describe-log-groups --log-group-name-prefix '/aws/lambda/mcp-prompts' --query 'logGroups[0].logGroupName' --output text | grep -q 'mcp-prompts'"
+    "aws logs describe-log-groups --log-group-name-prefix '/aws/lambda/McpPromptsStack-' --query 'logGroups[0].logGroupName' --output text | grep -q '/aws/lambda/McpPromptsStack-'"
 
 # 8. Test SSL Certificate (if domain provided)
 if [ -n "$1" ]; then
@@ -231,10 +231,10 @@ if [ "$API_ID" != "None" ] && [ "$API_ID" != "null" ]; then
     run_test "API Gateway exists" "true"
     
     run_test "API Gateway has CORS configured" \
-        "aws apigateway get-rest-api --rest-api-id '$API_ID' --query 'policy' --output text | grep -q 'CORS' || aws apigateway get-rest-api --rest-api-id '$API_ID' --query 'defaultCorsPreflightOptions' --output text | grep -q 'allowOrigins'"
+        "aws apigateway get-resources --rest-api-id \"$API_ID\" --query \"items[?contains(keys(resourceMethods), 'OPTIONS')].id\" --output text | grep -q \\\S"
     
     run_test "API Gateway has usage plan" \
-        "aws apigateway get-usage-plans --query 'items[?name==`MCP Prompts Usage Plan`]' --output text | grep -q 'MCP Prompts Usage Plan'"
+        "aws apigateway get-usage-plans --query \"items[?apiStages[?apiId=='$API_ID']]\" --output text | grep -q '\\S'"
 else
     print_warning "API Gateway not found - will be created by CDK"
 fi
