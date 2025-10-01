@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "3.12.1",
+  "version": "3.12.2",
   "description": "A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP) with AWS integration",
   "main": "dist/mcp-server-standalone.js",
   "types": "dist/mcp-server-standalone.d.ts",
@@ -94,6 +94,7 @@
     "commander": "^12.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "fs-extra": "^11.2.0",
     "helmet": "^7.2.0",
     "morgan": "^1.10.1",
     "pino": "^8.21.0",
