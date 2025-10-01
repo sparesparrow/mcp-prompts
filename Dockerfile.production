@@ -1,0 +1,90 @@
+# Multi-stage Dockerfile for Production with Security Enhancements
+# Stage 1: Build stage
+FROM node:20-alpine AS builder
+
+# Install build dependencies
+RUN apk add --no-cache \
+    python3 \
+    make \
+    g++ \
+    git
+
+# Set working directory
+WORKDIR /app
+
+# Copy package files
+COPY package*.json pnpm-lock.yaml ./
+COPY cdk/package*.json ./cdk/
+
+# Install dependencies
+RUN npm install -g pnpm@8
+RUN pnpm install --frozen-lockfile --force
+
+# Copy source code
+COPY . .
+
+# Build the application
+RUN pnpm run build
+
+# Stage 2: Production stage
+FROM node:20-alpine AS production
+
+# Security: Create non-root user
+RUN addgroup -g 1001 -S nodejs && \
+    adduser -S mcp-prompts -u 1001 -G nodejs
+
+# Install security updates and required packages
+RUN apk update && \
+    apk upgrade && \
+    apk add --no-cache \
+    dumb-init \
+    curl \
+    ca-certificates && \
+    rm -rf /var/cache/apk/*
+
+# Set working directory
+WORKDIR /app
+
+# Copy built application from builder stage
+COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
+COPY --from=builder --chown=mcp-prompts:nodejs /app/package*.json ./
+COPY --from=builder --chown=mcp-prompts:nodejs /app/node_modules ./node_modules
+
+# Copy data directory
+COPY --chown=mcp-prompts:nodejs data ./data
+
+# Create necessary directories
+RUN mkdir -p /app/logs /app/tmp && \
+    chown -R mcp-prompts:nodejs /app/logs /app/tmp
+
+# Security: Remove unnecessary packages and files
+RUN rm -rf /tmp/* /var/tmp/* && \
+    find /app -name "*.map" -delete && \
+    find /app -name "*.d.ts" -delete
+
+# Security: Set proper permissions
+RUN chmod -R 755 /app && \
+    chmod 600 /app/package*.json
+
+# Environment variables
+ENV NODE_ENV=production
+ENV LOG_LEVEL=info
+ENV STORAGE_TYPE=aws
+ENV PORT=3003
+ENV HOST=0.0.0.0
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
+    CMD curl -f http://localhost:3003/health || exit 1
+
+# Security: Switch to non-root user
+USER mcp-prompts
+
+# Expose port
+EXPOSE 3003
+
+# Use dumb-init to handle signals properly
+ENTRYPOINT ["dumb-init", "--"]
+
+# Start the application
+CMD ["node", "dist/index.js"]

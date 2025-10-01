@@ -1,14 +1,45 @@
 {
   "mcpServers": {
-    "mcp-prompts": {
+    "mcp-prompts-docker-aws": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-p", "3004:3003",
+        "-e", "STORAGE_TYPE=aws",
+        "-e", "AWS_REGION=eu-north-1",
+        "-e", "AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}",
+        "-e", "AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}",
+        "-e", "PROMPTS_TABLE=mcp-prompts",
+        "-e", "SESSIONS_TABLE=mcp-sessions",
+        "-e", "PROMPTS_BUCKET=mcp-prompts-catalog-875486186075-eu-north-1",
+        "-e", "PROCESSING_QUEUE=https://sqs.eu-north-1.amazonaws.com/875486186075/mcp-prompts-processing",
+        "-e", "MODE=http",
+        "mcp-prompts:test"
+      ]
+    },
+    "mcp-prompts-memory": {
       "command": "npx",
-      "args": ["-y", "@sparesparrow/mcp-prompts"],
+      "args": ["-y", "@sparesparrow/mcp-prompts", "start"],
       "env": {
-        "MODE": "mcp",
+        "STORAGE_TYPE": "memory",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "mcp-prompts-file": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts", "start"],
+      "env": {
+        "STORAGE_TYPE": "file",
+        "LOG_LEVEL": "debug"
+      }
+    },
+    "mcp-prompts-postgres": {
+      "command": "npx",
+      "args": ["-y", "@sparesparrow/mcp-prompts", "start"],
+      "env": {
         "STORAGE_TYPE": "postgres",
         "POSTGRES_URL": "postgres://postgres:postgres@localhost:5432/mcp_prompts",
-        "PORT": "3003",
-        "HOST": "0.0.0.0"
+        "LOG_LEVEL": "debug"
       }
     }
   }
