@@ -1,4 +1,4 @@
-# Multi-stage build for MCP Prompts with AWS DynamoDB Storage
+# Multi-stage build for MCP Prompts with File Storage
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -24,17 +24,21 @@ COPY package.json pnpm-lock.yaml ./
 # Install production dependencies only
 RUN corepack enable && pnpm install --prod --no-frozen-lockfile && pnpm store prune
 
-# Copy built application from builder stage
+# Copy built application and data from builder stage
 COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
+COPY --from=builder --chown=mcp-prompts:nodejs /app/data ./data
+
+# Create data directory for file storage
+RUN mkdir -p /app/data/prompts && chown -R mcp-prompts:nodejs /app/data
 
 # Switch to non-root user
 USER mcp-prompts
 
-# Set environment for AWS storage
+# Set environment for file storage
 ENV NODE_ENV=production
 ENV MODE=mcp
-ENV STORAGE_TYPE=aws
-ENV AWS_REGION=eu-north-1
+ENV STORAGE_TYPE=file
+ENV PROMPTS_DIR=/app/data
 ENV PORT=3003
 ENV HOST=0.0.0.0
 
@@ -45,5 +49,5 @@ EXPOSE 3003
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
 
-# Start the MCP server with AWS storage
+# Start the MCP server with file storage
 CMD ["node", "dist/mcp-server-standalone.js"]

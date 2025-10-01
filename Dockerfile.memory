@@ -1,4 +1,4 @@
-# Multi-stage build for MCP Prompts with AWS DynamoDB Storage
+# Multi-stage build for MCP Prompts with Memory Storage
 FROM node:20-alpine AS builder
 WORKDIR /app
 
@@ -30,11 +30,10 @@ COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
 # Switch to non-root user
 USER mcp-prompts
 
-# Set environment for AWS storage
+# Set environment for memory storage
 ENV NODE_ENV=production
 ENV MODE=mcp
-ENV STORAGE_TYPE=aws
-ENV AWS_REGION=eu-north-1
+ENV STORAGE_TYPE=memory
 ENV PORT=3003
 ENV HOST=0.0.0.0
 
@@ -45,5 +44,5 @@ EXPOSE 3003
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
   CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
 
-# Start the MCP server with AWS storage
+# Start the MCP server with memory storage
 CMD ["node", "dist/mcp-server-standalone.js"]

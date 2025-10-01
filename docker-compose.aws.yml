@@ -1,0 +1,23 @@
+services:
+  mcp-prompts-aws:
+    build:
+      context: .
+      dockerfile: Dockerfile.aws
+    environment:
+      - HOST=0.0.0.0
+      - PORT=3003
+      - MODE=mcp
+      - STORAGE_TYPE=aws
+      - AWS_REGION=eu-north-1
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_SESSION_TOKEN=${AWS_SESSION_TOKEN}
+    ports:
+      - "3003:3003"
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3003/health', (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
