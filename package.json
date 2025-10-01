@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "3.11.0",
+  "version": "3.12.0",
   "description": "A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP) with AWS integration",
   "main": "dist/mcp-server-standalone.js",
   "types": "dist/mcp-server-standalone.d.ts",
@@ -45,8 +45,15 @@
     "build:clean": "pnpm run clean && pnpm run build",
     "clean": "rm -rf dist",
     "dev": "nodemon --exec ts-node src/index.ts",
+    "dev:http": "MODE=http nodemon --exec ts-node src/index.ts",
+    "dev:mcp": "MODE=mcp nodemon --exec ts-node src/index.ts",
     "test": "vitest run",
     "test:watch": "vitest",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "lint": "eslint src --ext .ts,.js",
+    "lint:fix": "eslint src --ext .ts,.js --fix",
+    "type-check": "tsc --noEmit",
     "deploy": "./scripts/deploy-aws.sh",
     "cleanup": "./scripts/cleanup-aws.sh",
     "cdk:deploy": "cd cdk && cdk deploy --all",
@@ -56,21 +63,30 @@
     "start:mcp": "MODE=mcp node dist/index.js",
     "docker:build": "docker build -t sparesparrow/mcp-prompts:latest .",
     "docker:build:mcp": "docker build -f Dockerfile.mcp -t sparesparrow/mcp-prompts:latest .",
+    "docker:build:aws": "docker build -f Dockerfile.aws -t sparesparrow/mcp-prompts:aws .",
+    "docker:build:simple": "docker build -f Dockerfile.simple -t sparesparrow/mcp-prompts:simple .",
     "publish:dry": "npm publish --dry-run",
-    "publish:patch": "npm version patch && npm publish",
-    "publish:minor": "npm version minor && npm publish",
-    "publish:major": "npm version major && npm publish"
+    "publish:npm": "npm publish --access public",
+    "publish:gh": "npm publish --registry https://npm.pkg.github.com",
+    "publish:patch": "npm version patch && npm publish --access public",
+    "publish:minor": "npm version minor && npm publish --access public",
+    "publish:major": "npm version major && npm publish --access public",
+    "docker:tag:ghcr": "docker tag sparesparrow/mcp-prompts:latest ghcr.io/sparesparrow/mcp-prompts:latest",
+    "docker:push:dockerhub": "docker push sparesparrow/mcp-prompts:latest",
+    "docker:push:ghcr": "docker push ghcr.io/sparesparrow/mcp-prompts:latest",
+    "prepublishOnly": "pnpm run build",
+    "postinstall": "echo 'MCP Prompts installed successfully!'"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch": "^3.883.0",
-    "@aws-sdk/client-cognito-identity-provider": "^3.887.0",
-    "@aws-sdk/client-dynamodb": "^3.883.0",
-    "@aws-sdk/client-s3": "^3.883.0",
-    "@aws-sdk/client-sqs": "^3.883.0",
-    "@aws-sdk/credential-providers": "3.896.0",
-    "@aws-sdk/lib-dynamodb": "^3.883.0",
-    "@aws-sdk/util-dynamodb": "3.896.0",
-    "@modelcontextprotocol/sdk": "^1.13.3",
+    "@aws-sdk/client-cloudwatch": "^3.899.0",
+    "@aws-sdk/client-cognito-identity-provider": "^3.899.0",
+    "@aws-sdk/client-dynamodb": "^3.899.0",
+    "@aws-sdk/client-s3": "^3.899.0",
+    "@aws-sdk/client-sqs": "^3.899.0",
+    "@aws-sdk/credential-providers": "^3.899.0",
+    "@aws-sdk/lib-dynamodb": "^3.899.0",
+    "@aws-sdk/util-dynamodb": "^3.899.0",
+    "@modelcontextprotocol/sdk": "^1.18.2",
     "commander": "^12.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
@@ -85,20 +101,55 @@
   "devDependencies": {
     "@swc/cli": "^0.1.65",
     "@swc/core": "^1.13.5",
-    "@types/aws-lambda": "^8.10.152",
-    "@types/commander": "^2.12.2",
+    "@types/aws-lambda": "^8.10.153",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.23",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^20.19.13",
+    "@types/node": "^20.19.17",
     "@types/uuid": "^10.0.0",
     "nodemon": "^3.1.10",
     "stripe": "^14.17.0",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2",
+    "typescript": "^5.9.3",
     "vitest": "^1.6.1"
   },
   "engines": {
-    "node": ">=18.0.0"
+    "node": ">=18.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./mcp": {
+      "import": "./dist/mcp-server-standalone.js",
+      "require": "./dist/mcp-server-standalone.js",
+      "types": "./dist/mcp-server-standalone.d.ts"
+    },
+    "./cli": {
+      "import": "./dist/cli.js",
+      "require": "./dist/cli.js",
+      "types": "./dist/cli.d.ts"
+    },
+    "./package.json": "./package.json"
+  },
+  "funding": {
+    "type": "github",
+    "url": "https://github.com/sponsors/sparesparrow"
+  },
+  "os": [
+    "linux",
+    "darwin",
+    "win32"
+  ],
+  "cpu": [
+    "x64",
+    "arm64"
+  ]
+  ,
+  "publishConfig": {
+    "access": "public"
   }
 }

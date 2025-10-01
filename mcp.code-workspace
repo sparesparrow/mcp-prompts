@@ -4,23 +4,53 @@
     { "path": "." },
     { "path": "packages/*" },
     { "path": "apps/*" },
-    { "path": "docs" }
+    { "path": "docs" },
+    { "path": "cdk" }
   ],
   "settings": {
     "typescript.tsdk": "node_modules/typescript/lib",
     "typescript.preferences.includePackageJsonAutoImports": "on",
     "typescript.suggest.autoImports": true,
+    "typescript.preferences.importModuleSpecifier": "relative",
+    "typescript.updateImportsOnFileMove.enabled": "always",
     "editor.formatOnSave": true,
     "editor.defaultFormatter": "esbenp.prettier-vscode",
+    "editor.codeActionsOnSave": {
+      "source.fixAll.eslint": "explicit"
+    },
+    "eslint.experimental.useFlatConfig": true,
     "eslint.workingDirectories": ["packages/*", "apps/*"],
-    "typescript.enablePromptUseWorkspaceTsdk": true
+    "npm.packageManager": "pnpm",
+    "typescript.enablePromptUseWorkspaceTsdk": true,
+    "files.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.turbo": true,
+      "**/.git": true,
+      "**/.DS_Store": true,
+      "**/cdk.out": true
+    },
+    "search.exclude": {
+      "**/node_modules": true,
+      "**/dist": true,
+      "**/.turbo": true,
+      "**/cdk.out": true
+    },
+    "files.watcherExclude": {
+      "**/node_modules/**": true,
+      "**/dist/**": true,
+      "**/.turbo/**": true,
+      "**/cdk.out/**": true
+    }
   },
   "extensions": {
     "recommendations": [
       "esbenp.prettier-vscode",
       "dbaeumer.vscode-eslint",
       "ms-vscode.vscode-typescript-next",
-      "@biomejs/biome"
+      "@biomejs/biome",
+      "ms-azuretools.vscode-docker",
+      "amazonwebservices.aws-toolkit-vscode"
     ]
   }
 } 

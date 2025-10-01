@@ -2,7 +2,7 @@
   "mcpServers": {
     "mcp-prompts": {
       "command": "npx",
-      "args": ["-y", "@sparesparrow/mcp-prompts@3.0.8"],
+      "args": ["-y", "@sparesparrow/mcp-prompts"],
       "env": {
         "MODE": "mcp",
         "STORAGE_TYPE": "postgres",

@@ -1,23 +1,47 @@
-FROM node:20-alpine AS deps
-WORKDIR /app
-COPY package.json pnpm-lock.yaml ./
-RUN corepack enable && pnpm fetch
-
 FROM node:20-alpine AS builder
 WORKDIR /app
-COPY --from=deps /app/ /app/
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install dependencies and build
+RUN corepack enable && pnpm install --frozen-lockfile
 COPY . .
-RUN corepack enable && pnpm install --no-frozen-lockfile --ignore-scripts
 RUN pnpm run build
 
-FROM node:20-alpine AS runtime
+# Production stage
+FROM node:20-alpine AS production
 WORKDIR /app
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mcp-prompts -u 1001
+
+# Copy package files
+COPY package.json pnpm-lock.yaml ./
+
+# Install production dependencies only
+RUN corepack enable && pnpm install --prod --frozen-lockfile && pnpm store prune
+
+# Copy built application and data from builder stage
+COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
+COPY --from=builder --chown=mcp-prompts:nodejs /app/data ./data
+
+# Switch to non-root user
+USER mcp-prompts
+
+# Set environment variables
 ENV NODE_ENV=production
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/package.json ./
-COPY --from=builder /app/data ./data
+ENV PORT=3003
+ENV HOST=0.0.0.0
+
+# Expose port
 EXPOSE 3003
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 CMD wget --no-verbose --spider http://localhost:3003/health || exit 1
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
+  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
+
+# Start the application
 CMD ["node", "./dist/index.js"]
 
