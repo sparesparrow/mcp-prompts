@@ -1,404 +1,129 @@
 # MCP-Prompts
 
-A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP) with multi-backend support including AWS, PostgreSQL, and file storage.
+A comprehensive collection of Model Context Protocol (MCP) prompt templates and tools for various AI-powered workflows and integrations.
 
-## ✨ Features
+## Overview
 
-- **🔄 Multiple Storage Backends**: DynamoDB, PostgreSQL, and local file storage
-- **📦 Model Context Protocol**: Full MCP compliance for seamless AI integration
-- **🏗️ Hexagonal Architecture**: Clean separation of concerns with adapter pattern
-- **⚡ Serverless Ready**: AWS Lambda deployment with API Gateway
-- **🔍 Advanced Querying**: Filter by category, tags, and metadata
-- **📊 Version Control**: Complete prompt versioning and history
-- **🔐 Enterprise Security**: IAM, VPC, and encryption support
-- **💳 Subscription Management**: Free and premium tiers with Stripe integration
-- **🎯 Slash Commands**: Quick prompt execution with commands like "/code-review"
-- **🌐 Web Interface**: Modern web app for prompt management and user accounts
-- **📈 Monitoring**: CloudWatch metrics and comprehensive logging
-- **🧪 Testing**: Full test suite with local development support
+MCP-Prompts is a repository designed to provide ready-to-use prompt templates and tools for working with the Model Context Protocol. This project includes various prompt templates, integration examples, and utilities to help developers quickly implement MCP-based solutions in their applications.
 
-## 🚀 Quick Start
+## Features
 
-### Prerequisites
+- 📝 **Curated Prompt Templates**: Pre-built prompts for common use cases
+- 🔧 **MCP Tools Integration**: Ready-to-use tool configurations
+- 🚀 **AWS Integration**: Complete AWS deployment examples
+- 📚 **Comprehensive Documentation**: Detailed guides and examples
+- 🐳 **Docker Support**: Containerized deployments for various MCP servers
 
-- **Node.js 18+** and **PNPM**
-- **AWS CLI** (for AWS deployments)
-- **PostgreSQL** (for database deployments)
-- **Docker** (for containerized deployments)
+## Available MCP Tools
 
-### Choose Your Deployment
+This repository includes configurations and examples for the following MCP tools:
 
-#### 🏠 Local Development (File Storage)
-```bash
-# Install dependencies
-pnpm install
+### Core MCP Servers
 
-# Start with memory storage (fastest)
-STORAGE_TYPE=memory pnpm run dev
+- **File System Server** (`Dockerfile.file`): Access and manage local file systems
+- **Memory Server** (`Dockerfile.memory`): Persistent memory and state management
+- **AWS Integration Server** (`Dockerfile.aws`): AWS services integration
+- **Generic MCP Server** (`Dockerfile.mcp`): Base MCP server configuration
 
-# Or use file storage
-STORAGE_TYPE=file PROMPTS_DIR=./data/prompts pnpm run dev
-```
+### Tool Categories
 
-#### 🐘 PostgreSQL Database
-```bash
-# Deploy with PostgreSQL
-./scripts/deploy-postgres.sh
+1. **File Operations**: Read, write, search, and manage files
+2. **Memory Management**: Store and retrieve conversation context
+3. **Cloud Integration**: AWS services (S3, Lambda, DynamoDB, etc.)
+4. **Development Tools**: Code analysis, testing, and deployment utilities
 
-# Or run locally
-STORAGE_TYPE=postgres pnpm run dev
-```
+## Existing Templates
 
-#### ☁️ AWS Production (Recommended)
-```bash
-# One-command AWS deployment
-./scripts/deploy-aws-enhanced.sh
-```
+The repository includes several prompt template categories:
 
-### 🎯 New Features
+### 1. Development & Coding
+- Code review and analysis prompts
+- Debugging assistance templates
+- Documentation generation guides
+- Testing strategy prompts
 
-#### Subscription Management
-- **Free Tier**: Access to 5 public prompts, basic features
-- **Premium Tier**: Unlimited access, upload custom prompts, advanced features
-- **Stripe Integration**: Secure payment processing with webhooks
+### 2. AWS Integration
+- Infrastructure as Code (CDK) templates
+- Serverless deployment prompts
+- AWS service configuration guides
+- Monitoring and logging setups
 
-#### Slash Commands
-Execute prompts quickly using slash commands:
-```
-/code-review - Review code for best practices
-/bug-analyzer - Analyze bug reports
-/documentation - Generate documentation
-```
+### 3. Data Processing
+- Data transformation prompts
+- Analysis and reporting templates
+- ETL pipeline configurations
 
-#### Web Interface
-Modern web application for:
-- User registration and login
-- Prompt browsing and management
-- Subscription management
-- Slash command execution
+### 4. System Administration
+- Docker containerization guides
+- CI/CD pipeline templates
+- Environment configuration prompts
 
-### 🚀 Complete Deployment
+## How to Use
 
-```bash
-# 1. Deploy infrastructure
-cd cdk && cdk deploy --all
+### Quick Start
 
-# 2. Build application
-pnpm run build
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/sparesparrow/mcp-prompts.git
+   cd mcp-prompts
+   ```
 
-# 3. Deploy Lambda functions
-./scripts/deploy-aws.sh
+2. **Explore available templates**:
+   ```bash
+   ls -la examples/
+   ls -la data/
+   ```
 
-# 4. Deploy web interface
-./scripts/deploy-web.sh <web-bucket-name>
+3. **Choose your integration method**:
+   - Use Docker containers for quick deployment
+   - Configure MCP tools directly in your application
+   - Adapt templates to your specific needs
 
-# 5. Configure Stripe (optional)
-export STRIPE_SECRET_KEY=sk_test_...
-export STRIPE_WEBHOOK_SECRET=whsec_...
-```
+### Using Docker Containers
 
-## 📋 Table of Contents
-
-- [Architecture](#-architecture)
-- [Storage Types](#-storage-types)
-- [Installation](#-installation)
-- [Configuration](#-configuration)
-- [API Reference](#-api-reference)
-- [MCP Integration](#-mcp-integration)
-- [AWS Deployment](#-aws-deployment)
-- [Monitoring](#-monitoring)
-- [Testing](#-testing)
-- [Troubleshooting](#-troubleshooting)
-- [Contributing](#-contributing)
-
-## 🏗️ Architecture
-
-This project follows **hexagonal architecture** (ports & adapters) with clean separation between:
-
-- **Core Business Logic**: Prompt management, versioning, and validation
-- **Ports**: Interfaces for storage, events, and external services
-- **Adapters**: Concrete implementations (DynamoDB, PostgreSQL, S3, etc.)
-- **Infrastructure**: AWS services, HTTP servers, and CLI tools
-
-### Component Diagram
-
-```
-┌─────────────────────────────────────┐
-│           Presentation Layer        │
-│  ┌─────────────┐ ┌────────────────┐ │
-│  │   CLI Tool  │ │  HTTP Server   │ │
-│  └─────────────┘ └────────────────┘ │
-└─────────────────────────────────────┘
-                 │
-┌─────────────────────────────────────┐
-│         Application Layer           │
-│  ┌────────────────────────────────┐ │
-│  │  Prompt Service & Use Cases   │ │
-│  └────────────────────────────────┘ │
-└─────────────────────────────────────┘
-                 │
-┌─────────────────────────────────────┐
-│            Domain Layer             │
-│  ┌────────────────────────────────┐ │
-│  │  Prompt Entities & Business   │ │
-│  │        Logic                  │ │
-│  └────────────────────────────────┘ │
-└─────────────────────────────────────┘
-                 │
-┌─────────────────────────────────────┐
-│         Infrastructure Layer        │
-│  ┌─────┐ ┌─────┐ ┌─────┐ ┌─────┐    │
-│  │DDB  │ │PG   │ │S3   │ │SQS  │    │
-│  │Adapter│ │Adapter│ │Adapter│ │Adapter│   │
-│  └─────┘ └─────┘ └─────┘ └─────┘    │
-└─────────────────────────────────────┘
-```
-
-## 🔄 Storage Types
-
-### 1. 📁 File Storage (Development)
-
-**Best for:** Development, testing, offline usage
-
-**Features:**
-- Simple JSON file-based storage
-- No external dependencies
-- Easy backup and migration
-- Perfect for local development
-
-**Configuration:**
-```bash
-STORAGE_TYPE=file
-PROMPTS_DIR=./data/prompts
-```
-
-**Usage:**
-```bash
-STORAGE_TYPE=file pnpm run dev
-```
-
-### 2. 🐘 PostgreSQL Database
-
-**Best for:** Production applications, complex queries, ACID compliance
-
-**Features:**
-- Full ACID compliance
-- Complex queries and indexing
-- Session management
-- Backup and restore capabilities
-- Concurrent access support
-
-**Configuration:**
-```bash
-STORAGE_TYPE=postgres
-DB_HOST=localhost
-DB_PORT=5432
-DB_NAME=mcp_prompts
-DB_USER=mcp_user
-DB_PASSWORD=secure_password
-```
-
-**Deployment:**
-```bash
-./scripts/deploy-postgres.sh
-```
-
-### 3. ☁️ AWS Services (Production)
-
-**Best for:** Scalable production, cloud-native deployments
-
-**Features:**
-- DynamoDB for metadata storage
-- S3 for catalog and assets
-- SQS for event processing
-- API Gateway for HTTP endpoints
-- CloudFront for global CDN
-- CloudWatch for monitoring
-
-**Configuration:**
-```bash
-STORAGE_TYPE=aws
-AWS_REGION=us-east-1
-PROMPTS_TABLE=mcp-prompts
-PROMPTS_BUCKET=mcp-prompts-catalog
-PROCESSING_QUEUE=mcp-prompts-processing
-```
-
-**Deployment:**
-```bash
-./scripts/deploy-aws-enhanced.sh
-```
-
-### 4. 💾 Memory Storage (Testing)
-
-**Best for:** Unit testing, CI/CD pipelines, temporary deployments
-
-**Features:**
-- In-memory storage
-- No persistence
-- Fastest performance
-- Sample data included
-
-**Configuration:**
-```bash
-STORAGE_TYPE=memory
-```
-
-## 📦 Installation
-
-### NPM Package
+Each MCP server type has a dedicated Dockerfile:
 
 ```bash
-# Install globally
-npm install -g @sparesparrow/mcp-prompts
+# Build the file system MCP server
+docker build -f Dockerfile.file -t mcp-file-server .
 
-# Or use with npx
-npx @sparesparrow/mcp-prompts --help
+# Build the memory MCP server
+docker build -f Dockerfile.memory -t mcp-memory-server .
+
+# Build the AWS integration MCP server
+docker build -f Dockerfile.aws -t mcp-aws-server .
 ```
 
-### From Source
+### Configuring MCP Tools
 
-```bash
-# Clone repository
-git clone https://github.com/sparesparrow/mcp-prompts.git
-cd mcp-prompts
+1. **Create a configuration file** (`.env` based on `.env.example`):
+   ```bash
+   cp .env.example .env
+   ```
 
-# Install dependencies
-pnpm install
+2. **Edit configuration** with your specific settings:
+   ```env
+   MCP_SERVER_PORT=3000
+   AWS_REGION=us-east-1
+   # Add other required environment variables
+   ```
 
-# Build project
-pnpm run build
+3. **Run the MCP server**:
+   ```bash
+   docker run -p 3000:3000 --env-file .env mcp-aws-server
+   ```
 
-# Run locally
-STORAGE_TYPE=memory pnpm run dev
-```
+### Integrating with Claude Desktop or Other MCP Clients
 
-### Docker
+Add the MCP server configuration to your client's config file:
 
-```bash
-# Build image
-docker build -t mcp-prompts .
-
-# Run with different storage types
-docker run -p 3000:3000 -e STORAGE_TYPE=memory mcp-prompts
-docker run -p 3000:3000 -e STORAGE_TYPE=file -v $(pwd)/data:/app/data mcp-prompts
-```
-
-## ⚙️ Configuration
-
-### Environment Variables
-
-#### Core Configuration
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `STORAGE_TYPE` | Storage backend (memory/file/postgres/aws) | `memory` | Yes |
-| `NODE_ENV` | Environment (development/production) | `development` | No |
-| `LOG_LEVEL` | Logging level (debug/info/warn/error) | `info` | No |
-| `PORT` | HTTP server port | `3000` | No |
-
-#### File Storage Configuration
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `PROMPTS_DIR` | Directory for prompt files | `./data/prompts` | No |
-
-#### PostgreSQL Configuration
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `DB_HOST` | Database host | `localhost` | Yes |
-| `DB_PORT` | Database port | `5432` | No |
-| `DB_NAME` | Database name | `mcp_prompts` | No |
-| `DB_USER` | Database user | - | Yes |
-| `DB_PASSWORD` | Database password | - | Yes |
-| `DB_SSL` | Enable SSL connection | `false` | No |
-
-#### AWS Configuration
-
-| Variable | Description | Default | Required |
-|----------|-------------|---------|----------|
-| `AWS_REGION` | AWS region | `us-east-1` | Yes (for AWS storage) |
-| `AWS_PROFILE` | AWS profile name | `default` | No |
-| `PROMPTS_TABLE` | DynamoDB table name | `mcp-prompts` | No |
-| `SESSIONS_TABLE` | Sessions table name | `mcp-sessions` | No |
-| `PROMPTS_BUCKET` | S3 bucket name | `mcp-prompts-catalog-{account}-{region}` | No |
-| `PROCESSING_QUEUE` | SQS queue URL | - | No |
-| `CATALOG_SYNC_QUEUE` | Catalog sync queue URL | - | No |
-
-## 🔌 API Reference
-
-### REST API Endpoints
-
-#### Health & Status
-- `GET /health` - Service health check with component status
-- `GET /mcp` - MCP server capabilities and supported features
-
-#### Prompts Management
-- `GET /v1/prompts` - List prompts with optional filtering
-  - Query parameters: `?category=`, `?limit=`, `?offset=`, `?tags=`
-- `POST /v1/prompts` - Create new prompt
-- `GET /v1/prompts/{id}` - Get specific prompt by ID
-- `PUT /v1/prompts/{id}` - Update existing prompt
-- `DELETE /v1/prompts/{id}` - Delete prompt
-- `POST /v1/prompts/{id}/apply` - Apply template variables
-
-#### MCP Tools
-- `GET /mcp/tools` - List available MCP tools
-- `POST /mcp/tools` - Execute MCP tool with parameters
-
-### Request/Response Examples
-
-#### Create Prompt
-```bash
-curl -X POST http://localhost:3000/v1/prompts \
-  -H "Content-Type: application/json" \
-  -d '{
-    "name": "Code Review Assistant",
-    "description": "Advanced code review helper",
-    "template": "Please review this {{language}} code:\n\n```{{language}}\n{{code}}\n```\n\nFocus on:\n- Security issues\n- Performance\n- Best practices",
-    "category": "development",
-    "tags": ["code-review", "security", "performance"],
-    "variables": [
-      {"name": "language", "description": "Programming language", "type": "string", "required": true},
-      {"name": "code", "description": "Code to review", "type": "string", "required": true}
-    ]
-  }'
-```
-
-#### Apply Template
-```bash
-curl -X POST http://localhost:3000/v1/prompts/code_review_assistant/apply \
-  -H "Content-Type: application/json" \
-  -d '{
-    "language": "typescript",
-    "code": "function hello() { console.log(\"Hello World\"); }"
-  }'
-```
-
-## 🤖 MCP Integration
-
-### Model Context Protocol Support
-
-MCP-Prompts implements the full Model Context Protocol specification, making it compatible with any MCP-compatible AI assistant or IDE.
-
-#### MCP Server Modes
-
-1. **HTTP Mode** (Default): REST API server
-2. **MCP Mode**: Native MCP protocol server
-3. **CLI Mode**: Command-line interface
-
-#### Connecting to AI Assistants
-
-**Claude Desktop:**
 ```json
 {
   "mcpServers": {
     "mcp-prompts": {
-      "command": "npx",
-      "args": ["@sparesparrow/mcp-prompts"],
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "mcp-aws-server"],
       "env": {
-        "STORAGE_TYPE": "aws",
         "AWS_REGION": "us-east-1"
       }
     }
@@ -406,402 +131,175 @@ MCP-Prompts implements the full Model Context Protocol specification, making it 
 }
 ```
 
-**VS Code Extension:**
-```json
-{
-  "mcp": {
-    "servers": {
-      "prompts": {
-        "command": "npx",
-        "args": ["@sparesparrow/mcp-prompts"],
-        "options": {
-          "env": {
-            "STORAGE_TYPE": "aws",
-            "AWS_REGION": "us-east-1"
-          }
-        }
-      }
-    }
+## Examples
+
+### Example 1: File System Operations
+
+```typescript
+// Using the file system MCP server
+const response = await mcpClient.callTool({
+  name: "read_file",
+  arguments: {
+    path: "./data/sample.json"
   }
-}
+});
 ```
 
-#### Available MCP Tools
+### Example 2: AWS S3 Integration
 
-- **list_prompts**: Browse available prompts by category
-- **get_prompt**: Retrieve specific prompt with full details
-- **create_prompt**: Create new prompts programmatically
-- **update_prompt**: Modify existing prompts
-- **delete_prompt**: Remove prompts
-- **apply_prompt**: Apply template variables to generate final prompts
-
-## ☁️ AWS Deployment
-
-### Architecture Overview
-
-The AWS deployment creates a production-ready serverless architecture:
-
-- **API Gateway** - RESTful API endpoints with CORS
-- **Lambda Functions** - Serverless compute (MCP server, processing, catalog sync)
-- **DynamoDB** - NoSQL storage with global secondary indexes
-- **S3** - Object storage for catalog and assets
-- **SQS** - Message queuing for async processing
-- **CloudFront** - Global CDN for performance
-- **CloudWatch** - Monitoring, logging, and metrics
-
-### Quick AWS Deployment
-
-```bash
-# Prerequisites: AWS CLI configured
-aws configure
-
-# One-command deployment
-./scripts/deploy-aws-enhanced.sh
-```
-
-### Manual AWS Deployment
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build project
-pnpm run build
-
-# Deploy CDK infrastructure
-cd cdk
-pnpm install
-cdk bootstrap aws://$AWS_ACCOUNT/$AWS_REGION
-cdk deploy --all --require-approval never
-```
-
-### AWS Configuration
-
-### AWS Permissions
-
-The deployment creates minimal IAM roles following least-privilege:
-
-| Service | Permissions | Purpose |
-|---------|-------------|---------|
-| **Lambda** | CloudWatch Logs, VPC access | Function execution and logging |
-| **DynamoDB** | Read/write access to tables | Prompt and session storage |
-| **S3** | Read/write access to bucket | Catalog storage and assets |
-| **SQS** | Send/receive/delete messages | Async processing queues |
-| **CloudWatch** | PutMetricData, CreateLogGroups | Monitoring and metrics |
-
-### AWS Cost Optimization
-
-**Free Tier Usage:**
-- Lambda: 1M requests/month
-- DynamoDB: 25GB storage + 25 RCU/WCU
-- S3: 5GB storage + 20K GET + 2K PUT requests
-- API Gateway: 1M requests/month
-
-**Estimated Monthly Costs** (beyond free tier):
-- **$25-35/month** for moderate usage
-- Scales with usage, no fixed costs
-
-### AWS Security Features
-
-- **Encryption at rest** (DynamoDB, S3)
-- **Encryption in transit** (HTTPS/TLS)
-- **IAM roles** with minimal permissions
-- **CloudTrail** audit logging
-- **VPC support** (optional)
-
-## 📊 Monitoring
-
-### CloudWatch Metrics
-
-Automatic custom metrics:
-
-- **PromptAccessCount** - Usage tracking by prompt/category
-- **OperationLatency** - API response times
-- **ApiSuccess/ApiError** - Success/error rates
-- **ProcessingLatency** - Background processing times
-- **PromptCreated/Updated/Deleted** - CRUD operations
-
-### Health Checks
-
-```bash
-# Check all services
-curl https://your-api-gateway-url/health
-
-# Expected response
-{
-  "status": "healthy",
-  "services": {
-    "dynamodb": {"status": "healthy"},
-    "s3": {"status": "healthy"},
-    "sqs": {"status": "healthy"}
+```typescript
+// Upload a file to S3 using AWS MCP server
+const response = await mcpClient.callTool({
+  name: "s3_upload",
+  arguments: {
+    bucket: "my-bucket",
+    key: "data/file.json",
+    content: fileContent
   }
-}
+});
 ```
 
-### CloudWatch Alarms
+### Example 3: Memory Management
 
-Recommended alarms:
-- API error rate > 5%
-- Average latency > 1000ms
-- DynamoDB throttling events
-- Lambda error rate > 1%
-- SQS dead letter messages > 0
+```typescript
+// Store context in memory server
+await mcpClient.callTool({
+  name: "store_memory",
+  arguments: {
+    key: "conversation_context",
+    value: conversationData
+  }
+});
 
-## 🔒 Security
+// Retrieve stored context
+const context = await mcpClient.callTool({
+  name: "retrieve_memory",
+  arguments: {
+    key: "conversation_context"
+  }
+});
+```
 
-### Network Security
-- **VPC Endpoints** for private AWS service access
-- **Security Groups** restricting Lambda network access
-- **WAF** protection for API Gateway (optional)
+### Example 4: Using Prompt Templates
 
-### Data Security
-- **Encryption at rest** for DynamoDB and S3
-- **Encryption in transit** via HTTPS/TLS
-- **IAM roles** following least-privilege principle
-- **API Gateway authentication** via Cognito (optional)
+Browse the `examples/` directory for complete prompt templates:
 
-### Secrets Management
-- **AWS Systems Manager Parameter Store** for configuration
-- **AWS Secrets Manager** for sensitive data
-- **Environment variables** for Lambda configuration
+- **Code Review**: `examples/code-review-prompt.md`
+- **AWS Deployment**: `examples/aws-deployment-guide.md`
+- **Data Analysis**: `examples/data-analysis-template.md`
 
-## 🧪 Testing
+## AWS Integration Details
 
-### Local Development Testing
+For comprehensive AWS integration documentation, see:
+- [`DEPLOYMENT_GUIDE.md`](DEPLOYMENT_GUIDE.md) - Complete deployment instructions
+- [`DOCKER_AWS_TEST_REPORT.md`](DOCKER_AWS_TEST_REPORT.md) - AWS Docker testing results
+- `cdk/` - AWS CDK infrastructure as code
+- `Dockerfile.aws` - AWS-specific MCP server container
+
+### AWS Services Supported
+
+- **S3**: Object storage operations
+- **Lambda**: Serverless function management
+- **DynamoDB**: NoSQL database operations
+- **CloudWatch**: Logging and monitoring
+- **IAM**: Identity and access management
+- **ECR**: Container registry integration
+
+## Project Structure
+
+```
+mcp-prompts/
+├── apps/              # Application code
+├── cdk/               # AWS CDK infrastructure
+├── data/              # Sample data and datasets
+├── docs/              # Documentation
+├── examples/          # Example prompts and usage
+├── layers/            # Lambda layers
+├── packages/          # Reusable packages
+├── scripts/           # Utility scripts
+├── src/               # Source code
+├── web/               # Web interface
+├── Dockerfile.*       # Various MCP server containers
+└── README.md          # This file
+```
+
+## Development
+
+### Prerequisites
+
+- Node.js 18+ or compatible runtime
+- Docker (for containerized deployments)
+- AWS CLI (for AWS integrations)
+- Git
+
+### Setup Development Environment
+
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Set up environment variables:
+   ```bash
+   cp .env.example .env
+   # Edit .env with your configuration
+   ```
+
+3. Run tests:
+   ```bash
+   npm test
+   ```
+
+### Using DevContainers
+
+This project includes DevContainer configurations in `.devcontainer/` for VS Code and GitHub Codespaces:
 
 ```bash
-# Run unit tests
-pnpm test
-
-# Test with local DynamoDB
-docker run -p 8000:8000 amazon/dynamodb-local
-export DYNAMODB_ENDPOINT=http://localhost:8000
-STORAGE_TYPE=memory pnpm run dev
+# Open in VS Code with Dev Containers extension
+code .
+# Then: Cmd/Ctrl + Shift + P -> "Reopen in Container"
 ```
 
-### Integration Testing
+## Contributing
 
-```bash
-# Test health endpoint
-curl http://localhost:3000/health
+We welcome contributions! Please see [`CONTRIBUTING.md`](CONTRIBUTING.md) for guidelines.
 
-# Test prompts API
-curl http://localhost:3000/v1/prompts
+### How to Contribute
 
-# Test prompt creation
-curl -X POST http://localhost:3000/v1/prompts \
-  -H "Content-Type: application/json" \
-  -d '{"name": "test", "template": "Hello {{name}}", "category": "greeting"}'
-```
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
 
-### AWS Integration Testing
+Please read our [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md) before contributing.
 
-```bash
-# Test deployed API
-curl https://your-api-gateway-url/health
+## Resources
 
-# Test with AWS credentials
-AWS_REGION=us-east-1 npx @sparesparrow/mcp-prompts list
-```
+- [Model Context Protocol Documentation](https://modelcontextprotocol.io/)
+- [MCP Specification](https://spec.modelcontextprotocol.io/)
+- [AWS Documentation](https://docs.aws.amazon.com/)
+- [Docker Documentation](https://docs.docker.com/)
 
-## 🚨 Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
-#### AWS Deployment Issues
+**Issue: MCP server not starting**
+- Check that all required environment variables are set
+- Verify Docker is running (for containerized deployments)
+- Check logs: `docker logs <container-id>`
 
-1. **403 Access Denied**
-   - Check IAM permissions for your AWS user/role
-   - Verify resource policies on DynamoDB/S3
-   - Check VPC configuration if using private subnets
+**Issue: AWS credentials not working**
+- Ensure AWS CLI is configured: `aws configure`
+- Verify IAM permissions for required services
+- Check environment variables: `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`
 
-2. **CDK Bootstrap Required**
-   ```bash
-   cdk bootstrap aws://ACCOUNT/REGION
-   ```
+**Issue: Port already in use**
+- Change the port in your configuration
+- Stop conflicting services: `docker ps` and `docker stop <container-id>`
 
-3. **Lambda Timeout**
-   - Increase timeout in CDK stack (default: 30s)
-   - Optimize cold start performance
-   - Check DynamoDB/S3 connection latency
-
-4. **DynamoDB Throttling**
-   - Switch to On-Demand billing mode
-   - Optimize partition key distribution
-   - Implement exponential backoff in clients
-
-#### Storage Issues
-
-5. **PostgreSQL Connection Failed**
-   - Verify database credentials
-   - Check network connectivity
-   - Ensure database is running and accessible
-
-6. **File Storage Permissions**
-   ```bash
-   chmod -R 755 data/
-   ```
-
-#### MCP Integration Issues
-
-7. **MCP Server Not Connecting**
-   - Verify environment variables are set
-   - Check AWS credentials for cloud storage
-   - Ensure correct MCP server mode
-
-### Debug Commands
-
-#### AWS Services
-```bash
-# Check Lambda logs
-aws logs describe-log-groups --log-group-name-prefix "/aws/lambda/McpPromptsStack"
-
-# Check DynamoDB table
-aws dynamodb describe-table --table-name mcp-prompts
-
-# Check S3 bucket
-aws s3 ls s3://your-bucket-name --recursive
-
-# Check SQS queue
-aws sqs get-queue-attributes --queue-url your-queue-url --attribute-names All
-```
-
-#### Local Development
-```bash
-# Check application logs
-tail -f logs/mcp-prompts.log
-
-# Test database connectivity
-STORAGE_TYPE=postgres pg_isready -h localhost -p 5432
-
-# Check Node.js processes
-ps aux | grep mcp-prompts
-```
-
-### Performance Tuning
-
-#### Lambda Optimization
-- Increase memory allocation (more CPU)
-- Use provisioned concurrency for latency-sensitive functions
-- Optimize package size and dependencies
-
-#### Database Optimization
-- Use appropriate indexes
-- Implement connection pooling
-- Monitor query performance
-
-## 🔄 CI/CD Pipeline
-
-### GitHub Actions Workflows
-
-The repository includes several CI/CD workflows:
-
-1. **CI/CD Pipeline** (`.github/workflows/ci-cd.yml`)
-   - Tests on multiple storage types
-   - Builds and pushes Docker images
-   - Deploys to AWS
-   - Publishes to NPM
-
-2. **Multi-Platform Docker Build** (`.github/workflows/docker-multi-platform.yml`)
-   - Builds for multiple architectures
-   - Pushes to GitHub Container Registry
-
-3. **AWS Deployment** (`.github/workflows/aws-deploy.yml`)
-   - Automated AWS deployment
-   - Health checks and smoke tests
-
-### Required Secrets
-
-Configure these secrets in your GitHub repository:
-
-```bash
-# AWS Deployment
-AWS_ACCESS_KEY_ID
-AWS_SECRET_ACCESS_KEY
-AWS_REGION
-
-# NPM Publishing
-NPM_TOKEN
-
-# Security Scanning
-SNYK_TOKEN
-```
-
-### Manual Deployment
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build project
-pnpm run build
-
-# Run tests
-pnpm test
-
-# Deploy to AWS
-./scripts/deploy-aws-enhanced.sh
-
-# Or deploy to Docker
-./scripts/deploy-docker.sh
-```
-
-## 📚 Further Reading
-
-### AWS Documentation
-- [AWS CDK Documentation](https://docs.aws.amazon.com/cdk/)
-- [DynamoDB Best Practices](https://docs.aws.amazon.com/amazondynamodb/latest/developerguide/best-practices.html)
-- [Lambda Performance Optimization](https://docs.aws.amazon.com/lambda/latest/dg/best-practices.html)
-
-### MCP Protocol
-- [Model Context Protocol Specification](https://github.com/modelcontextprotocol/specification)
-- [MCP SDK Documentation](https://github.com/modelcontextprotocol/sdk)
-
-### Development
-- [Hexagonal Architecture](https://herbertograca.com/2017/11/16/explicit-architecture-01-ddd-hexagonal-onion-clean-cunning-architect/)
-- [TypeScript Best Practices](https://www.typescriptlang.org/docs/handbook/declaration-files/do-s-and-don-ts.html)
-
-## 🤝 Contributing
-
-### Development Setup
-
-1. **Fork the repository**
-2. **Clone your fork**
-   ```bash
-   git clone https://github.com/your-username/mcp-prompts.git
-   cd mcp-prompts
-   ```
-3. **Install dependencies**
-   ```bash
-   pnpm install
-   ```
-4. **Create feature branch**
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
-5. **Make changes and test**
-   ```bash
-   pnpm test
-   pnpm run build
-   ```
-6. **Submit pull request**
-
-### Guidelines
-
-- Follow existing code style and patterns
-- Add tests for new functionality
-- Update documentation for API changes
-- Use conventional commit messages
-- Test across all storage backends
-
-### Architecture Decisions
-
-- **Hexagonal Architecture**: Ports & Adapters pattern
-- **Storage Adapters**: Pluggable storage implementations
-- **MCP Compliance**: Full protocol implementation
-- **TypeScript**: Strict typing throughout
-
-## 📄 License
+## License
 
 **MIT License** - see [LICENSE](LICENSE) file for details.
 
@@ -824,3 +322,10 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
+
+## Support
+
+For questions and support:
+- Open an [issue](https://github.com/sparesparrow/mcp-prompts/issues)
+- Join our [discussions](https://github.com/sparesparrow/mcp-prompts/discussions)
+- Check the [wiki](https://github.com/sparesparrow/mcp-prompts/wiki) for additional documentation
