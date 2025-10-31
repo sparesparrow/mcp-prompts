@@ -423,6 +423,42 @@ async function startServer() {
         }
       });
 
+      app.get('/v1/subscription/status', async (req, res) => {
+        try {
+          const userContext = (req as any).userContext;
+
+          if (!userContext) {
+            return res.status(401).json({ error: 'Authentication required' });
+          }
+
+          // Get user subscription info from DynamoDB
+          const userResult = await dynamoClient.send(new GetItemCommand({
+            TableName: process.env.USERS_TABLE!,
+            Key: { user_id: { S: userContext.userId } }
+          }));
+
+          if (!userResult.Item) {
+            return res.status(404).json({ error: 'User not found' });
+          }
+
+          const subscriptionStatus = {
+            userId: userContext.userId,
+            email: userContext.email,
+            subscriptionTier: userResult.Item.subscription_tier?.S || 'free',
+            subscriptionId: userResult.Item.subscription_id?.S,
+            subscriptionExpiresAt: userResult.Item.subscription_expires_at?.S,
+            rateLimit: promptService.getRateLimit(userContext)
+          };
+
+          res.json(subscriptionStatus);
+        } catch (error) {
+          logger.error('Failed to get subscription status:', error);
+          res.status(500).json({
+            error: error instanceof Error ? error.message : 'Unknown error'
+          });
+        }
+      });
+
       app.post('/v1/payment/create-intent', async (req, res) => {
         try {
           const userContext = (req as any).userContext;
@@ -554,7 +590,7 @@ async function startServer() {
         logger.info('  POST /v1/payment/create-intent - Create payment intent');
         logger.info('  POST /v1/subscription/create - Create subscription');
         logger.info('  POST /v1/subscription/cancel - Cancel subscription');
-        logger.info('  POST /webhooks/stripe - Stripe webhooks');
+        logger.info('  POST /v1/webhook/stripe - Stripe webhooks');
       });
     }
 
