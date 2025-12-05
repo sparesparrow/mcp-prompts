@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies and build
-RUN corepack enable && pnpm install --frozen-lockfile
+RUN corepack enable && pnpm install
 COPY . .
 RUN pnpm run build
 
@@ -21,7 +21,7 @@ RUN adduser -S mcp-prompts -u 1001
 COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies only
-RUN corepack enable && pnpm install --prod --frozen-lockfile && pnpm store prune
+RUN corepack enable && pnpm install --prod && pnpm store prune
 
 # Copy built application and data from builder stage
 COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
