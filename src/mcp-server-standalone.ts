@@ -54,7 +54,7 @@ function loadSamplePrompts() {
 export async function createMcpServer() {
   const server = new McpServer({
     name: 'mcp-prompts',
-    version: '3.0.9',
+    version: '3.12.4',
   });
 
   // Load sample prompts

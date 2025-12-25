@@ -24,7 +24,7 @@ const program = new Command();
 program
   .name('mcp-prompts')
   .description('MCP Prompts CLI with AWS integration')
-  .version('3.0.9');
+  .version('3.12.4');
 
 // Initialize services
 function getServices() {

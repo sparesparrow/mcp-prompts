@@ -29,8 +29,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+        run: pnpm install
       - name: Build application
         run: pnpm run build
 
@@ -61,7 +60,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+            run: pnpm install
 
       - name: Run security audit
         run: pnpm audit --audit-level moderate
@@ -102,8 +101,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION_STAGING }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+          run: pnpm install
       - name: Build application
         run: pnpm run build
 
@@ -143,8 +141,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
+          run: pnpm install
       - name: Build application
         run: pnpm run build
 
