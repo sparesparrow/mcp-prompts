@@ -1,5 +1,8 @@
 # MCP Prompts Server
 
+> ⚠️ **CONSOLIDATION IN PROGRESS**: This repository is part of a strategic consolidation initiative. Multiple language bindings (TypeScript, Rust), integrations (VSCode, ESP32, Android), and format adapters are being consolidated into a monorepo structure. See [GitHub Discussion](#) for details on planned improvements. No breaking changes are planned for the core API.
+> 
+
 <div align="center">
 
 [![NPM Version](https://img.shields.io/npm/v/@sparesparrow/mcp-prompts)](https://www.npmjs.com/package/@sparesparrow/mcp-prompts)
