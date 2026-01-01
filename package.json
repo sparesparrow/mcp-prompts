@@ -14,7 +14,8 @@
     "README.md",
     "LICENSE",
     "examples",
-    "scripts"
+    "scripts",
+    "data/prompts"
   ],
   "keywords": [
     "mcp",

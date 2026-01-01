@@ -1,0 +1,13 @@
+{
+  "id": "embedded-serial-debugging",
+  "name": "Serial Debugging",
+  "description": "Debug embedded devices via serial communication",
+  "content": "Set up serial debugging for {{device_type}} device.\n\nPort: {{serial_port}}\nBaud Rate: {{baud_rate}}\nLog Level: {{log_level}}\n\nDebug Configuration:\n1. Open serial connection at {{serial_port}} with {{baud_rate}} baud\n2. Configure log filtering for {{log_level}} and above\n3. Enable timestamp prefixing\n4. Set up output buffering for log capture\n\nDebug Commands:\n{{#if enable_commands}}\n- Reset device: Send RST command\n- Get status: Send STATUS command\n- Configure: Send CONFIG command with parameters\n{{/if}}\n\n{{#if save_logs}}Save debug logs to {{log_file}}{{/if}}",
+  "isTemplate": true,
+  "variables": ["device_type", "serial_port", "baud_rate", "log_level", "enable_commands", "save_logs", "log_file"],
+  "tags": ["embedded", "serial", "debug", "logging", "uart"],
+  "category": "embedded",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

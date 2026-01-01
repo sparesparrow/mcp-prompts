@@ -1,0 +1,13 @@
+{
+  "id": "mcp-server-composition",
+  "name": "MCP Server Composition",
+  "description": "Compose multiple MCP servers into a unified server",
+  "content": "Compose MCP servers into: {{composed_name}}\n\nServers to Compose:\n{{#each servers}}\n- {{this.name}} (prefix: {{this.prefix}})\n{{/each}}\n\nAdditional Tools:\n{{#each additional_tools}}\n- {{this.name}}: {{this.description}}\n{{/each}}\n\nComposition Implementation:\n```python\n#!/usr/bin/env python3\n\"\"\"{{composed_name}} - Composed MCP Server.\"\"\"\nfrom sparetools.mcp_core.server.composer import ServerComposer\n\n{{#each servers}}\nfrom {{this.module}} import {{this.app_name}}\n{{/each}}\n\n# Create composer\ncomposer = ServerComposer(\"{{composed_name}}\")\n\n# Add servers\n{{#each servers}}\ncomposer.add_server({{this.app_name}}, prefix=\"{{this.prefix}}\")\n{{/each}}\n\n# Add additional tools\n{{#each additional_tools}}\ncomposer.add_tool(\n    \"{{this.name}}\",\n    {{this.handler}},\n    description=\"{{this.description}}\"\n)\n{{/each}}\n\n# Export composed app\napp = composer.get_server()\n\nif __name__ == \"__main__\":\n    composer.run()\n```\n\nMCP Configuration:\n```json\n{\n  \"{{composed_name}}\": {\n    \"command\": \"{{command}}\",\n    \"args\": {{args}},\n    \"env\": {{env}}\n  }\n}\n```",
+  "isTemplate": true,
+  "variables": ["composed_name", "servers", "additional_tools", "command", "args", "env"],
+  "tags": ["mcp", "server", "composition", "unified"],
+  "category": "mcp-development",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

@@ -1,0 +1,13 @@
+{
+  "id": "embedded-device-detection",
+  "name": "Embedded Device Detection",
+  "description": "Detect and identify connected embedded devices (ESP32, Arduino, etc.)",
+  "content": "Detect embedded devices connected via USB.\n\nTarget platforms: {{target_platforms}}\nOutput format: {{output_format}}\n\nSteps:\n1. Enumerate USB serial ports\n2. Match VID:PID against known device identifiers\n3. Classify devices by type and capabilities\n4. Generate device manifest\n\n{{#if include_jtag}}Include JTAG port detection for ESP32-S3{{/if}}",
+  "isTemplate": true,
+  "variables": ["target_platforms", "output_format", "include_jtag"],
+  "tags": ["embedded", "esp32", "arduino", "usb", "serial", "detection"],
+  "category": "embedded",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}
