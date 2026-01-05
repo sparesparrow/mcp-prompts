@@ -1,0 +1,62 @@
+{
+  "name": "@sparesparrow/mcp-esp32-bridge",
+  "version": "1.0.0",
+  "description": "ESP32 bridge service for MCP cognitive platform with FlatBuffers telemetry",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp-esp32-bridge": "dist/esp32-bridge.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:clean": "rm -rf dist && tsc",
+    "start": "node dist/esp32-bridge.js",
+    "dev": "nodemon --exec ts-node src/esp32-bridge.ts",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "esp32",
+    "embedded",
+    "iot",
+    "telemetry",
+    "flatbuffers",
+    "serial",
+    "bridge"
+  ],
+  "author": "sparesparrow",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@sparesparrow/mcp-prompts": "workspace:*",
+    "@sparesparrow/mcp-fbs": "workspace:*",
+    "flatbuffers": "^23.5.26",
+    "serialport": "^12.0.0",
+    "pino": "^8.21.0",
+    "pino-pretty": "^10.3.1",
+    "ws": "^8.16.0",
+    "express": "^4.21.2",
+    "cors": "^2.8.5",
+    "zod": "^3.25.71"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "@types/ws": "^8.5.10",
+    "@types/express": "^4.17.23",
+    "@types/cors": "^2.8.19",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "workspaces": [
+    "../../mcp-prompts",
+    "../mcp-fbs"
+  ]
+}

@@ -1,0 +1,204 @@
+// base_types.fbs
+// Foundation types used throughout MCP cognitive infrastructure
+// Version: 1.0.0
+
+namespace mcp.fbs.v1;
+
+// ============================================================================
+// Core Identity and Versioning Types
+// ============================================================================
+
+// UUID for unique entity identification
+table UUID {
+  bytes: [ubyte] (required);  // 16 bytes for UUID
+}
+
+// High-precision timestamp
+table Timestamp {
+  seconds: int64;        // Seconds since epoch
+  nanoseconds: uint32;   // Nanosecond precision
+}
+
+// Version information for schema evolution
+table Version {
+  major: uint16;
+  minor: uint16;
+  patch: uint16;
+  label: string;  // e.g., "alpha", "beta", "rc1"
+}
+
+// ============================================================================
+// Flexible Data Structures
+// ============================================================================
+
+// Flexible key-value pair for metadata
+table KeyValue {
+  key: string (required);
+  value: string (required);
+  value_type: string;  // "string", "number", "boolean", "json"
+}
+
+// Dynamic value type supporting multiple types
+union ValueType {
+  StringValue,
+  NumberValue,
+  BooleanValue,
+  ArrayValue,
+  ObjectValue
+}
+
+table StringValue {
+  value: string (required);
+}
+
+table NumberValue {
+  value: double;
+}
+
+table BooleanValue {
+  value: bool;
+}
+
+table ArrayValue {
+  values: [ValueType];
+}
+
+table ObjectValue {
+  pairs: [KeyValue];
+}
+
+table Value {
+  value: ValueType (required);
+}
+
+// ============================================================================
+// Error Handling and Status
+// ============================================================================
+
+// Error severity levels
+enum ErrorSeverity: byte {
+  Info = 0,
+  Warning = 1,
+  Error = 2,
+  Critical = 3,
+  Fatal = 4
+}
+
+// Structured error information
+table Error {
+  code: string (required);
+  message: string (required);
+  severity: ErrorSeverity;
+  details: [KeyValue];
+  stack_trace: string;
+  timestamp: Timestamp;
+}
+
+// Result wrapper supporting success or failure
+table Result {
+  success: bool;
+  error: Error;
+  data: [byte];  // Optional payload data
+}
+
+// ============================================================================
+// Statistics and Metrics
+// ============================================================================
+
+// Usage statistics for prompts, tools, etc.
+table Statistics {
+  usage_count: uint64;
+  success_count: uint64;
+  failure_count: uint64;
+  average_duration_ms: double;
+  last_used: Timestamp;
+  first_used: Timestamp;
+  peak_usage_period: string;
+}
+
+// Performance metrics
+table PerformanceMetrics {
+  execution_time_ms: uint32;
+  memory_used_bytes: uint64;
+  cpu_percent: float;
+  cache_hits: uint32;
+  cache_misses: uint32;
+}
+
+// ============================================================================
+// Confidence and Uncertainty
+// ============================================================================
+
+// Confidence scoring with reasoning
+table Confidence {
+  score: float (required);  // 0.0 to 1.0
+  reasoning: string;
+  evidence_quality: string;  // "high", "medium", "low"
+  last_updated: Timestamp;
+}
+
+// ============================================================================
+// Resource References
+// ============================================================================
+
+// URI reference to external resources
+table ResourceReference {
+  uri: string (required);
+  mime_type: string;
+  description: string;
+  size_bytes: uint64;
+  checksum: string;  // SHA-256 hash
+  last_modified: Timestamp;
+}
+
+// File path reference
+table FilePath {
+  path: string (required);
+  line_number: uint32;
+  column_number: uint32;
+  end_line: uint32;
+  end_column: uint32;
+}
+
+// ============================================================================
+// Pagination and Filtering
+// ============================================================================
+
+// Pagination parameters
+table PaginationParams {
+  offset: uint32;
+  limit: uint32;
+  total_count: uint32;
+  has_more: bool;
+}
+
+// Sort ordering
+enum SortOrder: byte {
+  Ascending = 0,
+  Descending = 1
+}
+
+// Sort specification
+table SortSpec {
+  field: string (required);
+  order: SortOrder;
+}
+
+// Filter operation
+enum FilterOp: byte {
+  Equals = 0,
+  NotEquals = 1,
+  GreaterThan = 2,
+  LessThan = 3,
+  Contains = 4,
+  StartsWith = 5,
+  EndsWith = 6,
+  InList = 7
+}
+
+// Filter criterion
+table FilterCriterion {
+  field: string (required);
+  operation: FilterOp;
+  value: string (required);
+}

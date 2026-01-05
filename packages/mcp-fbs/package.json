@@ -1,0 +1,36 @@
+{
+  "name": "@sparesparrow/mcp-fbs",
+  "version": "1.0.0",
+  "description": "FlatBuffers schemas and TypeScript bindings for MCP cognitive infrastructure with embedded systems support",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc && npm run generate:schemas",
+    "generate:schemas": "npm run generate:ts",
+    "generate:ts": "flatc --ts -o src/generated schemas/*.fbs",
+    "generate:py": "flatc --python -o ../generated/python schemas/*.fbs",
+    "generate:cpp": "flatc --cpp -o ../generated/cpp schemas/*.fbs",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": [
+    "mcp",
+    "flatbuffers",
+    "cognitive",
+    "prompts",
+    "serialization"
+  ],
+  "author": "sparesparrow",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "flatbuffers": "^23.5.26"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}

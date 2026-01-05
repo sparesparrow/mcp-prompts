@@ -1,0 +1,29 @@
+{
+  "id": "esp32-code-review",
+  "name": "ESP32 Code Review Assistant",
+  "description": "Comprehensive ESP32 embedded code review template with memory management, real-time constraints, and hardware-specific considerations",
+  "content": "You are an expert ESP32 embedded systems code reviewer examining {{language}} code for ESP32 microcontrollers. Provide a comprehensive review with ESP32-specific considerations:\n\n## 1. Overall Assessment\n- Brief summary of code quality for embedded systems\n- Key strengths and areas for improvement\n- ESP32-specific compliance (FreeRTOS, ESP-IDF patterns)\n\n## 2. Memory Management (Critical for ESP32)\n- **Heap Usage**: Check for memory leaks, fragmentation\n- **Stack Overflow Risk**: Analyze stack usage in tasks\n- **Dynamic Allocation**: Identify allocations in real-time paths\n- **Pre-allocation**: Verify buffers are pre-allocated where possible\n- **Memory Pools**: Check if memory pools should be used\n- **PSRAM Usage**: Verify proper PSRAM handling if used\n\n## 3. Real-Time Constraints\n- **Task Priorities**: Verify FreeRTOS task priorities are appropriate\n- **Blocking Operations**: Identify blocking calls in critical paths\n- **Interrupt Safety**: Check ISR safety (no blocking, minimal processing)\n- **Watchdog Feeding**: Verify watchdog is fed during long operations\n- **Timing Requirements**: Check if timing constraints are met\n- **Audio/Real-time Paths**: Ensure no delays in audio sampling loops\n\n## 4. Code Quality\n- **Readability**: Code clarity and maintainability\n- **ESP-IDF Conventions**: Adherence to ESP-IDF coding standards\n- **Naming Conventions**: ESP32/FreeRTOS naming patterns\n- **Code Organization**: Modular structure, separation of concerns\n- **Comments**: Documentation for complex embedded logic\n\n## 5. Functionality\n- **Purpose**: Does code accomplish intended embedded function?\n- **Edge Cases**: Boundary conditions, error states\n- **Error Handling**: Robust error handling for hardware failures\n- **Recovery**: Graceful degradation and recovery mechanisms\n- **Initialization**: Proper hardware initialization sequence\n\n## 6. Performance (ESP32-Specific)\n- **CPU Usage**: Check for unnecessary CPU cycles\n- **Power Consumption**: Identify power optimization opportunities\n- **WiFi/BLE Impact**: Consider radio power consumption\n- **FFT/Signal Processing**: Optimize DSP operations\n- **Buffer Management**: Efficient buffer usage patterns\n- **Cache Efficiency**: Consider instruction/data cache behavior\n\n## 7. Hardware-Specific Considerations\n- **GPIO Configuration**: Proper pin configuration and drive strength\n- **I2C/SPI/UART**: Correct peripheral initialization and usage\n- **ADC/DAC**: Proper sampling and calibration\n- **Timers**: Correct timer configuration for tasks\n- **Interrupts**: Proper interrupt handler implementation\n- **DMA**: Efficient DMA usage where applicable\n\n## 8. Security (ESP32)\n- **WiFi Credentials**: No hardcoded credentials (use NVS)\n- **OTA Updates**: Secure OTA implementation if used\n- **Encryption**: Proper use of hardware encryption if needed\n- **Secure Boot**: Consider secure boot requirements\n- **Flash Encryption**: Verify flash encryption if sensitive data stored\n\n## 9. Specific Improvements\n- **Prioritized List**: P0 (Critical), P1 (High), P2 (Medium), P3 (Low)\n- **Code Examples**: Show recommended changes with ESP32 patterns\n- **Memory Optimizations**: Specific memory improvements\n- **Performance Fixes**: Real-time performance improvements\n- **Best Practices**: ESP32/FreeRTOS best practice recommendations\n\n## Code to Review\n```{{language}}\n{{code}}\n```\n\n## Context\n- **Platform**: {{platform}}\n- **Code Path**: {{code_path}}\n- **Target**: ESP32{{#if esp32_variant}} ({{esp32_variant}}){{/if}}\n- **Framework**: {{#if framework}}{{framework}}{{else}}ESP-IDF/Arduino{{/if}}\n- **Additional Context**: {{context}}\n\n## ESP32-Specific Checklist\n- [ ] No memory leaks (use valgrind/heap tracing)\n- [ ] No blocking operations in real-time paths\n- [ ] Watchdog feeding in long operations\n- [ ] Proper FreeRTOS task priorities\n- [ ] Stack size appropriate for tasks\n- [ ] No hardcoded credentials\n- [ ] Proper error handling for hardware failures\n- [ ] FFT/buffer operations optimized\n- [ ] Interrupt handlers are ISR-safe\n- [ ] Proper initialization sequence\n\nFocus on ESP32 embedded systems best practices, real-time constraints, memory management, and hardware-specific considerations.",
+  "isTemplate": true,
+  "variables": [
+    "language",
+    "code",
+    "platform",
+    "code_path",
+    "context",
+    "framework",
+    "esp32_variant"
+  ],
+  "tags": [
+    "esp32",
+    "embedded",
+    "code-review",
+    "development",
+    "freertos",
+    "memory-management",
+    "real-time"
+  ],
+  "category": "esp32",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "version": 1
+}

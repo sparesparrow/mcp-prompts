@@ -1,0 +1,272 @@
+// protocol.fbs
+// Core Model Context Protocol (MCP) message definitions
+// Version: 1.0.0
+
+include "base_types.fbs";
+
+namespace mcp.fbs.v1.protocol;
+
+// ============================================================================
+// MCP Protocol Version
+// ============================================================================
+
+enum ProtocolVersion: int {
+  V2024_11_05 = 20241105,
+  V2025_01_01 = 20250101,
+  V2025_06_18 = 20250618
+}
+
+// ============================================================================
+// Content Types
+// ============================================================================
+
+// Text content
+table TextContent {
+  text: string (required);
+}
+
+// Image content
+table ImageContent {
+  data: string (required);  // Base64 encoded or URL
+  mime_type: string (required);
+}
+
+// Resource content reference
+table ResourceContent {
+  uri: string (required);
+  mime_type: string;
+  text: string;
+}
+
+// Union of content types
+union Content {
+  TextContent,
+  ImageContent,
+  ResourceContent
+}
+
+// ============================================================================
+// Tool Definitions
+// ============================================================================
+
+// Tool parameter definition
+table ToolParameter {
+  name: string (required);
+  description: string;
+  type: string;  // JSON schema type
+  required: bool;
+  default_value: string;
+}
+
+// Tool definition
+table Tool {
+  name: string (required, key);
+  description: string (required);
+  parameters: [ToolParameter];
+  input_schema: string;  // JSON schema
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// Tool call request
+table ToolCall {
+  id: mcp.fbs.v1.UUID (required);
+  tool_name: string (required);
+  arguments: [mcp.fbs.v1.KeyValue] (required);
+  timestamp: mcp.fbs.v1.Timestamp;
+}
+
+// Tool execution result
+table ToolResult {
+  tool_call_id: mcp.fbs.v1.UUID (required);
+  success: bool;
+  content: [Content];
+  error: mcp.fbs.v1.Error;
+  metadata: [mcp.fbs.v1.KeyValue];
+  execution_time_ms: uint32;
+}
+
+// ============================================================================
+// Resource Definitions
+// ============================================================================
+
+// Resource definition
+table Resource {
+  uri: string (required, key);
+  name: string (required);
+  description: string;
+  mime_type: string;
+  size_bytes: uint64;
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// Resource content with data
+table ResourceData {
+  resource: Resource (required);
+  content: Content (required);
+  last_modified: mcp.fbs.v1.Timestamp;
+  etag: string;
+}
+
+// ============================================================================
+// Prompt Definitions
+// ============================================================================
+
+// Prompt argument definition
+table PromptArgument {
+  name: string (required);
+  description: string;
+  required: bool;
+  default_value: string;
+}
+
+// Prompt message (for multi-turn prompts)
+table PromptMessage {
+  role: string (required);  // "user", "assistant", "system"
+  content: Content (required);
+}
+
+// Prompt template definition
+table Prompt {
+  name: string (required, key);
+  description: string;
+  content: Content (required);
+  arguments: [PromptArgument];
+  messages: [PromptMessage];
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// Applied prompt with filled arguments
+table AppliedPrompt {
+  prompt_name: string (required);
+  filled_content: Content (required);
+  argument_values: [mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// MCP Messages
+// ============================================================================
+
+// Message header
+table MessageHeader {
+  version: ProtocolVersion = V2025_01_01;
+  message_id: mcp.fbs.v1.UUID (required);
+  timestamp: mcp.fbs.v1.Timestamp (required);
+  session_id: string;
+  correlation_id: string;
+}
+
+// Request types
+union RequestPayload {
+  ToolCall,
+  ResourceRequest,
+  PromptRequest
+}
+
+// Response types
+union ResponsePayload {
+  ToolResult,
+  ResourceData,
+  AppliedPrompt,
+  ErrorResponse
+}
+
+// Generic request message
+table Request {
+  header: MessageHeader (required);
+  payload: RequestPayload (required);
+}
+
+// Generic response message
+table Response {
+  header: MessageHeader (required);
+  payload: ResponsePayload (required);
+  success: bool;
+}
+
+root_type Request;
+
+// ============================================================================
+// Resource and Prompt Request Types
+// ============================================================================
+
+table ResourceRequest {
+  uri: string (required);
+  range_start: uint64;
+  range_end: uint64;
+}
+
+table PromptRequest {
+  name: string (required);
+  arguments: [mcp.fbs.v1.KeyValue];
+}
+
+table ErrorResponse {
+  error: mcp.fbs.v1.Error (required);
+}
+
+// ============================================================================
+// Server and Client Capabilities
+// ============================================================================
+
+// Server capabilities
+table ServerCapabilities {
+  supports_tools: bool;
+  supports_resources: bool;
+  supports_prompts: bool;
+  supports_sampling: bool;
+  supports_logging: bool;
+  protocol_version: ProtocolVersion;
+  server_name: string;
+  server_version: string;
+}
+
+// Client capabilities
+table ClientCapabilities {
+  supports_tools: bool;
+  supports_resources: bool;
+  supports_prompts: bool;
+  protocol_version: ProtocolVersion;
+  client_name: string;
+  client_version: string;
+}
+
+// Initialization handshake
+table InitializeRequest {
+  client_capabilities: ClientCapabilities (required);
+  client_info: [mcp.fbs.v1.KeyValue];
+}
+
+table InitializeResponse {
+  server_capabilities: ServerCapabilities (required);
+  server_info: [mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Progress and Notifications
+// ============================================================================
+
+// Progress notification
+table ProgressNotification {
+  operation_id: mcp.fbs.v1.UUID (required);
+  progress: float;  // 0.0 to 1.0
+  message: string;
+  current_step: uint32;
+  total_steps: uint32;
+}
+
+// Log message
+enum LogLevel: byte {
+  Debug = 0,
+  Info = 1,
+  Warning = 2,
+  Error = 3,
+  Critical = 4
+}
+
+table LogMessage {
+  level: LogLevel;
+  message: string (required);
+  timestamp: mcp.fbs.v1.Timestamp;
+  source: string;
+  metadata: [mcp.fbs.v1.KeyValue];
+}

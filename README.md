@@ -29,6 +29,52 @@ MCP Prompts is a production-ready server that implements the Model Context Proto
 - **Multi-Mode**: Run as MCP server (stdio) or HTTP REST API
 - **Docker Support**: Multiple deployment configurations
 
+## Cognitive Architecture 🧠
+
+MCP Prompts implements a **seven-layer cognitive architecture** that transforms the system into an intelligent development assistant capable of learning from experience and adapting to different domains.
+
+### Seven Cognitive Layers
+
+```
+┌─────────────────────────────────────────┐
+│ 7. Evaluative    │ Quality Assessment   │
+│                  │ Priority Judgment    │
+├─────────────────────────────────────────┤
+│ 6. Transfer      │ Cross-Domain Analogies│
+│                  │ Pattern Abstraction  │
+├─────────────────────────────────────────┤
+│ 5. Meta-Cognitive│ Strategy Selection   │
+│                  │ Self-Awareness       │
+├─────────────────────────────────────────┤
+│ 4. Procedural    │ Workflows & Techniques│
+│                  │ Analysis Procedures  │
+├─────────────────────────────────────────┤
+│ 3. Semantic      │ Domain Knowledge     │
+│                  │ Tool Capabilities    │
+├─────────────────────────────────────────┤
+│ 2. Episodic      │ Problem-Solving      │
+│                  │ Experience Memory    │
+├─────────────────────────────────────────┤
+│ 1. Perceptual    │ Context Detection    │
+│                  │ Goal Identification  │
+└─────────────────────────────────────────┘
+```
+
+### Intelligent Prompt Management
+
+- **Context-Aware**: Automatically detects project types and applies relevant knowledge
+- **Experience Learning**: Captures successful problem-solving patterns for reuse
+- **Cross-Domain Transfer**: Applies patterns learned in one domain to others
+- **Self-Improving**: Learns from usage patterns to improve recommendations
+
+### FlatBuffers Integration
+
+High-performance binary serialization for cognitive data:
+- **Zero-copy deserialization** for maximum speed
+- **Schema evolution** supporting backward compatibility
+- **Inter-server communication** with minimal overhead
+- **Embedded optimization** for resource-constrained environments
+
 ## Features
 
 ### Core Features

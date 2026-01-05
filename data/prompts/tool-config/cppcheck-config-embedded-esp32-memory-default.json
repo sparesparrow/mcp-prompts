@@ -1,0 +1,41 @@
+{
+  "id": "cppcheck-config-embedded-esp32-memory-default",
+  "name": "cppcheck-config-embedded-esp32-memory-default",
+  "description": "Default cppcheck configuration for ESP32 embedded memory analysis",
+  "template": {
+    "project_type": "embedded-esp32",
+    "focus": "memory",
+    "is_embedded": true,
+    "cppcheck_flags": [
+      "--quiet",
+      "--template={file}:{line}:{column}: {severity}: {id}: {message}",
+      "--inline-suppr",
+      "--suppress=missingIncludeSystem",
+      "--enable=warning,performance,portability",
+      "--std=c++11",
+      "--platform=unix32"
+    ],
+    "success_count": 0,
+    "confidence": "low"
+  },
+  "category": "tool-config",
+  "tags": [
+    "cpp",
+    "cppcheck",
+    "memory",
+    "embedded-esp32",
+    "default"
+  ],
+  "version": "latest",
+  "createdAt": "2025-12-31T17:17:09.148Z",
+  "updatedAt": "2025-12-31T17:17:09.148Z",
+  "isLatest": true,
+  "metadata": {
+    "created": "2025-12-31T17:17:09.148Z",
+    "validation": "default_config",
+    "confidence": "low",
+    "tool": "cppcheck",
+    "project_type": "embedded-esp32"
+  },
+  "accessLevel": "public"
+}

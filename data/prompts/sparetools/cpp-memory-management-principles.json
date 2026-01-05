@@ -1,0 +1,13 @@
+{
+  "id": "cpp-memory-management-principles",
+  "name": "cpp-memory-management-principles",
+  "description": "Core principles of memory management in C++ with OpenSSL-specific considerations",
+  "content": "# C++ Memory Management Principles for OpenSSL\n\n## Core Principles\n\n### RAII (Resource Acquisition Is Initialization)\n- **Rule**: Every resource should be owned by an object whose destructor releases it\n- **OpenSSL Context**: EVP_MD_CTX, EVP_CIPHER_CTX should be wrapped in unique_ptr with custom deleters\n- **Example**: `std::unique_ptr<EVP_MD_CTX, decltype(&EVP_MD_CTX_free)> ctx(EVP_MD_CTX_new(), EVP_MD_CTX_free);`\n\n### Smart Pointer Usage\n- **unique_ptr**: For exclusive ownership (most common)\n- **shared_ptr**: Only when shared ownership is truly needed\n- **Avoid**: raw pointers for ownership\n\n### Exception Safety\n- **Rule**: Operations should be exception-safe\n- **OpenSSL Context**: Memory allocation failures in OpenSSL functions\n- **Pattern**: Use RAII wrappers that handle cleanup even during exceptions\n\n### Memory Leak Prevention\n- **Rule**: Every allocation must have a corresponding deallocation\n- **OpenSSL Context**: BIO, X509, EVP_PKEY objects all need explicit cleanup\n- **Tool**: Use valgrind regularly to detect leaks\n\n### Buffer Overflow Prevention\n- **Rule**: Always validate buffer sizes before operations\n- **OpenSSL Context**: memcpy, strcpy operations on cryptographic data\n- **Pattern**: Use std::array, std::vector, or bounds-checked alternatives\n\n## OpenSSL-Specific Memory Issues\n\n### Common Problems\n1. **EVP Context Leaks**: Forgetting to call EVP_*_free functions\n2. **BIO Object Leaks**: Not properly freeing BIO chains\n3. **Certificate Chain Leaks**: X509 objects not freed\n4. **Key Object Leaks**: EVP_PKEY not freed after use\n\n### Prevention Strategies\n- Create RAII wrapper classes for each OpenSSL type\n- Use custom deleters with smart pointers\n- Implement comprehensive testing with valgrind\n- Code review focus on memory ownership transfer\n\n## Context: {{context}}\n\nWhen analyzing {{context}} code, pay special attention to:\n- OpenSSL object lifecycle management\n- Exception safety in cryptographic operations\n- Memory allocation patterns in performance-critical paths",
+  "isTemplate": true,
+  "variables": ["context"],
+  "tags": ["cpp", "memory-management", "openssl", "security", "raii"],
+  "category": "sparetools",
+  "version": 1,
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z"
+}

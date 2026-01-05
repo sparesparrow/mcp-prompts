@@ -1,0 +1,242 @@
+// esp32-telemetry.fbs
+// FlatBuffers schemas for ESP32 sensor telemetry and system monitoring
+// Optimized for low-power embedded systems with efficient binary serialization
+// Version: 1.0.0
+
+include "../mcp/base_types.fbs";
+
+namespace mcp.fbs.v1.embedded.esp32;
+
+// ============================================================================
+// Core Sensor and Telemetry Types
+// ============================================================================
+
+// Generic sensor reading with type safety
+table SensorReading {
+  sensor_id:string (required);     // e.g., "bpm", "temp", "accel_x"
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  value:double;                    // Sensor value (flexible for different types)
+  unit:string;                     // Unit of measurement ("bpm", "°C", "m/s²", etc.)
+  confidence:float = 1.0;          // Confidence score 0.0-1.0
+  metadata:[mcp.fbs.v1.KeyValue]; // Additional sensor-specific data
+}
+
+// Specialized BPM sensor data
+table BPMData {
+  bpm:int (required);              // Beats per minute
+  confidence:float (required);     // Detection confidence 0.0-1.0
+  raw_samples:[short];             // Raw ADC samples for verification
+  quality_score:float = 0.0;       // Signal quality metric
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  sensor_metadata:[mcp.fbs.v1.KeyValue];
+}
+
+// Multi-axis accelerometer data
+table AccelerometerData {
+  x:float (required);
+  y:float (required);
+  z:float (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  scale:string = "g";              // Acceleration scale ("g", "m/s²")
+  resolution:float = 0.001;        // Sensor resolution
+}
+
+// Environmental sensor readings
+table EnvironmentalData {
+  temperature:float;               // °C
+  humidity:float;                  // % RH
+  pressure:float;                  // hPa
+  altitude:float;                  // meters (calculated)
+  gas_resistance:int;              // Raw gas sensor value
+  iaq_score:int;                   // Indoor Air Quality score
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// ============================================================================
+// ESP32 System Monitoring
+// ============================================================================
+
+// Memory usage statistics
+table MemoryStats {
+  heap_free:int (required);        // Free heap bytes
+  heap_total:int (required);       // Total heap bytes
+  heap_min_free:int;               // Minimum free heap since boot
+  psram_free:int;                  // PSRAM free bytes (if available)
+  psram_total:int;                 // PSRAM total bytes
+  largest_free_block:int;          // Largest contiguous free block
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// WiFi connection statistics
+table WiFiStats {
+  connected:bool (required);
+  ssid:string;
+  bssid:string;
+  rssi:int;                        // Signal strength (-100 to 0)
+  channel:int;
+  ip_address:string;
+  gateway:string;
+  subnet_mask:string;
+  dns_server:string;
+  tx_bytes:int;                    // Bytes transmitted
+  rx_bytes:int;                    // Bytes received
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// Task monitoring for FreeRTOS
+table TaskInfo {
+  name:string (required);
+  state:string (required);         // "running", "ready", "blocked", etc.
+  priority:int (required);
+  stack_high_water_mark:int;       // Minimum stack space remaining
+  runtime_counter:int;             // CPU time used
+  core_id:int;                     // Which core the task is running on
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// ============================================================================
+// Power and Performance Monitoring
+// ============================================================================
+
+// Battery/power monitoring
+table PowerStats {
+  voltage:float;                   // Battery voltage (V)
+  current:float;                   // Current draw (mA)
+  charge_level:int;                // Battery percentage (0-100)
+  is_charging:bool;
+  temperature:float;               // Battery temperature (°C)
+  cycles:int;                      // Charge cycles
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// Performance counters
+table PerformanceStats {
+  cpu_usage_core0:float;           // CPU usage percentage core 0
+  cpu_usage_core1:float;           // CPU usage percentage core 1
+  free_heap_drop_rate:int;         // Heap drop events per minute
+  wifi_reconnect_count:int;        // WiFi reconnection events
+  task_switches:int;               // RTOS task switches per second
+  interrupt_count:int;             // Total interrupts serviced
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// ============================================================================
+// Telemetry Message Types
+// ============================================================================
+
+// Union of all possible telemetry data types
+union TelemetryPayload {
+  SensorReading,
+  BPMData,
+  AccelerometerData,
+  EnvironmentalData,
+  MemoryStats,
+  WiFiStats,
+  TaskInfo,
+  PowerStats,
+  PerformanceStats
+}
+
+// Telemetry message header with metadata
+table TelemetryMessage {
+  device_id:string (required);      // Unique ESP32 device identifier
+  firmware_version:string (required);
+  message_id:mcp.fbs.v1.UUID (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  sequence_number:int;              // Monotonically increasing sequence
+  payload_type:string (required);   // Type identifier for payload
+  payload:TelemetryPayload (required);
+  compression_used:bool = false;   // Whether payload was compressed
+  crc32:uint32;                     // CRC32 checksum for data integrity
+}
+
+// ============================================================================
+// Batch Telemetry for Efficiency
+// ============================================================================
+
+// Batch of telemetry messages for bulk transfer
+table TelemetryBatch {
+  device_id:string (required);
+  batch_id:mcp.fbs.v1.UUID (required);
+  start_timestamp:mcp.fbs.v1.Timestamp (required);
+  end_timestamp:mcp.fbs.v1.Timestamp (required);
+  message_count:int (required);
+  messages:[TelemetryMessage] (required);
+  compression_method:string;        // "gzip", "lz4", etc.
+  total_uncompressed_size:int;
+  total_compressed_size:int;
+  batch_metadata:[mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Command and Control Messages
+// ============================================================================
+
+// Commands that can be sent to ESP32
+enum ESP32Command {
+  GET_TELEMETRY = 0,
+  SET_SENSOR_CONFIG = 1,
+  RESET_DEVICE = 2,
+  UPDATE_FIRMWARE = 3,
+  CALIBRATE_SENSORS = 4,
+  ENTER_DEEP_SLEEP = 5,
+  WIFI_RECONNECT = 6,
+  LOG_LEVEL_SET = 7
+}
+
+// Command message structure
+table CommandMessage {
+  command_id:mcp.fbs.v1.UUID (required);
+  command_type:ESP32Command (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  parameters:[mcp.fbs.v1.KeyValue];  // Command-specific parameters
+  timeout_ms:int = 5000;            // Command timeout
+  require_ack:bool = true;          // Whether acknowledgment is required
+}
+
+// Command acknowledgment
+table CommandAck {
+  command_id:mcp.fbs.v1.UUID (required);
+  success:bool (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  result_data:[mcp.fbs.v1.KeyValue]; // Command result data
+  error_message:string;              // Error description if failed
+}
+
+// ============================================================================
+// Configuration and Calibration
+// ============================================================================
+
+// Sensor calibration data
+table SensorCalibration {
+  sensor_id:string (required);
+  calibration_date:mcp.fbs.v1.Timestamp (required);
+  offset:double;                    // Calibration offset
+  scale:double = 1.0;              // Calibration scale factor
+  reference_value:double;           // Reference value used for calibration
+  accuracy:float;                   // Calibration accuracy
+  valid_until:mcp.fbs.v1.Timestamp; // When recalibration is needed
+}
+
+// Device configuration
+table DeviceConfig {
+  device_id:string (required);
+  telemetry_interval_ms:int = 1000; // How often to send telemetry
+  sensors_enabled:[string];         // List of enabled sensors
+  wifi_ssid:string;
+  wifi_password:string;             // NOTE: In production, use secure key exchange
+  server_endpoint:string;           // Where to send telemetry
+  compression_enabled:bool = true;
+  debug_logging:bool = false;
+  calibration_data:[SensorCalibration];
+}
+
+// ============================================================================
+// Root Types for Schema
+// ============================================================================
+
+root_type TelemetryMessage;
+root_type TelemetryBatch;
+root_type CommandMessage;
+root_type CommandAck;
+root_type DeviceConfig;

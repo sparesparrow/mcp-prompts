@@ -1,8 +1,10 @@
 import { pino } from 'pino';
 
+// For MCP servers using stdio transport, logs must go to stderr, not stdout
+// stdout is reserved for JSON-RPC messages
 export const logger = pino({
   level: process.env.LOG_LEVEL || 'info'
-});
+}, process.stderr);
 
 export function generateId(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36);

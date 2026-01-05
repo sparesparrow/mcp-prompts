@@ -1,0 +1,444 @@
+// cognitive.fbs
+// Schema definitions for cognitive architecture components
+// Implements the seven-layer cognitive model
+// Version: 1.0.0
+
+include "base_types.fbs";
+include "protocol.fbs";
+
+namespace mcp.fbs.v1.cognitive;
+
+// ============================================================================
+// Layer 1: Perceptual Prompts - Understanding Context
+// ============================================================================
+
+// Context classification for project types
+enum ProjectType: byte {
+  Unknown = 0,
+  WebService = 1,
+  CommandLineTool = 2,
+  Library = 3,
+  EmbeddedSystem = 4,
+  MobileApp = 5,
+  DesktopApp = 6,
+  DataPipeline = 7,
+  MachineLearning = 8
+}
+
+// Domain classification for specialized knowledge
+enum Domain: byte {
+  General = 0,
+  SoftwareDevelopment = 1,
+  MedicalAnalysis = 2,
+  FinancialModeling = 3,
+  CreativeProduction = 4,
+  Infrastructure = 5,
+  DataScience = 6,
+  Security = 7
+}
+
+// Project context detected through perceptual analysis
+table ProjectContext {
+  project_type: ProjectType;
+  primary_language: string;
+  languages: [string];
+  domain: Domain;
+  build_system: string;
+  has_tests: bool;
+  has_ci: bool;
+  performance_critical: bool;
+  safety_critical: bool;
+  security_sensitive: bool;
+  real_time_constraints: bool;
+  detected_frameworks: [string];
+  confidence: mcp.fbs.v1.Confidence;
+  detection_timestamp: mcp.fbs.v1.Timestamp;
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// Analysis goal classification
+enum AnalysisGoal: byte {
+  BugFinding = 0,
+  PerformanceOptimization = 1,
+  SecurityAudit = 2,
+  CodeQuality = 3,
+  Diagnosis = 4,
+  Refactoring = 5,
+  Documentation = 6
+}
+
+// Risk profile assessment
+enum RiskLevel: byte {
+  Low = 0,
+  Medium = 1,
+  High = 2,
+  Critical = 3
+}
+
+table RiskProfile {
+  overall_risk: RiskLevel;
+  failure_impact: string;
+  regulatory_requirements: [string];
+  data_sensitivity: RiskLevel;
+  availability_requirements: RiskLevel;
+  recommended_analysis_depth: string;
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Layer 2: Episodic Memory - Specific Experiences
+// ============================================================================
+
+// Problem signature for identifying similar situations
+table ProblemSignature {
+  symptoms: [string] (required);
+  context_fingerprint: string;
+  error_patterns: [string];
+  affected_components: [string];
+  reproduction_conditions: [string];
+}
+
+// Investigation step in diagnostic process
+table InvestigationStep {
+  step_number: uint32;
+  action: string (required);
+  tool_used: string;
+  findings: string;
+  led_to_solution: bool;
+  duration_ms: uint32;
+}
+
+// Solution pattern that resolved an issue
+table SolutionPattern {
+  description: string (required);
+  implementation_steps: [string];
+  validation_method: string;
+  side_effects: [string];
+  applicability_conditions: [string];
+}
+
+// Episodic memory entry capturing a specific experience
+table EpisodeMemory {
+  id: mcp.fbs.v1.UUID (required);
+  name: string (required, key);  // Using name as key instead of UUID
+  problem_signature: ProblemSignature (required);
+  context: ProjectContext (required);
+  investigation_path: [InvestigationStep];
+  solution: SolutionPattern (required);
+  success: bool;
+  cognitive_load: float;  // Difficulty rating 0-10
+  generalization_cues: [string];
+  tags: [string];
+  created_at: mcp.fbs.v1.Timestamp;
+  used_count: uint32;
+  effectiveness_score: float;
+  related_episodes: [mcp.fbs.v1.UUID];
+}
+
+// ============================================================================
+// Layer 3: Semantic Memory - Generalized Knowledge
+// ============================================================================
+
+// Conceptual understanding of domain principles
+table ConceptualKnowledge {
+  concept_name: string (required, key);
+  definition: string (required);
+  principles: [string];
+  relationships: [mcp.fbs.v1.KeyValue];  // Related concepts
+  examples: [string];
+  anti_patterns: [string];
+  domain: Domain;
+  abstraction_level: uint8;  // 0=concrete, 10=abstract
+  metadata: [mcp.fbs.v1.KeyValue];
+}
+
+// Domain model encoding structure and relationships
+table DomainModel {
+  domain: Domain;  // Enum cannot be required
+  components: [string];
+  interactions: [mcp.fbs.v1.KeyValue];
+  common_patterns: [string];
+  failure_modes: [string];
+  best_practices: [string];
+  constraints: [string];
+  version: mcp.fbs.v1.Version;
+}
+
+// Tool capability knowledge
+table ToolCapabilityKnowledge {
+  tool_name: string (required, key);
+  purpose: string;
+  strengths: [string];
+  limitations: [string];
+  complementary_tools: [string];
+  best_use_cases: [string];
+  configuration_guidance: [mcp.fbs.v1.KeyValue];
+  performance_characteristics: [mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Layer 4: Procedural Memory - Workflows and Techniques
+// ============================================================================
+
+// Decision point in a workflow
+table DecisionPoint {
+  condition: string (required);
+  true_branch: string;  // Reference to next step or workflow
+  false_branch: string;
+  evaluation_criteria: [string];
+}
+
+// Workflow step with optional branching
+table WorkflowStep {
+  step_id: string (required);
+  description: string (required);
+  action: string (required);
+  tool: string;
+  parameters: [mcp.fbs.v1.KeyValue];
+  expected_output: string;
+  decision_point: DecisionPoint;
+  next_step: string;
+  alternatives: [string];
+}
+
+// Complete workflow template
+table WorkflowTemplate {
+  id: mcp.fbs.v1.UUID (required);
+  name: string (required, key);  // Using name as key instead of UUID
+  description: string;
+  goal: AnalysisGoal;
+  applicable_contexts: [ProjectType];
+  steps: [WorkflowStep] (required);
+  entry_point: string (required);
+  exit_conditions: [string];
+  estimated_duration_ms: uint32;
+  complexity_score: float;
+  success_rate: float;
+  usage_count: uint32;
+  version: mcp.fbs.v1.Version;
+}
+
+// Analytical technique description
+table Technique {
+  name: string (required, key);
+  description: string (required);
+  method: string;
+  applicable_situations: [string];
+  examples: [string];
+  pitfalls: [string];
+  related_techniques: [string];
+}
+
+// Configuration recipe for tool usage
+table ConfigurationRecipe {
+  tool_name: string (required);
+  context: ProjectContext;
+  configuration: [mcp.fbs.v1.KeyValue] (required);
+  rationale: [mcp.fbs.v1.KeyValue];
+  expected_behavior: string;
+  performance_impact: string;
+  success_rate: float;
+}
+
+// ============================================================================
+// Layer 5: Meta-Cognitive - Self-Awareness and Strategy
+// ============================================================================
+
+// Strategy for approaching problems
+enum Strategy: byte {
+  HypothesisDriven = 0,
+  SystematicEnumeration = 1,
+  BinarySearch = 2,
+  TopDown = 3,
+  BottomUp = 4,
+  Incremental = 5,
+  Experimental = 6
+}
+
+// Context factors influencing strategy selection
+table ContextFactors {
+  time_pressure: RiskLevel;
+  information_availability: RiskLevel;
+  failure_impact: RiskLevel;
+  team_expertise: float;
+  resource_constraints: [string];
+  observability_quality: float;
+}
+
+// Strategy recommendation with reasoning
+table StrategyRecommendation {
+  recommended_strategy: Strategy;
+  reasoning: string (required);
+  context_factors: ContextFactors (required);
+  alternative_strategies: [Strategy];
+  confidence: mcp.fbs.v1.Confidence;
+}
+
+// Self-assessment of understanding
+table EpistemicState {
+  topic: string (required);
+  confidence_level: float;  // 0.0 to 1.0
+  evidence_quality: RiskLevel;
+  knowledge_gaps: [string];
+  assumptions: [string];
+  certainty_source: string;  // "direct evidence", "inference", "pattern matching"
+  last_validated: mcp.fbs.v1.Timestamp;
+}
+
+// Learning opportunity recognition
+table LearningOpportunity {
+  situation_id: mcp.fbs.v1.UUID (required);
+  opportunity_type: string;  // "novel pattern", "unexpected success", "contradiction"
+  significance_score: float;
+  capture_recommendation: string;
+  reasoning: string;
+  suggested_tags: [string];
+}
+
+// ============================================================================
+// Layer 6: Cross-Domain Transfer - Analogical Reasoning
+// ============================================================================
+
+// Abstract pattern independent of domain
+table AbstractPattern {
+  pattern_id: mcp.fbs.v1.UUID (required);
+  name: string (required, key);  // Using name as key instead of UUID
+  abstract_structure: string (required);
+  relationships: [string];
+  constraints: [string];
+  applicability_conditions: [string];
+  source_domain: Domain;
+  instantiations: [mcp.fbs.v1.UUID];  // Concrete examples
+  effectiveness_across_domains: [mcp.fbs.v1.KeyValue];
+}
+
+// Structural mapping between domains
+table StructuralMapping {
+  source_domain: Domain;  // Enum cannot be required
+  target_domain: Domain;  // Enum cannot be required
+  source_concepts: [string];
+  target_concepts: [string];
+  concept_mappings: [mcp.fbs.v1.KeyValue] (required);
+  relationship_mappings: [mcp.fbs.v1.KeyValue];
+  validity_conditions: [string];
+  examples: [string];
+  confidence: mcp.fbs.v1.Confidence;
+}
+
+// Transferable principle extracted from specific knowledge
+table TransferablePrinciple {
+  principle_id: mcp.fbs.v1.UUID (required);
+  name: string (required, key);  // Using name as key instead of UUID
+  abstract_description: string (required);
+  underlying_mechanism: string;
+  source_domains: [Domain];
+  applicable_domains: [Domain];
+  instantiation_examples: [mcp.fbs.v1.KeyValue];
+  validation_evidence: [string];
+}
+
+// ============================================================================
+// Layer 7: Evaluative - Judgment and Quality Assessment
+// ============================================================================
+
+// Quality dimensions for assessment
+table QualityMetrics {
+  thoroughness: float;  // 0.0 to 1.0
+  accuracy: float;
+  actionability: float;
+  clarity: float;
+  efficiency: float;
+  completeness: float;
+  overall_score: float;
+  assessment_reasoning: string;
+}
+
+// Analysis quality assessment
+table AnalysisQualityAssessment {
+  analysis_id: mcp.fbs.v1.UUID (required);
+  quality_metrics: QualityMetrics (required);
+  identifies_root_cause: bool;
+  provides_actionable_recommendations: bool;
+  evidence_strength: RiskLevel;
+  expert_review_rating: float;
+  improvement_suggestions: [string];
+  assessed_at: mcp.fbs.v1.Timestamp;
+}
+
+// Explanation effectiveness assessment
+table ExplanationAssessment {
+  explanation_id: mcp.fbs.v1.UUID (required);
+  provides_insight: bool;
+  appropriate_technical_level: bool;
+  includes_context: bool;
+  explains_why_not_just_what: bool;
+  actionable_guidance: bool;
+  user_satisfaction_score: float;
+  improvement_notes: [string];
+}
+
+// Priority judgment for resource allocation
+enum Priority: byte {
+  Defer = 0,
+  Low = 1,
+  Medium = 2,
+  High = 3,
+  Critical = 4
+}
+
+table PriorityJudgment {
+  item_id: mcp.fbs.v1.UUID (required);
+  priority: Priority;
+  criticality: RiskLevel;
+  effort_estimate: uint32;  // minutes
+  expected_value: float;
+  reasoning: string (required);
+  dependencies: [mcp.fbs.v1.UUID];
+}
+
+// Aesthetic judgment about solutions
+table AestheticJudgment {
+  solution_id: mcp.fbs.v1.UUID (required);
+  elegance_score: float;
+  simplicity_score: float;
+  robustness_score: float;
+  maintainability_score: float;
+  overall_quality: float;
+  reasoning: string;
+  exemplifies_principles: [string];
+  violates_principles: [string];
+}
+
+// ============================================================================
+// Enhanced Prompt Definition for Cognitive System
+// ============================================================================
+
+enum PromptLayer: byte {
+  Unknown = 0,
+  Perceptual = 1,
+  Episodic = 2,
+  Semantic = 3,
+  Procedural = 4,
+  MetaCognitive = 5,
+  Transfer = 6,
+  Evaluative = 7
+}
+
+// Extended prompt with cognitive metadata
+table CognitivePrompt {
+  base_prompt: mcp.fbs.v1.protocol.Prompt (required);
+  layer: PromptLayer;
+  domain: Domain;
+  tags: [string];
+  related_prompts: [mcp.fbs.v1.UUID];
+  parent_prompt: mcp.fbs.v1.UUID;  // For derived prompts
+  derived_from_episodes: [mcp.fbs.v1.UUID];
+  abstraction_level: uint8;
+  applicability_score: [mcp.fbs.v1.KeyValue];  // Context -> score
+  statistics: mcp.fbs.v1.Statistics;
+  effectiveness_by_context: [mcp.fbs.v1.KeyValue];
+  last_updated: mcp.fbs.v1.Timestamp;
+  version_history: [mcp.fbs.v1.Version];
+}
+
+root_type CognitivePrompt;

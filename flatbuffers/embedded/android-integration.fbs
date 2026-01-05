@@ -1,0 +1,275 @@
+// android-integration.fbs
+// FlatBuffers schemas for Android device integration and clipboard synchronization
+// Optimized for mobile devices with efficient cross-platform data sync
+// Version: 1.0.0
+
+include "../mcp/base_types.fbs";
+
+namespace mcp.fbs.v1.embedded.android;
+
+// ============================================================================
+// Clipboard and Content Sharing
+// ============================================================================
+
+// Clipboard content types
+enum ClipboardContentType {
+  TEXT = 0,
+  HTML = 1,
+  URI = 2,
+  INTENT = 3,
+  IMAGE = 4,
+  FILE = 5,
+  MULTIPLE = 6
+}
+
+// Clipboard item metadata
+table ClipboardItem {
+  id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);      // Source device identifier
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  content_type:ClipboardContentType (required);
+  mime_type:string;                 // MIME type for content
+  content:string;                   // Text content or base64 encoded data
+  label:string;                     // User-visible label
+  source_app:string;                // App that provided the content
+  size_bytes:int;                   // Content size
+  expires_at:mcp.fbs.v1.Timestamp;  // When content expires
+  metadata:[mcp.fbs.v1.KeyValue];  // Additional metadata
+}
+
+// Clipboard synchronization batch
+table ClipboardSync {
+  sync_id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  items:[ClipboardItem] (required);
+  operation:string (required);      // "push", "pull", "sync"
+  last_sync_timestamp:mcp.fbs.v1.Timestamp;
+  compression_used:bool = false;
+}
+
+// ============================================================================
+// Device and Sensor Data
+// ============================================================================
+
+// Android device information
+table DeviceInfo {
+  device_id:string (required);
+  manufacturer:string;
+  model:string;
+  android_version:string;
+  api_level:int;
+  screen_density:float;
+  screen_size_x:int;
+  screen_size_y:int;
+  total_memory_mb:int;
+  available_memory_mb:int;
+  battery_level:int;                // 0-100
+  is_charging:bool;
+  network_type:string;              // "wifi", "mobile", "none"
+  timestamp:mcp.fbs.v1.Timestamp (required);
+}
+
+// Android sensor readings
+table AndroidSensorData {
+  sensor_type:string (required);    // "accelerometer", "gyroscope", "magnetometer", etc.
+  sensor_name:string;
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  values:[float];                   // Sensor values (x, y, z, etc.)
+  accuracy:int;                     // Sensor accuracy level
+  device_id:string (required);
+}
+
+// Location data (GPS)
+table LocationData {
+  latitude:double (required);
+  longitude:double (required);
+  altitude:double;
+  accuracy:float;                   // Accuracy in meters
+  speed:float;                      // Speed in m/s
+  bearing:float;                    // Direction in degrees
+  provider:string;                  // GPS, Network, etc.
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  device_id:string (required);
+}
+
+// ============================================================================
+// App and System Monitoring
+// ============================================================================
+
+// Android app information
+table AppInfo {
+  package_name:string (required);
+  app_name:string;
+  version_name:string;
+  version_code:int;
+  is_system_app:bool;
+  is_enabled:bool;
+  install_time:mcp.fbs.v1.Timestamp;
+  last_update_time:mcp.fbs.v1.Timestamp;
+  permissions:[string];
+  device_id:string (required);
+}
+
+// Battery monitoring
+table BatteryStats {
+  level:int (required);             // 0-100
+  scale:int;
+  temperature:int;                  // Temperature in tenths of degrees Celsius
+  voltage:int;                      // Voltage in millivolts
+  status:string;                    // "charging", "discharging", "full", etc.
+  plugged:string;                   // "ac", "usb", "wireless", "none"
+  health:string;                    // "good", "overheat", "dead", etc.
+  technology:string;                // Battery technology
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  device_id:string (required);
+}
+
+// Network statistics
+table NetworkStats {
+  bytes_tx:int;                     // Bytes transmitted
+  bytes_rx:int;                     // Bytes received
+  packets_tx:int;
+  packets_rx:int;
+  network_type:string;              // "wifi", "mobile", "bluetooth", etc.
+  ssid:string;                      // WiFi SSID
+  signal_strength:int;              // WiFi signal strength (-100 to 0)
+  mobile_network_type:string;       // "LTE", "3G", "2G", etc.
+  carrier_name:string;
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  device_id:string (required);
+}
+
+// ============================================================================
+// Notification and Event Monitoring
+// ============================================================================
+
+// Android notification data
+table NotificationData {
+  id:string (required);
+  package_name:string (required);
+  title:string;
+  text:string;
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  priority:int;                     // Notification priority
+  category:string;                  // Notification category
+  is_ongoing:bool;
+  device_id:string (required);
+}
+
+// System event monitoring
+table SystemEvent {
+  event_type:string (required);     // "boot", "shutdown", "screen_on", "screen_off", etc.
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  details:[mcp.fbs.v1.KeyValue];
+  device_id:string (required);
+}
+
+// ============================================================================
+// Synchronization and Messaging
+// ============================================================================
+
+// Device synchronization message
+union DeviceMessagePayload {
+  ClipboardSync,
+  DeviceInfo,
+  AndroidSensorData,
+  LocationData,
+  AppInfo,
+  BatteryStats,
+  NetworkStats,
+  NotificationData,
+  SystemEvent
+}
+
+// Device message wrapper
+table DeviceMessage {
+  message_id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);
+  message_type:string (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  payload:DeviceMessagePayload (required);
+  priority:int = 0;                 // Message priority (higher = more important)
+  ttl_seconds:int = 3600;          // Time to live
+  compression_used:bool = false;
+}
+
+// Bulk device message batch
+table DeviceMessageBatch {
+  batch_id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  messages:[DeviceMessage] (required);
+  compression_method:string;
+  total_uncompressed_size:int;
+  total_compressed_size:int;
+}
+
+// ============================================================================
+// Command and Control for Android
+// ============================================================================
+
+// Commands for Android device
+enum AndroidCommand {
+  GET_CLIPBOARD = 0,
+  SET_CLIPBOARD = 1,
+  GET_DEVICE_INFO = 2,
+  GET_SENSOR_DATA = 3,
+  GET_LOCATION = 4,
+  GET_NOTIFICATIONS = 5,
+  TAKE_SCREENSHOT = 6,
+  VIBRATE = 7,
+  PLAY_SOUND = 8,
+  SHOW_TOAST = 9,
+  LAUNCH_APP = 10
+}
+
+// Android command message
+table AndroidCommandMessage {
+  command_id:mcp.fbs.v1.UUID (required);
+  command_type:AndroidCommand (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  parameters:[mcp.fbs.v1.KeyValue];
+  timeout_ms:int = 10000;
+  device_id:string (required);
+}
+
+// Android command response
+table AndroidCommandResponse {
+  command_id:mcp.fbs.v1.UUID (required);
+  success:bool (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  response_data:[mcp.fbs.v1.KeyValue];
+  error_message:string;
+  device_id:string (required);
+}
+
+// ============================================================================
+// Configuration and Settings
+// ============================================================================
+
+// Android device configuration
+table AndroidDeviceConfig {
+  device_id:string (required);
+  sync_enabled:bool = true;
+  clipboard_sync_interval_ms:int = 5000;
+  sensor_sync_enabled:bool = false;
+  location_sync_enabled:bool = false;
+  notification_sync_enabled:bool = false;
+  battery_monitoring_enabled:bool = true;
+  network_monitoring_enabled:bool = true;
+  compression_enabled:bool = true;
+  server_endpoint:string;
+  auth_token:string;
+  sync_filters:[mcp.fbs.v1.KeyValue]; // Filters for what to sync
+}
+
+// ============================================================================
+// Root Types for Schema
+// ============================================================================
+
+root_type DeviceMessage;
+root_type DeviceMessageBatch;
+root_type AndroidCommandMessage;
+root_type AndroidCommandResponse;
+root_type AndroidDeviceConfig;

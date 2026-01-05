@@ -1,0 +1,300 @@
+// embedded-common.fbs
+// Common FlatBuffers schemas shared across embedded systems and mobile devices
+// Provides unified interfaces for heterogeneous device communication
+// Version: 1.0.0
+
+include "../mcp/base_types.fbs";
+
+namespace mcp.fbs.v1.embedded.common;
+
+// ============================================================================
+// Unified Device Identification and Capabilities
+// ============================================================================
+
+// Device type enumeration
+enum DeviceType {
+  ESP32 = 0,
+  ESP8266 = 1,
+  RASPBERRY_PI = 2,
+  ARDUINO = 3,
+  ANDROID_PHONE = 4,
+  ANDROID_TABLET = 5,
+  IOS_PHONE = 6,
+  IOS_TABLET = 7,
+  GENERIC_EMBEDDED = 8,
+  GENERIC_MOBILE = 9
+}
+
+// Device capability flags
+table DeviceCapabilities {
+  has_wifi:bool = false;
+  has_bluetooth:bool = false;
+  has_gps:bool = false;
+  has_accelerometer:bool = false;
+  has_gyroscope:bool = false;
+  has_magnetometer:bool = false;
+  has_temperature:bool = false;
+  has_humidity:bool = false;
+  has_pressure:bool = false;
+  has_light_sensor:bool = false;
+  has_camera:bool = false;
+  has_microphone:bool = false;
+  has_speaker:bool = false;
+  has_display:bool = false;
+  has_battery:bool = false;
+  supports_ota:bool = false;
+  supports_encryption:bool = false;
+  max_message_size:int = 1024;      // Maximum message size in bytes
+}
+
+// Unified device information
+table DeviceProfile {
+  device_id:string (required);
+  device_type:DeviceType (required);
+  firmware_version:string (required);
+  hardware_version:string;
+  manufacturer:string;
+  model:string;
+  serial_number:string;
+  mac_address:string;
+  ip_address:string;
+  capabilities:DeviceCapabilities (required);
+  registration_timestamp:mcp.fbs.v1.Timestamp (required);
+  last_seen:mcp.fbs.v1.Timestamp;
+  status:string = "online";         // "online", "offline", "error"
+  metadata:[mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Unified Telemetry Framework
+// ============================================================================
+
+// Generic telemetry value union
+union TelemetryValue {
+  IntValue,
+  FloatValue,
+  DoubleValue,
+  StringValue,
+  BoolValue,
+  BytesValue,
+  Vector3f,
+  Vector4f
+}
+
+table IntValue { value:int (required); }
+table FloatValue { value:float (required); }
+table DoubleValue { value:double (required); }
+table StringValue { value:string (required); }
+table BoolValue { value:bool (required); }
+table BytesValue { value:[ubyte] (required); }
+table Vector3f { x:float; y:float; z:float; }
+table Vector3i { x:int; y:int; z:int; }
+table Vector4f { x:float; y:float; z:float; w:float; }
+
+// Unified telemetry reading
+table TelemetryReading {
+  sensor_id:string (required);
+  sensor_type:string (required);    // "temperature", "accelerometer", "gps", etc.
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  value:TelemetryValue (required);
+  unit:string;                      // Unit of measurement
+  confidence:float = 1.0;          // Confidence score 0.0-1.0
+  accuracy:float;                   // Measurement accuracy
+  raw_data:[ubyte];                 // Raw sensor data if available
+  metadata:[mcp.fbs.v1.KeyValue];
+}
+
+// Telemetry batch for efficient transmission
+table TelemetryBatch {
+  device_id:string (required);
+  batch_id:mcp.fbs.v1.UUID (required);
+  start_timestamp:mcp.fbs.v1.Timestamp (required);
+  end_timestamp:mcp.fbs.v1.Timestamp (required);
+  readings:[TelemetryReading] (required);
+  compression_used:bool = false;
+  compression_method:string;
+  batch_metadata:[mcp.fbs.v1.KeyValue];
+}
+
+// ============================================================================
+// Unified Command and Control
+// ============================================================================
+
+// Generic command types
+enum GenericCommand {
+  GET_STATUS = 0,
+  GET_TELEMETRY = 1,
+  SET_CONFIG = 2,
+  RESET_DEVICE = 3,
+  UPDATE_FIRMWARE = 4,
+  CALIBRATE = 5,
+  ENTER_LOW_POWER = 6,
+  EXIT_LOW_POWER = 7,
+  REBOOT = 8,
+  FACTORY_RESET = 9,
+  GET_LOGS = 10,
+  CLEAR_LOGS = 11,
+  SELF_TEST = 12
+}
+
+// Unified command message
+table UnifiedCommand {
+  command_id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);
+  command_type:GenericCommand (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  parameters:[mcp.fbs.v1.KeyValue];
+  timeout_ms:int = 5000;
+  require_ack:bool = true;
+  priority:int = 0;                 // 0=normal, 1=high, 2=critical
+}
+
+// Unified command response
+table UnifiedResponse {
+  command_id:mcp.fbs.v1.UUID (required);
+  device_id:string (required);
+  success:bool (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  response_data:[mcp.fbs.v1.KeyValue];
+  error_code:int;                   // Error code if failed
+  error_message:string;
+  execution_time_ms:int;
+}
+
+// ============================================================================
+// Device Management and Discovery
+// ============================================================================
+
+// Device discovery message (broadcast)
+table DeviceDiscovery {
+  device_id:string (required);
+  device_profile:DeviceProfile (required);
+  discovery_timestamp:mcp.fbs.v1.Timestamp (required);
+  supported_protocols:[string];     // "flatbuffers", "json", "mqtt", etc.
+  available_services:[string];      // "telemetry", "clipboard", "sensors", etc.
+}
+
+// Device heartbeat for connection monitoring
+table DeviceHeartbeat {
+  device_id:string (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  uptime_seconds:int;
+  status:string = "ok";             // "ok", "warning", "error"
+  status_message:string;
+  battery_level:int;                // 0-100, -1 if not available
+  signal_strength:int;              // -100 to 0 dBm, -1 if not available
+  temperature:float;                // Device temperature in °C
+}
+
+// ============================================================================
+// Configuration Management
+// ============================================================================
+
+// Unified device configuration
+table UnifiedConfig {
+  device_id:string (required);
+  config_version:int = 1;
+  telemetry_enabled:bool = true;
+  telemetry_interval_ms:int = 1000;
+  compression_enabled:bool = true;
+  encryption_enabled:bool = false;
+  low_power_mode:bool = false;
+  debug_mode:bool = false;
+  server_endpoint:string;
+  auth_token:string;
+  update_url:string;
+  config_parameters:[mcp.fbs.v1.KeyValue];
+}
+
+// Configuration update message
+table ConfigUpdate {
+  device_id:string (required);
+  config:UnifiedConfig (required);
+  update_timestamp:mcp.fbs.v1.Timestamp (required);
+  force_update:bool = false;        // Force device to accept config
+  rollback_on_error:bool = true;
+}
+
+// ============================================================================
+// Error Handling and Diagnostics
+// ============================================================================
+
+// Error severity levels
+enum ErrorSeverity {
+  DEBUG = 0,
+  INFO = 1,
+  WARNING = 2,
+  ERROR = 3,
+  CRITICAL = 4,
+  FATAL = 5
+}
+
+// Device error report
+table DeviceError {
+  device_id:string (required);
+  error_id:mcp.fbs.v1.UUID (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  severity:ErrorSeverity (required);
+  error_code:int;
+  error_message:string (required);
+  component:string;                  // Which component failed
+  stack_trace:string;
+  context_data:[mcp.fbs.v1.KeyValue];
+  recoverable:bool = true;
+}
+
+// Diagnostic information
+table DeviceDiagnostics {
+  device_id:string (required);
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  self_test_results:[mcp.fbs.v1.KeyValue];
+  performance_metrics:[mcp.fbs.v1.KeyValue];
+  system_health:[mcp.fbs.v1.KeyValue];
+  recent_errors:[DeviceError];
+}
+
+// ============================================================================
+// Firmware and Update Management
+// ============================================================================
+
+// Firmware update information
+table FirmwareUpdate {
+  device_id:string (required);
+  update_id:mcp.fbs.v1.UUID (required);
+  version:string (required);
+  size_bytes:int (required);
+  checksum:string (required);       // SHA-256 checksum
+  update_url:string;
+  update_data:[ubyte];              // Firmware binary data (if embedded)
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  mandatory:bool = false;
+  auto_install:bool = false;
+}
+
+// Update status report
+table UpdateStatus {
+  device_id:string (required);
+  update_id:mcp.fbs.v1.UUID (required);
+  status:string (required);         // "downloading", "installing", "complete", "failed"
+  progress_percent:int;             // 0-100
+  timestamp:mcp.fbs.v1.Timestamp (required);
+  error_message:string;
+}
+
+// ============================================================================
+// Root Types for Schema
+// ============================================================================
+
+root_type DeviceProfile;
+root_type TelemetryReading;
+root_type TelemetryBatch;
+root_type UnifiedCommand;
+root_type UnifiedResponse;
+root_type DeviceDiscovery;
+root_type DeviceHeartbeat;
+root_type UnifiedConfig;
+root_type ConfigUpdate;
+root_type DeviceError;
+root_type DeviceDiagnostics;
+root_type FirmwareUpdate;
+root_type UpdateStatus;

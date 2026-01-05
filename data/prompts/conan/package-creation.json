@@ -1,0 +1,13 @@
+{
+  "id": "conan-package-creation",
+  "name": "Conan Package Creation",
+  "description": "Create a new Conan package with best practices",
+  "content": "Create Conan package: {{package_name}}/{{package_version}}.\n\nPackage Details:\n- Name: {{package_name}}\n- Version: {{package_version}}\n- Description: {{description}}\n- License: {{license}}\n- Topics: {{topics}}\n\nPackage Type: {{package_type}}\n\nConanfile Structure:\n```python\nfrom conan import ConanFile\nfrom conan.tools.files import copy\nimport os\n\nclass {{class_name}}Conan(ConanFile):\n    name = \"{{package_name}}\"\n    version = \"{{package_version}}\"\n    description = \"{{description}}\"\n    license = \"{{license}}\"\n    topics = ({{topics}})\n    \n    {{#if python_requires}}\n    python_requires = \"{{python_requires}}\"\n    {{/if}}\n    \n    package_type = \"{{package_type}}\"\n    \n    exports_sources = {{exports_sources}}\n    \n    {{#if has_requirements}}\n    def requirements(self):\n        {{#each requirements}}\n        self.requires(\"{{this}}\")\n        {{/each}}\n    {{/if}}\n    \n    def package(self):\n        # Package implementation\n        pass\n    \n    def package_info(self):\n        # Package info implementation\n        pass\n```\n\n{{#if include_tests}}Include test_package for validation{{/if}}",
+  "isTemplate": true,
+  "variables": ["package_name", "package_version", "description", "license", "topics", "package_type", "class_name", "python_requires", "exports_sources", "has_requirements", "requirements", "include_tests"],
+  "tags": ["conan", "package", "creation", "template"],
+  "category": "conan",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

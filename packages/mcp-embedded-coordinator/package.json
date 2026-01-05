@@ -1,0 +1,58 @@
+{
+  "name": "@sparesparrow/mcp-embedded-coordinator",
+  "version": "1.0.0",
+  "description": "Unified MCP coordinator for embedded systems (ESP32, Android) with cognitive orchestration",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "bin": {
+    "mcp-embedded-coordinator": "dist/embedded-coordinator.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "build:clean": "rm -rf dist && tsc",
+    "start": "node dist/embedded-coordinator.js",
+    "dev": "nodemon --exec ts-node src/embedded-coordinator.ts",
+    "test": "vitest run",
+    "lint": "eslint src --ext .ts",
+    "lint:fix": "eslint src --ext .ts --fix",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [
+    "mcp",
+    "embedded",
+    "esp32",
+    "android",
+    "coordinator",
+    "orchestration",
+    "cognitive"
+  ],
+  "author": "sparesparrow",
+  "license": "Apache-2.0",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@sparesparrow/mcp-prompts": "workspace:*",
+    "@sparesparrow/mcp-fbs": "workspace:*",
+    "@sparesparrow/mcp-esp32-bridge": "workspace:*",
+    "@sparesparrow/mcp-android-bridge": "workspace:*",
+    "flatbuffers": "^23.5.26",
+    "pino": "^8.21.0",
+    "pino-pretty": "^10.3.1",
+    "zod": "^3.25.71"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "typescript": "^5.9.3",
+    "vitest": "^1.6.1",
+    "nodemon": "^3.1.10",
+    "ts-node": "^10.9.2"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "workspaces": [
+    "../../mcp-prompts",
+    "../mcp-fbs",
+    "../mcp-esp32-bridge",
+    "../mcp-android-bridge"
+  ]
+}

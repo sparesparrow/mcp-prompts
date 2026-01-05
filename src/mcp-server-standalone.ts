@@ -3,7 +3,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
-import { logger } from './utils';
+import { logger } from './utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -32,22 +32,69 @@ const UpdatePromptParams = PromptSchema.partial().omit({ id: true });
 // In-memory storage for prompts
 const prompts = new Map();
 
-// Load sample prompts on startup
+// Recursively load JSON files from a directory
+function loadPromptsFromDirectory(dir: string, prompts: Map<string, any>): number {
+  let count = 0;
+  try {
+    const entries = fs.readdirSync(dir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      const fullPath = path.join(dir, entry.name);
+
+      if (entry.isDirectory()) {
+        // Recursively load from subdirectories
+        count += loadPromptsFromDirectory(fullPath, prompts);
+      } else if (entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'index.json') {
+        try {
+          const promptData = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
+
+          // Store prompt with all its data including content
+          prompts.set(promptData.id, {
+            ...promptData,
+            createdAt: promptData.createdAt || new Date().toISOString(),
+            updatedAt: promptData.updatedAt || new Date().toISOString(),
+            version: promptData.version || 1
+          });
+          count++;
+        } catch (err) {
+          logger.warn(`Failed to load prompt from ${fullPath}:`, err);
+        }
+      }
+    }
+  } catch (err) {
+    logger.warn(`Failed to read directory ${dir}:`, err);
+  }
+
+  return count;
+}
+
+// Load prompts from data/prompts directory structure
 function loadSamplePrompts() {
   try {
-    const sampleDataPath = path.join(process.cwd(), 'data', 'sample-prompts.json');
-    const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'));
-    for (const prompt of sampleData.prompts) {
-      prompts.set(prompt.id, {
-        ...prompt,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: 1
-      });
+    // First, try to load from the main prompts directory structure
+    const promptsDir = path.join(process.cwd(), 'data', 'prompts');
+
+    if (fs.existsSync(promptsDir)) {
+      const totalLoaded = loadPromptsFromDirectory(promptsDir, prompts);
+      logger.info(`Loaded ${totalLoaded} prompts from directory structure`);
+    } else {
+      // Fallback to sample prompts if prompts directory doesn't exist
+      const sampleDataPath = path.join(process.cwd(), 'data', 'sample-prompts.json');
+      if (fs.existsSync(sampleDataPath)) {
+        const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'));
+        for (const prompt of sampleData.prompts) {
+          prompts.set(prompt.id, {
+            ...prompt,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            version: 1
+          });
+        }
+        logger.info(`Loaded ${sampleData.prompts.length} sample prompts`);
+      }
     }
-    logger.info(`Loaded ${sampleData.prompts.length} sample prompts`);
   } catch (error) {
-    logger.warn('Could not load sample prompts:', error);
+    logger.warn('Could not load prompts:', error);
   }
 }
 
@@ -286,9 +333,7 @@ export async function startMcpServer() {
 }
 
 // Start the server when this file is executed directly
-if (require.main === module) {
-  startMcpServer().catch((error) => {
-    console.error('Failed to start MCP server:', error);
-    process.exit(1);
-  });
-}
+startMcpServer().catch((error) => {
+  console.error('Failed to start MCP server:', error);
+  process.exit(1);
+});
