@@ -1,6 +1,7 @@
 import pino from 'pino';
-import { McpPromptsClient } from '../../../packages/mcp-devtools-unified/src/adapters/mcp-prompts-client.js';
-import { PromptLayer, Domain } from '../../../packages/mcp-fbs/src/types.js';
+// import disabled for build
+// import disabled for build
+import { Domain, PromptLayer, SimpleMcpPromptsClient } from '../../types.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -59,12 +60,12 @@ export interface EpisodeData {
 
 export class PatternSynthesisService {
   private patterns: Map<string, EpisodePattern> = new Map();
-  private mcpClient: McpPromptsClient;
+  private mcpClient: SimpleMcpPromptsClient;
   private minPatternConfidence = 0.6; // Minimum confidence to create a pattern
   private minOccurrences = 3; // Minimum episodes to form a pattern
 
-  constructor(mcpClient?: McpPromptsClient) {
-    this.mcpClient = mcpClient || new McpPromptsClient();
+  constructor(mcpClient?: SimpleMcpPromptsClient) {
+    this.mcpClient = mcpClient || new SimpleMcpPromptsClient();
   }
 
   /**

@@ -1,4 +1,5 @@
 {
+  "id": "identify-analysis-goals",
   "name": "identify-analysis-goals",
   "description": "Determine the appropriate analysis goals based on project context and symptoms",
   "content": "Given the project context and reported symptoms, identify the most appropriate analysis goals:\n\nProject Context: {{project_context}}\nSymptoms/Issues: {{symptoms}}\nTime Available: {{time_constraint}}\nRisk Level: {{risk_level}}\n\nDetermine whether this is:\n- Bug finding and fixing\n- Performance optimization\n- Security audit\n- Code quality improvement\n- Refactoring needs\n- Documentation gaps\n\nPrioritize goals based on risk level and time constraints.",

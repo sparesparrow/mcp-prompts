@@ -1,8 +1,6 @@
 #!/usr/bin/env node
 
-import { DynamoDBAdapter } from './adapters/aws/dynamodb-adapter';
-import { S3CatalogAdapter } from './adapters/aws/s3-adapter';
-import { SQSAdapter } from './adapters/aws/sqs-adapter';
+// AWS adapters are imported dynamically to avoid dependencies
 import { PromptService } from './core/services/prompt.service';
 import { McpServer } from './mcp/mcp-server';
 import { MetricsCollector } from './monitoring/cloudwatch-metrics';
@@ -10,18 +8,26 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import pino from 'pino';
+import { URL } from 'url';
 import { DynamoDBClient, GetItemCommand, UpdateItemCommand } from '@aws-sdk/client-dynamodb';
 import { PaymentService } from './core/services/payment.service';
 
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  transport: process.env.NODE_ENV === 'development' ? {
-    target: 'pino-pretty',
-    options: {
-      colorize: true
-    }
-  } : undefined
-});
+// Create a logger that outputs to stderr for MCP mode compatibility
+// In MCP stdio mode, disable logging to avoid interfering with JSON-RPC protocol
+const logger = process.env.MODE === 'mcp'
+  ? { info: () => {}, error: () => {}, warn: () => {}, debug: () => {} } // No-op logger for MCP
+  : pino({
+      level: process.env.LOG_LEVEL || 'info'
+    }, process.stderr); // Normal logger for other modes
+
+// In MCP mode, silence all console output to prevent interference with JSON-RPC protocol
+if (process.env.MODE === 'mcp') {
+  console.log = () => {};
+  console.error = () => {};
+  console.warn = () => {};
+  console.info = () => {};
+  console.debug = () => {};
+}
 
 // Initialize DynamoDB client for user data
 const dynamoClient = new DynamoDBClient({ region: process.env.AWS_REGION });
@@ -74,22 +80,53 @@ function rateLimit(req: express.Request, res: express.Response, next: express.Ne
 
 async function startServer() {
   try {
-    console.log('Starting server...');
     const mode = process.env.MODE || 'mcp';
     const port = parseInt(process.env.PORT || '3000');
     const host = process.env.HOST || '0.0.0.0';
-    console.log('Mode:', mode, 'Port:', port, 'Host:', host);
+    const storageType = process.env.STORAGE_TYPE || 'memory';
 
-    // Initialize AWS adapters
-    const promptRepository = new DynamoDBAdapter(
-      process.env.PROMPTS_TABLE || 'mcp-prompts'
-    );
-    const catalogRepository = new S3CatalogAdapter(
-      process.env.PROMPTS_BUCKET || 'mcp-prompts-catalog'
-    );
-    const eventBus = new SQSAdapter(
-      process.env.PROCESSING_QUEUE || 'mcp-prompts-processing'
-    );
+    // Initialize adapters based on storage type
+    let promptRepository: any;
+    let catalogRepository: any;
+    let eventBus: any;
+
+    if (storageType === 'file') {
+      const { FilePromptRepository } = await import('./adapters/file/file-prompt-repository.js');
+      const { FileCatalogRepository } = await import('./adapters/file/file-catalog-repository.js');
+      const { MemoryEventBus } = await import('./adapters/memory/memory-event-bus.js');
+
+      const promptsDir = process.env.PROMPTS_DIR || './data/prompts';
+      promptRepository = new FilePromptRepository(promptsDir);
+      catalogRepository = new FileCatalogRepository(promptsDir);
+      eventBus = new MemoryEventBus();
+    } else if (storageType === 'postgres') {
+      // PostgreSQL support temporarily disabled - needs pg module installation
+      throw new Error('PostgreSQL storage is not yet implemented. Use file or memory storage instead.');
+    } else if (storageType === 'memory') {
+      const { MemoryPromptRepository } = await import('./adapters/memory/memory-prompt-repository.js');
+      const { FileCatalogRepository } = await import('./adapters/file/file-catalog-repository.js');
+      const { MemoryEventBus } = await import('./adapters/memory/memory-event-bus.js');
+
+      promptRepository = new MemoryPromptRepository();
+      catalogRepository = new FileCatalogRepository(process.env.PROMPTS_DIR || './data/prompts');
+      eventBus = new MemoryEventBus();
+        } else {
+            // AWS-based storage (legacy default)
+            const { DynamoDBAdapter } = await import('./adapters/aws/dynamodb-adapter.js');
+            const { S3CatalogAdapter } = await import('./adapters/aws/s3-adapter.js');
+            const { SQSAdapter } = await import('./adapters/aws/sqs-adapter.js');
+
+            promptRepository = new DynamoDBAdapter(
+              process.env.PROMPTS_TABLE || 'mcp-prompts'
+            );
+            catalogRepository = new S3CatalogAdapter(
+              process.env.PROMPTS_BUCKET || 'mcp-prompts-catalog'
+            );
+            eventBus = new SQSAdapter(
+              process.env.PROCESSING_QUEUE || 'mcp-prompts-processing'
+            );
+        }
+
     const metricsCollector = new MetricsCollector();
 
     // Initialize services
@@ -148,10 +185,8 @@ async function startServer() {
 
     if (mode === 'mcp') {
       // Start MCP server
-      console.log('Starting MCP server...');
       await mcpServer.start();
-      console.log('MCP server started successfully');
-      logger.info('MCP Prompts server started in MCP mode');
+      // Don't log in MCP mode to avoid interfering with stdio protocol
     } else if (mode === 'http') {
       // Start HTTP server
       const app = express();

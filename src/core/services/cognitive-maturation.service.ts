@@ -3,6 +3,7 @@
 // Coordinates usage tracking, pattern synthesis, prompt generation, and cross-domain transfer
 
 import pino from 'pino';
+import { Domain } from '../../types.js';
 import { UsageTrackingService } from './usage-tracking.service.js';
 import { PatternSynthesisService, EpisodeData } from './pattern-synthesis.service.js';
 import { AutomaticPromptGenerationService } from './automatic-prompt-generation.service.js';
@@ -122,7 +123,8 @@ export class CognitiveMaturationService {
 
     } catch (error) {
       logger.error('Learning cycle failed:', error);
-      results.insightsGenerated.push(`Learning cycle encountered error: ${error.message}`);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      results.insightsGenerated.push(`Learning cycle encountered error: ${errorMessage}`);
     }
 
     return results;
@@ -210,10 +212,10 @@ export class CognitiveMaturationService {
   /**
    * Get learning recommendations for system improvement
    */
-  getLearningRecommendations(): string[] {
+  async getLearningRecommendations(): Promise<string[]> {
     const recommendations: string[] = [];
 
-    const health = this.getSystemHealth(); // Note: this is async in reality
+    const health = await this.getSystemHealth();
     const patternCount = this.patternService.getPatterns().length;
 
     if (patternCount < 10) {

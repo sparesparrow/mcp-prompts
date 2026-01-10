@@ -1,0 +1,27 @@
+FROM node:20-alpine
+
+# Install the mcp-prompts package globally (will use the latest published version)
+RUN npm install -g @sparesparrow/mcp-prompts
+
+# Create app user for security
+RUN addgroup -g 1001 -S nodejs
+RUN adduser -S mcp-prompts -u 1001
+
+# Create data directory
+RUN mkdir -p /app/data/prompts && chown -R mcp-prompts:nodejs /app
+
+# Copy local prompt data (this will override the npm package data)
+COPY data/prompts/ /app/data/prompts/
+
+# Set working directory so the server can find the data
+WORKDIR /app
+
+# Switch to non-root user
+USER mcp-prompts
+
+# Set environment for MCP mode
+ENV MODE=mcp
+ENV NODE_ENV=production
+
+# Start the MCP server
+CMD ["npx", "@sparesparrow/mcp-prompts", "start"]

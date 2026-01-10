@@ -1,0 +1,77 @@
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "node",
+      "args": ["/home/sparrow/projects/mcp/ai-mcp-monorepo/packages/mcp-prompts/dist/index.js"],
+      "env": {
+        "MODE": "mcp",
+        "STORAGE_TYPE": "file",
+        "LOG_LEVEL": "info",
+        "PROMPTS_DIR": "/home/sparrow/mcp/data/prompts"
+      }
+    },
+    "mcp-prompts-memory": {
+      "command": "node",
+      "args": ["/home/sparrow/projects/mcp/ai-mcp-monorepo/packages/mcp-prompts/dist/index.js"],
+      "env": {
+        "MODE": "mcp",
+        "STORAGE_TYPE": "memory",
+        "LOG_LEVEL": "info"
+      }
+    },
+    "github": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_TOKEN}"
+      }
+    },
+    "filesystem": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/home/sparrow"
+      ],
+      "env": {}
+    },
+    "server-memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {
+        "MEMORY_FILE_PATH": "${workspaceRoot}/memory.json"
+      }
+    },
+    "mcp-server-fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "server-sequential-thinking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sequential-thinking"
+      ]
+    },
+    "unified-dev-tools": {
+      "command": "bash",
+      "args": ["-c", "cd /home/sparrow/mcp/servers/python/unified_dev_tools && uv run python unified_dev_tools_mcp_server.py"],
+      "env": {
+        "LOG_LEVEL": "INFO",
+        "MCP_PROMPTS_PATH": "/home/sparrow/projects/ai-mcp-monorepo/packages/mcp-prompts/data/prompts",
+        "ESP32_LOG_DIR": "/home/sparrow/esp32_logs",
+        "ANDROID_LOG_DIR": "/home/sparrow/android_logs",
+        "CONAN_SESSION_STORAGE": "/home/sparrow/.mcp/conan_sessions.json",
+        "PROJECT_DIR": "/home/sparrow/projects/embedded-systems/esp32-bpm-detector"
+      }
+    }
+  }
+}

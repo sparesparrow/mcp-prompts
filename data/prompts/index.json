@@ -1,23 +1,7 @@
 {
+  "id": "index",
+  "name": "index",
   "prompts": [
-    {
-      "id": "analysis-assistant",
-      "name": "Analysis Assistant",
-      "description": "Test prompt for learning loop demonstration",
-      "tags": [
-        "test",
-        "demo"
-      ],
-      "isTemplate": true,
-      "metadata": {
-        "learning_data": {
-          "previous_success_rate": 0.7,
-          "total_interactions": 10,
-          "improvements_applied": [],
-          "refined_at": "2026-01-01T02:13:31.031923Z"
-        }
-      }
-    },
     {
       "id": "analysis-assistant",
       "name": "Analysis Assistant",
@@ -214,8 +198,8 @@
       "metadata": {}
     },
     {
-      "id": "development-system-prompt-zcna0",
-      "name": "Development System Prompt",
+      "id": "development-system-prompt-template",
+      "name": "Development System Prompt Template",
       "description": "A template for creating system prompts for development assistance",
       "tags": [
         "development",
@@ -787,8 +771,8 @@
     }
   ],
   "metadata": {
-    "totalPrompts": 46,
-    "lastUpdated": "2026-01-01T02:19:23.552003Z",
+    "totalPrompts": 45,
+    "lastUpdated": "2026-01-06T12:00:00.000000Z",
     "version": "1.0"
   }
 }

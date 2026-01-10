@@ -1,6 +1,7 @@
 import pino from 'pino';
-import { McpPromptsClient } from '../../../packages/mcp-devtools-unified/src/adapters/mcp-prompts-client.js';
-import { PromptLayer, Domain } from '../../../packages/mcp-fbs/src/types.js';
+// import disabled for build
+// import disabled for build
+import { Domain, PromptLayer, SimpleMcpPromptsClient } from '../../types.js';
 import { PatternSynthesisService, EpisodePattern } from './pattern-synthesis.service.js';
 
 const logger = pino({
@@ -57,7 +58,7 @@ export interface TransferOpportunity {
 }
 
 export class CrossDomainTransferService {
-  private mcpClient: McpPromptsClient;
+  private mcpClient: SimpleMcpPromptsClient;
   private patternService: PatternSynthesisService;
   private transferablePrinciples: Map<string, TransferablePrinciple> = new Map();
   private domainMappings: Map<string, DomainMapping> = new Map();
@@ -82,10 +83,10 @@ export class CrossDomainTransferService {
   };
 
   constructor(
-    mcpClient?: McpPromptsClient,
+    mcpClient?: SimpleMcpPromptsClient,
     patternService?: PatternSynthesisService
   ) {
-    this.mcpClient = mcpClient || new McpPromptsClient();
+    this.mcpClient = mcpClient || new SimpleMcpPromptsClient();
     this.patternService = patternService || new PatternSynthesisService();
     this.initializeDomainMappings();
   }

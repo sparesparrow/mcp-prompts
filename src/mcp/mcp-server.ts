@@ -18,8 +18,6 @@ export class McpServer {
   }
 
   public async start(): Promise<void> {
-    console.log('Starting MCP server in stdio mode...');
-    
     // Simple MCP server implementation using stdio
     process.stdin.setEncoding('utf8');
     process.stdout.setEncoding('utf8');
@@ -61,7 +59,7 @@ export class McpServer {
 
     // Handle stdin end
     process.stdin.on('end', () => {
-      console.log('MCP Server stdin closed');
+      // Client disconnected
       process.exit(0);
     });
 
@@ -78,12 +76,12 @@ export class McpServer {
     });
 
     process.stdout.on('close', () => {
-      console.log('MCP Server stdout closed');
+      // Stdout closed
       // Client disconnected, exit gracefully
       process.exit(0);
     });
     
-    console.log('MCP Server started with stdio transport, waiting for initialize request...');
+    // Silent in MCP mode - don't log to stderr as it might confuse clients
   }
 
   private sendResponse(id: any, result?: any, error?: any): void {
@@ -164,21 +162,23 @@ export class McpServer {
           return;
         }
 
+        const params = request.params as any;
         const result = {
-          protocolVersion: '2024-11-05',
+          protocolVersion: params?.protocolVersion || '2024-11-05',
           capabilities: {
-            tools: {},
-            prompts: {}
+            tools: {
+              listChanged: true
+            }
           },
           serverInfo: {
-            name: 'mcp-prompts-aws',
-            version: '3.12.3'
+            name: 'mcp-prompts',
+            version: '3.14.0'
           }
         };
 
         this.initialized = true;
         this.sendResponse(requestId, result);
-        console.log('MCP Server initialized successfully');
+        // Silent initialization - client will receive response
         return;
       }
 
@@ -403,7 +403,9 @@ export class McpServer {
           if (!args?.name || !args?.content) {
             throw new Error('name and content are required');
           }
-          const newPrompt = await this.promptService.createPrompt(args);
+          // Map content to template for the service
+          const createData = { ...args, template: args.content };
+          const newPrompt = await this.promptService.createPrompt(createData);
           result = newPrompt.toJSON();
           break;
 
@@ -487,7 +489,7 @@ export class McpServer {
   // Legacy methods for HTTP compatibility
   public getCapabilities(): any {
     return {
-      name: 'mcp-prompts-aws',
+      name: 'mcp-prompts',
       version: '1.0.0',
       capabilities: {
         tools: {},

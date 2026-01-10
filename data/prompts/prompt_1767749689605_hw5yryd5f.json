@@ -1,0 +1,15 @@
+{
+  "id": "prompt_1767749689605_hw5yryd5f",
+  "name": "quick-test-prompt",
+  "description": "",
+  "template": "This is a quick test prompt",
+  "category": "general",
+  "tags": [],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-07T01:34:49.605Z",
+  "updatedAt": "2026-01-07T01:34:49.605Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

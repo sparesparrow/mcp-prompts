@@ -1,6 +1,7 @@
 import pino from 'pino';
-import { McpPromptsClient } from '../../../packages/mcp-devtools-unified/src/adapters/mcp-prompts-client.js';
-import { PromptLayer, Domain } from '../../../packages/mcp-fbs/src/types.js';
+// import disabled for build
+// import disabled for build
+import { Domain, PromptLayer, SimpleMcpPromptsClient } from '../../types.js';
 import { PatternSynthesisService, EpisodePattern } from './pattern-synthesis.service.js';
 import { UsageTrackingService, UsageAnalytics } from './usage-tracking.service.js';
 
@@ -36,7 +37,7 @@ export interface GeneratedPrompt {
 }
 
 export class AutomaticPromptGenerationService {
-  private mcpClient: McpPromptsClient;
+  private mcpClient: SimpleMcpPromptsClient;
   private patternService: PatternSynthesisService;
   private usageService: UsageTrackingService;
 
@@ -48,11 +49,11 @@ export class AutomaticPromptGenerationService {
   private lastGenerationDate = new Date().toDateString();
 
   constructor(
-    mcpClient?: McpPromptsClient,
+    mcpClient?: SimpleMcpPromptsClient,
     patternService?: PatternSynthesisService,
     usageService?: UsageTrackingService
   ) {
-    this.mcpClient = mcpClient || new McpPromptsClient();
+    this.mcpClient = mcpClient || new SimpleMcpPromptsClient();
     this.patternService = patternService || new PatternSynthesisService();
     this.usageService = usageService || new UsageTrackingService(null as any); // Will be properly initialized
   }

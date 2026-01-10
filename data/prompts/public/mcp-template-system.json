@@ -1,4 +1,5 @@
 {
+  "id": "mcp-template-system",
   "name": "mcp-template-system",
   "version": "1.0.0",
   "description": "A sophisticated template-based prompt system that leverages multiple MCP servers and resources for enhanced AI interactions.",

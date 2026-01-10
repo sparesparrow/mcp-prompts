@@ -6,12 +6,14 @@ import { IPromptRepository } from '../core/ports/prompt-repository.interface';
 // Mock dependencies
 class MockPromptRepository implements IPromptRepository {
   async save(prompt: any): Promise<void> {}
-  async findById(id: string): Promise<any> { return null; }
-  async findByCategory(category: string, limit: number): Promise<any[]> { return []; }
+  async findById(id: string, version?: string): Promise<any> { return null; }
+  async findByCategory(category: string, limit?: number): Promise<any[]> { return []; }
+  async findLatestVersions(limit?: number): Promise<any[]> { return []; }
   async search(query: string, category?: string): Promise<any[]> { return []; }
-  async findAll(limit: number): Promise<any[]> { return []; }
-  async delete(id: string): Promise<void> {}
-  async healthCheck(): Promise<{ status: string }> { return { status: 'healthy' }; }
+  async update(id: string, version: string, updates: Partial<any>): Promise<void> {}
+  async delete(id: string, version?: string): Promise<void> {}
+  async getVersions(id: string): Promise<string[]> { return []; }
+  async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; details?: any }> { return { status: 'healthy' }; }
 }
 
 class MockCatalogRepository {
@@ -102,7 +104,7 @@ describe('McpServer', () => {
         id: 1,
         method: 'initialize',
         params: {
-          protocolVersion: '2024-11-05',
+          protocolVersion: '2025-11-25',
           capabilities: {},
           clientInfo: {
             name: 'test-client',
@@ -119,9 +121,9 @@ describe('McpServer', () => {
       expect(response.jsonrpc).toBe('2.0');
       expect(response.id).toBe(1);
       expect(response.result).toBeDefined();
-      expect(response.result.protocolVersion).toBe('2024-11-05');
-      expect(response.result.serverInfo.name).toBe('mcp-prompts-aws');
-      expect(response.result.serverInfo.version).toBe('3.12.3');
+      expect(response.result.protocolVersion).toBe('2025-11-25');
+      expect(response.result.serverInfo.name).toBe('mcp-prompts');
+      expect(response.result.serverInfo.version).toBe('3.14.0');
     });
 
     it('should handle initialized notification', async () => {
@@ -391,7 +393,7 @@ describe('McpServer', () => {
 
   describe('Connection Handling', () => {
     it('should handle stdout close gracefully', async () => {
-      process.stdout.closed = true;
+      (process.stdout as any).closed = true;
       
       await mcpServer.start();
       const dataHandler = stdinOnSpy.mock.calls.find((call: any[]) => call[0] === 'data')?.[1];
@@ -408,7 +410,7 @@ describe('McpServer', () => {
     });
 
     it('should handle stdout destroyed state', async () => {
-      process.stdout.destroyed = true;
+      (process.stdout as any).destroyed = true;
       
       await mcpServer.start();
       const dataHandler = stdinOnSpy.mock.calls.find((call: any[]) => call[0] === 'data')?.[1];

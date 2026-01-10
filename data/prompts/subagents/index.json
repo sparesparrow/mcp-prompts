@@ -1,0 +1,1279 @@
+{
+  "total": 127,
+  "categories": {
+    "dev": 10,
+    "language": 26,
+    "infra": 14,
+    "quality": 14,
+    "data": 12,
+    "dx": 13,
+    "specialized": 12,
+    "business": 11,
+    "meta": 9,
+    "research": 6
+  },
+  "subagents": [
+    {
+      "id": "dev/api-designer",
+      "name": "api-designer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "api",
+        "performance"
+      ]
+    },
+    {
+      "id": "dev/backend-developer",
+      "name": "backend-developer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "api",
+        "backend",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "dev/electron-pro",
+      "name": "electron-pro",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "dev/frontend-developer",
+      "name": "frontend-developer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "react",
+        "frontend"
+      ]
+    },
+    {
+      "id": "dev/fullstack-developer",
+      "name": "fullstack-developer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "database"
+      ]
+    },
+    {
+      "id": "dev/graphql-architect",
+      "name": "graphql-architect",
+      "category": "dev",
+      "model": "claude-opus",
+      "tags": [
+        "dev",
+        "api"
+      ]
+    },
+    {
+      "id": "dev/microservices-architect",
+      "name": "microservices-architect",
+      "category": "dev",
+      "model": "claude-opus",
+      "tags": [
+        "dev"
+      ]
+    },
+    {
+      "id": "dev/mobile-developer",
+      "name": "mobile-developer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev",
+        "react",
+        "flutter",
+        "mobile"
+      ]
+    },
+    {
+      "id": "dev/ui-designer",
+      "name": "ui-designer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev"
+      ]
+    },
+    {
+      "id": "dev/websocket-engineer",
+      "name": "websocket-engineer",
+      "category": "dev",
+      "model": "claude-sonnet",
+      "tags": [
+        "dev"
+      ]
+    },
+    {
+      "id": "language/angular-architect",
+      "name": "angular-architect",
+      "category": "language",
+      "model": "claude-opus",
+      "tags": [
+        "language",
+        "angular",
+        "frontend",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/cpp-pro",
+      "name": "cpp-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/csharp-developer",
+      "name": "csharp-developer",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/django-developer",
+      "name": "django-developer",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "python",
+        "api",
+        "security"
+      ]
+    },
+    {
+      "id": "language/dotnet-core-expert",
+      "name": "dotnet-core-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "api",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/dotnet-framework-4-8-expert",
+      "name": "dotnet-framework-4.8-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language"
+      ]
+    },
+    {
+      "id": "language/elixir-expert",
+      "name": "elixir-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language"
+      ]
+    },
+    {
+      "id": "language/flutter-expert",
+      "name": "flutter-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "flutter",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/golang-pro",
+      "name": "golang-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/java-architect",
+      "name": "java-architect",
+      "category": "language",
+      "model": "claude-opus",
+      "tags": [
+        "language",
+        "react",
+        "java"
+      ]
+    },
+    {
+      "id": "language/javascript-pro",
+      "name": "javascript-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "javascript",
+        "java",
+        "api",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/kotlin-specialist",
+      "name": "kotlin-specialist",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "kotlin"
+      ]
+    },
+    {
+      "id": "language/laravel-specialist",
+      "name": "laravel-specialist",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "api"
+      ]
+    },
+    {
+      "id": "language/nextjs-developer",
+      "name": "nextjs-developer",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/php-pro",
+      "name": "php-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/powershell-5-1-expert",
+      "name": "powershell-5.1-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language"
+      ]
+    },
+    {
+      "id": "language/powershell-7-expert",
+      "name": "powershell-7-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language"
+      ]
+    },
+    {
+      "id": "language/python-pro",
+      "name": "python-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "python"
+      ]
+    },
+    {
+      "id": "language/rails-expert",
+      "name": "rails-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "api"
+      ]
+    },
+    {
+      "id": "language/react-specialist",
+      "name": "react-specialist",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "react",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/rust-engineer",
+      "name": "rust-engineer",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "rust",
+        "performance"
+      ]
+    },
+    {
+      "id": "language/spring-boot-engineer",
+      "name": "spring-boot-engineer",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "react"
+      ]
+    },
+    {
+      "id": "language/sql-pro",
+      "name": "sql-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "performance",
+        "database"
+      ]
+    },
+    {
+      "id": "language/swift-expert",
+      "name": "swift-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language"
+      ]
+    },
+    {
+      "id": "language/typescript-pro",
+      "name": "typescript-pro",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "typescript",
+        "backend",
+        "frontend"
+      ]
+    },
+    {
+      "id": "language/vue-expert",
+      "name": "vue-expert",
+      "category": "language",
+      "model": "claude-sonnet",
+      "tags": [
+        "language",
+        "react",
+        "vue",
+        "api",
+        "performance"
+      ]
+    },
+    {
+      "id": "infra/azure-infra-engineer",
+      "name": "azure-infra-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra"
+      ]
+    },
+    {
+      "id": "infra/cloud-architect",
+      "name": "cloud-architect",
+      "category": "infra",
+      "model": "claude-opus",
+      "tags": [
+        "infra",
+        "aws",
+        "azure",
+        "gcp",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "infra/database-administrator",
+      "name": "database-administrator",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "performance",
+        "database"
+      ]
+    },
+    {
+      "id": "infra/deployment-engineer",
+      "name": "deployment-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "api"
+      ]
+    },
+    {
+      "id": "infra/devops-engineer",
+      "name": "devops-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "devops"
+      ]
+    },
+    {
+      "id": "infra/devops-incident-responder",
+      "name": "devops-incident-responder",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "api"
+      ]
+    },
+    {
+      "id": "infra/incident-responder",
+      "name": "incident-responder",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "security"
+      ]
+    },
+    {
+      "id": "infra/kubernetes-specialist",
+      "name": "kubernetes-specialist",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "kubernetes",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "infra/network-engineer",
+      "name": "network-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "rust",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "infra/platform-engineer",
+      "name": "platform-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "api"
+      ]
+    },
+    {
+      "id": "infra/security-engineer",
+      "name": "security-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "rust",
+        "security"
+      ]
+    },
+    {
+      "id": "infra/sre-engineer",
+      "name": "sre-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "testing"
+      ]
+    },
+    {
+      "id": "infra/terraform-engineer",
+      "name": "terraform-engineer",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra",
+        "terraform",
+        "security"
+      ]
+    },
+    {
+      "id": "infra/windows-infra-admin",
+      "name": "windows-infra-admin",
+      "category": "infra",
+      "model": "claude-sonnet",
+      "tags": [
+        "infra"
+      ]
+    },
+    {
+      "id": "quality/accessibility-tester",
+      "name": "accessibility-tester",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/ad-security-reviewer",
+      "name": "ad-security-reviewer",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/architect-reviewer",
+      "name": "architect-reviewer",
+      "category": "quality",
+      "model": "claude-opus",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/chaos-engineer",
+      "name": "chaos-engineer",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "testing"
+      ]
+    },
+    {
+      "id": "quality/code-reviewer",
+      "name": "code-reviewer",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "quality/compliance-auditor",
+      "name": "compliance-auditor",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "aws",
+        "security"
+      ]
+    },
+    {
+      "id": "quality/debugger",
+      "name": "debugger",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/error-detective",
+      "name": "error-detective",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/penetration-tester",
+      "name": "penetration-tester",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "security",
+        "testing"
+      ]
+    },
+    {
+      "id": "quality/performance-engineer",
+      "name": "performance-engineer",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "testing",
+        "performance",
+        "database"
+      ]
+    },
+    {
+      "id": "quality/powershell-security-hardening",
+      "name": "powershell-security-hardening",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality"
+      ]
+    },
+    {
+      "id": "quality/qa-expert",
+      "name": "qa-expert",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "testing",
+        "qa"
+      ]
+    },
+    {
+      "id": "quality/security-auditor",
+      "name": "security-auditor",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "security"
+      ]
+    },
+    {
+      "id": "quality/test-automator",
+      "name": "test-automator",
+      "category": "quality",
+      "model": "claude-sonnet",
+      "tags": [
+        "quality",
+        "testing"
+      ]
+    },
+    {
+      "id": "data/ai-engineer",
+      "name": "ai-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/data-analyst",
+      "name": "data-analyst",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data",
+        "python"
+      ]
+    },
+    {
+      "id": "data/data-engineer",
+      "name": "data-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/data-scientist",
+      "name": "data-scientist",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/database-optimizer",
+      "name": "database-optimizer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data",
+        "performance",
+        "database"
+      ]
+    },
+    {
+      "id": "data/llm-architect",
+      "name": "llm-architect",
+      "category": "data",
+      "model": "claude-opus",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/machine-learning-engineer",
+      "name": "machine-learning-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data",
+        "performance"
+      ]
+    },
+    {
+      "id": "data/ml-engineer",
+      "name": "ml-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/mlops-engineer",
+      "name": "mlops-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "data/nlp-engineer",
+      "name": "nlp-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data",
+        "performance"
+      ]
+    },
+    {
+      "id": "data/postgres-pro",
+      "name": "postgres-pro",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data",
+        "performance",
+        "database"
+      ]
+    },
+    {
+      "id": "data/prompt-engineer",
+      "name": "prompt-engineer",
+      "category": "data",
+      "model": "claude-sonnet",
+      "tags": [
+        "data"
+      ]
+    },
+    {
+      "id": "dx/build-engineer",
+      "name": "build-engineer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/cli-developer",
+      "name": "cli-developer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/dependency-manager",
+      "name": "dependency-manager",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx",
+        "security"
+      ]
+    },
+    {
+      "id": "dx/documentation-engineer",
+      "name": "documentation-engineer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx",
+        "api"
+      ]
+    },
+    {
+      "id": "dx/dx-optimizer",
+      "name": "dx-optimizer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx",
+        "performance"
+      ]
+    },
+    {
+      "id": "dx/git-workflow-manager",
+      "name": "git-workflow-manager",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/legacy-modernizer",
+      "name": "legacy-modernizer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/mcp-developer",
+      "name": "mcp-developer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/powershell-module-architect",
+      "name": "powershell-module-architect",
+      "category": "dx",
+      "model": "claude-opus",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/powershell-ui-architect",
+      "name": "powershell-ui-architect",
+      "category": "dx",
+      "model": "claude-opus",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/refactoring-specialist",
+      "name": "refactoring-specialist",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "dx/slack-expert",
+      "name": "slack-expert",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx",
+        "api"
+      ]
+    },
+    {
+      "id": "dx/tooling-engineer",
+      "name": "tooling-engineer",
+      "category": "dx",
+      "model": "claude-sonnet",
+      "tags": [
+        "dx"
+      ]
+    },
+    {
+      "id": "specialized/api-documenter",
+      "name": "api-documenter",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "api"
+      ]
+    },
+    {
+      "id": "specialized/blockchain-developer",
+      "name": "blockchain-developer",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "security"
+      ]
+    },
+    {
+      "id": "specialized/embedded-systems",
+      "name": "embedded-systems",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "embedded"
+      ]
+    },
+    {
+      "id": "specialized/fintech-engineer",
+      "name": "fintech-engineer",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized"
+      ]
+    },
+    {
+      "id": "specialized/game-developer",
+      "name": "game-developer",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "performance"
+      ]
+    },
+    {
+      "id": "specialized/iot-engineer",
+      "name": "iot-engineer",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "iot"
+      ]
+    },
+    {
+      "id": "specialized/m365-admin",
+      "name": "m365-admin",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized"
+      ]
+    },
+    {
+      "id": "specialized/mobile-app-developer",
+      "name": "mobile-app-developer",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "mobile",
+        "performance"
+      ]
+    },
+    {
+      "id": "specialized/payment-integration",
+      "name": "payment-integration",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized"
+      ]
+    },
+    {
+      "id": "specialized/quant-analyst",
+      "name": "quant-analyst",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "performance"
+      ]
+    },
+    {
+      "id": "specialized/risk-manager",
+      "name": "risk-manager",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "testing"
+      ]
+    },
+    {
+      "id": "specialized/seo-specialist",
+      "name": "seo-specialist",
+      "category": "specialized",
+      "model": "claude-sonnet",
+      "tags": [
+        "specialized",
+        "performance"
+      ]
+    },
+    {
+      "id": "business/business-analyst",
+      "name": "business-analyst",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/content-marketer",
+      "name": "content-marketer",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/customer-success-manager",
+      "name": "customer-success-manager",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/legal-advisor",
+      "name": "legal-advisor",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/product-manager",
+      "name": "product-manager",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/project-manager",
+      "name": "project-manager",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/sales-engineer",
+      "name": "sales-engineer",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/scrum-master",
+      "name": "scrum-master",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business"
+      ]
+    },
+    {
+      "id": "business/technical-writer",
+      "name": "technical-writer",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business",
+        "api"
+      ]
+    },
+    {
+      "id": "business/ux-researcher",
+      "name": "ux-researcher",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business",
+        "testing"
+      ]
+    },
+    {
+      "id": "business/wordpress-master",
+      "name": "wordpress-master",
+      "category": "business",
+      "model": "claude-sonnet",
+      "tags": [
+        "business",
+        "security",
+        "performance"
+      ]
+    },
+    {
+      "id": "meta/agent-organizer",
+      "name": "agent-organizer",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta",
+        "performance"
+      ]
+    },
+    {
+      "id": "meta/context-manager",
+      "name": "context-manager",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta",
+        "performance"
+      ]
+    },
+    {
+      "id": "meta/error-coordinator",
+      "name": "error-coordinator",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "meta/it-ops-orchestrator",
+      "name": "it-ops-orchestrator",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "meta/knowledge-synthesizer",
+      "name": "knowledge-synthesizer",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "meta/multi-agent-coordinator",
+      "name": "multi-agent-coordinator",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "meta/performance-monitor",
+      "name": "performance-monitor",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta",
+        "performance"
+      ]
+    },
+    {
+      "id": "meta/task-distributor",
+      "name": "task-distributor",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "meta/workflow-orchestrator",
+      "name": "workflow-orchestrator",
+      "category": "meta",
+      "model": "claude-opus",
+      "tags": [
+        "meta"
+      ]
+    },
+    {
+      "id": "research/competitive-analyst",
+      "name": "competitive-analyst",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    },
+    {
+      "id": "research/data-researcher",
+      "name": "data-researcher",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    },
+    {
+      "id": "research/market-researcher",
+      "name": "market-researcher",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    },
+    {
+      "id": "research/research-analyst",
+      "name": "research-analyst",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    },
+    {
+      "id": "research/search-specialist",
+      "name": "search-specialist",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    },
+    {
+      "id": "research/trend-analyst",
+      "name": "trend-analyst",
+      "category": "research",
+      "model": "claude-haiku",
+      "tags": [
+        "research"
+      ]
+    }
+  ]
+}

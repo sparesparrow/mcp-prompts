@@ -1,3 +1,76 @@
+# Release Notes - v3.14.0
+
+## 🎉 New Release
+
+**Date**: January 7, 2026
+**Version**: 3.14.0
+**Tag**: `v3.14.0`
+
+## 📦 Published Platforms
+
+- ✅ **npm**: `@sparesparrow/mcp-prompts@3.14.0`
+- ✅ **GitHub Packages**: `@sparesparrow/mcp-prompts@3.14.0`
+- ✅ **Cloudsmith**: `mcp-prompts@3.14.0`
+- ✅ **Docker**: `ghcr.io/sparesparrow/mcp-prompts:3.14.0`
+
+## 🆕 What's New
+
+### 🚀 Major Architecture Improvements
+
+#### Configurable Storage Backends (No AWS Dependency)
+- **File Storage**: Local filesystem-based prompt storage
+- **Memory Storage**: In-memory storage for testing/development
+- **PostgreSQL Support**: Planned for future release
+- **AWS Storage**: Optional, only when explicitly configured
+
+#### Event Publishing Made Optional
+- **Local Development**: No AWS services required
+- **Configurable Event Bus**: Memory-based for local, SQS for cloud
+- **Zero Breaking Changes**: Existing AWS deployments unaffected
+
+#### New Storage Adapters
+- `FilePromptRepository`: Persistent file-based storage
+- `MemoryPromptRepository`: Volatile in-memory storage
+- `MemoryEventBus`: Local event publishing (no AWS)
+- `FileCatalogRepository`: Local catalog management
+
+### 🔧 Technical Improvements
+
+#### Build System Overhaul
+- **CommonJS Migration**: Resolved ES module compatibility issues
+- **Dynamic Imports**: AWS dependencies loaded only when needed
+- **Improved Module Resolution**: Better Node.js compatibility
+
+#### API Consistency Fixes
+- **Tool Schema Alignment**: Fixed create_prompt parameter mapping
+- **Error Handling**: Better validation and user feedback
+- **MCP Compliance**: Enhanced protocol adherence
+
+### 📊 Storage Type Comparison
+
+| Feature | File Storage | Memory Storage | PostgreSQL | AWS |
+|---------|-------------|----------------|------------|-----|
+| **AWS Dependency** | ❌ None | ❌ None | ❌ None | ✅ Required |
+| **Persistence** | ✅ File-based | ❌ Ephemeral | ✅ Database | ✅ S3/DynamoDB |
+| **Performance** | ⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐ |
+| **Setup Complexity** | ⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐ |
+
+### 🔒 Security & Compatibility
+
+- **No Breaking Changes**: Existing AWS deployments continue working
+- **Backward Compatible**: All existing APIs maintained
+- **Local Development**: No AWS credentials required
+- **Production Ready**: All storage types tested and validated
+
+### 🐛 Bug Fixes
+
+- Fixed ES module compatibility issues
+- Resolved create_prompt tool parameter validation
+- Corrected event publishing for local storage types
+- Improved error messages and validation
+
+---
+
 # Release Notes - v3.12.6
 
 ## 🎉 New Release

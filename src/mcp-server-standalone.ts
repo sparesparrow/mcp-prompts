@@ -71,8 +71,8 @@ function loadPromptsFromDirectory(dir: string, prompts: Map<string, any>): numbe
 // Load prompts from data/prompts directory structure
 function loadSamplePrompts() {
   try {
-    // First, try to load from the main prompts directory structure
-    const promptsDir = path.join(process.cwd(), 'data', 'prompts');
+    // First, try to load from PROMPTS_DIR environment variable, or fallback to relative path
+    const promptsDir = process.env.PROMPTS_DIR || path.join(process.cwd(), 'data', 'prompts');
 
     if (fs.existsSync(promptsDir)) {
       const totalLoaded = loadPromptsFromDirectory(promptsDir, prompts);
@@ -183,11 +183,24 @@ export async function createMcpServer() {
         );
       }
 
+      // Return summary format instead of full content to avoid large responses
+      const summaryList = promptList.map(prompt => ({
+        id: prompt.id,
+        name: prompt.name,
+        description: prompt.description || 'No description',
+        tags: prompt.tags,
+        isTemplate: prompt.isTemplate || false,
+        createdAt: prompt.createdAt,
+        version: prompt.version
+      }));
+
       return {
         content: [
           {
             type: 'text',
-            text: JSON.stringify(promptList, null, 2)
+            text: `Found ${summaryList.length} prompts:\n\n${summaryList.map(p =>
+              `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]`
+            ).join('\n')}`
           }
         ]
       };

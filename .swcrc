@@ -1,14 +1,22 @@
 {
-  "jsc": {
-    "parser": {
-      "syntax": "typescript",
-      "tsx": false,
-      "decorators": true
-    },
-    "target": "es2022",
-    "loose": false
-  },
   "module": {
     "type": "commonjs"
-  }
-} 
+  },
+  "jsc": {
+    "target": "es2020",
+    "parser": {
+      "syntax": "typescript",
+      "tsx": false
+    },
+    "transform": {
+      "optimizer": {
+        "globals": {
+          "vars": {
+            "process.env.NODE_ENV": "\"production\""
+          }
+        }
+      }
+    }
+  },
+  "sourceMaps": true
+}

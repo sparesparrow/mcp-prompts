@@ -1,7 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "3.12.7",
-  "type": "module",
+  "version": "3.14.0",
   "description": "A robust, extensible server for managing, versioning, and serving prompts and templates for LLM applications, built on the Model Context Protocol (MCP) with AWS integration",
   "main": "dist/mcp-server-standalone.js",
   "types": "dist/mcp-server-standalone.d.ts",
@@ -36,7 +35,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/sparesparrow/mcp-prompts.git"
+    "url": "git+https://github.com/sparesparrow/mcp-prompts.git"
   },
   "bugs": {
     "url": "https://github.com/sparesparrow/mcp-prompts/issues"
@@ -84,6 +83,8 @@
     "postinstall": "echo 'MCP Prompts installed successfully!'"
   },
   "dependencies": {
+    "@sparesparrow/mcp-fbs": "workspace:*",
+    "@sparesparrow/mcp-devtools-unified": "workspace:*",
     "@aws-sdk/client-cloudwatch": "^3.899.0",
     "@aws-sdk/client-cognito-identity-provider": "^3.899.0",
     "@aws-sdk/client-dynamodb": "^3.899.0",
@@ -92,10 +93,11 @@
     "@aws-sdk/credential-providers": "^3.899.0",
     "@aws-sdk/lib-dynamodb": "^3.899.0",
     "@aws-sdk/util-dynamodb": "^3.899.0",
-    "@modelcontextprotocol/sdk": "^1.18.2",
+    "@modelcontextprotocol/sdk": "^1.25.1",
     "commander": "^12.0.0",
     "cors": "^2.8.5",
     "express": "^4.21.2",
+    "flatbuffers": "25.9.23",
     "fs-extra": "^11.2.0",
     "helmet": "^7.2.0",
     "morgan": "^1.10.1",

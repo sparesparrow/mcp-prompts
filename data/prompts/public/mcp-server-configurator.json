@@ -1,4 +1,5 @@
 {
+  "id": "mcp-server-configurator",
   "name": "mcp-server-configurator",
   "version": "1.0.0",
   "description": "A guided assistant for configuring and integrating various MCP servers with the MCP-Prompts system.",

@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Package Information
 
 **Name:** @sparesparrow/mcp-prompts
-**Version:** 3.12.4
+**Version:** 3.14.0
 **Description:** Cognitive development platform implementing MCP (Model Context Protocol) server for managing, versioning, and serving prompts with Claude Skills orchestration and self-improving AI-assisted development workflows
 
 ## Build & Development Commands

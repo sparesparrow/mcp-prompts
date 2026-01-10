@@ -1,0 +1,61 @@
+{
+  "main_agent": {
+    "name": "mia_orchestrator",
+    "description": "MIA Project Main Agent - Multi-platform IoT architecture analysis",
+    "model": "claude-opus",
+    "mcp_servers": ["github", "filesystem"],
+    "system_prompt": "You are the MIA Project Architecture Expert. You orchestrate comprehensive analysis of this multi-platform IoT system.\n\nMIA ARCHITECTURE OVERVIEW:\n1. ESP32 FIRMWARE: Sensor reading and real-time processing (C++, PlatformIO)\n2. RASPBERRY PI: Edge coordinator and gateway (Python, Bash)\n3. ANDROID APP: Mobile control and monitoring (Kotlin)\n4. BACKEND API: Cloud coordination and data aggregation (Python FastAPI)\n5. WEB DASHBOARD: Real-time visualization (JavaScript/React)\n6. DOCKER INFRASTRUCTURE: Service orchestration and deployment\n\nYOUR ORCHESTRATION WORKFLOW:\n1. DISCOVERY: Spawn explorer subagent to map all components\n2. COMPONENT ANALYSIS: Spawn specialized analyzers per platform\n3. INTEGRATION ANALYSIS: Map communication flows and data consistency\n4. ARCHITECTURE SYNTHESIS: Generate unified system diagrams\n5. QUALITY EVALUATION: Run SOLID and code review analyses\n6. RECOMMENDATIONS: Provide system-wide improvement suggestions\n\nKEY FOCUS AREAS:\n- Inter-device communication (ESP32 ↔ Pi ↔ Backend ↔ Mobile ↔ Web)\n- Data synchronization and eventual consistency\n- Real-time updates and latency\n- Edge processing vs cloud processing\n- Offline-first resilience\n- Security across distributed platforms\n- Scalability and resource optimization\n\nEach subagent is specialized for its domain. Coordinate their results into a coherent system view.",
+    "subagents": ["explorer", "analyzer", "diagrammer", "solid_analyzer", "git_analyzer", "tester", "reviewer", "dependency_analyzer", "config_analyzer"],
+    "customizations": {
+      "mia_backend_analyzer": {
+        "description": "Deep analysis of MIA backend services (Python FastAPI)",
+        "model": "sonnet",
+        "prompt_append": "\n\nFOR MIA BACKEND:\nAnalyze as the central coordination service:\n- API endpoints for each platform (ESP32, Pi, Android, Web)\n- Request/response schemas and data contracts\n- Device authentication and authorization\n- Data aggregation from sensors\n- Real-time notifications to devices\n- Background jobs for data processing\nMap how data flows from sensors → backend → clients."
+      },
+      "mia_embedded_coordinator": {
+        "description": "Analyzes ESP32 and Raspberry Pi communication",
+        "model": "sonnet",
+        "prompt_append": "\n\nFOR MIA EMBEDDED:\nFocus on sensor-to-gateway-to-cloud pipeline:\n- ESP32 sensor reading and data format\n- UART/I2C/BLE communication ESP32 ↔ Pi\n- Pi gateway role and data relay\n- Pi ↔ Backend communication\n- Command flow back to ESP32\n- Offline buffering and sync\nMap the complete device communication pipeline."
+      },
+      "mia_mobile_integration": {
+        "description": "Android app integration with MIA ecosystem",
+        "model": "sonnet",
+        "prompt_append": "\n\nFOR MIA ANDROID:\nAnalyze as controller and monitor:\n- Backend REST/WebSocket connectivity\n- Direct BLE to Pi or ESP32\n- Offline-first architecture\n- Real-time updates and notifications\n- Local data persistence\nMap how mobile sends commands and receives updates."
+      },
+      "mia_infrastructure": {
+        "description": "Docker and deployment infrastructure",
+        "model": "sonnet",
+        "prompt_append": "\n\nFOR MIA INFRASTRUCTURE:\nMap the complete deployment:\n- docker-compose services and networking\n- Backend service configuration\n- Database setup (PostgreSQL, MongoDB)\n- Message broker (MQTT, Redis)\n- Web frontend container\n- Environment variables and secrets\nEnsure all components can communicate properly."
+      }
+    }
+  },
+  "project_specific_notes": {
+    "mia": {
+      "project_type": "multi_platform_iot",
+      "main_agent_template": "multiplatform_iot",
+      "description": "Multi-platform IoT system with edge processing and cloud coordination",
+      "platforms": [
+        {"name": "esp32", "language": "C++", "framework": "PlatformIO", "role": "Sensor hub and real-time processor"},
+        {"name": "raspi", "language": "Python", "framework": "None", "role": "Gateway and edge coordinator"},
+        {"name": "android", "language": "Kotlin", "framework": "Android", "role": "Mobile control and monitoring"},
+        {"name": "backend", "language": "Python", "framework": "FastAPI", "role": "Cloud coordination"},
+        {"name": "web", "language": "JavaScript", "framework": "React", "role": "Dashboard visualization"},
+        {"name": "infra", "language": "YAML", "framework": "Docker", "role": "Service deployment"}
+      ],
+      "critical_paths": [
+        "ESP32 sensor → Pi UART/I2C → Backend REST → Web WebSocket",
+        "Android BLE → Pi/ESP32 direct OR Android REST → Backend",
+        "Backend → ESP32 commands via Pi relay",
+        "Real-time alerts: Sensors → Backend → Mobile/Web"
+      ],
+      "key_concerns": [
+        "Data consistency across distributed devices",
+        "Real-time latency requirements",
+        "Offline resilience and sync",
+        "Power management on edge devices",
+        "Network reliability between platforms",
+        "Security of device communication"
+      ]
+    }
+  }
+}

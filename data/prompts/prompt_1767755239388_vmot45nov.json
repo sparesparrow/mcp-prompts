@@ -1,0 +1,15 @@
+{
+  "id": "prompt_1767755239388_vmot45nov",
+  "name": "test-prompt",
+  "description": "",
+  "template": "This is a test prompt for functionality testing",
+  "category": "test",
+  "tags": [],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-07T03:07:19.388Z",
+  "updatedAt": "2026-01-07T03:07:19.388Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

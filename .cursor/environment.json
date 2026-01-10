@@ -2,7 +2,7 @@
   "name": "MCP Prompts Development Environment",
   "description": "Comprehensive development environment for MCP Prompts - a robust server for managing prompts and templates with AWS integration",
   "user": "sparesparrow",
-  "version": "3.12.3",
+  "version": "3.14.0",
   "install": "pnpm install",
   "start": "pnpm run dev",
   "env": {
