@@ -16,8 +16,12 @@ import { SQSAdapter } from '../adapters/aws/sqs-adapter';
 import { PromptService } from '../core/services/prompt.service';
 import { SubagentService } from '../core/services/subagent.service';
 import { MainAgentService } from '../core/services/main-agent.service';
+import { OrchestrateService } from '../core/services/orchestrate.service';
+import { ProjectScaffoldService } from '../core/services/project-scaffold.service';
+import { ReportGenerationService } from '../core/services/report-generation.service';
 import { createSubagentsRouter } from './routes/subagents.router';
 import { createMainAgentsRouter } from './routes/main-agents.router';
+import { createOrchestrateRouter } from './routes/orchestrate.router';
 
 export async function createServerWithAgents(): Promise<express.Application> {
   const app = express();
@@ -53,6 +57,9 @@ export async function createServerWithAgents(): Promise<express.Application> {
   const promptService = new PromptService(promptRepository, catalogRepository, eventBus);
   const subagentService = new SubagentService(promptRepository, eventBus);
   const mainAgentService = new MainAgentService(promptRepository, subagentService, eventBus);
+  const orchestrateService = new OrchestrateService(promptRepository, subagentService, mainAgentService, eventBus);
+  const projectScaffoldService = new ProjectScaffoldService(promptRepository, eventBus);
+  const reportGenerationService = new ReportGenerationService(eventBus);
 
   // Health check endpoint
   app.get('/health', async (req, res) => {
@@ -139,6 +146,7 @@ export async function createServerWithAgents(): Promise<express.Application> {
   // NEW: Agent orchestration routes
   app.use('/v1/subagents', createSubagentsRouter(subagentService));
   app.use('/v1/main-agents', createMainAgentsRouter(mainAgentService));
+  app.use('/v1/orchestrate', createOrchestrateRouter(orchestrateService, projectScaffoldService, reportGenerationService));
 
   // Stats endpoint
   app.get('/v1/stats', async (req, res) => {
@@ -203,6 +211,7 @@ if (require.main === module) {
       console.log(`   API info: http://${HOST}:${PORT}/v1`);
       console.log(`   Subagents: http://${HOST}:${PORT}/v1/subagents`);
       console.log(`   Main agents: http://${HOST}:${PORT}/v1/main-agents`);
+      console.log(`   Orchestration: http://${HOST}:${PORT}/v1/orchestrate`);
     });
   }).catch(error => {
     console.error('Failed to start server:', error);
