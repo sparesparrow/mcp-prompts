@@ -179,7 +179,7 @@ HELP
 
 # Main execution
 main() {
-    local project_path="."
+    local project_path=""
     local mode="analyze"
     local verbose=false
 
@@ -200,15 +200,22 @@ main() {
                 exit 1
                 ;;
             *)
-                if [[ -z "$project_path" ]] || [[ "$project_path" == "." ]]; then
+                # First positional arg is project_path
+                if [[ -z "$project_path" ]]; then
                     project_path="$1"
                 else
+                    # Second positional arg is mode
                     mode="$1"
                 fi
                 shift
                 ;;
         esac
     done
+
+    # Use current directory if not specified
+    if [[ -z "$project_path" ]]; then
+        project_path="."
+    fi
 
     # Resolve absolute path
     project_path=$(cd "$project_path" && pwd)
@@ -272,7 +279,8 @@ main() {
         --mcp-config ~/.cursor/mcp.json \
         --output-format stream-json \
         --input-format stream-json \
-        --permission-mode bypassPermissions
+        --permission-mode bypassPermissions \
+        --verbose
 
     local exit_code=$?
 
