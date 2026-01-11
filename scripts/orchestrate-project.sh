@@ -270,7 +270,7 @@ main() {
     log "Executing claude orchestration..."
     echo ""
 
-    echo "{\"type\":\"user_message\",\"message\":$(echo "$user_msg" | jq -Rs .)}" | \
+    echo "{\"type\":\"user\",\"message\":$(echo "$user_msg" | jq -Rs .)}" | \
     claude \
         --print \
         --model "$model" \
