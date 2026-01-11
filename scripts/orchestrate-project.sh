@@ -1,6 +1,14 @@
 #!/usr/bin/env bash
 # orchestrate-project.sh - Simple project orchestration using mcp-prompts directly
 # Uses prompts from data/prompts/ and calls claude CLI directly
+#
+# Cost Optimization Strategy:
+# - Main agent (sonnet): Intelligent orchestration & synthesis (~$0.0015)
+# - Subagents (haiku): Parallel analysis tasks (~$0.0027)
+# - Total per analysis: ~$0.004 (85% cheaper than opus-based approach)
+# - All subagents run in parallel for speed
+#
+# See COST_OPTIMIZATION.md for detailed strategy
 
 set -euo pipefail
 
