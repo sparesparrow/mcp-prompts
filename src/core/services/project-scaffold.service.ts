@@ -49,7 +49,7 @@ export class ProjectScaffoldService {
       }
 
       // Validate template content exists
-      const templateContent = template.content || '';
+      const templateContent = template.template || '';
       if (!templateContent) {
         throw new ValidationError(`Template ${templateId} has no content`);
       }
@@ -145,7 +145,7 @@ export class ProjectScaffoldService {
     }
 
     // Extract required variables from template content
-    const requiredVars = this.extractRequiredVariables(template.content || '');
+    const requiredVars = this.extractRequiredVariables(template.template || '');
 
     // Check if all required variables are provided
     for (const requiredVar of requiredVars) {
@@ -189,30 +189,58 @@ export class ProjectScaffoldService {
     directories: string[];
     files: Array<{ path: string; content: string }>;
   } {
-    // Parse YAML or JSON structure from template
-    // For now, this is a simplified implementation
-    const directories: string[] = [
-      'src',
-      'src/components',
-      'src/services',
-      'tests',
-      'docs'
-    ];
+    // #region agent log
+    fetch('http://127.0.0.1:7250/ingest/d33ee5cc-2ed5-4c57-a04d-227ffe7b5c8f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'project-scaffold.service.ts:188',message:'parsing template structure',data:{templateContentLength:templateContent.length,firstChars:templateContent.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'bug-fixes-test-3',hypothesisId:'bug1'})}).catch(()=>{});
+    // #endregion agent log
 
-    const files: Array<{ path: string; content: string }> = [
-      {
-        path: 'README.md',
-        content: '# {{projectName}}\n\n{{description}}\n\n## Installation\n\n```bash\nnpm install\n```\n\n## Usage\n\n```bash\nnpm start\n```'
-      },
-      {
-        path: 'package.json',
-        content: '{\n  "name": "{{projectName}}",\n  "version": "1.0.0",\n  "description": "{{description}}",\n  "scripts": {\n    "start": "node index.js",\n    "test": "jest"\n  }\n}'
-      },
-      {
-        path: '.gitignore',
-        content: 'node_modules/\ndist/\n.env\n.DS_Store\n*.log'
+    try {
+      // Try to parse as JSON first
+      const parsed = JSON.parse(templateContent);
+      if (parsed.directories && parsed.files) {
+        return {
+          directories: Array.isArray(parsed.directories) ? parsed.directories : [],
+          files: Array.isArray(parsed.files) ? parsed.files : []
+        };
       }
-    ];
+    } catch (jsonError) {
+      // Not JSON, continue with other parsing attempts
+    }
+
+    // Try to parse as YAML (simplified implementation)
+    // For now, fall back to extracting structure from template content
+    const directories: string[] = [];
+    const files: Array<{ path: string; content: string }> = [];
+
+    // Extract file paths from template variables like {{file:path/to/file}}
+    const fileMatches = templateContent.match(/\{\{file:([^}]+)\}\}/g);
+    if (fileMatches) {
+      for (const match of fileMatches) {
+        const filePath = match.replace(/\{\{file:|\}\}/g, '');
+        const dir = path.dirname(filePath);
+        if (dir !== '.' && !directories.includes(dir)) {
+          directories.push(dir);
+        }
+        files.push({
+          path: filePath,
+          content: `Content for ${filePath}` // Placeholder - would need proper template parsing
+        });
+      }
+    }
+
+    // If no files found in template, provide default structure
+    if (files.length === 0) {
+      directories.push('src', 'tests');
+      files.push(
+        {
+          path: 'README.md',
+          content: '# New Project\n\n{{description}}'
+        },
+        {
+          path: 'package.json',
+          content: '{\n  "name": "{{projectName}}"\n}'
+        }
+      );
+    }
 
     return { directories, files };
   }

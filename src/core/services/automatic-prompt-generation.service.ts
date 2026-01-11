@@ -4,6 +4,7 @@ import pino from 'pino';
 import { Domain, PromptLayer, SimpleMcpPromptsClient } from '../../types.js';
 import { PatternSynthesisService, EpisodePattern } from './pattern-synthesis.service.js';
 import { UsageTrackingService, UsageAnalytics } from './usage-tracking.service.js';
+import { IEventBus } from '../ports/event-bus.interface.js';
 
 const logger = pino({
   level: process.env.LOG_LEVEL || 'info',
@@ -51,11 +52,14 @@ export class AutomaticPromptGenerationService {
   constructor(
     mcpClient?: SimpleMcpPromptsClient,
     patternService?: PatternSynthesisService,
-    usageService?: UsageTrackingService
+    usageService?: UsageTrackingService,
+    eventBus?: IEventBus
   ) {
+    // #region agent log
+    fetch('http://127.0.0.1:7250/ingest/d33ee5cc-2ed5-4c57-a04d-227ffe7b5c8f',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'automatic-prompt-generation.service.ts:51',message:'constructor called',data:{hasEventBus:!!eventBus,usageServiceProvided:!!usageService},timestamp:Date.now(),sessionId:'debug-session',runId:'bug-fixes-test-3',hypothesisId:'bug2'})}).catch(()=>{});
     this.mcpClient = mcpClient || new SimpleMcpPromptsClient();
     this.patternService = patternService || new PatternSynthesisService();
-    this.usageService = usageService || new UsageTrackingService(null as any); // Will be properly initialized
+    this.usageService = usageService || new UsageTrackingService(eventBus || { publish: async () => {}, subscribe: () => {}, healthCheck: async () => ({ status: 'healthy' as const, details: 'mock' }) });
   }
 
   /**
@@ -78,6 +82,7 @@ export class AutomaticPromptGenerationService {
     }
 
     try {
+
       // 1. Check for novel patterns that need prompts
       const novelPatterns = await this.identifyNovelPatterns();
       for (const pattern of novelPatterns) {
@@ -196,12 +201,36 @@ export class AutomaticPromptGenerationService {
   }
 
   private async identifyIneffectivePrompts(): Promise<Array<{ promptId: string; analytics: UsageAnalytics }>> {
-    // Get all prompts and their usage analytics
-    // This would need to be implemented to fetch all prompts
+
     const ineffectivePrompts: Array<{ promptId: string; analytics: UsageAnalytics }> = [];
 
-    // Placeholder implementation
-    // In real implementation, would query all prompts and check effectiveness
+    try {
+      // Get usage patterns to identify poorly performing prompts
+      const usagePatterns = this.usageService.getUsagePatterns();
+
+
+      // Find prompts with low success rates or high failure rates
+      for (const promptStats of usagePatterns.popularPrompts || []) {
+        const analytics = await this.usageService.getUsageAnalytics(promptStats.promptId);
+
+        // Consider a prompt ineffective if success rate < 70%
+        if (analytics && analytics.successRate < 0.7) {
+          ineffectivePrompts.push({
+            promptId: promptStats.promptId,
+            analytics
+          });
+        }
+      }
+
+      // Also check for prompts that are rarely used (might indicate they're not effective)
+      // This would require getting all prompts and checking which ones have low usage
+
+
+    } catch (error) {
+      logger.warn('Failed to identify ineffective prompts', { error: (error as Error).message });
+    }
+
+    return ineffectivePrompts;
 
     return ineffectivePrompts;
   }

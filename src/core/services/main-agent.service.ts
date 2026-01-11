@@ -70,13 +70,17 @@ export class MainAgentService {
    * Get main agent template for a specific project type
    */
   async getMainAgentForProjectType(projectType: string): Promise<Prompt | null> {
+    console.log(`DEBUG: getMainAgentForProjectType called with projectType: ${projectType}`);
+
     if (!projectType || typeof projectType !== 'string' || projectType.trim() === '') {
       throw new ValidationError('Project type is required and must be a non-empty string');
     }
 
     const mainAgents = await this.promptRepository.findMainAgents(projectType, 1);
+    console.log(`DEBUG: getMainAgentForProjectType found ${mainAgents.length} agents for ${projectType}: ${mainAgents.map(a => a.id).join(', ')}`);
 
     if (mainAgents.length === 0) {
+      console.log(`DEBUG: getMainAgentForProjectType returning null - no agents found for ${projectType}`);
       return null;
     }
 

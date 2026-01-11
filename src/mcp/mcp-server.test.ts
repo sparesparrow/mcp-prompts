@@ -14,6 +14,15 @@ class MockPromptRepository implements IPromptRepository {
   async delete(id: string, version?: string): Promise<void> {}
   async getVersions(id: string): Promise<string[]> { return []; }
   async healthCheck(): Promise<{ status: 'healthy' | 'unhealthy'; details?: any }> { return { status: 'healthy' }; }
+
+  // New agent methods
+  async findByType(type: string, limit?: number): Promise<any[]> { return []; }
+  async findSubagents(filter?: any, limit?: number): Promise<any[]> { return []; }
+  async findMainAgents(projectType?: string, limit?: number): Promise<any[]> { return []; }
+  async findProjectTemplates(limit?: number): Promise<any[]> { return []; }
+  async getSubagentCategories(): Promise<string[]> { return []; }
+  async getAgentModels(): Promise<any[]> { return []; }
+  async updateExecutionStats(id: string, executionCount: number, successRate: number, lastExecutedAt: Date): Promise<void> {}
 }
 
 class MockCatalogRepository {

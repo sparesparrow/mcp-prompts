@@ -253,4 +253,39 @@ export class DynamoDBAdapter implements IPromptRepository {
       item.author_id
     );
   }
+
+  // Stub implementations for new agent methods
+  async findByType(type: string, limit?: number): Promise<Prompt[]> {
+    // TODO: Implement DynamoDB query for prompt type
+    return [];
+  }
+
+  async findSubagents(filter?: any, limit?: number): Promise<Prompt[]> {
+    // TODO: Implement DynamoDB query for subagents
+    return [];
+  }
+
+  async findMainAgents(projectType?: string, limit?: number): Promise<Prompt[]> {
+    // TODO: Implement DynamoDB query for main agents
+    return [];
+  }
+
+  async findProjectTemplates(limit?: number): Promise<Prompt[]> {
+    // TODO: Implement DynamoDB query for project templates
+    return [];
+  }
+
+  async getSubagentCategories(): Promise<string[]> {
+    // TODO: Implement DynamoDB aggregation for categories
+    return [];
+  }
+
+  async getAgentModels(): Promise<any[]> {
+    // TODO: Implement DynamoDB aggregation for models
+    return [];
+  }
+
+  async updateExecutionStats(id: string, executionCount: number, successRate: number, lastExecutedAt: Date): Promise<void> {
+    // TODO: Implement DynamoDB update for execution stats
+  }
 }

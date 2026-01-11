@@ -99,6 +99,78 @@ export class MemoryPromptRepository implements IPromptRepository {
       }
     };
   }
+
+  // Stub implementations for new agent methods
+  async findByType(type: string, limit?: number): Promise<Prompt[]> {
+    return Array.from(prompts.values())
+      .filter(p => p.promptType === type)
+      .slice(0, limit || 50);
+  }
+
+  async findSubagents(filter?: any, limit?: number): Promise<Prompt[]> {
+    let agents = Array.from(prompts.values())
+      .filter(p => p.promptType === 'subagent_registry');
+
+    if (filter) {
+      if (filter.category) {
+        agents = agents.filter(p => p.category === filter.category);
+      }
+      if (filter.tags) {
+        agents = agents.filter(p => filter.tags.some((tag: string) => p.tags.includes(tag)));
+      }
+      if (filter.model) {
+        agents = agents.filter(p => p.agentConfig?.model === filter.model);
+      }
+    }
+
+    return agents.slice(0, limit || 50);
+  }
+
+  async findMainAgents(projectType?: string, limit?: number): Promise<Prompt[]> {
+    let agents = Array.from(prompts.values())
+      .filter(p => p.promptType === 'main_agent_template');
+
+    if (projectType) {
+      agents = agents.filter(p =>
+        p.agentConfig?.compatibleWith?.includes(projectType) ||
+        p.id.includes(projectType) ||
+        p.category === projectType
+      );
+    }
+
+    return agents.slice(0, limit || 50);
+  }
+
+  async findProjectTemplates(limit?: number): Promise<Prompt[]> {
+    return Array.from(prompts.values())
+      .filter(p => p.promptType === 'project_orchestration_template')
+      .slice(0, limit || 50);
+  }
+
+  async getSubagentCategories(): Promise<string[]> {
+    const categories = Array.from(prompts.values())
+      .filter(p => p.promptType === 'subagent_registry')
+      .map(p => p.category)
+      .filter((cat, index, arr) => arr.indexOf(cat) === index);
+    return categories;
+  }
+
+  async getAgentModels(): Promise<any[]> {
+    const models = Array.from(prompts.values())
+      .filter(p => p.agentConfig?.model)
+      .map(p => p.agentConfig!.model)
+      .filter((model, index, arr) => arr.indexOf(model) === index);
+    return models;
+  }
+
+  async updateExecutionStats(id: string, executionCount: number, successRate: number, lastExecutedAt: Date): Promise<void> {
+    const prompt = prompts.get(id);
+    if (prompt && prompt.agentConfig) {
+      prompt.agentConfig.executionCount = executionCount;
+      prompt.agentConfig.successRate = successRate;
+      prompt.agentConfig.lastExecutedAt = lastExecutedAt;
+    }
+  }
 }
 
 export class MemoryCatalogRepository implements ICatalogRepository {

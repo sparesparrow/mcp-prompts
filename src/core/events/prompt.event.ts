@@ -1,6 +1,6 @@
 export class PromptEvent {
   constructor(
-    public readonly type: 'prompt_created' | 'prompt_updated' | 'prompt_deleted' | 'prompt_accessed',
+    public readonly type: 'prompt_created' | 'prompt_updated' | 'prompt_deleted' | 'prompt_accessed' | 'subagents_listed' | 'subagent_accessed' | 'subagent_executed' | 'main_agents_listed' | 'main_agent_accessed' | 'project_detected' | 'orchestration_started' | 'orchestration_completed' | 'orchestration_failed' | 'phase_executed' | 'synthesis_complete' | 'project_scaffolded' | 'report_generated',
     public readonly promptId: string,
     public readonly timestamp: Date = new Date(),
     public readonly metadata: Record<string, any> = {}

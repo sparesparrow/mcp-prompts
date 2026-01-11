@@ -118,75 +118,8 @@ export class FilePromptRepository implements IPromptRepository {
     return allPrompts.filter(p => p.category === category);
   }
 
-  async findLatestVersions(limit: number = 50): Promise<Prompt[]> {
-    try {
-      const files = await fs.readdir(this.promptsDir);
-      const prompts: Prompt[] = [];
-
-      for (const file of files) {
-        if (file.endsWith('.json')) {
-        try {
-          const content = await fs.readFile(path.join(this.promptsDir, file), 'utf-8');
-          const data = JSON.parse(content);
-
-          // Create proper Prompt instance with safe date parsing
-          const createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
-          const updatedAt = data.updatedAt ? new Date(data.updatedAt) : new Date();
-
-          // Ensure dates are valid
-          if (isNaN(createdAt.getTime())) {
-            console.warn(`Invalid createdAt date for prompt ${data.id}, using current date`);
-          }
-          if (isNaN(updatedAt.getTime())) {
-            console.warn(`Invalid updatedAt date for prompt ${data.id}, using current date`);
-          }
-
-          const prompt = new Prompt(
-            data.id,
-            data.name,
-            data.description || '',
-            data.template || data.system_prompt || '', // Support both template and system_prompt
-            data.category || 'general',
-            Array.isArray(data.tags) ? data.tags : [],
-            Array.isArray(data.variables) ? data.variables : [],
-            data.version || 'latest',
-            createdAt,
-            updatedAt,
-            data.isLatest !== false, // default to true
-            data.metadata || {},
-            data.accessLevel || 'public',
-            data.authorId,
-            // NEW: Agent orchestration fields
-            (data.promptType as PromptType) || data.type as PromptType || 'standard',
-            data.agentConfig || (data.model ? {
-              model: data.model as ClaudeModel,
-              systemPrompt: data.system_prompt,
-              tools: data.tools,
-              mcpServers: data.mcp_servers,
-              subagents: data.subagents,
-              compatibleWith: data.compatible_with,
-              sourceUrl: data.source_url,
-              executionCount: data.agent_execution_count || 0,
-              successRate: data.agent_success_rate,
-              lastExecutedAt: data.agent_last_executed_at ? new Date(data.agent_last_executed_at) : undefined
-            } : undefined)
-          );
-          prompts.push(prompt);
-        } catch (error) {
-          // Skip invalid files
-          console.warn(`Skipping invalid prompt file: ${file}`);
-        }
-        }
-      }
-
-      // Sort by updatedAt descending and limit
-      return prompts
-        .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime())
-        .slice(0, limit);
-    } catch (error) {
-      return [];
-    }
-  }
+  // NOTE: findLatestVersions method moved below - this duplicate was removed
+  // The recursive version at line 409 is the one that should be used
 
   async search(query: string, category?: string): Promise<Prompt[]> {
     const allPrompts = await this.findLatestVersions(1000);
@@ -261,8 +194,12 @@ export class FilePromptRepository implements IPromptRepository {
   // NEW: Agent orchestration methods
 
   async findByType(type: PromptType, limit?: number): Promise<Prompt[]> {
-    const allPrompts = await this.findLatestVersions(limit || 1000);
-    return allPrompts.filter(p => p.promptType === type);
+    // Always load a high number of prompts to ensure we find all of the requested type
+    // The limit parameter applies AFTER filtering by type
+    const allPrompts = await this.findLatestVersions(10000);
+    const filtered = allPrompts.filter(p => p.promptType === type);
+    // Apply limit after filtering by type
+    return limit ? filtered.slice(0, limit) : filtered;
   }
 
   async findSubagents(filter?: SubagentFilter, limit?: number): Promise<Prompt[]> {
@@ -300,7 +237,8 @@ export class FilePromptRepository implements IPromptRepository {
   }
 
   async findMainAgents(projectType?: string, limit?: number): Promise<Prompt[]> {
-    let prompts = await this.findByType('main_agent_template', limit);
+    // Always get all main agents first, then filter by projectType, then apply limit
+    let prompts = await this.findByType('main_agent_template');
 
     if (projectType) {
       prompts = prompts.filter(p =>
@@ -310,7 +248,8 @@ export class FilePromptRepository implements IPromptRepository {
       );
     }
 
-    return prompts;
+    // Apply limit after filtering by projectType
+    return limit ? prompts.slice(0, limit) : prompts;
   }
 
   async findProjectTemplates(limit?: number): Promise<Prompt[]> {
@@ -428,36 +367,40 @@ export class FilePromptRepository implements IPromptRepository {
             console.warn(`Invalid updatedAt date for prompt ${data.id}, using current date`);
           }
 
-          const prompt = new Prompt(
-            data.id,
-            data.name,
-            data.description || '',
-            data.template || data.system_prompt || '',
-            data.category || 'general',
-            Array.isArray(data.tags) ? data.tags : [],
-            Array.isArray(data.variables) ? data.variables : [],
-            data.version || 'latest',
-            createdAt,
-            updatedAt,
-            data.isLatest !== false,
-            data.metadata || {},
-            data.accessLevel || 'public',
-            data.authorId,
-            (data.promptType as PromptType) || data.type as PromptType || 'standard',
-            data.agentConfig || (data.model ? {
-              model: data.model as ClaudeModel,
-              systemPrompt: data.system_prompt,
-              tools: data.tools,
-              mcpServers: data.mcp_servers,
-              subagents: data.subagents,
-              compatibleWith: data.compatible_with,
-              sourceUrl: data.source_url,
-              executionCount: data.agent_execution_count || 0,
-              successRate: data.agent_success_rate,
-              lastExecutedAt: data.agent_last_executed_at ? new Date(data.agent_last_executed_at) : undefined
-            } : undefined)
-          );
-          prompts.push(prompt);
+          try {
+            const prompt = new Prompt(
+              data.id,
+              data.name,
+              data.description || '',
+              data.content || data.template || data.system_prompt || '',
+              data.category || 'general',
+              Array.isArray(data.tags) ? data.tags : [],
+              Array.isArray(data.variables) ? data.variables : [],
+              data.version || 'latest',
+              createdAt,
+              updatedAt,
+              data.isLatest !== false,
+              data.metadata || {},
+              data.accessLevel || 'public',
+              data.authorId,
+              (data.promptType as PromptType) || data.type as PromptType || 'standard',
+              data.agentConfig || (data.model ? {
+                model: data.model as ClaudeModel,
+                systemPrompt: data.system_prompt || data.content,
+                tools: data.tools,
+                mcpServers: data.mcp_servers || data.mcpServers,
+                subagents: data.subagents,
+                compatibleWith: data.compatible_with || data.compatibleWith || (data.agentConfig?.compatibleWith),
+                sourceUrl: data.source_url || data.sourceUrl,
+                executionCount: data.agent_execution_count || 0,
+                successRate: data.agent_success_rate,
+                lastExecutedAt: data.agent_last_executed_at ? new Date(data.agent_last_executed_at) : undefined
+              } : undefined)
+            );
+            prompts.push(prompt);
+          } catch (constructorError) {
+            console.warn(`Skipping invalid prompt file: ${filePath} - constructor error: ${(constructorError as Error).message}`);
+          }
         } catch (error) {
           console.warn(`Skipping invalid prompt file: ${filePath}`);
         }
