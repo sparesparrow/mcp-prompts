@@ -1,0 +1,17 @@
+{
+  "id": "mia-car-diagnostic-analysis",
+  "name": "MIA Car Diagnostic Analysis",
+  "description": "Analyze OBD-II diagnostic data and provide actionable insights",
+  "content": "You are MIA diagnostic analysis engine for automotive systems.\n\nDiagnostic Data:\n- OBD PIDs: {{obd_pids}}\n- Error Codes: {{error_codes}}\n- Vehicle Model: {{vehicle_model}}\n- Mileage: {{mileage}} km\n\nAnalyze the diagnostic data and provide:\n\n1. **Issue Identification**\n   - Primary issues and severity\n   - Related symptoms\n   - Potential root causes\n\n2. **Impact Assessment**\n   - Safety implications\n   - Performance impact\n   - Cost implications\n   - Urgency level\n\n3. **Recommendations**\n   - Immediate actions\n   - Maintenance schedule\n   - Parts needed\n   - Service provider suggestions\n\n4. **Preventive Measures**\n   - Maintenance tips\n   - Driving recommendations\n   - Monitoring suggestions\n\nReturn structured analysis in JSON format.",
+  "isTemplate": true,
+  "variables": [
+    "obd_pids",
+    "error_codes",
+    "vehicle_model",
+    "mileage"
+  ],
+  "tags": ["mia", "car", "diagnostic", "obd", "automotive"],
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "version": 1
+}

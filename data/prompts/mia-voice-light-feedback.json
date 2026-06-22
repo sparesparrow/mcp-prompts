@@ -1,0 +1,17 @@
+{
+  "id": "mia-voice-light-feedback",
+  "name": "MIA Voice Light Feedback",
+  "description": "Maps MIA voice pipeline phases to mosquitto_pub commands that synchronize the Zigbee lights with what the assistant is doing. Uses real mood names and real MQTT topics.",
+  "content": "You are syncing MIA's light state to the voice pipeline phase.\n\nInputs:\n- Pipeline phase: {{command_phase}}  (one of: listening, processing, speaking, success, error)\n- Command type: {{command_type}}      (e.g. home-control, query, music, unknown)\n- Success: {{success}}               (true / false)\n\nBroker: `localhost`\nMood topic: `mia/lights/mood`   payload: `{\"mood\":\"<name>\"}`\nEffect topic: `mia/lights/effect`  payload: `{\"effect\":\"<name>\",\"duration\":<seconds>}`\nDirect topic: `zigbee2mqtt/<addr>/set`\nAll-lights loop addrs: `0xa4c1384e392e54ca 0xa4c1380c7b18a110 0xa4c13821d31bca27`\n\n---\n\n## Phase → Light mapping\n\n### `listening` — STT active, waiting for speech\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"listening\"}'\n# listening = Purple — signals MIA is ready for voice input\n```\n\n### `processing` — AI model is computing a response\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"thinking\"}'\n# thinking = Blue pulse — signals active computation\n```\n\n### `speaking` — TTS is playing audio output\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"speaking\"}'\n# speaking = Cyan — signals MIA is talking\n```\n\n### `success` — command completed, {{success}} == true\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"done\"}'\n# done = Green\n# Additionally flash 3× for strong confirmation:\nmosquitto_pub -h localhost -t 'mia/lights/effect' -m '{\"effect\":\"flash\",\"duration\":2}'\n```\n\n### `error` — command failed, {{success}} == false\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"error\"}'\n# error = Red flash — unambiguous failure signal\n```\n\n---\n\n## Command-type modifiers\n\nApply after the base phase command when `{{command_phase}}` is `success`:\n\n| command_type | Extra action |\n|---|---|\n| `home-control` | No extra — `done` is sufficient |\n| `music` / `party` | Use `celebration` instead of `done` + `sound` effect |\n| `alarm` / `alert` | Use `alert` mood |\n| `night` / `sleep` | Use `night` mood, skip flash |\n| `unknown` | Use `waiting` mood after result |\n\n```bash\n# music success example:\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"celebration\"}'\nmosquitto_pub -h localhost -t 'mia/lights/sound' -m '{\"enabled\":true,\"mode\":\"energy\",\"sensitivity\":0.6}'\n```\n\n---\n\n## Idle / cooldown\n\nAfter 30 seconds with no new phase event, restore calm:\n```bash\nmosquitto_pub -h localhost -t 'mia/lights/mood' -m '{\"mood\":\"calm\"}'\n```\n\n---\n\n## Output\n\nReturn exactly the shell commands to run for the given `{{command_phase}}`, `{{command_type}}`, and `{{success}}`. No prose, no JSON wrapper — just executable bash.",
+  "isTemplate": true,
+  "variables": [
+    "command_phase",
+    "command_type",
+    "success"
+  ],
+  "tags": ["mia", "lights", "voice", "feedback", "zigbee"],
+  "category": "mia",
+  "createdAt": "2026-03-28T00:00:00.000Z",
+  "updatedAt": "2026-03-28T00:00:00.000Z",
+  "version": 1
+}

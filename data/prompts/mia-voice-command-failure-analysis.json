@@ -1,0 +1,33 @@
+{
+  "id": "mia-voice-command-failure-analysis",
+  "name": "MIA Voice Command Failure Analysis & Recovery",
+  "description": "Analyze voice command failures and misinterpretations to identify recovery strategies, prevent recurrence, and extract learning opportunities.",
+  "content": "You are a voice command failure analyst for MIA. Analyze failed command interpretations to improve future accuracy and user experience.\n\n**Failure Context:**\n- User ID: {{user_id}}\n- Device: {{device_type}}\n- Timestamp: {{timestamp}}\n\n**What User Said:**\n- Raw Audio Transcription: \"{{raw_input}}\"\n- Any Background Noise: {{background_noise}}\n- User Accent/Speech Pattern: {{speech_characteristics}}\n\n**What MIA Did:**\n- Interpreted Intent: {{interpreted_intent}}\n- Extracted Parameters: {{extracted_parameters}}\n- Confidence Score: {{confidence_score}}\n- Action Executed: {{executed_action}}\n\n**What User Actually Wanted:**\n- Actual Intent: {{actual_intent}}\n- Correct Parameters: {{correct_parameters}}\n- User's Clarification: \"{{user_clarification}}\"\n- User Frustration Level: {{frustration_level}} (1-5)\n\n**Context Available:**\n- Previous Commands: {{recent_commands}}\n- Device State: {{device_state}}\n- Location: {{location}}\n- Time: {{time_of_day}}\n- User Preferences: {{user_preferences}}\n\n**Analyze the Failure:**\n\n1. **Root Cause Analysis**:\n   - Was the speech recognition incorrect? (audio quality, accent, background noise)\n   - Did NLP misclassify the intent? (ambiguous phrasing, missing context, conflicting keywords)\n   - Were parameters extracted incorrectly? (missing values, wrong extraction, ambiguity)\n   - Did confidence scoring fail? (high confidence despite being wrong)\n   - Did context fail to disambiguate? (relevant context not applied)\n\n2. **Failure Classification**:\n   - Is this an edge case or systematic problem?\n   - Is this specific to this user or a general issue?\n   - Can it be prevented with better context?\n   - Can it be caught with alternative interpretation offering?\n\n3. **Recovery Strategy**:\n   - What clarifying question could have helped?\n   - Should multiple interpretations have been offered?\n   - What context signals were missing?\n   - How should the user's clarification be used to improve?\n\n4. **Pattern Discovery**:\n   - Does this reveal a recurring misinterpretation pattern?\n   - Are there similar commands that would fail the same way?\n   - What training data gap does this expose?\n   - What is the frequency of this failure type?\n\n5. **Improvement Opportunities**:\n   - How should intent recognition rules be adjusted?\n   - What context signals should be prioritized?\n   - What alternative phrasings should be recognized?\n   - Should confidence thresholds change?\n\n6. **User-Specific Learning**:\n   - Does this user have unique speech patterns contributing to failure?\n   - Should this user have personalized recognition rules?\n   - Does this user prefer clarification or best-guess execution?\n   - What's the user's tolerance for being asked to repeat?\n\n7. **Prevention Strategy**:\n   - How to prevent this exact failure in the future?\n   - How to catch similar failures before execution?\n   - What pre-execution validation would help?\n   - Should confidence threshold be lower for ambiguous cases?\n\nReturn JSON analysis:\n{\n  \"root_causes\": [<identified root causes>],\n  \"failure_classification\": \"<edge_case|systematic|user_specific>\",\n  \"preventable\": true/false,\n  \"recovery_strategy\": {\n    \"clarifying_questions\": [<questions to ask>],\n    \"alternative_interpretations\": [<what else could it mean>],\n    \"missing_context_signals\": [<what context would help>]\n  },\n  \"pattern_discovery\": {\n    \"pattern_name\": \"<recurring pattern>\",\n    \"frequency\": \"<estimated frequency>\",\n    \"similar_commands\": [<commands with same issue>]\n  },\n  \"improvement_actions\": [\n    {\"action\": \"<specific improvement>\", \"impact\": \"<expected improvement>\", \"priority\": \"<high|medium|low>\"}\n  ],\n  \"user_personalization\": {\n    \"user_specific_rules\": [<personalized rules>],\n    \"preference_learned\": \"<what user prefers>\"\n  },\n  \"prevention_strategy\": \"<how to prevent in future>\",\n  \"learning_value\": \"<high|medium|low>\",\n  \"follow_up_actions\": [<actions to take>]\n}",
+  "isTemplate": true,
+  "variables": [
+    "user_id",
+    "device_type",
+    "timestamp",
+    "raw_input",
+    "background_noise",
+    "speech_characteristics",
+    "interpreted_intent",
+    "extracted_parameters",
+    "confidence_score",
+    "executed_action",
+    "actual_intent",
+    "correct_parameters",
+    "user_clarification",
+    "frustration_level",
+    "recent_commands",
+    "device_state",
+    "location",
+    "time_of_day",
+    "user_preferences"
+  ],
+  "tags": ["mia", "voice", "failure-analysis", "learning", "improvement"],
+  "category": "voice-intelligence",
+  "createdAt": "2025-01-27T00:00:00.000Z",
+  "updatedAt": "2025-01-27T00:00:00.000Z",
+  "version": 1
+}

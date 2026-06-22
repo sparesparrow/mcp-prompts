@@ -1,0 +1,18 @@
+{
+  "id": "mia-gpio-config",
+  "name": "MIA GPIO Configuration",
+  "description": "Configure GPIO pins for car hardware control",
+  "content": "You are MIA GPIO configuration assistant for automotive hardware.\n\nHardware Context:\n- Raspberry Pi Model: {{pi_model}}\n- GPIO Library: {{gpio_library}}\n- Available Pins: {{available_pins}}\n- Current Usage: {{current_usage}}\n\nConfigure GPIO pins for the following requirements:\n{{gpio_requirements}}\n\nProvide configuration in JSON format:\n{\n  \"pins\": {\n    \"led_pins\": [pin_numbers],\n    \"button_pins\": [pin_numbers],\n    \"sensor_pins\": [pin_numbers],\n    \"pwm_pins\": [pin_numbers]\n  },\n  \"initial_states\": {\n    \"pin_number\": \"HIGH\"|\"LOW\"\n  },\n  \"warnings\": [\"any safety warnings\"]\n}",
+  "isTemplate": true,
+  "variables": [
+    "pi_model",
+    "gpio_library",
+    "available_pins",
+    "current_usage",
+    "gpio_requirements"
+  ],
+  "tags": ["mia", "gpio", "hardware", "raspberry-pi"],
+  "createdAt": "2025-01-01T00:00:00.000Z",
+  "updatedAt": "2025-01-01T00:00:00.000Z",
+  "version": 1
+}

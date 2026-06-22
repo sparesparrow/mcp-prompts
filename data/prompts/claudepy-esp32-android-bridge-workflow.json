@@ -1,0 +1,496 @@
+{
+  "id": "claudepy-esp32-android-bridge-workflow",
+  "name": "Claudepy ESP32-Android Bridge Workflow",
+  "description": "Orchestrates the complete development workflow for connecting ESP32 devices to Android apps. Encodes proven patterns for bidirectional communication, protocol design, and state synchronization across embedded-mobile boundaries.",
+  "content": "# Claudepy ESP32-Android Bridge Workflow
+
+## Project Context
+- **ESP32 Firmware Path:** {{esp32_firmware_path}}
+- **Android App Path:** {{android_app_path}}
+- **Communication Protocol:** {{protocol}} (mqtt|websocket|bluetooth|serial)
+- **Data Schema:** {{data_schema}} (json|protobuf|flatbuffers|custom)
+- **Integration Complexity:** {{complexity}} (simple|moderate|complex)
+
+---
+
+## Phase 1: Protocol Architecture Design 🌐
+
+### Protocol Selection Matrix
+| Use Case | Recommended Protocol | Rationale |
+|----------|---------------------|-----------|
+| Local network, low latency | WebSocket | Direct connection, minimal overhead |
+| IoT cloud integration | MQTT | Broker-based, QoS levels, retained messages |
+| Direct device pairing | Bluetooth LE | No WiFi dependency, low power |
+| USB tethered | Serial/ADB | Debugging, firmware updates |
+
+### Connection Topology
+```
+┌─────────────┐     ┌─────────────┐     ┌─────────────┐
+│  Android    │◄───►│   {{protocol}}   │◄───►│    ESP32    │
+│    App      │     │   Broker/   │     │   Firmware  │
+│             │     │   Gateway   │     │             │
+└─────────────┘     └─────────────┘     └─────────────┘
+```
+
+### Message Schema Design
+**Command Pattern (Android → ESP32):**
+```json
+{
+  "cmd": "<command_type>",
+  "id": "<uuid>",
+  "timestamp": <unix_ms>,
+  "payload": {<command_specific_data>},
+  "ack_required": true
+}
+```
+
+**Event Pattern (ESP32 → Android):**
+```json
+{
+  "event": "<event_type>",
+  "id": "<uuid>",
+  "timestamp": <unix_ms>,
+  "data": {<event_specific_data>},
+  "correlation_id": "<original_cmd_id>"
+}
+```
+
+---
+
+## Phase 2: ESP32 Firmware Implementation 🔧
+
+### Core Components Checklist
+- [ ] WiFi/Network connection manager
+- [ ] Protocol client (MQTT/WebSocket/BLE)
+- [ ] Message serializer/deserializer
+- [ ] Command dispatcher
+- [ ] State machine for device modes
+- [ ] Error handling and reconnection logic
+- [ ] OTA update capability (recommended)
+
+### Connection Manager Pattern
+```cpp
+class ConnectionManager {
+public:
+    void begin(const char* ssid, const char* pass);
+    bool isConnected();
+    void reconnect();
+    void onDisconnect(std::function<void()> callback);
+    
+private:
+    uint32_t lastReconnectAttempt = 0;
+    const uint32_t RECONNECT_INTERVAL = 5000;
+    uint8_t reconnectAttempts = 0;
+    const uint8_t MAX_RECONNECT_ATTEMPTS = 10;
+};
+```
+
+### Protocol-Specific Implementation
+
+**MQTT (Recommended for IoT):**
+```cpp
+// Topics structure
+const char* TOPIC_CMD = "device/{{device_id}}/cmd";
+const char* TOPIC_STATUS = "device/{{device_id}}/status";
+const char* TOPIC_TELEMETRY = "device/{{device_id}}/telemetry";
+const char* TOPIC_ACK = "device/{{device_id}}/ack";
+
+// QoS levels
+// CMD: QoS 1 (at least once)
+// STATUS: QoS 0 (at most once)
+// TELEMETRY: QoS 0 (frequent, loss acceptable)
+```
+
+**WebSocket (Recommended for local):**
+```cpp
+// Binary framing for efficiency
+enum MessageType : uint8_t {
+    CMD = 0x01,
+    EVENT = 0x02,
+    HEARTBEAT = 0x03,
+    ACK = 0x04
+};
+
+struct MessageHeader {
+    uint8_t type;
+    uint32_t length;
+    uint64_t timestamp;
+};
+```
+
+### Power Optimization (Battery-Powered Devices)
+- Use light sleep between messages
+- Batch telemetry data
+- Implement adaptive reporting intervals
+- Disable WiFi during deep sleep periods
+
+---
+
+## Phase 3: Android App Integration 📱
+
+### Architecture Pattern
+**MVVM + Repository Pattern:**
+```
+View (Fragment/Activity)
+    ↓
+ViewModel (State holder)
+    ↓
+Repository (Data source abstraction)
+    ↓
+DataSource (MQTT/WebSocket/BLE client)
+    ↓
+ESP32 Device
+```
+
+### Connection Service
+```kotlin
+class DeviceConnectionService : Service() {
+    private val binder = LocalBinder()
+    private var connectionState = ConnectionState.DISCONNECTED
+    
+    // Protocol-specific client
+    private lateinit var mqttClient: MqttAndroidClient
+    // OR private lateinit var webSocketClient: WebSocketClient
+    // OR private lateinit var bleManager: BluetoothManager
+    
+    override fun onBind(intent: Intent): IBinder = binder
+    
+    fun connect(deviceId: String, config: ConnectionConfig)
+    fun disconnect()
+    fun sendCommand(command: DeviceCommand): Flow<CommandResult>
+    fun observeEvents(): Flow<DeviceEvent>
+    
+    enum class ConnectionState {
+        DISCONNECTED, CONNECTING, CONNECTED, ERROR
+    }
+}
+```
+
+### State Synchronization Strategy
+**Option A: Event-Driven (Recommended)**
+- ESP32 publishes state changes as events
+- Android subscribes and updates local state
+- Conflict resolution: Last-write-wins with timestamps
+
+**Option B: Request-Response**
+- Android polls for state periodically
+- Higher latency but simpler implementation
+- Use for non-critical status updates
+
+**Option C: Hybrid**
+- Event-driven for critical changes
+- Periodic sync for full state reconciliation
+- Best for complex applications
+
+### Connection Resilience
+```kotlin
+// Exponential backoff for reconnection
+fun calculateReconnectDelay(attempt: Int): Long {
+    return min(INITIAL_DELAY * (2.0.pow(attempt)), MAX_DELAY)
+}
+
+// Connection state machine
+sealed class ConnectionState {
+    object Disconnected : ConnectionState()
+    data class Connecting(val attempt: Int) : ConnectionState()
+    data class Connected(val since: Long) : ConnectionState()
+    data class Error(val reason: String) : ConnectionState()
+}
+```
+
+---
+
+## Phase 4: End-to-End Integration 🔄
+
+### Handshake Sequence
+```
+Android          Protocol           ESP32
+   │                 │                 │
+   │── CONNECT ─────►│                 │
+   │                 │                 │
+   │◄── CONNACK ─────│                 │
+   │                 │                 │
+   │── SUBSCRIBE ───►│                 │
+   │                 │                 │
+   │◄── SUBACK ──────│                 │
+   │                 │                 │
+   │                 │◄── CONNECT ─────│
+   │                 │                 │
+   │                 │── CONNACK ─────►│
+   │                 │                 │
+   │◄── ONLINE ──────│◄── ONLINE ─────│
+```
+
+### Command Execution Flow
+1. **Android** generates command with UUID
+2. **Android** publishes to `device/{id}/cmd`
+3. **ESP32** receives, validates, executes
+4. **ESP32** publishes ACK to `device/{id}/ack`
+5. **ESP32** publishes result event
+6. **Android** correlates response via UUID
+7. **Android** updates UI with result
+
+### Error Handling Matrix
+| Scenario | ESP32 Behavior | Android Behavior |
+|----------|---------------|------------------|
+| Network disconnect | Enter reconnect loop | Show offline indicator, queue commands |
+| Invalid command | Send NACK with error code | Show error, offer retry |
+| Timeout | Send timeout event | Auto-retry with backoff |
+| Protocol error | Reinitialize connection | Reconnect service |
+| Device busy | Send busy status | Queue or defer command |
+
+---
+
+## Phase 5: Testing & Validation ✅
+
+### Unit Test Patterns
+**ESP32 (Native/Pio):**
+```cpp
+void test_command_parsing() {
+    const char* json = R"({"cmd":"set_led","payload":{"state":true}})";
+    auto cmd = Command::fromJson(json);
+    TEST_ASSERT_EQUAL(CommandType::SET_LED, cmd.type);
+    TEST_ASSERT_TRUE(cmd.payload["state"].as<bool>());
+}
+```
+
+**Android (JUnit + MockK):**
+```kotlin
+@Test
+fun `command sent with correct UUID format`() = runTest {
+    val mockClient = mockk<MqttAndroidClient>(relaxed = true)
+    val repository = DeviceRepository(mockClient)
+    
+    repository.sendCommand(SetLedCommand(true))
+    
+    verify { 
+        mockClient.publish(any(), match { 
+            it.payload.toString().contains("\"id\":\"") 
+        }, any(), any()) 
+    }
+}
+```
+
+### Integration Test Scenarios
+1. **Connection Lifecycle**: Connect → Exchange data → Disconnect → Reconnect
+2. **Command Round-Trip**: Send command → Verify execution → Receive response
+3. **Error Recovery**: Simulate network failure → Verify reconnection → Resume operation
+4. **Concurrent Commands**: Send multiple commands → Verify ordering → Check responses
+5. **Long-Running Stability**: 24-hour test with periodic data exchange
+
+### Performance Benchmarks
+| Metric | Target | Acceptable |
+|--------|--------|------------|
+| Connection establish | < 2s | < 5s |
+| Command round-trip | < 200ms | < 500ms |
+| Event propagation | < 100ms | < 300ms |
+| Reconnect time | < 5s | < 10s |
+| Message throughput | > 100 msg/s | > 50 msg/s |
+
+---
+
+## Phase 6: Deployment & Monitoring 🚀
+
+### Production Checklist
+- [ ] TLS/SSL encryption enabled
+- [ ] Authentication (certificates or tokens)
+- [ ] Firmware OTA configured
+- [ ] Crash reporting (Firebase/Sentry)
+- [ ] Analytics for usage patterns
+- [ ] Remote logging for debugging
+- [ ] Rate limiting on commands
+- [ ] Input validation on both sides
+
+### Monitoring Metrics
+- Connection uptime percentage
+- Command success/failure rates
+- Average response latency
+- Reconnection frequency
+- Error types and frequency
+- Battery drain (mobile and device)
+
+### Security Hardening
+```cpp
+// ESP32: Validate all inputs
+bool validateCommand(const JsonDocument& doc) {
+    if (!doc.containsKey("cmd")) return false;
+    if (!doc["cmd"].is<const char*>()) return false;
+    // Additional validation...
+    return true;
+}
+```
+
+```kotlin
+// Android: Certificate pinning
+val okHttpClient = OkHttpClient.Builder()
+    .certificatePinner(
+        CertificatePinner.Builder()
+            .add("broker.example.com", "sha256/...")
+            .build()
+    )
+    .build()
+```
+
+---
+
+## Common Patterns Library 📚
+
+### Pattern 1: Configuration Sync
+```cpp
+// ESP32: Store config in NVS
+void handleConfigUpdate(const JsonObject& config) {
+    preferences.begin("device", false);
+    preferences.putString("wifi_ssid", config["wifi_ssid"]);
+    preferences.putString("mqtt_broker", config["mqtt_broker"]);
+    preferences.end();
+    // Publish confirmation
+    publishEvent("config_updated", config);
+}
+```
+
+### Pattern 2: Firmware Update Trigger
+```cpp
+// ESP32: Handle OTA command
+void handleOtaCommand(const JsonObject& payload) {
+    String firmwareUrl = payload["url"];
+    String expectedHash = payload["hash"];
+    
+    publishEvent("ota_started", {});
+    
+    if (performOtaUpdate(firmwareUrl, expectedHash)) {
+        publishEvent("ota_success", {});
+        delay(1000);
+        ESP.restart();
+    } else {
+        publishEvent("ota_failed", {"reason": "hash_mismatch"});
+    }
+}
+```
+
+### Pattern 3: Batch Data Upload
+```kotlin
+// Android: Collect and batch sensor data
+class TelemetryCollector {
+    private val buffer = mutableListOf<SensorReading>()
+    
+    fun collect(reading: SensorReading) {
+        buffer.add(reading)
+        if (buffer.size >= BATCH_SIZE) {
+            flush()
+        }
+    }
+    
+    private fun flush() {
+        repository.uploadBatch(buffer.toList())
+        buffer.clear()
+    }
+}
+```
+
+---
+
+## Troubleshooting Guide 🔍
+
+### Issue: Commands not received by ESP32
+**Diagnostic Steps:**
+1. Verify MQTT/WebSocket client connected
+2. Check topic subscription on ESP32
+3. Validate message format (JSON syntax)
+4. Monitor with `mosquitto_sub` or Wireshark
+5. Check ESP32 serial logs for parsing errors
+
+### Issue: Android app shows stale data
+**Diagnostic Steps:**
+1. Verify event subscription active
+2. Check timestamp ordering
+3. Validate state update logic in ViewModel
+4. Monitor with MQTT.fx or similar client
+5. Check for network proxy/firewall issues
+
+### Issue: Frequent disconnections
+**Diagnostic Steps:**
+1. Check WiFi signal strength on ESP32
+2. Verify keepalive/heartbeat intervals
+3. Monitor for memory leaks
+4. Check broker connection limits
+5. Validate TLS certificate expiration
+
+---
+
+## Workflow Commands
+
+Use these commands to execute this workflow:
+
+1. **Initialize Project Structure:**
+   ```
+   claudepy init-esp32-android-bridge --protocol {{protocol}} --path {{project_path}}
+   ```
+
+2. **Generate ESP32 Firmware:**
+   ```
+   claudepy generate-esp32-firmware --schema {{data_schema}} --features "mqtt,ota,sensors"
+   ```
+
+3. **Generate Android Scaffold:**
+   ```
+   claudepy generate-android-client --protocol {{protocol}} --architecture mvvm
+   ```
+
+4. **Validate Integration:**
+   ```
+   claudepy validate-bridge --esp32-path {{esp32_firmware_path}} --android-path {{android_app_path}}
+   ```
+
+5. **Run Integration Tests:**
+   ```
+   claudepy test-bridge --test-suite full --duration 1h
+   ```
+
+---
+
+## Expected Output
+
+Upon completing this workflow, you will have:
+
+1. **ESP32 Firmware** with:
+   - Robust protocol client implementation
+   - Command dispatcher with validation
+   - State management and error handling
+   - OTA update capability
+   - Power optimization features
+
+2. **Android App** with:
+   - Clean architecture (MVVM + Repository)
+   - Connection service with resilience
+   - Protocol abstraction layer
+   - State synchronization
+   - Comprehensive error handling
+
+3. **Integration Artifacts**:
+   - Protocol specification document
+   - Message schema definitions
+   - Test suites (unit + integration)
+   - Deployment checklist
+   - Monitoring dashboard config
+
+---
+
+*Generated by Claudepy Cross-Domain Bridge Workflow v1.0*
+*Category: cross-platform-orchestration*
+*Tags: esp32, android, bridge, workflow, claudepy, orchestration, iot, mobile*
+",
+  "isTemplate": true,
+  "variables": ["esp32_firmware_path", "android_app_path", "protocol", "data_schema", "complexity"],
+  "tags": ["innovation", "auto-generated", "esp32", "android", "bridge", "workflow", "claudepy", "orchestration", "cross-platform", "iot", "mobile"],
+  "category": "cross-platform-orchestration",
+  "version": 1,
+  "createdAt": "2026-03-13T08:00:00.000Z",
+  "updatedAt": "2026-03-13T08:00:00.000Z",
+  "metadata": {
+    "author": "prompt-innovation-cron",
+    "innovation_cycle": "2026-03-13",
+    "targets_gap": "claudepy-workflow-prompts",
+    "cross_domain": ["esp32", "android"],
+    "estimated_impact": "High - Bridges embedded-mobile development workflow"
+  }
+}

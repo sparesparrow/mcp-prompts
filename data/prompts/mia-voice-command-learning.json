@@ -1,0 +1,30 @@
+{
+  "id": "mia-voice-command-learning",
+  "name": "MIA Voice Command Learning Framework",
+  "description": "Extract learning signals from voice command interactions to improve future command recognition and interpretation. Captures success patterns, identifies failures, and discovers user-specific variations.",
+  "content": "You are a voice command learning analyzer for MIA (Modular IoT Assistant).\n\nAnalyze this voice command interaction:\n\n**Interaction Metadata:**\n- User ID: {{user_id}}\n- Timestamp: {{timestamp}}\n- Device Type: {{device_type}}\n- Location: {{location}}\n- Time of Day: {{time_of_day}}\n\n**Command Execution:**\n- Raw Input: \"{{raw_input}}\"\n- Interpreted Intent: {{intent}}\n- Confidence Score: {{confidence}}\n- Extracted Parameters: {{parameters}}\n\n**Outcome:**\n- Success: {{success}} (true/false)\n- User Satisfaction: {{satisfaction_score}} (1-5, null if no feedback)\n- Actual Action Taken: {{actual_action}}\n\n**Context Used:**\n- Previous Intent: {{previous_intent}}\n- Command History: {{recent_commands}}\n- Device State: {{device_state}}\n- User Preferences: {{user_preferences}}\n\nAnalyze and extract learning signals:\n\n1. **Command Pattern Match**:\n   - Does this command match an existing pattern family?\n   - What variations of phrasing did this user employ?\n   - How does this compare to other users' phrasings for the same intent?\n\n2. **Parameter Extraction Quality**:\n   - Were parameters correctly identified?\n   - What implicit parameters might have been missed?\n   - Are there ambiguous parameter values that need clarification?\n\n3. **Context Effectiveness**:\n   - Did context improve the interpretation accuracy?\n   - Which context signals (location, time, history, preferences) influenced the result?\n   - How much would accuracy improve with better context?\n\n4. **Confidence Calibration**:\n   - Was the confidence score appropriate for the accuracy achieved?\n   - Are there patterns where confidence is overestimated or underestimated?\n\n5. **Failure Analysis** (if success == false):\n   - Why did the interpretation fail?\n   - Is this an edge case or a systematic problem?\n   - What context or clarification would have helped?\n   - Should alternatives have been offered?\n\n6. **User Adaptation**:\n   - What does this reveal about the user's speech patterns?\n   - Are they using unique phrasing or shortcuts?\n   - What command variations should be recognized in the future?\n\n7. **Next Command Prediction**:\n   - What command might this user issue next (given the current command)?\n   - Are there command sequences this user frequently uses?\n\nReturn JSON with learning signals:\n{\n  \"command_pattern_family\": \"<intent_family>\",\n  \"phasing_variations\": [<list of alternative phrasings observed>],\n  \"parameter_extraction_quality\": {\"success\": true/false, \"issues\": [...]},\n  \"context_effectiveness\": {\"signals_used\": [...], \"improvement_potential\": ...},\n  \"confidence_calibration\": {\"appropriate\": true/false, \"adjustment\": ...},\n  \"failure_root_cause\": \"<if applicable>\",\n  \"user_adaptation_insights\": {\"patterns\": [...], \"preferences\": [...]},\n  \"next_command_prediction\": \"<predicted next intent>\",\n  \"learning_priorities\": [<high_value_learning_areas>],\n  \"recommendations_for_improvement\": [<actionable_improvements>]\n}",
+  "isTemplate": true,
+  "variables": [
+    "user_id",
+    "timestamp",
+    "device_type",
+    "location",
+    "time_of_day",
+    "raw_input",
+    "intent",
+    "confidence",
+    "parameters",
+    "success",
+    "satisfaction_score",
+    "actual_action",
+    "previous_intent",
+    "recent_commands",
+    "device_state",
+    "user_preferences"
+  ],
+  "tags": ["mia", "voice", "learning", "command-intelligence", "pattern-extraction"],
+  "category": "voice-intelligence",
+  "createdAt": "2025-01-27T00:00:00.000Z",
+  "updatedAt": "2025-01-27T00:00:00.000Z",
+  "version": 1
+}

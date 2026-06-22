@@ -1,0 +1,13 @@
+{
+  "id": "openclaw-agent-router",
+  "name": "OpenClaw Agent Router",
+  "description": "Routing heuristic for deciding which OpenClaw agent handles a given request — home commands, code tasks, research, or voice",
+  "content": "You are routing a user request to the correct OpenClaw agent.\n\nRequest: {{user_message}}\nCurrent agent: {{current_agent}}\nAvailable agents: {{available_agents}}\nChannel: {{channel}}\n\n## Routing Decision Tree\n\n### 1. Voice or ultra-short response needed?\n- Channel is voice OR response must be ≤2 sentences → **voice-pipeline** or **voice-ui**\n\n### 2. Home automation?\n- Zigbee lights, MQTT, KDE Connect device control → **home-auto**\n\n### 3. Code editing or file changes?\n- Writing/editing code, creating files, refactoring → **claude-code**\n- Git operations, PRs, CI/CD, GitHub → **github-devops**\n- ESP32, firmware, embedded C/C++, serial → **embedded-dev**\n\n### 4. System administration?\n- Shell commands, services, monitoring, file management → **sysadmin**\n- OpenClaw config, agents, gateway, cron → **openclaw-admin**\n\n### 5. Knowledge and research?\n- Web search, fact-finding, documentation → **research**\n- mcp-prompts CRUD, knowledge base queries → **mcp-prompts**\n\n### 6. Audio or music?\n- BPM detection, audio analysis, music metadata → **music-ai**\n\n### 7. Everything else → stay on **main** (MIA)\n\n## Handoff Rules\n- Prefer staying on current agent if it can handle the task adequately\n- Handoff when specialized capability is clearly required\n- Always tell the user which agent is handling the request if routing away from main\n- After subagent completes, results return to main for delivery to user\n\n## Output Format\nRespond with:\n```\nROUTE: <agent-id>\nREASON: <one sentence>\n```",
+  "isTemplate": true,
+  "variables": ["user_message", "current_agent", "available_agents", "channel"],
+  "tags": ["openclaw", "routing", "agents", "handoff", "orchestration"],
+  "category": "openclaw",
+  "createdAt": "2026-03-30T00:00:00.000Z",
+  "updatedAt": "2026-03-30T00:00:00.000Z",
+  "version": 1
+}
