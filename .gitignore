@@ -37,6 +37,10 @@ coverage/
 .Trashes
 ehthumbs.db
 Thumbs.db
+**/.directory
+
+# Generated probe metadata
+data/.last-innovation-check
 
 # Logs
 logs/
