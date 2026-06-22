@@ -36,17 +36,19 @@ export class PromptService {
       data.category || 'general',
       data.tags || [],
       data.variables || [],
-      data.version || 'latest',
+      String(data.version || '1'), // Ensure version is a string
       new Date(),
       new Date(),
       true,
       data.metadata || {},
-      data.access_level || 'public',
-      data.author_id
+      data.accessLevel || data.access_level || 'public',
+      data.authorId || data.author_id,
+      data.promptType || 'standard',
+      data.agentConfig
     );
 
     await this.promptRepository.save(prompt);
-    
+
     // Publish event
     await this.eventBus.publish(new PromptEvent('prompt_created', prompt.id, new Date(), {
       category: prompt.category,

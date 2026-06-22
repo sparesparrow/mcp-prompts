@@ -1,9 +1,7 @@
 #!/usr/bin/env node
 
 import { Command } from 'commander';
-import { DynamoDBAdapter } from './adapters/aws/dynamodb-adapter';
-import { S3CatalogAdapter } from './adapters/aws/s3-adapter';
-import { SQSAdapter } from './adapters/aws/sqs-adapter';
+// AWS adapters are archived - using memory adapters only
 import { MemoryPromptRepository, MemoryCatalogRepository, MemoryEventBus, loadSamplePrompts } from './adapters/memory-adapter';
 import { PromptService } from './core/services/prompt.service';
 import { PromptIndexingService } from './core/services/prompt-indexing.service';
@@ -28,30 +26,14 @@ program
 
 // Initialize services
 function getServices() {
-  const useMemory = process.env.STORAGE_TYPE === 'memory' || !process.env.AWS_REGION;
+  // Using memory adapters only (AWS adapters are archived)
+  logger.info('Using memory storage adapters');
+  const promptRepository = new MemoryPromptRepository();
+  const catalogRepository = new MemoryCatalogRepository();
+  const eventBus = new MemoryEventBus();
   
-  let promptRepository, catalogRepository, eventBus;
-  
-  if (useMemory) {
-    logger.info('Using memory storage adapters');
-    promptRepository = new MemoryPromptRepository();
-    catalogRepository = new MemoryCatalogRepository();
-    eventBus = new MemoryEventBus();
-    
-    // Load sample prompts for memory mode
-    loadSamplePrompts();
-  } else {
-    logger.info('Using AWS storage adapters');
-    promptRepository = new DynamoDBAdapter(
-      process.env.PROMPTS_TABLE || 'mcp-prompts'
-    );
-    catalogRepository = new S3CatalogAdapter(
-      process.env.PROMPTS_BUCKET || 'mcp-prompts-catalog'
-    );
-    eventBus = new SQSAdapter(
-      process.env.PROCESSING_QUEUE || 'mcp-prompts-processing'
-    );
-  }
+  // Load sample prompts for memory mode
+  loadSamplePrompts();
   
   const promptService = new PromptService(
     promptRepository,
@@ -277,7 +259,7 @@ program
       process.env.HOST = options.host;
       
       // Import and start the server
-      await import('./index');
+      await import('./mcp-server-standalone');
     } catch (error) {
       logger.error('Failed to start server:', error);
       process.exit(1);

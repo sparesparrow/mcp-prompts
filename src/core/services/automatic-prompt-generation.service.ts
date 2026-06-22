@@ -184,10 +184,11 @@ export class AutomaticPromptGenerationService {
     const novelPatterns: EpisodePattern[] = [];
 
     for (const pattern of patterns) {
-      if (pattern.confidence >= this.minNoveltyScore) {
+      const confidence = pattern.confidence ?? 0.5;
+      if (confidence >= this.minNoveltyScore) {
         // Check if we already have a prompt for this pattern
         const existingPrompts = await this.mcpClient.searchPrompts({
-          tags: ['pattern', pattern.patternId],
+          tags: ['pattern', pattern.patternId || pattern.id],
           limit: 1
         });
 
@@ -197,7 +198,7 @@ export class AutomaticPromptGenerationService {
       }
     }
 
-    return novelPatterns.sort((a, b) => b.confidence - a.confidence);
+    return novelPatterns.sort((a, b) => (b.confidence ?? 0) - (a.confidence ?? 0));
   }
 
   private async identifyIneffectivePrompts(): Promise<Array<{ promptId: string; analytics: UsageAnalytics }>> {
@@ -286,9 +287,9 @@ export class AutomaticPromptGenerationService {
       layer: PromptLayer.Procedural,
       domain: pattern.applicableDomains[0] || Domain.General,
       tags: ['generated', 'pattern', 'cognitive', pattern.name.toLowerCase().replace(/\s+/g, '-')],
-      abstractionLevel: pattern.abstractionLevel,
-      generationReason: `Synthesized from ${pattern.occurrences.length} similar episodes with ${pattern.confidence.toFixed(2)} confidence`,
-      expectedEffectiveness: pattern.confidence * 0.8, // Slightly conservative estimate
+      abstractionLevel: pattern.abstractionLevel ?? 5,
+      generationReason: `Synthesized from ${pattern.occurrences.length} similar episodes with ${(pattern.confidence ?? 0.5).toFixed(2)} confidence`,
+      expectedEffectiveness: (pattern.confidence ?? 0.5) * 0.8, // Slightly conservative estimate
       createdAt: new Date()
     };
 
@@ -384,12 +385,12 @@ export class AutomaticPromptGenerationService {
       `## Pattern Overview`,
       pattern.description,
       '',
-      `**Confidence**: ${(pattern.confidence * 100).toFixed(1)}%`,
+      `**Confidence**: ${((pattern.confidence ?? 0.5) * 100).toFixed(1)}%`,
       `**Based on**: ${pattern.occurrences.length} episodes`,
-      `**Abstraction Level**: ${pattern.abstractionLevel}/10`,
+      `**Abstraction Level**: ${pattern.abstractionLevel ?? 5}/10`,
       '',
       `## Common Symptoms`,
-      ...pattern.commonSymptoms.map(symptom => `- ${symptom}`),
+      ...pattern.commonSymptoms.map((symptom: string) => `- ${symptom}`),
       '',
       `## Recommended Approaches`
     ];
@@ -401,20 +402,20 @@ export class AutomaticPromptGenerationService {
         `**Estimated Time**: ${Math.round(solution.averageTime / 1000)} seconds`,
         '',
         'Steps to follow:',
-        ...solution.steps.map((step, i) => `${i + 1}. ${step}`),
+        ...solution.steps.map((step: string, i: number) => `${i + 1}. ${step}`),
         ''
       );
     }
 
     sections.push(
       `## Context Information`,
-      `- **Applicable Domains**: ${pattern.applicableDomains.map(d => Domain[d]).join(', ')}`,
+      `- **Applicable Domains**: ${pattern.applicableDomains.map((d: number) => Domain[d]).join(', ')}`,
       `- **Complexity Level**: ${pattern.occurrences[0]?.context.complexity || 'mixed'}`,
       `- **Common Tools**: ${this.extractCommonTools(pattern.occurrences).join(', ')}`,
       '',
       `## When to Apply`,
       `Use this pattern when you encounter:`,
-      ...pattern.commonSymptoms.map(symptom => `- ${symptom}`),
+      ...pattern.commonSymptoms.map((symptom: string) => `- ${symptom}`),
       '',
       `This pattern was automatically synthesized from successful problem-solving experiences.`
     );

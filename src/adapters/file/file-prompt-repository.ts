@@ -77,35 +77,50 @@ export class FilePromptRepository implements IPromptRepository {
 
   /**
    * Parse prompt data into a Prompt entity
+   * Handles multiple field name variants for backward compatibility
    */
   private parsePromptData(data: any): Prompt {
     const createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
     const updatedAt = data.updatedAt ? new Date(data.updatedAt) : new Date();
 
+    // Ensure dates are valid
+    if (isNaN(createdAt.getTime())) {
+      console.warn(`Invalid createdAt date for prompt ${data.id}`);
+    }
+    if (isNaN(updatedAt.getTime())) {
+      console.warn(`Invalid updatedAt date for prompt ${data.id}`);
+    }
+
+    // Primary field is 'template', fallback to 'content' or 'system_prompt' for compatibility
+    const template = data.template || data.content || data.system_prompt || '';
+
+    // Ensure version is a string
+    const version = String(data.version || '1');
+
     return new Prompt(
       data.id,
       data.name,
       data.description || '',
-      data.content || data.template || data.system_prompt || '',
+      template,
       data.category || 'general',
       Array.isArray(data.tags) ? data.tags : [],
       Array.isArray(data.variables) ? data.variables : [],
-      data.version || 'latest',
+      version,
       createdAt,
       updatedAt,
       data.isLatest !== false,
       data.metadata || {},
       data.accessLevel || 'public',
       data.authorId,
-      (data.promptType as PromptType) || data.type as PromptType || 'standard',
+      (data.promptType as PromptType) || (data.type as PromptType) || 'standard',
       data.agentConfig || (data.model ? {
         model: data.model as ClaudeModel,
-        systemPrompt: data.system_prompt || data.content,
+        systemPrompt: data.system_prompt || template,
         tools: data.tools,
         mcpServers: data.mcp_servers || data.mcpServers,
         subagents: data.subagents,
-        compatibleWith: data.compatible_with || data.compatibleWith,
-        sourceUrl: data.source_url,
+        compatibleWith: data.compatible_with || data.compatibleWith || data.agentConfig?.compatibleWith,
+        sourceUrl: data.source_url || data.sourceUrl,
         executionCount: data.agent_execution_count || 0,
         successRate: data.agent_success_rate,
         lastExecutedAt: data.agent_last_executed_at ? new Date(data.agent_last_executed_at) : undefined
@@ -355,48 +370,9 @@ export class FilePromptRepository implements IPromptRepository {
           const content = await fs.readFile(filePath, 'utf-8');
           const data = JSON.parse(content);
 
-          // Create proper Prompt instance with safe date parsing
-          const createdAt = data.createdAt ? new Date(data.createdAt) : new Date();
-          const updatedAt = data.updatedAt ? new Date(data.updatedAt) : new Date();
-
-          // Ensure dates are valid
-          if (isNaN(createdAt.getTime())) {
-            console.warn(`Invalid createdAt date for prompt ${data.id}, using current date`);
-          }
-          if (isNaN(updatedAt.getTime())) {
-            console.warn(`Invalid updatedAt date for prompt ${data.id}, using current date`);
-          }
-
           try {
-            const prompt = new Prompt(
-              data.id,
-              data.name,
-              data.description || '',
-              data.content || data.template || data.system_prompt || '',
-              data.category || 'general',
-              Array.isArray(data.tags) ? data.tags : [],
-              Array.isArray(data.variables) ? data.variables : [],
-              data.version || 'latest',
-              createdAt,
-              updatedAt,
-              data.isLatest !== false,
-              data.metadata || {},
-              data.accessLevel || 'public',
-              data.authorId,
-              (data.promptType as PromptType) || data.type as PromptType || 'standard',
-              data.agentConfig || (data.model ? {
-                model: data.model as ClaudeModel,
-                systemPrompt: data.system_prompt || data.content,
-                tools: data.tools,
-                mcpServers: data.mcp_servers || data.mcpServers,
-                subagents: data.subagents,
-                compatibleWith: data.compatible_with || data.compatibleWith || (data.agentConfig?.compatibleWith),
-                sourceUrl: data.source_url || data.sourceUrl,
-                executionCount: data.agent_execution_count || 0,
-                successRate: data.agent_success_rate,
-                lastExecutedAt: data.agent_last_executed_at ? new Date(data.agent_last_executed_at) : undefined
-              } : undefined)
-            );
+            // Use the consistent parsePromptData method
+            const prompt = this.parsePromptData(data);
             prompts.push(prompt);
           } catch (constructorError) {
             console.warn(`Skipping invalid prompt file: ${filePath} - constructor error: ${(constructorError as Error).message}`);

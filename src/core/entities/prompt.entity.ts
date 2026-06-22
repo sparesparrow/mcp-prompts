@@ -36,11 +36,11 @@ export class Prompt {
     public readonly id: string,
     public readonly name: string,
     public readonly description: string,
-    public readonly template: string,
+    public readonly template: string, // PRIMARY field for prompt content
     public readonly category: string,
     public readonly tags: string[] = [],
     public readonly variables: string[] = [],
-    public readonly version: string = 'latest',
+    public readonly version: string = '1', // Use string for consistency
     public readonly createdAt: Date = new Date(),
     public readonly updatedAt: Date = new Date(),
     public readonly isLatest: boolean = true,

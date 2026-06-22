@@ -240,13 +240,22 @@ export class McpServer {
         },
         {
           name: 'list_prompts',
-          description: 'List prompts by category or get latest prompts',
+          description: 'List prompts by category or get latest prompts. Use fields="summary" (default) to avoid token bloat.',
           inputSchema: {
             type: 'object',
             properties: {
               category: { type: 'string', description: 'Category to filter by (optional)' },
-              limit: { type: 'number', description: 'Maximum number of prompts to return (default: 50)' }
+              limit: { type: 'number', description: 'Maximum number of prompts to return (default: 20)' },
+              fields: { type: 'string', enum: ['summary', 'full'], description: 'Response detail level. "summary" (default) returns {id, name, tags, category} only. "full" returns complete prompt objects.' }
             }
+          }
+        },
+        {
+          name: 'list_categories',
+          description: 'List all prompt categories with counts. Use this to discover categories before drilling into one with list_prompts.',
+          inputSchema: {
+            type: 'object',
+            properties: {}
           }
         },
         {
@@ -379,9 +388,25 @@ export class McpServer {
         
         case 'list_prompts':
           const prompts = args?.category
-            ? await this.promptService.getPromptsByCategory(args.category, args.limit || 50)
-            : await this.promptService.getLatestPrompts(args?.limit || 50);
-          result = prompts.map(p => p.toJSON());
+            ? await this.promptService.getPromptsByCategory(args.category, args?.limit || 20)
+            : await this.promptService.getLatestPrompts(args?.limit || 20);
+          const fieldsMode = args?.fields || 'summary';
+          if (fieldsMode === 'summary') {
+            result = prompts.map(p => ({ id: p.id, name: p.name, tags: p.tags, category: p.category }));
+          } else {
+            result = prompts.map(p => p.toJSON());
+          }
+          break;
+
+        case 'list_categories':
+          const allPromptsForCats = await this.promptService.getLatestPrompts(1000);
+          const catCounts: Record<string, number> = {};
+          for (const p of allPromptsForCats) {
+            catCounts[p.category] = (catCounts[p.category] || 0) + 1;
+          }
+          result = Object.entries(catCounts)
+            .map(([category, count]) => ({ category, count }))
+            .sort((a, b) => b.count - a.count);
           break;
         
         case 'search_prompts':
@@ -540,10 +565,14 @@ export class McpServer {
           return { result: prompt ? prompt.toJSON() : null };
         
         case 'list_prompts':
-          const prompts = args.category
-            ? await this.promptService.getPromptsByCategory(args.category, args.limit || 50)
-            : await this.promptService.getLatestPrompts(args.limit || 50);
-          return { result: prompts.map(p => p.toJSON()) };
+          const promptsLegacy = args.category
+            ? await this.promptService.getPromptsByCategory(args.category, args.limit || 20)
+            : await this.promptService.getLatestPrompts(args.limit || 20);
+          const legacyFields = args.fields || 'summary';
+          if (legacyFields === 'summary') {
+            return { result: promptsLegacy.map(p => ({ id: p.id, name: p.name, tags: p.tags, category: p.category })) };
+          }
+          return { result: promptsLegacy.map(p => p.toJSON()) };
         
         case 'search_prompts':
           const searchResults = await this.promptService.searchPrompts(args.query, args.category);
