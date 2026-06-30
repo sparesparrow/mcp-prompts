@@ -1,0 +1,18 @@
+{
+  "id": "prompt_1767743985595_5ycx6bbgt",
+  "name": "test-functionality-prompt",
+  "description": "",
+  "template": "Test template content",
+  "category": "test",
+  "tags": [
+    "test",
+    "functionality"
+  ],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-06T23:59:45.595Z",
+  "updatedAt": "2026-01-06T23:59:45.595Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

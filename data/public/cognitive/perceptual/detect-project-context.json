@@ -1,0 +1,29 @@
+{
+  "id": "detect-project-context",
+  "name": "detect-project-context",
+  "description": "Analyze project structure to determine type, language, and context",
+  "content": "Analyze this project to determine its type and context:\n\nProject files: {{files}}\nRoot directory contents: {{root_contents}}\n\nDetermine:\n1. Project type (web service, CLI tool, library, embedded, etc.)\n2. Primary programming language(s)\n3. Build system/configuration files present\n4. Whether it has tests, CI/CD, documentation\n5. Performance/safety criticality indicators\n\nProvide a structured assessment of the project context.",
+  "arguments": [
+    {
+      "name": "files",
+      "description": "List of key project files",
+      "required": true
+    },
+    {
+      "name": "root_contents",
+      "description": "Contents of root directory",
+      "required": true
+    }
+  ],
+  "tags": [
+    "project-analysis",
+    "context-detection",
+    "language-detection"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 1,
+    "domain": 1,
+    "abstractionLevel": 2
+  }
+}

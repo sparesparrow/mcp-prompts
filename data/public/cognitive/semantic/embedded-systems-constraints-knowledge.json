@@ -1,0 +1,21 @@
+{
+  "id": "embedded-systems-constraints-knowledge",
+  "name": "embedded-systems-constraints-knowledge",
+  "description": "Core knowledge about embedded systems constraints and best practices",
+  "content": "# Embedded Systems Constraints and Best Practices\n\n## Memory Management\n**Key Principles:**\n- **Limited RAM**: ESP32 has ~320KB available heap\n- **No garbage collection**: Manual memory management required\n- **Stack overflow prevention**: Monitor task stack usage\n- **PSRAM consideration**: External RAM for large buffers\n\n**Best Practices:**\n- Use static allocation where possible\n- Implement memory pools for frequent allocations\n- Monitor heap usage with `uxTaskGetStackHighWaterMark`\n- Avoid large stack variables in tasks\n\n## Power Management\n**ESP32 Power Modes:**\n- **Active**: ~80mA (full operation)\n- **Light Sleep**: ~0.8mA (RAM retention)\n- **Deep Sleep**: ~10µA (full state loss)\n- **Hibernation**: ~2.5µA (RTC memory only)\n\n**Android Power Management:**\n- **Doze Mode**: Background restrictions after screen off\n- **App Standby**: Restrictions for unused apps\n- **Battery Optimization**: System power saving features\n\n## Real-Time Considerations\n**Timing Requirements:**\n- **Interrupt Latency**: Minimize ISR execution time\n- **Task Priorities**: Proper FreeRTOS task prioritization\n- **Watchdog Timers**: Prevent system hangs\n- **Critical Sections**: Minimize interrupt disabling\n\n## Communication Protocols\n**ESP32 Communication:**\n- **WiFi**: TCP/UDP sockets, HTTP/MQTT\n- **Bluetooth**: GATT server/client, serial emulation\n- **Serial**: UART for debugging and device control\n\n**Android Communication:**\n- **WebSocket**: Real-time bidirectional communication\n- **REST APIs**: HTTP-based device control\n- **Clipboard Sync**: Cross-device content sharing\n\n## Security Considerations\n**Embedded Security:**\n- **Physical Access**: Device protection requirements\n- **Firmware Updates**: Secure OTA mechanisms\n- **Data Encryption**: Sensitive data protection\n- **Network Security**: WiFi and Bluetooth security\n\n**Android Security:**\n- **Permissions**: Runtime permission handling\n- **App Sandboxing**: Isolated execution environment\n- **Data Encryption**: Device-level encryption\n- **API Security**: Authentication and authorization\n",
+  "arguments": [],
+  "tags": [
+    "embedded",
+    "constraints",
+    "memory",
+    "power",
+    "real-time",
+    "security"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 3,
+    "domain": 7,
+    "abstractionLevel": 4
+  }
+}

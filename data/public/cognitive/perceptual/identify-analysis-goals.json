@@ -1,0 +1,39 @@
+{
+  "id": "identify-analysis-goals",
+  "name": "identify-analysis-goals",
+  "description": "Determine the appropriate analysis goals based on project context and symptoms",
+  "content": "Given the project context and reported symptoms, identify the most appropriate analysis goals:\n\nProject Context: {{project_context}}\nSymptoms/Issues: {{symptoms}}\nTime Available: {{time_constraint}}\nRisk Level: {{risk_level}}\n\nDetermine whether this is:\n- Bug finding and fixing\n- Performance optimization\n- Security audit\n- Code quality improvement\n- Refactoring needs\n- Documentation gaps\n\nPrioritize goals based on risk level and time constraints.",
+  "arguments": [
+    {
+      "name": "project_context",
+      "description": "Project type and characteristics",
+      "required": true
+    },
+    {
+      "name": "symptoms",
+      "description": "Issues or symptoms reported",
+      "required": true
+    },
+    {
+      "name": "time_constraint",
+      "description": "Available time for analysis",
+      "required": false
+    },
+    {
+      "name": "risk_level",
+      "description": "Criticality of the project",
+      "required": false
+    }
+  ],
+  "tags": [
+    "goal-identification",
+    "prioritization",
+    "risk-assessment"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 1,
+    "domain": 1,
+    "abstractionLevel": 3
+  }
+}

@@ -1,0 +1,20 @@
+{
+  "id": "use-static-analysis-mcp",
+  "name": "use-static-analysis-mcp",
+  "description": "Demonstrates using MCP tools for static analysis workflows",
+  "content": "# Static Analysis with MCP Tools\n\n## Running C++ Static Analysis\n\nFirst, check what static analysis tools are available:\n\n<mcp-tool-call>\n<tool>list_tools</tool>\n<args>{}</args>\n</mcp-tool-call>\n\nIf cppcheck is available, run it on your project:\n\n<mcp-tool-call>\n<tool>run_cppcheck</tool>\n<args>{\"project_path\": \"./src\", \"enable_checks\": [\"all\"], \"std\": \"c++17\"}</args>\n</mcp-tool-call>\n\nFor clang-tidy analysis:\n\n<mcp-tool-call>\n<tool>run_clang_tidy</tool>\n<args>{\"source_files\": [\"src/main.cpp\", \"src/utils.cpp\"], \"checks\": \"*\"}</args>\n</mcp-tool-call>\n\n## Interpreting Results\n\nAfter running analysis, apply the results interpretation prompt:\n\n<mcp-tool-call>\n<tool>get_prompt</tool>\n<args>{\"name\": \"interpret-static-analysis-results\"}</args>\n</mcp-tool-call>\n\nThen apply it with the analysis results:\n\n<mcp-tool-call>\n<tool>apply_template</tool>\n<args>{\"prompt_name\": \"interpret-static-analysis-results\", \"variables\": {\"analysis_output\": \"[paste cppcheck/clang-tidy output here]\"} }</args>\n</mcp-tool-call>\n\n## Workflow Integration\n\nFor a complete static analysis workflow:\n\n<mcp-tool-call>\n<tool>get_prompt</tool>\n<args>{\"name\": \"cpp-static-analysis-workflow\"}</args>\n</mcp-tool-call>",
+  "arguments": [],
+  "tags": [
+    "mcp-usage",
+    "static-analysis",
+    "cpp",
+    "workflow",
+    "tool-demonstration"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 3
+  }
+}

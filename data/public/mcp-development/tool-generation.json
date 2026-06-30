@@ -1,0 +1,13 @@
+{
+  "id": "mcp-tool-generation",
+  "name": "MCP Tool Generation",
+  "description": "Generate an MCP tool with proper structure and documentation",
+  "content": "Generate MCP tool: {{tool_name}}\n\nTool Details:\n- Name: {{tool_name}}\n- Description: {{description}}\n- Server: {{server_name}}\n\nParameters:\n{{#each parameters}}\n- {{this.name}}: {{this.type}} - {{this.description}}{{#if this.required}} (required){{/if}}{{#if this.default}} (default: {{this.default}}){{/if}}\n{{/each}}\n\nReturn Type: {{return_type}}\n\nTool Implementation:\n```python\n@self.server.tool()\nasync def {{tool_name}}(\n    {{#each parameters}}\n    {{this.name}}: {{this.python_type}}{{#if this.default}} = {{this.default}}{{/if}},\n    {{/each}}\n) -> {{return_python_type}}:\n    \"\"\"{{description}}\n    \n    Args:\n    {{#each parameters}}\n        {{this.name}}: {{this.description}}\n    {{/each}}\n    \n    Returns:\n        {{return_description}}\n    \"\"\"\n    # Implementation\n    {{implementation}}\n```\n\n{{#if add_validation}}Add input validation{{/if}}\n{{#if add_error_handling}}Add error handling with proper error codes{{/if}}",
+  "isTemplate": true,
+  "variables": ["tool_name", "description", "server_name", "parameters", "return_type", "return_python_type", "return_description", "implementation", "add_validation", "add_error_handling"],
+  "tags": ["mcp", "tool", "generation", "fastmcp"],
+  "category": "mcp-development",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

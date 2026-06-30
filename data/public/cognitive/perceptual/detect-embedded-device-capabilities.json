@@ -1,0 +1,20 @@
+{
+  "id": "detect-embedded-device-capabilities",
+  "name": "detect-embedded-device-capabilities",
+  "description": "Analyze embedded device capabilities and recommend appropriate tools",
+  "content": "# Embedded Device Capability Analysis\n\nWhen working with embedded devices, first assess the device capabilities:\n\n## ESP32 Device Assessment\n**Check these capabilities:**\n- WiFi connectivity available\n- Bluetooth support (Classic + BLE)\n- Available sensors (BPM, temperature, accelerometer)\n- Memory constraints (heap, PSRAM)\n- Real-time requirements\n- Power management features\n\n## Android Device Assessment\n**Check these capabilities:**\n- Android API level and version\n- Available sensors (GPS, accelerometer, light)\n- Battery monitoring\n- Network connectivity (WiFi, mobile)\n- Clipboard access\n- App installation permissions\n\n## Recommended Analysis Approach\n\nBased on device capabilities, use these tools:\n\n### For ESP32 Devices:\n```\nget_esp32_telemetry --sensor_types '[\"bpm\", \"temperature\"]'\nanalyze_telemetry_patterns --sensor_type bpm --analysis_type anomaly\n```\n\n### For Android Devices:\n```\nget_android_clipboard --include_history true\nanalyze_android_clipboard_patterns --pattern_type content\n```\n\n### For Cross-Device Coordination:\n```\ndiscover_embedded_devices\nsync_clipboard_across_devices --content \"Coordinated message\"\nexecute_cross_device_workflow --workflow_name \"health_check\"\n```\n",
+  "arguments": [],
+  "tags": [
+    "embedded",
+    "device-capabilities",
+    "assessment",
+    "esp32",
+    "android"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 1,
+    "domain": 7,
+    "abstractionLevel": 2
+  }
+}

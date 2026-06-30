@@ -1,0 +1,20 @@
+{
+  "id": "esp32-architecture-knowledge",
+  "name": "esp32-architecture-knowledge",
+  "description": "ESP32 microcontroller architecture and constraints knowledge",
+  "content": "# ESP32 Architecture Knowledge\n\n## Core Architecture\n- **Dual-core Xtensa LX6**: 240MHz clock, asymmetric cores\n- **Memory**: 520KB SRAM, external SPI flash up to 16MB\n- **WiFi**: 802.11 b/g/n, soft-AP mode\n- **Bluetooth**: Classic + BLE 4.2\n\n## Memory Constraints\n- **IRAM**: 128KB instruction RAM (faster, limited)\n- **DRAM**: 320KB data RAM\n- **Flash**: External SPI, slower access\n- **Heap**: ~300KB available, fragmented\n\n## Real-Time Considerations\n- **FreeRTOS**: Preemptive multitasking\n- **Task Priorities**: 0-24 (higher = more priority)\n- **Stack Size**: Default 4KB, monitor usage\n- **Interrupt Handling**: IRAM-only functions\n\n## Power Management\n- **Light Sleep**: CPU off, RAM retained (~0.8mA)\n- **Deep Sleep**: Full state retention (~10µA)\n- **Modem Sleep**: WiFi/BT power cycling\n- **Active**: ~80mA (depending on usage)\n\n## Common Pitfalls\n- **Stack Overflow**: Monitor with uxTaskGetStackHighWaterMark\n- **Heap Fragmentation**: Use heap_caps_malloc with MALLOC_CAP_INTERNAL\n- **WiFi Interrupt Latency**: Keep critical code short\n- **Flash Wear**: Minimize writes to flash sectors\n\n## Development Tools\n- **ESP-IDF**: Official framework\n- **Arduino Core**: Simplified development\n- **OpenOCD/JTAG**: Hardware debugging\n- **esp32-monitor**: Serial debugging",
+  "arguments": [],
+  "tags": [
+    "esp32",
+    "embedded",
+    "architecture",
+    "constraints",
+    "real-time"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 3,
+    "domain": 1,
+    "abstractionLevel": 3
+  }
+}

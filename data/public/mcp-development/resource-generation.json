@@ -1,0 +1,13 @@
+{
+  "id": "mcp-resource-generation",
+  "name": "MCP Resource Generation",
+  "description": "Generate an MCP resource with proper structure",
+  "content": "Generate MCP resource: {{resource_uri}}\n\nResource Details:\n- URI: {{resource_uri}}\n- Name: {{resource_name}}\n- Description: {{description}}\n- MIME Type: {{mime_type}}\n\nResource Implementation:\n```python\n@self.server.resource(\"{{resource_uri}}\")\nasync def {{handler_name}}() -> str:\n    \"\"\"{{description}}\n    \n    Returns:\n        Resource content as {{mime_type}}\n    \"\"\"\n    {{implementation}}\n```\n\nExample Usage in MCP Client:\n```python\n# List resources\nresources = await client.list_resources()\n\n# Read this resource\ncontent = await client.read_resource(\"{{resource_uri}}\")\nprint(content)\n```\n\n{{#if dynamic_uri}}Resource URI supports dynamic parameters{{/if}}\n{{#if cacheable}}Resource is cacheable with TTL: {{cache_ttl}}{{/if}}",
+  "isTemplate": true,
+  "variables": ["resource_uri", "resource_name", "description", "mime_type", "handler_name", "implementation", "dynamic_uri", "cacheable", "cache_ttl"],
+  "tags": ["mcp", "resource", "generation"],
+  "category": "mcp-development",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

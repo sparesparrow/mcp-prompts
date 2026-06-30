@@ -1,0 +1,20 @@
+{
+  "id": "use-git-integration-mcp",
+  "name": "use-git-integration-mcp",
+  "description": "Demonstrates using MCP tools for git-based development workflows",
+  "content": "# Git Integration with MCP Tools\n\n## Analyzing Code Changes\n\nCheck what git-related tools are available:\n\n<mcp-tool-call>\n<tool>list_tools</tool>\n<args>{}</args>\n</mcp-tool-call>\n\nAnalyze changes in the current branch:\n\n<mcp-tool-call>\n<tool>git_analyze_changes</tool>\n<args>{\"since_commit\": \"HEAD~5\", \"include_stats\": true}</args>\n</mcp-tool-call>\n\nGet detailed diff analysis:\n\n<mcp-tool-call>\n<tool>git_get_diff</tool>\n<args>{\"commit_range\": \"HEAD~1\", \"include_context\": 3}</args>\n</mcp-tool-call>\n\n## Blame Analysis for Debugging\n\nFind who last modified problematic code:\n\n<mcp-tool-call>\n<tool>git_blame</tool>\n<args>{\"file\": \"src/buggy_function.cpp\", \"line_range\": \"100-120\"}</args>\n</mcp-tool-call>\n\n## Commit Quality Analysis\n\nReview recent commit quality:\n\n<mcp-tool-call>\n<tool>git_analyze_commits</tool>\n<args>{\"branch\": \"main\", \"since_days\": 7, \"include_metrics\": true}</args>\n</mcp-tool-call>\n\n## Integration with Static Analysis\n\nCombine git and static analysis:\n\n<mcp-tool-call>\n<tool>analyze_changed_code</tool>\n<args>{\"since_commit\": \"origin/main\", \"tools\": [\"cppcheck\", \"clang-tidy\"]}</args>\n</mcp-tool-call>",
+  "arguments": [],
+  "tags": [
+    "mcp-usage",
+    "git",
+    "version-control",
+    "code-analysis",
+    "tool-demonstration"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 4
+  }
+}

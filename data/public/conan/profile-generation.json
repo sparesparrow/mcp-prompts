@@ -1,0 +1,13 @@
+{
+  "id": "conan-profile-generation",
+  "name": "Conan Profile Generation",
+  "description": "Generate Conan profiles for cross-compilation and embedded development",
+  "content": "Generate Conan profile for {{target_platform}}.\n\nTarget Details:\n- Platform: {{target_platform}}\n- Architecture: {{arch}}\n- Compiler: {{compiler}} {{compiler_version}}\n- Build Type: {{build_type}}\n\nProfile Content:\n```\n[settings]\nos={{os_name}}\narch={{arch}}\ncompiler={{compiler}}\ncompiler.version={{compiler_version}}\nbuild_type={{build_type}}\n\n{{#if cppstd}}compiler.cppstd={{cppstd}}{{/if}}\n{{#if libcxx}}compiler.libcxx={{libcxx}}{{/if}}\n\n[options]\n{{#each options}}\n{{this.name}}={{this.value}}\n{{/each}}\n\n[buildenv]\n{{#each env_vars}}\n{{this.name}}={{this.value}}\n{{/each}}\n\n[tool_requires]\n{{#each tool_requires}}\n{{this}}\n{{/each}}\n```\n\nSave to: {{output_path}}",
+  "isTemplate": true,
+  "variables": ["target_platform", "arch", "compiler", "compiler_version", "build_type", "os_name", "cppstd", "libcxx", "options", "env_vars", "tool_requires", "output_path"],
+  "tags": ["conan", "profile", "cross-compilation", "build"],
+  "category": "conan",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

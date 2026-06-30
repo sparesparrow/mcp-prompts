@@ -1,0 +1,45 @@
+{
+  "id": "select-debugging-strategy",
+  "name": "select-debugging-strategy",
+  "description": "Choose appropriate debugging strategy based on context and constraints",
+  "content": "Given the debugging scenario, select the most appropriate strategy:\n\nProblem Context: {{problem_description}}\nAvailable Tools: {{available_tools}}\nTime Constraints: {{time_available}}\nSystem Access: {{system_access_level}}\nRisk of Change: {{change_risk}}\n\n## Strategy Options\n\n### Scientific Method (Hypothesis-Driven)\n- **When**: Complex problems, good understanding of system\n- **Pros**: Systematic, educational, prevents flailing\n- **Cons**: Time-intensive for simple problems\n- **Tools**: Logging, breakpoints, controlled experiments\n\n### Pattern Matching (Experience-Based)\n- **When**: Seen similar problems before, time pressure\n- **Pros**: Fast resolution for known issues\n- **Cons**: May miss novel aspects\n- **Tools**: Code search, log analysis, symptom correlation\n\n### Binary Search (Divide and Conquer)\n- **When**: Linear code paths, reproducible issues\n- **Pros**: Efficient for large codebases\n- **Cons**: Requires reproducible test case\n- **Tools**: Git bisect, conditional breakpoints\n\n### Exploratory (Trial and Error)\n- **When**: Unknown territory, learning opportunity\n- **Pros**: Discovers unexpected insights\n- **Cons**: Unpredictable time, may not converge\n- **Tools**: Interactive debuggers, print statements\n\n### External Perspective (Rubber Duck/Peer Review)\n- **When**: Stuck, need fresh viewpoint\n- **Pros**: Often reveals obvious issues\n- **Cons**: Requires explanation effort\n- **Tools**: Documentation, code review, pair debugging\n\n**Recommended Strategy**: [Select based on context]\n**Reasoning**: [Explain choice]\n**Fallback Strategy**: [If primary doesn't work]",
+  "arguments": [
+    {
+      "name": "problem_description",
+      "description": "Description of the debugging problem",
+      "required": true
+    },
+    {
+      "name": "available_tools",
+      "description": "Debugging tools available",
+      "required": true
+    },
+    {
+      "name": "time_available",
+      "description": "Time available for debugging",
+      "required": true
+    },
+    {
+      "name": "system_access_level",
+      "description": "Level of system access (full, limited, remote)",
+      "required": true
+    },
+    {
+      "name": "change_risk",
+      "description": "Risk of making changes during debugging",
+      "required": true
+    }
+  ],
+  "tags": [
+    "debugging",
+    "strategy-selection",
+    "meta-cognition",
+    "problem-solving"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 5,
+    "domain": 1,
+    "abstractionLevel": 4
+  }
+}

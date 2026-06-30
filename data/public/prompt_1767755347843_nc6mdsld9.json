@@ -1,0 +1,15 @@
+{
+  "id": "prompt_1767755347843_nc6mdsld9",
+  "name": "test-functionality-prompt",
+  "description": "",
+  "template": "This is a test prompt to verify all functionality works",
+  "category": "general",
+  "tags": [],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-07T03:09:07.843Z",
+  "updatedAt": "2026-01-07T03:09:07.843Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

@@ -1,0 +1,9 @@
+{
+  "id": "modify-mermaid-diagram",
+  "name": "Modify Mermaid Diagram",
+  "content": "You are an expert in modifying Mermaid diagrams. Your task is to modify the provided diagram according to the requested changes while maintaining its overall structure and clarity.",
+  "isTemplate": false,
+  "createdAt": "2025-03-14T20:48:57.253Z",
+  "updatedAt": "2025-03-14T20:48:57.253Z",
+  "version": 1
+}

@@ -1,0 +1,19 @@
+{
+  "id": "memory-management-principles",
+  "name": "memory-management-principles",
+  "description": "Core principles of memory management across different programming paradigms",
+  "content": "# Memory Management Principles\n\n## RAII (Resource Acquisition Is Initialization) - C++\n- Resources tied to object lifetime\n- Automatic cleanup in destructors\n- Smart pointers (unique_ptr, shared_ptr)\n- Exception safety guarantees\n\n## Garbage Collection - Java, Python, Go\n- Automatic memory reclamation\n- Reference counting vs mark-and-sweep\n- GC pauses and performance impact\n- Memory leaks through reference cycles\n\n## Manual Memory Management - C, Assembly\n- Explicit allocation/deallocation\n- Ownership semantics\n- Buffer overflow prevention\n- Memory alignment requirements\n\n## Common Patterns\n- **Ownership transfer**: clear responsibility passing\n- **Borrowing**: temporary access without ownership\n- **Reference counting**: shared ownership tracking\n- **Arena allocation**: bulk allocation/deallocation\n\n## Detection Techniques\n- Valgrind (C/C++): comprehensive memory checking\n- AddressSanitizer: fast compile-time instrumentation\n- Heap profiling: allocation pattern analysis",
+  "arguments": [],
+  "tags": [
+    "memory-management",
+    "raii",
+    "garbage-collection",
+    "ownership"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 3,
+    "domain": 1,
+    "abstractionLevel": 5
+  }
+}

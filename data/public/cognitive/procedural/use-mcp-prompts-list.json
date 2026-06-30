@@ -1,0 +1,19 @@
+{
+  "id": "use-mcp-prompts-list",
+  "name": "use-mcp-prompts-list",
+  "description": "Demonstrates how to use the list_prompts MCP tool",
+  "content": "# Listing Available Prompts\n\nTo see all available prompts in the system:\n\n<mcp-tool-call>\n<tool>list_prompts</tool>\n<args>{}</args>\n</mcp-tool-call>\n\nThis returns all prompts available for use. You can also filter by category:\n\n<mcp-tool-call>\n<tool>list_prompts</tool>\n<args>{\"category\": \"cognitive\"}</args>\n</mcp-tool-call>\n\nOr by tags:\n\n<mcp-tool-call>\n<tool>list_prompts</tool>\n<args>{\"tags\": [\"embedded\", \"debugging\"]}</args>\n</mcp-tool-call>\n\nThe response includes prompt metadata like name, description, tags, and whether it's a template requiring variables.",
+  "arguments": [],
+  "tags": [
+    "mcp-usage",
+    "self-documenting",
+    "meta",
+    "tool-demonstration"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 6
+  }
+}

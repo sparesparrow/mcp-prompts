@@ -1,0 +1,40 @@
+{
+  "id": "cppcheck-config-desktop-general-default",
+  "name": "cppcheck-config-desktop-general-default",
+  "description": "Default cppcheck configuration for desktop C++ general analysis",
+  "template": {
+    "project_type": "desktop",
+    "focus": "general",
+    "is_embedded": false,
+    "cppcheck_flags": [
+      "--quiet",
+      "--template={file}:{line}:{column}: {severity}: {id}: {message}",
+      "--inline-suppr",
+      "--suppress=missingIncludeSystem",
+      "--enable=all",
+      "--std=c++17"
+    ],
+    "success_count": 0,
+    "confidence": "low"
+  },
+  "category": "tool-config",
+  "tags": [
+    "cpp",
+    "cppcheck",
+    "general",
+    "desktop",
+    "default"
+  ],
+  "version": "latest",
+  "createdAt": "2025-12-31T17:17:09.148Z",
+  "updatedAt": "2025-12-31T17:17:09.148Z",
+  "isLatest": true,
+  "metadata": {
+    "created": "2025-12-31T17:17:09.148Z",
+    "validation": "default_config",
+    "confidence": "low",
+    "tool": "cppcheck",
+    "project_type": "desktop"
+  },
+  "accessLevel": "public"
+}

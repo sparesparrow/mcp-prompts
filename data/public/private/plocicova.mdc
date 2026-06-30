@@ -1,0 +1,13 @@
+# Dominika Pločicová Coding Style Rules
+
+## Commit Messages
+- Use "Resolve AK-XXXX" format for issue resolution
+- Include feature descriptions like "Kesovanie ocsp", "Response headers probably working"
+
+## Code Style
+- Focus on security features: OCSP caching, proxy configuration, reporter parsing
+- Handle merges and releases carefully
+
+## Development Approach
+- Resolve specific issues in proxy and reporting systems
+- Work on caching, headers, and feedback fixes

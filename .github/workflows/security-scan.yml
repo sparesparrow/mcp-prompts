@@ -8,6 +8,10 @@ on:
   schedule:
     - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
@@ -25,14 +29,17 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
 
-    - name: Run CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
       with:
         languages: javascript
+
+    - name: Run CodeQL Analysis
+      uses: github/codeql-action/analyze@v3
 
     - name: Run Snyk to check for vulnerabilities
       uses: snyk/actions/node@master

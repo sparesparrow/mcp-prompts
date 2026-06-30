@@ -1,0 +1,19 @@
+{
+  "id": "test-bench-container-orchestrator",
+  "name": "TestBench Container Orchestrator",
+  "description": "Manage singleton TestBenchContainer for Lennox IFC testing with ngapy-inspired patterns",
+  "content": "# TestBench Container Orchestrator (ngapy-inspired)\n\nManage the singleton TestBenchContainer ensuring single instance across all Lennox IFC tests.\n\n## Core Responsibilities\n\n### 1. Singleton Instance Management\n- Guarantee single bench instance across all test execution\n- Platform-specific bench initialization (simulator/HIL/physical)\n- Resource lifecycle management with proper cleanup\n\n### 2. Platform Abstraction\n**Supported Platforms:**\n- `simulator`: Software simulation for development\n- `hil`: Hardware-in-loop for integration testing\n- `physical`: Real hardware for final validation\n\n### 3. Configuration Integration\n- Hierarchical configuration loading with caching\n- Environment variable merging\n- Test-specific override support\n\n## Usage Pattern\n\n```python\nfrom ngapy_patterns import TestBenchContainer\n\n# Get singleton instance\ndef setUpModule():\n    global bench\n    bench = TestBenchContainer().get_instance()\n    bench.start()\n\ndef tearDownModule():\n    bench.stop()\n\n# Use in tests\ndef test_state_transition(self):\n    self.bench.set_thermostat_call(w1=True, w2=False)\n    # Test logic works identically across platforms\n```\n\n## Configuration Structure\n\n```yaml\n# config/lennox/test_bench.yaml\nplatform: simulator  # simulator, hil, physical\ntimeout: 30.0       # Default timeout in seconds\nretry_count: 3      # Max retry attempts\n\n# Platform-specific configs\nsimulator:\n  state_file: simulator_state.json\nhil:\n  can_channel: can0\n  gpio_chip: raspberry_pi\nphysical:\n  power_supply_port: /dev/ttyUSB0\n```\n\n## Integration Points\n\n### With Response Dispatcher\n```python\n# Async operations through dispatcher\nbench = TestBenchContainer().get_instance()\nseq_id = bench.send_can_message_async({'cmd': 'read_state'})\n\ncv, trackers = dispatcher.new_request([seq_id], [callback])\nwith cv:\n    success = cv.wait(timeout=5.0)\n```\n\n## Success Metrics\n\n- **Zero Resource Conflicts**: No multiple bench instances in CI/CD\n- **Platform Independence**: Tests run identically on all platforms\n- **Startup Time**: < 5 seconds for bench initialization\n- **Resource Efficiency**: < 10% overhead vs direct hardware access",
+  "isTemplate": true,
+  "variables": ["platform", "configuration_overrides", "resource_limits", "diagnostic_level"],
+  "tags": ["testing", "lennox", "ngapy", "singleton", "platform-abstraction", "resource-management"],
+  "category": "lennox-testing-framework",
+  "version": 1,
+  "createdAt": "2026-01-07T00:00:00.000Z",
+  "updatedAt": "2026-01-07T00:00:00.000Z"
+}
+
+
+
+
+
+

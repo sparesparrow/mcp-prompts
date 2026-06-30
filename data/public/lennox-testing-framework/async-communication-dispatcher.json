@@ -1,0 +1,19 @@
+{
+  "id": "async-communication-dispatcher",
+  "name": "Async Communication Dispatcher",
+  "description": "Manage message-based async communication for Lennox IFC testing with ngapy-inspired dispatcher patterns",
+  "content": "# Async Communication Dispatcher (ngapy-inspired)\n\nManage event-driven, asynchronous communication between test components and hardware interfaces.\n\n## Core Responsibilities\n\n### 1. Request-Response Correlation\n- Track async requests and their responses\n- Sequence ID management for message correlation\n- Timeout handling with configurable limits\n\n### 2. Thread-Safe Operations\n- Condition variable synchronization\n- Safe concurrent access to shared state\n- Deadlock prevention mechanisms\n\n### 3. Callback Management\n- Flexible callback registration system\n- Support for multiple response handlers\n- Error propagation and exception handling\n\n## Usage Pattern\n\n```python\nfrom ngapy_patterns import ResponseDispatcher\n\ndispatcher = ResponseDispatcher()\n\n# Send async CAN message\nseq_id = can_interface.send_message_async({'cmd': 'read_state'})\n\n# Register response handler\ndef handle_response(response):\n    print(f\"Received: {response}\")\n    self.assertEqual(response['state'], 'IDLE')\n\ncv, trackers = dispatcher.new_request(\n    [seq_id],\n    [handle_response],\n    ['read_state_command']\n)\n\n# Wait for response with timeout\nwith cv:\n    success = cv.wait(timeout=5.0)\n    assert success, \"Timeout waiting for CAN response\"\n```\n\n## Message Types Supported\n\n### CAN/RSBus Messages\n- **Set Commands**: Configuration and control messages\n- **Get Commands**: Status and data requests\n- **Monitor Commands**: Continuous data streaming\n- **CAID Messages**: Parameter access (EEPROM)\n\n### Serial/UART Messages\n- **A2L Refrigerant Detection**: Safety-critical communication\n- **Diagnostic Output**: 7-segment display and status messages\n- **Firmware Logs**: Debug and status information\n\n### GPIO Events\n- **Input Changes**: Thermostat calls, pressure switches\n- **Output Confirmation**: Relay state verification\n- **Analog Readings**: Flame sensor, temperature sensors\n\n## Success Metrics\n\n- **Zero Message Loss**: All sent messages receive responses or timeouts\n- **Response Time**: < 500ms average for local operations\n- **Concurrent Operations**: Support for 50+ simultaneous requests\n- **Error Rate**: < 1% timeout or communication failures\n- **Resource Usage**: Minimal memory and CPU overhead",
+  "isTemplate": true,
+  "variables": ["communication_type", "timeout_config", "concurrency_limits", "error_handling"],
+  "tags": ["testing", "lennox", "ngapy", "async", "communication", "dispatcher", "message-passing"],
+  "category": "lennox-testing-framework",
+  "version": 1,
+  "createdAt": "2026-01-07T00:00:00.000Z",
+  "updatedAt": "2026-01-07T00:00:00.000Z"
+}
+
+
+
+
+
+

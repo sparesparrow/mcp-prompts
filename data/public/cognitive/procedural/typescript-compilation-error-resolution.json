@@ -1,0 +1,29 @@
+{
+  "id": "typescript-compilation-error-resolution",
+  "name": "typescript-compilation-error-resolution",
+  "description": "Pattern for resolving TypeScript compilation errors in MCP package development",
+  "content": "## TypeScript Compilation Error Resolution Pattern\n\n### Context\nWhen developing MCP (Model Context Protocol) packages, TypeScript compilation errors commonly occur due to:\n- Missing dependencies between packages\n- Incomplete FlatBuffers schema generation\n- Incorrect TypeScript configuration inheritance\n- Import path resolution issues\n\n### Investigation Strategy\n\n#### Step 1: Analyze Error Messages\n```\n- Look for \"Cannot find module\" or \"Cannot find name\" errors\n- Check for missing type definitions\n- Identify circular dependency warnings\n- Note package boundary issues\n```\n\n#### Step 2: Dependency Analysis\n```\n- Verify workspace package references in package.json\n- Check if dependent packages are built\n- Confirm TypeScript declaration files exist\n- Validate import path correctness\n```\n\n#### Step 3: Configuration Review\n```\n- Ensure tsconfig.json extends root configuration\n- Verify compilation target and module settings\n- Check include/exclude patterns\n- Confirm declaration generation settings\n```\n\n#### Step 4: Schema Generation Check\n```\n- For FlatBuffers-dependent packages:\n  - Verify .fbs schema files exist\n  - Check if TypeScript bindings are generated\n  - Confirm flatc compiler availability\n  - Validate generated import paths\n```\n\n### Resolution Pattern\n\n#### Pattern 1: Missing FlatBuffers Bindings\n**Symptoms:** `Cannot find name 'PromptLayer'` or similar enum/type errors\n\n**Solution:**\n1. Check if FlatBuffers schemas define required types\n2. Generate TypeScript bindings manually if flatc unavailable\n3. Create placeholder interfaces matching schema definitions\n4. Update import paths in dependent packages\n\n#### Pattern 2: Configuration Inheritance Issues\n**Symptoms:** TypeScript ignores extended configuration\n\n**Solution:**\n1. Update tsconfig.json to extend root config: `\"extends\": \"../../tsconfig.json\"`\n2. Override only necessary compiler options\n3. Remove conflicting settings\n\n#### Pattern 3: Package Build Order\n**Symptoms:** Dependencies not available during compilation\n\n**Solution:**\n1. Build dependent packages first\n2. Use workspace references correctly\n3. Ensure dist/ directories contain .d.ts files\n\n### Learning Capture\n\n#### Episode Memory Structure\n```\nProblem Signature:\n- Symptoms: TypeScript compilation errors in new package\n- Context: MCP server development with FlatBuffers integration\n- Affected Components: mcp-devtools-unified, mcp-fbs packages\n\nInvestigation Path:\n1. Identified missing FlatBuffers TypeScript bindings\n2. Found incomplete package configuration\n3. Discovered dependency build order issues\n\nSolution Pattern:\n- Created manual TypeScript bindings for FlatBuffers schemas\n- Fixed tsconfig.json inheritance\n- Established proper import relationships\n\nSuccess Metrics:\n- Compilation errors resolved: 100%\n- Build process stabilized\n- Package integration successful\n```\n\n### Prevention Strategies\n\n1. **Pre-build Validation:** Always build dependencies before dependent packages\n2. **Schema-First Development:** Generate bindings immediately after schema changes\n3. **Configuration Consistency:** Use consistent TypeScript configurations across packages\n4. **Import Path Standards:** Establish clear conventions for workspace imports\n\n### Cognitive Insights\n\n**Key Learning:** TypeScript compilation issues in monorepo environments typically stem from three root causes:\n1. Incomplete dependency management\n2. Configuration inheritance problems\n3. Schema/code generation gaps\n\n**Transferable Pattern:** Apply this systematic investigation approach to similar compilation issues in any TypeScript monorepo environment.",
+  "layer": "Procedural",
+  "domain": "SoftwareDevelopment",
+  "tags": [
+    "typescript",
+    "compilation",
+    "monorepo",
+    "flatbuffers",
+    "mcp",
+    "debugging",
+    "build-system"
+  ],
+  "metadata": {
+    "applicable_contexts": [
+      "TypeScript monorepo development",
+      "MCP package integration",
+      "FlatBuffers schema usage",
+      "Workspace dependency management"
+    ],
+    "success_rate": 0.95,
+    "cognitive_load": 3,
+    "estimated_duration_minutes": 30,
+    "difficulty_level": "intermediate"
+  }
+}

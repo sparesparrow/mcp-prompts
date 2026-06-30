@@ -1,0 +1,34 @@
+{
+  "id": "embedded-esp32-full-bringup-workflow",
+  "name": "Embedded ESP32 Full Bringup Workflow",
+  "description": "Complete ESP32 project setup from scratch to working device with MCP integration",
+  "content": "# Embedded ESP32 Full Bringup Workflow\n\n## Overview\nComplete workflow for setting up an ESP32 project from scratch to a fully functional device with network connectivity, HTTP API, and MCP server integration.\n\n## Prerequisites\n- ESP32-S3 development board\n- USB-C data cable\n- PlatformIO installed\n- Linux/Mac development machine\n\n## Phase 1: Initial Setup\n\n### Step 1.1: Network Configuration\n**Use**: `esp32-network-ap-mode-configuration`\n\n```bash\n# Follow the complete guide in esp32-network-ap-mode-configuration\n# Key steps:\n# 1. Configure AP SSID and password in config.h\n# 2. Initialize WiFi.softAP() in setup()\n# 3. Verify AP appears in network scan\n```\n\n**Validation**:\n- [ ] Device appears in WiFi network scan\n- [ ] Can connect to AP from client device\n- [ ] Serial monitor shows AP IP: 192.168.4.1\n\n### Step 1.2: Build & Upload\n**Use**: `esp32-platformio-serial-upload-debugging`\n\n```bash\n# Follow troubleshooting guide if upload fails\n# Standard workflow:\npio run --environment esp32-s3\npio run --environment esp32-s3 --target upload\n```\n\n**Validation**:\n- [ ] Build completes without errors\n- [ ] Upload succeeds\n- [ ] Serial monitor shows boot messages\n\n## Phase 2: Schema & Code Generation\n\n### Step 2.1: FlatBuffers Schema Sync\n**Use**: `esp32-flatbuffers-schema-sync-workflow`\n\n```bash\n# If using FlatBuffers for protocol:\n# 1. Edit .fbs schema files\n# 2. Regenerate headers\nflatc --cpp --gen-mutable schemas/*.fbs -o include/\n\n# 3. Clean and rebuild\npio run --target clean\npio run --environment esp32-s3\n```\n\n**Validation**:\n- [ ] Generated headers have recent timestamps\n- [ ] Build completes without FlatBuffers errors\n- [ ] No \"undefined reference\" linker errors\n\n## Phase 3: HTTP API Integration\n\n### Step 3.1: HTTP Server Setup\n**Use**: `esp32-mcp-server-http-api-integration`\n\n```cpp\n// Initialize AsyncWebServer\nAsyncWebServer* httpServer = new AsyncWebServer(80);\n\n// Add endpoints\nhttpServer->on(\"/api/v1/system/health\", HTTP_GET, handleHealth);\nhttpServer->on(\"/api/v1/bpm/current\", HTTP_GET, handleBPM);\n\n// Start server\nhttpServer->begin();\n```\n\n**Validation**:\n- [ ] `curl http://192.168.4.1/api/v1/system/health` returns JSON\n- [ ] CORS headers present for web UI access\n- [ ] Error handling returns proper JSON error responses\n\n## Phase 4: Memory Optimization\n\n### Step 4.1: FFT Memory Constraints\n**Use**: `embedded-audio-fft-memory-constraints`\n\n```cpp\n// Pre-allocate all buffers at startup\nclass BPMDetector {\n    float* fftInput;  // Pre-allocated\n    float* fftOutput; // Pre-allocated\n    // ...\n};\n\n// Monitor heap\nSerial.printf(\"Free heap: %lu\\n\", ESP.getFreeHeap());\n```\n\n**Validation**:\n- [ ] Free heap stays > 50KB during operation\n- [ ] No memory leaks over 24 hours\n- [ ] FFT processing completes in < 50ms\n\n## Phase 5: MCP Server Integration\n\n### Step 5.1: MCP Server Setup (Host Side)\n**Use**: `mcp-server-file-storage-index-sync`\n\n```bash\n# If using mcp-prompts server:\n# 1. Ensure index.json is synchronized\ncd /path/to/mcp-prompts/data/prompts\npython3 scripts/regenerate_index.py\n\n# 2. Start MCP server\nmcp-prompts start --mode mcp\n```\n\n**Validation**:\n- [ ] MCP server starts without errors\n- [ ] `list_prompts` returns all prompts\n- [ ] Index matches actual files\n\n## Complete Validation Checklist\n\n### Network\n- [ ] AP mode active and accessible\n- [ ] Web server responds on port 80\n- [ ] Can ping device from host\n\n### Functionality\n- [ ] BPM detection working (if applicable)\n- [ ] HTTP API endpoints functional\n- [ ] Serial output shows no errors\n\n### Memory\n- [ ] Free heap > 50KB\n- [ ] No memory leaks detected\n- [ ] Stable operation > 1 hour\n\n### Integration\n- [ ] MCP server can query device API\n- [ ] Device appears in MCP tool results\n- [ ] End-to-end workflow functional\n\n## Troubleshooting\n\n### Common Issues\n\n**AP not starting**:\n→ Follow `esp32-network-ap-mode-configuration` troubleshooting\n\n**Upload fails**:\n→ Follow `esp32-platformio-serial-upload-debugging` checklist\n\n**Build errors**:\n→ Check `esp32-flatbuffers-schema-sync-workflow` if using FlatBuffers\n\n**Memory crashes**:\n→ Apply `embedded-audio-fft-memory-constraints` optimizations\n\n**MCP server issues**:\n→ Use `mcp-server-file-storage-index-sync` to fix index\n\n## Success Metrics\n\n- **Total Setup Time**: < 2 hours from scratch to working device\n- **Upload Success Rate**: > 95% on first attempt\n- **API Response Time**: < 100ms\n- **Memory Stability**: 24+ hours without restart\n- **Integration Success**: MCP tools can query device\n\n## Related Atomic Prompts\n\nThis meta-workflow combines:\n1. `esp32-network-ap-mode-configuration`\n2. `esp32-platformio-serial-upload-debugging`\n3. `esp32-flatbuffers-schema-sync-workflow`\n4. `esp32-mcp-server-http-api-integration`\n5. `embedded-audio-fft-memory-constraints`\n6. `mcp-server-file-storage-index-sync`\n\n## Next Steps\n\nAfter completing this workflow:\n1. Document any project-specific learnings\n2. Create new atomic prompts for unique patterns\n3. Update confidence levels based on results\n4. Share learnings with team/projects",
+  "isTemplate": false,
+  "tags": ["embedded", "esp32", "workflow", "meta", "bringup", "setup"],
+  "category": "esp32",
+  "version": 1,
+  "createdAt": "2026-01-01T03:00:00.000Z",
+  "updatedAt": "2026-01-01T03:00:00.000Z",
+  "metadata": {
+    "context": ["embedded", "esp32", "workflow"],
+    "problem": "Complete ESP32 project setup from scratch to working device",
+    "requires_knowledge": [
+      "esp32-network-ap-mode-configuration",
+      "esp32-platformio-serial-upload-debugging",
+      "esp32-flatbuffers-schema-sync-workflow",
+      "esp32-mcp-server-http-api-integration",
+      "embedded-audio-fft-memory-constraints",
+      "mcp-server-file-storage-index-sync"
+    ],
+    "success_count": 1,
+    "confidence": "medium",
+    "validation_checklist": [
+      "Device broadcasts WiFi with configured SSID",
+      "Upload completes without errors",
+      "FFT processes audio without crashes",
+      "Free heap stays > 50KB",
+      "HTTP API responds correctly",
+      "MCP server can query device"
+    ]
+  }
+}

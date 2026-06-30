@@ -1,0 +1,15 @@
+{
+  "id": "prompt_1767749435950_ya7fo24vt",
+  "name": "test-prompt",
+  "description": "",
+  "template": "This is a test prompt for functionality testing",
+  "category": "test",
+  "tags": [],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-07T01:30:35.950Z",
+  "updatedAt": "2026-01-07T01:30:35.950Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

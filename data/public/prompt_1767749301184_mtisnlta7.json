@@ -1,0 +1,15 @@
+{
+  "id": "prompt_1767749301184_mtisnlta7",
+  "name": "test-minimal",
+  "description": "",
+  "template": "Test content",
+  "category": "general",
+  "tags": [],
+  "variables": [],
+  "version": "latest",
+  "createdAt": "2026-01-07T01:28:21.184Z",
+  "updatedAt": "2026-01-07T01:28:21.184Z",
+  "isLatest": true,
+  "metadata": {},
+  "accessLevel": "public"
+}

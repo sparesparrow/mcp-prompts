@@ -1,0 +1,20 @@
+{
+  "id": "performance-regression-diagnosis",
+  "name": "performance-regression-diagnosis",
+  "description": "Systematic approach to diagnosing performance regressions",
+  "content": "# Performance Regression Diagnosis Workflow\n\n## Step 1: Establish Baseline (5 minutes)\n- Identify when performance was acceptable\n- Document expected vs actual performance metrics\n- Confirm regression is reproducible\n\n## Step 2: Profiling (15-30 minutes)\n```bash\n# CPU profiling\nperf record -g ./application\nperf report\n\n# Memory profiling\nvalgrind --tool=massif ./application\nms_print massif.out.*\n\n# Call graph analysis\ngprof ./application gmon.out > analysis.txt\n```\n\n## Step 3: Binary Search in Version History (30-60 minutes)\n- Use git bisect to find introducing commit\n- Test performance at each step\n- Identify the specific code change\n\n## Step 4: Code Analysis (30-90 minutes)\n- Review the problematic commit\n- Analyze algorithm complexity changes\n- Check for memory leaks or bloat\n- Look for lock contention or I/O issues\n\n## Step 5: Microbenchmarking (15-30 minutes)\n```cpp\n// Example microbenchmark\n#include <benchmark/benchmark.h>\n\nstatic void BM_ProblematicFunction(benchmark::State& state) {\n  for (auto _ : state) {\n    // Code under test\n    problematic_function();\n  }\n}\nBENCHMARK(BM_ProblematicFunction);\n```\n\n## Common Causes\n- **Algorithm degradation**: O(n) → O(n²)\n- **Memory leaks**: Growing heap usage\n- **Lock contention**: Thread synchronization overhead\n- **I/O bottlenecks**: Disk/network latency\n- **Cache misses**: Memory access pattern issues",
+  "arguments": [],
+  "tags": [
+    "performance",
+    "profiling",
+    "regression",
+    "diagnosis",
+    "optimization"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 3
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "embedded-firmware-deployment",
+  "name": "Firmware Deployment",
+  "description": "Deploy firmware to embedded devices with proper configuration",
+  "content": "Deploy firmware to {{device_type}} device.\n\nDevice Port: {{device_port}}\nProfile: {{profile_name}}\nBuild Type: {{build_type}}\n\nDeployment Steps:\n1. Verify device connection at {{device_port}}\n2. Load Conan profile: {{profile_name}}\n3. Build firmware with {{build_type}} configuration\n4. Flash firmware using appropriate tool\n5. Verify deployment success\n6. Reset device if requested\n\n{{#if verify_deployment}}Run verification tests after deployment{{/if}}\n{{#if parallel_deploy}}Deploy to multiple devices in parallel{{/if}}",
+  "isTemplate": true,
+  "variables": ["device_type", "device_port", "profile_name", "build_type", "verify_deployment", "parallel_deploy"],
+  "tags": ["embedded", "deployment", "flash", "firmware", "esp32", "arduino"],
+  "category": "embedded",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

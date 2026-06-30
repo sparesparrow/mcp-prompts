@@ -1,0 +1,13 @@
+{
+  "id": "embedded-jtag-workflow",
+  "name": "JTAG Debug Workflow",
+  "description": "Set up JTAG debugging workflow for ESP32-S3 and similar devices",
+  "content": "Configure JTAG debugging for {{device_type}}.\n\nTarget: {{target_chip}}\nInterface: {{jtag_interface}}\nDebug Speed: {{debug_speed}} kHz\n\nSetup Steps:\n1. Configure OpenOCD for {{target_chip}}\n2. Set JTAG interface to {{jtag_interface}}\n3. Set adapter speed to {{debug_speed}} kHz\n4. Initialize flash programming support\n5. Configure GDB server on port {{gdb_port}}\n\nOpenOCD Configuration:\n```\ninterface {{jtag_interface}}\nadapter speed {{debug_speed}}\nsource [find target/{{target_chip}}.cfg]\ngdb_port {{gdb_port}}\n```\n\n{{#if auto_reset}}Enable automatic target reset on connect{{/if}}\n{{#if flash_verify}}Verify flash contents after programming{{/if}}",
+  "isTemplate": true,
+  "variables": ["device_type", "target_chip", "jtag_interface", "debug_speed", "gdb_port", "auto_reset", "flash_verify"],
+  "tags": ["embedded", "jtag", "debug", "openocd", "esp32-s3", "gdb"],
+  "category": "embedded",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

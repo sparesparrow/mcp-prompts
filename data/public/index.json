@@ -1,0 +1,778 @@
+{
+  "id": "index",
+  "name": "index",
+  "prompts": [
+    {
+      "id": "analysis-assistant",
+      "name": "Analysis Assistant",
+      "description": "You are a data analysis and transformation assistant that can parse and extract organized JSON data,...",
+      "tags": [
+        "analysis",
+        "insights",
+        "ai-assistant"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "architecture-design-assistant",
+      "name": "Architecture Design Assistant",
+      "description": "You are a talented language interpreter and a helpful software architecture design assistant thinkin...",
+      "tags": [
+        "architecture",
+        "design",
+        "programming",
+        "ai-assistant"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "clipboard-search-pattern-analyzer",
+      "name": "clipboard-search-pattern-analyzer",
+      "description": "Analyze clipboard search patterns to optimize retrieval and indexing strategies",
+      "tags": [
+        "cliphist",
+        "search",
+        "optimization",
+        "analysis",
+        "user-experience"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "code-refactoring-assistant",
+      "name": "Code Refactoring Assistant",
+      "description": "You are a talented information interpreter and transformator and a helpful source code refactoring a...",
+      "tags": [
+        "refactoring",
+        "programming",
+        "optimization",
+        "ai-assistant"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "code-review-assistant",
+      "name": "Code Review Assistant",
+      "description": "A comprehensive template for reviewing code with best practices, security considerations, and improvement suggestions",
+      "tags": [
+        "development",
+        "code-review",
+        "quality-assurance",
+        "security"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "conan-cross-compilation",
+      "name": "Cross-Compilation Setup",
+      "description": "Set up Conan for cross-compilation to embedded targets",
+      "tags": [
+        "conan",
+        "cross-compilation",
+        "toolchain",
+        "embedded"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "conan-package-creation",
+      "name": "Conan Package Creation",
+      "description": "Create a new Conan package with best practices",
+      "tags": [
+        "conan",
+        "package",
+        "creation",
+        "template"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "conan-profile-generation",
+      "name": "Conan Profile Generation",
+      "description": "Generate Conan profiles for cross-compilation and embedded development",
+      "tags": [
+        "conan",
+        "profile",
+        "cross-compilation",
+        "build"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "consolidated-interfaces-template",
+      "name": "Consolidated TypeScript Interfaces Template",
+      "description": "A template for creating a unified TypeScript interfaces file that consolidates related interfaces into a centralized location",
+      "tags": [
+        "development",
+        "typescript",
+        "interfaces",
+        "consolidation",
+        "template"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "could-you-interpret-the-assumed-applicat",
+      "name": "Could you interpret the assumed applicat...",
+      "description": "Could you interpret the assumed application of this software design as a life-story analogy?",
+      "tags": [
+        "ai",
+        "productivity"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "cpp-memory-management-principles",
+      "name": "cpp-memory-management-principles",
+      "description": "Core principles of memory management in C++ with OpenSSL-specific considerations",
+      "tags": [
+        "cpp",
+        "memory-management",
+        "openssl",
+        "security",
+        "raii"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "cppcheck-configuration-openssl",
+      "name": "cppcheck-configuration-openssl",
+      "description": "Optimized cppcheck configuration for OpenSSL cryptographic code analysis",
+      "tags": [
+        "cpp",
+        "cppcheck",
+        "configuration",
+        "openssl",
+        "security"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "data-analysis-template",
+      "name": "Data Analysis Template",
+      "description": "A flexible template for analyzing various types of data with customizable parameters",
+      "tags": [
+        "analysis",
+        "data",
+        "research",
+        "statistics"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "debugging-assistant",
+      "name": "Debugging Assistant",
+      "description": "You are a development assistant helping with {{project_type}} development using {{language}}",
+      "tags": [
+        "debugging",
+        "programming",
+        "troubleshooting",
+        "ai-assistant"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "development-system-prompt",
+      "name": "Development System Prompt",
+      "description": "A template for creating system prompts for development assistance",
+      "tags": [
+        "development",
+        "system",
+        "template"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "development-system-prompt-template",
+      "name": "Development System Prompt Template",
+      "description": "A template for creating system prompts for development assistance",
+      "tags": [
+        "development",
+        "system",
+        "template"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "development-workflow",
+      "name": "Development Workflow",
+      "description": "Standard workflow for installing dependencies, testing, documenting, and pushing changes",
+      "tags": [
+        "development",
+        "workflow",
+        "python"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "docker-compose-prompt-combiner",
+      "name": "Docker Compose Prompt Combiner",
+      "description": "A specialized prompt combiner for creating Docker Compose configurations that integrates service definitions, volumes, networks, and deployment patterns",
+      "tags": [
+        "devops",
+        "docker",
+        "docker-compose",
+        "orchestration",
+        "deployment"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "docker-containerization-guide",
+      "name": "Docker Containerization Guide",
+      "description": "A template for setting up Docker containers for Node.js applications with best practices for multi-stage builds, security, and configuration",
+      "tags": [
+        "development",
+        "docker",
+        "containerization",
+        "devops",
+        "deployment",
+        "template"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "embedded-audio-fft-memory-constraints",
+      "name": "Embedded Audio FFT Memory Constraints",
+      "description": "Optimize FFT processing on ESP32 with 320KB RAM for real-time audio analysis",
+      "tags": [
+        "embedded",
+        "esp32",
+        "audio",
+        "memory",
+        "fft",
+        "optimization",
+        "real-time"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "audio",
+          "memory",
+          "real-time"
+        ],
+        "problem": "FFT processing on ESP32 with 320KB RAM: optimize memory usage",
+        "success_count": 1,
+        "confidence": "medium",
+        "constraints": {
+          "total_ram": "320KB",
+          "available_after_system": "~200KB",
+          "fft_buffer_size_samples": 512,
+          "fft_buffer_bytes": "512 * 4 bytes float = 2KB"
+        },
+        "related_prompts": [
+          "esp32-mcp-server-http-api-integration",
+          "esp32-network-ap-mode-configuration"
+        ]
+      }
+    },
+    {
+      "id": "embedded-device-detection",
+      "name": "Embedded Device Detection",
+      "description": "Detect and identify connected embedded devices (ESP32, Arduino, etc.)",
+      "tags": [
+        "embedded",
+        "esp32",
+        "arduino",
+        "usb",
+        "serial",
+        "detection"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "embedded-esp32-full-bringup-workflow",
+      "name": "Embedded ESP32 Full Bringup Workflow",
+      "description": "Complete ESP32 project setup from scratch to working device with MCP integration",
+      "tags": [
+        "embedded",
+        "esp32",
+        "workflow",
+        "meta",
+        "bringup",
+        "setup"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "workflow"
+        ],
+        "problem": "Complete ESP32 project setup from scratch to working device",
+        "requires_knowledge": [
+          "esp32-network-ap-mode-configuration",
+          "esp32-platformio-serial-upload-debugging",
+          "esp32-flatbuffers-schema-sync-workflow",
+          "esp32-mcp-server-http-api-integration",
+          "embedded-audio-fft-memory-constraints",
+          "mcp-server-file-storage-index-sync"
+        ],
+        "success_count": 1,
+        "confidence": "medium",
+        "validation_checklist": [
+          "Device broadcasts WiFi with configured SSID",
+          "Upload completes without errors",
+          "FFT processes audio without crashes",
+          "Free heap stays > 50KB",
+          "HTTP API responds correctly",
+          "MCP server can query device"
+        ]
+      }
+    },
+    {
+      "id": "embedded-firmware-deployment",
+      "name": "Firmware Deployment",
+      "description": "Deploy firmware to embedded devices with proper configuration",
+      "tags": [
+        "embedded",
+        "deployment",
+        "flash",
+        "firmware",
+        "esp32",
+        "arduino"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "embedded-jtag-workflow",
+      "name": "JTAG Debug Workflow",
+      "description": "Set up JTAG debugging workflow for ESP32-S3 and similar devices",
+      "tags": [
+        "embedded",
+        "jtag",
+        "debug",
+        "openocd",
+        "esp32-s3",
+        "gdb"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "embedded-serial-debugging",
+      "name": "Serial Debugging",
+      "description": "Debug embedded devices via serial communication",
+      "tags": [
+        "embedded",
+        "serial",
+        "debug",
+        "logging",
+        "uart"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "esp32-fft-configuration-guide",
+      "name": "esp32-fft-configuration-guide",
+      "description": "Guide for optimizing FFT configuration on ESP32 for audio beat detection",
+      "tags": [
+        "esp32",
+        "fft",
+        "audio",
+        "beat-detection",
+        "optimization",
+        "embedded"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "esp32-fft-optimization-methodology",
+      "name": "esp32-fft-optimization-methodology",
+      "description": "Comprehensive methodology for optimizing FFT configurations on ESP32 for real-time BPM detection, achieving 2x performance improvements",
+      "tags": [
+        "fft",
+        "esp32",
+        "optimization",
+        "performance",
+        "bpm-detection",
+        "real-time",
+        "embedded"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "esp32-flatbuffers-schema-sync-workflow",
+      "name": "ESP32 FlatBuffers Schema Sync Workflow",
+      "description": "Prevent FlatBuffers schema version mismatch errors by maintaining schema synchronization",
+      "tags": [
+        "embedded",
+        "esp32",
+        "flatbuffers",
+        "schema",
+        "build",
+        "code-generation"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "flatbuffers",
+          "schema"
+        ],
+        "problem": "Prevent FlatBuffers schema version mismatch errors",
+        "success_count": 1,
+        "confidence": "high",
+        "triggers": {
+          "when_to_regenerate": [
+            "After modifying any .fbs schema file",
+            "After changing flatbuffers version",
+            "When seeing 'FLATBUFFERS_VERSION_*' errors during build"
+          ]
+        }
+      }
+    },
+    {
+      "id": "esp32-mcp-server-http-api-integration",
+      "name": "ESP32 MCP Server HTTP API Integration",
+      "description": "Expose ESP32 device capabilities via HTTP API compatible with mcp-prompts",
+      "tags": [
+        "embedded",
+        "esp32",
+        "mcp",
+        "http-server",
+        "api",
+        "integration"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "mcp",
+          "http-server"
+        ],
+        "problem": "Expose ESP32 device capabilities via HTTP API compatible with mcp-prompts",
+        "success_count": 1,
+        "confidence": "low",
+        "related_prompts": [
+          "esp32-network-ap-mode-configuration",
+          "esp32-flatbuffers-schema-sync-workflow",
+          "embedded-audio-fft-memory-constraints"
+        ]
+      }
+    },
+    {
+      "id": "esp32-network-ap-mode-configuration",
+      "name": "ESP32 Network AP Mode Configuration",
+      "description": "Configure ESP32 as WiFi access point for standalone operation with web server",
+      "tags": [
+        "embedded",
+        "esp32",
+        "networking",
+        "wifi",
+        "ap-mode",
+        "configuration"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "networking",
+          "wifi"
+        ],
+        "problem": "Set up ESP32 as WiFi access point for standalone operation",
+        "success_count": 1,
+        "confidence": "low",
+        "related_prompts": [
+          "esp32-mcp-server-http-api-integration",
+          "esp32-platformio-serial-upload-debugging",
+          "embedded-audio-fft-memory-constraints"
+        ]
+      }
+    },
+    {
+      "id": "esp32-platformio-serial-upload-debugging",
+      "name": "ESP32 PlatformIO Serial Upload Debugging",
+      "description": "Diagnose and fix PlatformIO upload failures for ESP32 devices",
+      "tags": [
+        "embedded",
+        "esp32",
+        "platformio",
+        "build",
+        "upload",
+        "debugging"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "embedded",
+          "esp32",
+          "platformio",
+          "build"
+        ],
+        "problem": "Diagnose and fix PlatformIO upload failures",
+        "success_count": 1,
+        "confidence": "medium",
+        "related_prompts": [
+          "esp32-network-ap-mode-configuration",
+          "esp32-flatbuffers-schema-sync-workflow"
+        ]
+      }
+    },
+    {
+      "id": "foresight-assistant",
+      "name": "Foresight Assistant",
+      "description": "A sophisticated assistant that analyzes future scenarios and provides insight into potential outcomes of user decisions.",
+      "tags": [
+        "future",
+        "planning",
+        "decision-making",
+        "scenarios",
+        "prediction",
+        "analysis",
+        "ai-assistant"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "generate-different-types-of-questions-ab",
+      "name": "Generate different types of questions ab...",
+      "description": "Generate different types of questions about the given text",
+      "tags": [
+        "ai",
+        "productivity"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "image-1-describe-the-icon-in-one-sen",
+      "name": "<|image_1|>\ndescribe the icon in one sen...",
+      "description": "<|image_1|>\ndescribe the icon in one sentence",
+      "tags": [
+        "ai",
+        "productivity"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "initialize-project-setup-for-a-new-micro",
+      "name": "Initialize project setup for a new micro...",
+      "description": "Initialize project setup for a new microservice",
+      "tags": [
+        "ai",
+        "productivity"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "install-dependencies-build-run-test",
+      "name": "install dependencies, build, run, test,...",
+      "description": "install dependencies, build, run, test, fix, document, commit, and push your changes",
+      "tags": [
+        "ai",
+        "productivity"
+      ],
+      "isTemplate": false,
+      "metadata": {}
+    },
+    {
+      "id": "mcp-integration-assistant",
+      "name": "MCP Integration Assistant",
+      "description": "A comprehensive prompt template for coordinating multiple MCP servers to solve complex tasks",
+      "tags": [
+        "mcp-integration",
+        "multi-server",
+        "template",
+        "advanced"
+      ],
+      "isTemplate": true,
+      "metadata": {
+        "recommended_servers": [
+          "prompt-manager",
+          "github",
+          "memory",
+          "filesystem",
+          "sequential-thinking",
+          "postgres"
+        ],
+        "example_variables": {
+          "task_description": "Analyze a GitHub repository to identify potential performance bottlenecks, recommend improvements, and document the findings",
+          "required_skills": "code analysis, performance optimization, documentation",
+          "task_type": "code optimization",
+          "additional_servers": "brave-search: Search the web for performance optimization best practices",
+          "additional_guidelines": "Prioritize high-impact, low-effort optimizations that can be implemented quickly"
+        }
+      }
+    },
+    {
+      "id": "mcp-resource-generation",
+      "name": "MCP Resource Generation",
+      "description": "Generate an MCP resource with proper structure",
+      "tags": [
+        "mcp",
+        "resource",
+        "generation"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "mcp-resources-explorer",
+      "name": "MCP Resources Explorer",
+      "description": "A template for exploring and leveraging resources across multiple MCP servers",
+      "tags": [
+        "mcp-resources",
+        "resource-integration",
+        "template",
+        "discovery"
+      ],
+      "isTemplate": true,
+      "metadata": {
+        "resource_capabilities": [
+          "list",
+          "get",
+          "search",
+          "query",
+          "aggregate",
+          "transform"
+        ],
+        "example_variables": {
+          "resource_context": "A project with source code on GitHub, configuration in local files, and data in a PostgreSQL database",
+          "exploration_task": "Map the relationships between database tables, code repositories, and configuration files to create a comprehensive system overview",
+          "task_type": "system architecture analysis",
+          "additional_resource_servers": "brave-search: Access web resources for documentation and best practices",
+          "custom_guidelines": "Focus on identifying security-related configurations and data handling patterns across all resources"
+        },
+        "recommended_tools": [
+          "resources/list",
+          "resources/get",
+          "resources/search"
+        ]
+      }
+    },
+    {
+      "id": "mcp-server-composition",
+      "name": "MCP Server Composition",
+      "description": "Compose multiple MCP servers into a unified server",
+      "tags": [
+        "mcp",
+        "server",
+        "composition",
+        "unified"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "mcp-server-dev-prompt-combiner",
+      "name": "MCP Server Development Prompt Combiner",
+      "description": "A specialized prompt combiner for MCP server development that integrates interface definitions, implementation patterns, and best practices",
+      "tags": [
+        "development",
+        "mcp",
+        "server",
+        "prompt-engineering",
+        "integration"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "mcp-server-file-storage-index-sync",
+      "name": "MCP Server File Storage Index Synchronization",
+      "description": "Fix mcp-prompts file storage index.json synchronization issues",
+      "tags": [
+        "infrastructure",
+        "mcp",
+        "file-storage",
+        "data-consistency",
+        "indexing"
+      ],
+      "isTemplate": false,
+      "metadata": {
+        "context": [
+          "infrastructure",
+          "mcp",
+          "file-storage",
+          "data-consistency"
+        ],
+        "problem": "mcp-prompts file storage index.json gets out of sync with actual files",
+        "success_count": 1,
+        "confidence": "medium",
+        "related_prompts": [
+          "esp32-flatbuffers-schema-sync-workflow"
+        ]
+      }
+    },
+    {
+      "id": "mcp-tool-generation",
+      "name": "MCP Tool Generation",
+      "description": "Generate an MCP tool with proper structure and documentation",
+      "tags": [
+        "mcp",
+        "tool",
+        "generation",
+        "fastmcp"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "monorepo-migration-guide",
+      "name": "Monorepo Migration and Code Organization Guide",
+      "description": "A template for guiding the migration of code into a monorepo structure with best practices for TypeScript interfaces, Docker configuration, and CI/CD workflows",
+      "tags": [
+        "development",
+        "monorepo",
+        "typescript",
+        "docker",
+        "ci-cd",
+        "migration"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    },
+    {
+      "id": "voice-command-design-principles",
+      "name": "voice-command-design-principles",
+      "description": "Design principles for effective voice command interfaces in MIA",
+      "tags": [
+        "mia",
+        "voice-command",
+        "design",
+        "ux",
+        "context-awareness"
+      ],
+      "isTemplate": true,
+      "metadata": {}
+    }
+  ],
+  "metadata": {
+    "totalPrompts": 45,
+    "lastUpdated": "2026-01-06T12:00:00.000000Z",
+    "version": "1.0"
+  }
+}

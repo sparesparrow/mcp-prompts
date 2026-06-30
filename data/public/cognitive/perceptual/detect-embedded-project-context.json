@@ -1,0 +1,40 @@
+{
+  "id": "detect-embedded-project-context",
+  "name": "detect-embedded-project-context",
+  "description": "Analyze embedded project structure and requirements",
+  "content": "Analyze this embedded project to understand its characteristics:\n\nHardware: {{hardware_platform}}\nCode Structure: {{code_files}}\nBuild System: {{build_config}}\nCommunication: {{interfaces}}\n\nIdentify:\n1. Microcontroller/processor architecture (ARM, ESP32, AVR, etc.)\n2. Real-time requirements and constraints\n3. Memory limitations (RAM, flash)\n4. Peripheral usage (GPIO, ADC, UART, I2C, SPI)\n5. Power consumption requirements\n6. Safety/security criticality\n\nAssess whether this is:\n- Bare-metal embedded system\n- RTOS-based (FreeRTOS, Zephyr, etc.)\n- IoT device with network connectivity\n- Safety-critical system (automotive, medical, industrial)",
+  "arguments": [
+    {
+      "name": "hardware_platform",
+      "description": "Target hardware platform",
+      "required": true
+    },
+    {
+      "name": "code_files",
+      "description": "Key source files",
+      "required": true
+    },
+    {
+      "name": "build_config",
+      "description": "Build system and configuration",
+      "required": true
+    },
+    {
+      "name": "interfaces",
+      "description": "Communication interfaces used",
+      "required": true
+    }
+  ],
+  "tags": [
+    "embedded",
+    "hardware",
+    "real-time",
+    "microcontroller"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 1,
+    "domain": 1,
+    "abstractionLevel": 2
+  }
+}

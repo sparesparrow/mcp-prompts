@@ -1,0 +1,41 @@
+{
+  "id": "embedded-memory-constrained-analysis",
+  "name": "embedded-memory-constrained-analysis",
+  "description": "Memory analysis for resource-constrained embedded systems",
+  "content": "Analyze {{code}} for memory constraints in embedded context:\n\nHardware Context: {{hardware_specs}}\nMemory Limits: {{memory_constraints}}\nReal-time Requirements: {{rt_requirements}}\n\n## Memory Analysis Checklist\n\n### 1. Stack Usage Analysis\n- **Default Task Stack**: ESP32 FreeRTOS default 4KB\n- **Interrupt Stack**: Additional overhead for ISRs\n- **Local Variables**: Large arrays/structs on stack\n- **Function Call Depth**: Recursion and deep call chains\n\n### 2. Heap Memory Assessment\n- **Dynamic Allocation**: malloc/new usage patterns\n- **Memory Leaks**: Unfreed allocations in loops\n- **Fragmentation**: Frequent alloc/free cycles\n- **Peak Usage**: Maximum concurrent allocations\n\n### 3. Static Memory Usage\n- **Global Variables**: .data and .bss sections\n- **String Literals**: Read-only data section\n- **Initialized Data**: Flash-to-RAM copying\n- **Code Size**: Instruction memory requirements\n\n### 4. Real-Time Memory Access\n- **IRAM Placement**: Interrupt handlers and time-critical code\n- **DRAM Access**: Slower but larger capacity\n- **Cache Considerations**: ESP32 cache mapping\n- **DMA Buffers**: Peripheral data transfer buffers\n\n### 5. Power-Aware Memory\n- **Retention During Sleep**: RTC memory preservation\n- **Fast Boot**: Minimize initialization time\n- **Memory Power Gating**: When not in use\n\n## Recommendations\n[Based on analysis, provide specific recommendations]",
+  "arguments": [
+    {
+      "name": "code",
+      "description": "Code to analyze",
+      "required": true
+    },
+    {
+      "name": "hardware_specs",
+      "description": "Target hardware specifications",
+      "required": true
+    },
+    {
+      "name": "memory_constraints",
+      "description": "Memory limitations",
+      "required": true
+    },
+    {
+      "name": "rt_requirements",
+      "description": "Real-time requirements",
+      "required": true
+    }
+  ],
+  "tags": [
+    "embedded",
+    "memory",
+    "real-time",
+    "esp32",
+    "analysis"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 2
+  }
+}

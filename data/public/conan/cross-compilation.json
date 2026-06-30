@@ -1,0 +1,13 @@
+{
+  "id": "conan-cross-compilation",
+  "name": "Cross-Compilation Setup",
+  "description": "Set up Conan for cross-compilation to embedded targets",
+  "content": "Configure cross-compilation from {{host_platform}} to {{target_platform}}.\n\nHost: {{host_platform}} ({{host_arch}})\nTarget: {{target_platform}} ({{target_arch}})\nToolchain: {{toolchain_name}}\n\nSetup Steps:\n1. Install toolchain: {{toolchain_name}}\n2. Configure Conan profiles:\n   - Host profile: default\n   - Build profile: {{build_profile}}\n3. Set environment variables:\n   - CC={{cc_compiler}}\n   - CXX={{cxx_compiler}}\n   - AR={{ar_tool}}\n4. Create conanfile with proper settings\n\nBuild Command:\n```bash\nconan install . --profile:host={{target_profile}} --profile:build={{build_profile}} --build=missing\nconan build .\n```\n\n{{#if use_docker}}Use Docker container for isolated build environment{{/if}}\n{{#if cache_toolchain}}Cache toolchain in Conan package{{/if}}",
+  "isTemplate": true,
+  "variables": ["host_platform", "host_arch", "target_platform", "target_arch", "toolchain_name", "build_profile", "target_profile", "cc_compiler", "cxx_compiler", "ar_tool", "use_docker", "cache_toolchain"],
+  "tags": ["conan", "cross-compilation", "toolchain", "embedded"],
+  "category": "conan",
+  "version": 1,
+  "createdAt": "2024-12-29T00:00:00.000Z",
+  "updatedAt": "2024-12-29T00:00:00.000Z"
+}

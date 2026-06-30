@@ -1,0 +1,29 @@
+{
+  "id": "esp32-code-review",
+  "name": "ESP32 Code Review Assistant",
+  "description": "Comprehensive ESP32-specific code review template focusing on embedded systems best practices, memory management, real-time constraints, and hardware-specific considerations",
+  "content": "You are a senior embedded systems engineer reviewing ESP32 firmware code. Provide a comprehensive ESP32-specific code review with the following sections:\n\n## 1. Overall Assessment\n- Brief summary of code quality for embedded systems\n- Key strengths and areas for improvement\n- ESP32-specific considerations ({{platform}} variant)\n\n## 2. Memory Management (Critical for ESP32)\n- **Heap fragmentation**: Check for frequent allocations/deallocations\n- **Stack overflow risks**: Analyze stack usage in tasks\n- **Memory leaks**: Identify allocations without corresponding frees\n- **Pre-allocation**: Verify buffers are pre-allocated for real-time paths\n- **PSRAM usage**: If ESP32-S3, check PSRAM allocation patterns\n- **FreeRTOS heap**: Verify heap configuration matches usage\n\n## 3. Real-Time Constraints\n- **Task priorities**: Verify FreeRTOS task priorities are appropriate\n- **Blocking operations**: Identify blocking calls in critical paths\n- **Interrupt handling**: Check ISR duration and stack usage\n- **Watchdog feeding**: Verify watchdog is fed during long operations\n- **Timing accuracy**: Check use of `vTaskDelay` vs `delay` (milliseconds vs microseconds)\n- **Audio sampling**: If applicable, verify sample rate timing (25kHz = 40μs intervals)\n\n## 4. Code Quality & Best Practices\n- **C++17/20 features**: Appropriate use of modern C++ for embedded\n- **RAII**: Resource management without manual cleanup\n- **Smart pointers**: Use of `std::unique_ptr` / `std::shared_ptr` where appropriate\n- **Platform abstraction**: Code should use interfaces, not direct ESP-IDF calls\n- **Error handling**: Comprehensive error checking and recovery\n- **Logging**: Appropriate log levels (avoid excessive logging in real-time paths)\n\n## 5. ESP32-Specific Considerations\n- **WiFi/BLE**: Proper connection handling, AP mode configuration\n- **I2S/ADC**: Audio input configuration and sampling\n- **GPIO**: Pin configuration and interrupt handling\n- **SPIFFS/LittleFS**: File system usage if applicable\n- **NVS**: Non-volatile storage for configuration\n- **Deep sleep**: Power management if applicable\n- **JTAG debugging**: Debugging support configuration\n\n## 6. Security & Safety\n- **Hardcoded credentials**: Check for WiFi passwords, API keys in source\n- **Input validation**: All external inputs validated\n- **Buffer overflows**: Array bounds checking\n- **Integer overflow**: Safe arithmetic operations\n- **Null pointer checks**: All pointer dereferences validated\n- **Exception safety**: C++ exception handling in embedded context\n\n## 7. Performance Issues\n- **String operations**: Avoid dynamic string allocation in loops\n- **FFT operations**: Pre-allocated buffers for frequency analysis\n- **Network operations**: Non-blocking HTTP/WebSocket handling\n- **Display updates**: Efficient rendering for OLED displays\n- **Serial communication**: Appropriate baud rates and buffering\n\n## 8. Code Organization\n- **Platform abstraction**: Use of `IPlatform`, `IAudioInput`, etc. interfaces\n- **Initialization pattern**: Proper use of `InitStep` pattern\n- **FlatBuffers**: Protocol serialization using FlatBuffers\n- **Namespace**: Code in `sparetools::bpm` namespace\n- **File structure**: Adherence to project directory conventions\n\n## 9. Testing & Debugging\n- **Unit test coverage**: Critical functions have unit tests\n- **Hardware emulation**: Tests work with emulator\n- **Serial debugging**: Appropriate debug output\n- **Memory profiling**: Tools for heap analysis\n- **Performance profiling**: Timing measurements for critical paths\n\n## 10. Specific Improvements\n- Prioritized list (P0/P1/P2/P3) of actionable improvements\n- Code snippets showing problems and recommended fixes\n- ESP32-specific best practices recommendations\n- References to ESP-IDF documentation where applicable\n\n## Code to Review\n\n**Language**: {{language}}\n**Platform**: {{platform}}\n**Code Path**: {{code_path}}\n\n```{{language}}\n{{code}}\n```\n\n**Context**:\n{{context}}\n\n**Review Focus**:\n- Memory management and heap fragmentation\n- Real-time constraints and task scheduling\n- ESP32 hardware-specific considerations\n- Security vulnerabilities\n- Performance bottlenecks\n\nProvide actionable, prioritized recommendations with code examples.",
+  "isTemplate": true,
+  "variables": [
+    "language",
+    "platform",
+    "code_path",
+    "code",
+    "context"
+  ],
+  "tags": [
+    "esp32",
+    "embedded",
+    "code-review",
+    "development",
+    "firmware",
+    "c++",
+    "freertos",
+    "memory-management",
+    "real-time"
+  ],
+  "category": "esp32",
+  "createdAt": "2026-01-01T00:00:00.000Z",
+  "updatedAt": "2026-01-01T00:00:00.000Z",
+  "version": 1
+}

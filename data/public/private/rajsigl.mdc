@@ -1,0 +1,13 @@
+# Tomáš Rajsigl Coding Style Rules
+
+## Commit Messages
+- Use "Resolve AK-XXXX" with feature descriptions: "Resolve AK-488 'Feat/ typography'"
+- Focus on frontend features and components
+
+## Code Style
+- Implement typography, user reactivation, and generic components
+- Work on radio components and user interfaces
+
+## Development Approach
+- Resolve feature requests systematically
+- Build reusable UI components

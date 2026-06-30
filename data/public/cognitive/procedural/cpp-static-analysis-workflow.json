@@ -1,0 +1,20 @@
+{
+  "id": "cpp-static-analysis-workflow",
+  "name": "cpp-static-analysis-workflow",
+  "description": "Systematic workflow for C++ static analysis",
+  "content": "# C++ Static Analysis Workflow\n\n## Phase 1: Compiler Warnings (5-10 minutes)\n```bash\n# Enable all warnings\ng++ -Wall -Wextra -Wpedantic -Wshadow -Wconversion \\\n    -fsanitize=address -fsanitize=undefined \\\n    -o build/app src/*.cpp\n\n# Or with CMake\ncmake -DCMAKE_CXX_FLAGS=\"-Wall -Wextra -Wpedantic\" ..\nmake\n```\n\n## Phase 2: cppcheck (10-15 minutes)\n```bash\ncppcheck --enable=all --std=c++17 --language=c++ \\\n         --suppress=missingIncludeSystem \\\n         --inline-suppr --xml --xml-version=2 \\\n         src/ 2> cppcheck_results.xml\n```\n\n## Phase 3: clang-tidy (15-30 minutes)\n```bash\n# Generate compile_commands.json first\ncmake -DCMAKE_EXPORT_COMPILE_COMMANDS=ON ..\n\nclang-tidy -p build/compile_commands.json \\\n           -checks='*' \\\n           -header-filter='.*' \\\n           src/*.cpp > clang_tidy_results.txt\n```\n\n## Phase 4: Manual Review (30-60 minutes)\n1. Review high-severity warnings first\n2. Check for false positives\n3. Look for patterns indicating deeper issues\n4. Validate fixes don't introduce new problems\n\n## Common Issue Patterns\n- **Uninitialized variables**: Memory corruption source\n- **Null pointer dereferences**: Runtime crashes\n- **Resource leaks**: Memory/performance degradation\n- **Buffer overflows**: Security vulnerabilities",
+  "arguments": [],
+  "tags": [
+    "cpp",
+    "static-analysis",
+    "workflow",
+    "cppcheck",
+    "clang-tidy"
+  ],
+  "isTemplate": true,
+  "metadata": {
+    "layer": 4,
+    "domain": 1,
+    "abstractionLevel": 2
+  }
+}

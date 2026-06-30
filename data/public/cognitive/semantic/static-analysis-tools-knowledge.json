@@ -1,0 +1,19 @@
+{
+  "id": "static-analysis-tools-knowledge",
+  "name": "static-analysis-tools-knowledge",
+  "description": "Knowledge about static analysis tools and their capabilities",
+  "content": "# Static Analysis Tools Knowledge Base\n\n## C/C++ Tools\n- **cppcheck**: General-purpose static analysis, memory leaks, null pointer dereferences\n- **clang-tidy**: LLVM-based, coding standards, modernize checks\n- **gcc/g++ -Wall -Wextra**: Compiler warnings for potential issues\n- **pvs-studio**: Advanced static analysis, MISRA compliance\n- **infer**: Facebook's static analyzer for memory and concurrency\n\n## Python Tools\n- **pylint**: Style and error checking\n- **flake8**: PEP 8 style guide enforcement\n- **mypy**: Static type checking\n- **bandit**: Security vulnerability scanning\n\n## JavaScript/TypeScript\n- **eslint**: Configurable linting rules\n- **typescript**: Type checking and compilation\n- **prettier**: Code formatting\n\n## Best Practices\n1. Run multiple tools with different focuses\n2. Use tool-specific configuration files\n3. Integrate into CI/CD pipelines\n4. Review false positives manually\n5. Address high-confidence warnings first",
+  "arguments": [],
+  "tags": [
+    "static-analysis",
+    "tools",
+    "best-practices",
+    "languages"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 3,
+    "domain": 1,
+    "abstractionLevel": 4
+  }
+}

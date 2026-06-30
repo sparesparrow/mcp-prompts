@@ -1,0 +1,36 @@
+{
+  "id": "pylint-config-python-security-default",
+  "name": "pylint-config-python-security-default",
+  "description": "Default pylint configuration for Python security analysis",
+  "template": {
+    "project_type": "python",
+    "focus": "security",
+    "pylint_opts": [
+      "--output-format=json",
+      "--reports=n",
+      "--enable=E,W",
+      "--disable=C,R,I"
+    ],
+    "success_count": 0,
+    "confidence": "low"
+  },
+  "category": "tool-config",
+  "tags": [
+    "python",
+    "pylint",
+    "security",
+    "default"
+  ],
+  "version": "latest",
+  "createdAt": "2025-12-31T17:17:09.149Z",
+  "updatedAt": "2025-12-31T17:17:09.149Z",
+  "isLatest": true,
+  "metadata": {
+    "created": "2025-12-31T17:17:09.149Z",
+    "validation": "default_config",
+    "confidence": "low",
+    "tool": "pylint",
+    "project_type": "python"
+  },
+  "accessLevel": "public"
+}

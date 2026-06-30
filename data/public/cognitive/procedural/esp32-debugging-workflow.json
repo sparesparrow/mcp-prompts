@@ -1,0 +1,20 @@
+{
+  "id": "esp32-debugging-workflow",
+  "name": "esp32-debugging-workflow",
+  "description": "Systematic debugging workflow for ESP32 embedded systems",
+  "content": "# ESP32 Debugging Workflow\n\n## Phase 1: Initial Assessment (5 minutes)\n**Gather system information:**\n```\nget_esp32_status\nget_esp32_telemetry\n```\n\n**Check for obvious issues:**\n- Memory usage (heap exhaustion?)\n- WiFi connectivity (network problems?)\n- Power stability (brownout detection?)\n\n## Phase 2: Serial Logging Analysis (10 minutes)\n**Enable debug logging:**\n- Set log level to DEBUG in ESP32 firmware\n- Monitor serial output for error messages\n- Look for exception traces or assertion failures\n\n**Common serial indicators:**\n- `Guru Meditation Error`: CPU exception\n- `rst cause`: Reset cause (power, watchdog, etc.)\n- `Heap exhausted`: Memory allocation failure\n\n## Phase 3: Peripheral Debugging (15 minutes)\n**Test individual components:**\n```\n# Test sensor readings\nget_esp32_telemetry --sensor_types '[\"bpm\"]'\n\n# Check WiFi status\nget_esp32_status\n\n# Test FreeRTOS tasks\n# (Monitor task stack usage in serial logs)\n```\n\n## Phase 4: Logic Analysis (20 minutes)\n**Use debugging tools:**\n- **GDB/OpenOCD**: Hardware debugging with breakpoints\n- **ESP-IDF Monitor**: Real-time log monitoring\n- **JTAG Debugging**: Full system state inspection\n\n**Key debugging commands:**\n```gdb\n# Break on function\nbreak my_function\n\n# Print variable\nprint my_variable\n\n# Continue execution\ncontinue\n\n# Step through code\nstep\n```\n\n## Phase 5: Performance Analysis (15 minutes)\n**Profile system performance:**\n- Monitor task execution times\n- Check interrupt latency\n- Analyze memory fragmentation\n- Measure power consumption\n\n## Phase 6: Firmware Updates (10 minutes)\n**If software bug suspected:**\n- Prepare minimal test firmware\n- Flash and test incrementally\n- Use git bisect for regression identification\n\n## Common ESP32 Issues\n\n### Memory Problems\n**Symptoms:** Random crashes, heap exhaustion\n**Solutions:**\n- Increase heap size in ESP-IDF config\n- Use PSRAM for large buffers\n- Implement memory pools\n- Monitor with `heap_caps_get_free_size`\n\n### WiFi Issues\n**Symptoms:** Connection drops, slow responses\n**Solutions:**\n- Check antenna placement\n- Adjust WiFi power settings\n- Implement reconnection logic\n- Monitor signal strength\n\n### Power Problems\n**Symptoms:** Random resets, brownout detection\n**Solutions:**\n- Check power supply stability\n- Add decoupling capacitors\n- Implement power monitoring\n- Use appropriate power modes\n\n### Task Management Issues\n**Symptoms:** System hangs, missed deadlines\n**Solutions:**\n- Review FreeRTOS task priorities\n- Check stack sizes with `uxTaskGetStackHighWaterMark`\n- Implement watchdog timers\n- Profile task execution times\n",
+  "arguments": [],
+  "tags": [
+    "esp32",
+    "debugging",
+    "workflow",
+    "troubleshooting",
+    "embedded"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 4,
+    "domain": 7,
+    "abstractionLevel": 2
+  }
+}

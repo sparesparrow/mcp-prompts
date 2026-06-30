@@ -1,0 +1,19 @@
+{
+  "id": "two-phase-analysis-pattern",
+  "name": "two-phase-analysis-pattern",
+  "description": "Universal two-phase analysis pattern applicable across domains",
+  "content": "# Two-Phase Analysis Pattern\n\n## Abstract Structure\n**Phase 1: Exploratory** - Broad, fast-coverage assessment\n**Phase 2: Focused** - Deep analysis of identified areas\n\n## Software Development Instance\n### Phase 1: Fast Static Analysis (5-15 minutes)\n- Run basic linters (eslint, compiler warnings)\n- Quick grep for common anti-patterns\n- Surface-level code review\n\n### Phase 2: Deep Analysis (30-120 minutes)\n- Run heavy static analysis (cppcheck, valgrind)\n- Detailed code review of flagged areas\n- Performance profiling of suspected bottlenecks\n\n## Medical Diagnosis Instance\n### Phase 1: Initial Assessment (5-15 minutes)\n- Vital signs, basic physical exam\n- Patient history review\n- Symptom correlation with common conditions\n\n### Phase 2: Specialized Testing (30-120 minutes)\n- Targeted lab work based on initial findings\n- Specialist consultations\n- Advanced imaging for suspected issues\n\n## Quality Assurance Instance\n### Phase 1: Broad Coverage Testing (15-60 minutes)\n- Run full test suite\n- Basic integration tests\n- Automated security scans\n\n### Phase 2: Targeted Investigation (60-240 minutes)\n- Deep debugging of failing tests\n- Performance analysis of slow components\n- Security audit of vulnerable areas\n\n## Key Principles\n1. **Efficiency**: Fast initial pass identifies focus areas\n2. **Resource Allocation**: Intensive analysis only where needed\n3. **Risk Management**: Address high-risk areas first\n4. **Iterative Refinement**: Phase 1 informs Phase 2 scope\n\n## When to Apply\n- Analysis is expensive or time-consuming\n- Issues are sparse rather than ubiquitous\n- High-confidence screening methods exist\n- Resource constraints require prioritization",
+  "arguments": [],
+  "tags": [
+    "analysis-pattern",
+    "cross-domain",
+    "efficiency",
+    "prioritization"
+  ],
+  "isTemplate": false,
+  "metadata": {
+    "layer": 6,
+    "domain": 0,
+    "abstractionLevel": 8
+  }
+}

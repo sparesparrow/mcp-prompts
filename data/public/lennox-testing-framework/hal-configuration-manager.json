@@ -1,0 +1,19 @@
+{
+  "id": "hal-configuration-manager",
+  "name": "HAL Configuration Manager",
+  "description": "Manage hierarchical configuration with caching for Lennox IFC testing HAL",
+  "content": "# HAL Configuration Manager (ngapy-inspired)\n\nManage hierarchical configuration with intelligent caching for hardware abstraction layer.\n\n## Configuration Hierarchy\n\n```yaml\n# 1. Test-specific overrides (highest priority)\ntest_timeout: 10.0\n\n# 2. Environment variables\nPLATFORM: simulator\nLOG_LEVEL: DEBUG\n\n# 3. Product configuration\nproduct: lennox_2stage\nfirmware_version: v1.2.3\n\n# 4. Platform defaults (lowest priority)\ndefault_timeout: 30.0\nretry_count: 3\n```\n\n## Caching Strategy\n\n```python\n# MD5-based cache invalidation\ncache_key = hashlib.md5(f\"{files_hash}|{env_vars}|{overrides}\".encode()).hexdigest()\nif self._is_cache_valid(cache_key):\n    return self.cache[cache_key]\n```\n\n## Integration with HAL\n\n```python\n# Configuration drives HAL behavior\nconfig = hal_config.get_configuration()\nbench = HALFactory.create_bench(config.platform)\nbench.configure(config.hardware)\n```\n\n## Success Metrics\n\n- **Cache Hit Rate**: > 90% for repeated configurations\n- **Load Time**: < 100ms for cached configurations\n- **Override Support**: Full hierarchical merging\n- **Environment Integration**: Automatic environment variable inclusion",
+  "isTemplate": true,
+  "variables": ["config_hierarchy", "cache_strategy", "override_mechanism", "environment_integration"],
+  "tags": ["testing", "lennox", "ngapy", "configuration", "caching", "hal", "hierarchical"],
+  "category": "lennox-testing-framework",
+  "version": 1,
+  "createdAt": "2026-01-07T00:00:00.000Z",
+  "updatedAt": "2026-01-07T00:00:00.000Z"
+}
+
+
+
+
+
+

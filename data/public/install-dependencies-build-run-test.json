@@ -1,0 +1,14 @@
+{
+  "id": "install-dependencies-build-run-test",
+  "name": "install dependencies, build, run, test,...",
+  "description": "install dependencies, build, run, test, fix, document, commit, and push your changes",
+  "content": "install dependencies, build, run, test, fix, document, commit, and push your changes. Because your environment is externally managed, we'll create and use a virtual environment:\nCreate a virtual environment in the project directory.\nUpgrade pip (optional but recommended).\nInstall the package in editable mode within the virtual environment.\nRun tests (e.g. using pytest).\nDocument any changes (the README already provides documentation).\nCommit all changes and push to your Git repository.",
+  "isTemplate": false,
+  "tags": [
+    "ai",
+    "productivity"
+  ],
+  "createdAt": "2025-03-05T03:37:30.300Z",
+  "updatedAt": "2025-03-05T03:41:11.321Z",
+  "version": 1
+}
