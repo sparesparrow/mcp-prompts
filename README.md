@@ -1,5 +1,7 @@
 # mcp-prompts
 
+[![MCP Toplist](https://mcptoplist.com/badge/glama%2Fsparesparrow%2Fmcp-prompts.svg)](https://mcptoplist.com/server/glama%2Fsparesparrow%2Fmcp-prompts)
+
 Simple MCP server for managing AI prompts and agent configurations with direct claude CLI orchestration.
 
 ## What It Does
