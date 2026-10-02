@@ -8,13 +8,30 @@ on:
   schedule:
     - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
 
+# SARIF upload and CodeQL write to the Security tab: without security-events: write the
+# upload fails with "Resource not accessible by integration" (the weekly run has been red
+# since at least 2026-07).
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v4
+      with:
+        languages: javascript-typescript
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -25,19 +42,17 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      if: always()
+      uses: github/codeql-action/upload-sarif@v4
       with:
         sarif_file: 'trivy-results.sarif'
 
     - name: Run CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-      with:
-        languages: javascript
+      uses: github/codeql-action/analyze@v4
 
     - name: Run Snyk to check for vulnerabilities
+      if: env.SNYK_TOKEN != ''
       uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
         args: --severity-threshold=high
 
@@ -46,10 +61,19 @@ jobs:
         npm audit --audit-level=high
       continue-on-error: true
 
-    - name: Check for secrets
+    # base and head must differ, so only diff-scan pull requests; other events scan the tree.
+    - name: Check for secrets (pull request diff)
+      if: github.event_name == 'pull_request'
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: main
-        head: HEAD
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+        extra_args: --debug --only-verified
+
+    - name: Check for secrets (full scan)
+      if: github.event_name != 'pull_request'
+      uses: trufflesecurity/trufflehog@main
+      with:
+        path: ./
         extra_args: --debug --only-verified
