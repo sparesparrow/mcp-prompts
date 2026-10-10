@@ -9,6 +9,13 @@ Simple MCP server for managing AI prompts and agent configurations with direct c
 - **Provides agent templates** for project orchestration
 - **Works with Claude Desktop, Cursor, and other MCP clients**
 
+## Packages
+
+- npm: [`@sparesparrow/mcp-prompts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts)
+- Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts)
+
+Published releases lag behind `main`. To run what this README describes, build from source as below.
+
 ## Quick Start
 
 ### 1. Install
@@ -24,9 +31,9 @@ pnpm build
 pnpm start
 ```
 
-### 3. Configure Claude Desktop
+### 3. Configure your MCP client
 
-Add to `~/.claude/mcp.json`:
+For Claude Desktop, add to `claude_desktop_config.json` (other clients take the same command and env):
 
 ```json
 {
@@ -69,12 +76,12 @@ This automatically:
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | Query prompts with filters (tags, search, category) |
-| `get_prompt` | Retrieve specific prompt with template expansion |
-| `create_prompt` | Add new prompt to repository |
+| `list_prompts` | List prompts, filtered by tags or a search term |
+| `get_prompt` | Retrieve a prompt by ID |
+| `add_prompt` | Add a new prompt or template |
 | `update_prompt` | Modify existing prompt |
 | `delete_prompt` | Remove prompt |
-| `apply_template` | Apply variables to template string |
+| `apply_template` | Fill a template prompt's `{{variables}}` |
 | `get_stats` | Repository statistics |
 
 ## Prompts Organization

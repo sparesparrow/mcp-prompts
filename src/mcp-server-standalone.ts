@@ -29,6 +29,16 @@ const PromptSchema = z.object({
 const CreatePromptParams = PromptSchema.omit({ id: true });
 const UpdatePromptParams = PromptSchema.partial().omit({ id: true });
 
+// Report the installed package version rather than a hard-coded one that drifts.
+function packageVersion(): string {
+  try {
+    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
+    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
 // In-memory storage for prompts
 const prompts = new Map();
 
@@ -101,14 +111,22 @@ function loadSamplePrompts() {
 export async function createMcpServer() {
   const server = new McpServer({
     name: 'mcp-prompts',
-    version: '3.12.4',
+    version: packageVersion(),
   });
+
+  // Each handler validates its own arguments with zod, so the SDK's generic overloads add nothing
+  // here except type instantiation too deep for tsc (TS2589) on these schemas.
+  const registerTool = server.tool.bind(server) as (...args: unknown[]) => void;
 
   // Load sample prompts
   loadSamplePrompts();
 
   // Tool: Add a new prompt
-  server.tool('add_prompt', async (params) => {
+  registerTool(
+    'add_prompt',
+    'Add a new prompt. Set isTemplate and variables to make it a template that apply_template can fill.',
+    CreatePromptParams.shape,
+    async (params: unknown) => {
     try {
       const validatedParams = CreatePromptParams.parse(params);
       const id = `prompt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
@@ -136,7 +154,11 @@ export async function createMcpServer() {
   });
 
   // Tool: Get a prompt by ID
-  server.tool('get_prompt', async (params) => {
+  registerTool(
+    'get_prompt',
+    'Get a prompt by its ID.',
+    { id: z.string().describe('Prompt ID, as returned by list_prompts') },
+    async (params: unknown) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(params);
       const prompt = prompts.get(id);
@@ -158,7 +180,14 @@ export async function createMcpServer() {
   });
 
   // Tool: List all prompts
-  server.tool('list_prompts', async (params) => {
+  registerTool(
+    'list_prompts',
+    'List prompts, optionally filtered by tags (any match) or a search term.',
+    {
+      tags: z.array(z.string()).optional().describe('Return prompts carrying any of these tags'),
+      search: z.string().optional().describe('Text to look for in the name, description or content')
+    },
+    async (params: unknown) => {
     try {
       const validatedParams = z.object({
         tags: z.array(z.string()).optional(),
@@ -211,7 +240,11 @@ export async function createMcpServer() {
   });
 
   // Tool: Update a prompt
-  server.tool('update_prompt', async (params) => {
+  registerTool(
+    'update_prompt',
+    'Update fields of an existing prompt; its version is incremented.',
+    { id: z.string().describe('Prompt ID'), updates: UpdatePromptParams },
+    async (params: unknown) => {
     try {
       const { id, updates } = z.object({
         id: z.string(),
@@ -247,7 +280,11 @@ export async function createMcpServer() {
   });
 
   // Tool: Delete a prompt
-  server.tool('delete_prompt', async (params) => {
+  registerTool(
+    'delete_prompt',
+    'Delete a prompt by its ID.',
+    { id: z.string().describe('Prompt ID') },
+    async (params: unknown) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(params);
       const prompt = prompts.get(id);
@@ -271,7 +308,14 @@ export async function createMcpServer() {
   });
 
   // Tool: Apply template variables to a prompt
-  server.tool('apply_template', async (params) => {
+  registerTool(
+    'apply_template',
+    'Fill a template prompt\'s {{variables}} and return the resulting text.',
+    {
+      id: z.string().describe('ID of a template prompt'),
+      variables: z.record(z.any()).describe('Values for the template variables, by name')
+    },
+    async (params: unknown) => {
     try {
       const { id, variables } = z.object({
         id: z.string(),
@@ -309,7 +353,10 @@ export async function createMcpServer() {
   });
 
   // Tool: Get prompt statistics
-  server.tool('get_stats', async () => {
+  registerTool(
+    'get_stats',
+    'Counts of prompts and templates, with the tags and categories in use.',
+    async () => {
     try {
       const promptList = Array.from(prompts.values());
       const stats = {
