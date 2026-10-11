@@ -18,7 +18,8 @@ on:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '8'
+  # pnpm-lock.yaml is lockfile v9, which pnpm 8 cannot read.
+  PNPM_VERSION: '9'
 
 jobs:
   build-and-test:
@@ -52,7 +53,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Type check
         run: pnpm run type-check
@@ -100,8 +101,9 @@ jobs:
           name: dist
           path: dist/
 
+      # Full install: `pnpm publish` runs prepublishOnly (`pnpm run build`), which needs the dev dependencies.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prod
+        run: pnpm install --frozen-lockfile
 
       - name: Get version from package.json
         id: package-version
@@ -193,8 +195,9 @@ jobs:
           name: dist
           path: dist/
 
+      # Full install: `pnpm publish` runs prepublishOnly (`pnpm run build`), which needs the dev dependencies.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prod
+        run: pnpm install --frozen-lockfile
 
       - name: Publish to GitHub Packages
         run: pnpm publish --registry https://npm.pkg.github.com --no-git-checks || echo "Already published or error"
