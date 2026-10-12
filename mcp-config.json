@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "docker",
+      "args": [
+        "run",
+        "--rm",
+        "-i",
+        "mcp-prompts-mcp-prompts-file"
+      ]
+    }
+  }
+}
