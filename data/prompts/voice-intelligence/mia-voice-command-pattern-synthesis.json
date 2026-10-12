@@ -11,11 +11,26 @@
     "avg_confidence",
     "satisfaction_avg",
     "intent_count",
-    "user_count"
+    "user_count",
+    "freq",
+    "threshold",
+    "improvement",
+    "frequency",
+    "potential",
+    "probability",
+    "value_score"
   ],
-  "tags": ["mia", "voice", "pattern-synthesis", "machine-learning", "knowledge-extraction"],
+  "tags": [
+    "knowledge-extraction",
+    "machine-learning",
+    "mia",
+    "pattern-synthesis",
+    "voice"
+  ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-27T00:00:00.000Z",
-  "updatedAt": "2025-01-27T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-27T00:00:00.000Z"
 }

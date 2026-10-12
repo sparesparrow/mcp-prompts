@@ -9,9 +9,17 @@
     "command_type",
     "success"
   ],
-  "tags": ["mia", "lights", "voice", "feedback", "zigbee"],
-  "category": "mia",
+  "tags": [
+    "feedback",
+    "lights",
+    "mia",
+    "voice",
+    "zigbee"
+  ],
+  "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-03-28T00:00:00.000Z",
-  "updatedAt": "2026-03-28T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-03-28T00:00:00.000Z"
 }

@@ -11,8 +11,17 @@
     "vehicle_status",
     "passenger_count"
   ],
-  "tags": ["mia", "car", "emergency", "safety", "automotive"],
+  "tags": [
+    "automotive",
+    "car",
+    "emergency",
+    "mia",
+    "safety"
+  ],
+  "category": "mia-car",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-01T00:00:00.000Z",
-  "updatedAt": "2025-01-01T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-01T00:00:00.000Z"
 }

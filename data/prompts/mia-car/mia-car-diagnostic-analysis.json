@@ -10,8 +10,17 @@
     "vehicle_model",
     "mileage"
   ],
-  "tags": ["mia", "car", "diagnostic", "obd", "automotive"],
+  "tags": [
+    "automotive",
+    "car",
+    "diagnostic",
+    "mia",
+    "obd"
+  ],
+  "category": "mia-car",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-01T00:00:00.000Z",
-  "updatedAt": "2025-01-01T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-01T00:00:00.000Z"
 }

@@ -12,8 +12,17 @@
     "location",
     "voice_command"
   ],
-  "tags": ["mia", "car", "voice", "elevenlabs", "automotive"],
+  "tags": [
+    "automotive",
+    "car",
+    "elevenlabs",
+    "mia",
+    "voice"
+  ],
+  "category": "mia-car",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-01T00:00:00.000Z",
-  "updatedAt": "2025-01-01T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-01T00:00:00.000Z"
 }

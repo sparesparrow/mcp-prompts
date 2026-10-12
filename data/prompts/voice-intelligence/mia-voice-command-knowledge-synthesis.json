@@ -17,11 +17,31 @@
     "time_period",
     "user_count",
     "device_count",
-    "baseline_accuracy"
+    "baseline_accuracy",
+    "confidence",
+    "success_rate",
+    "satisfaction",
+    "weight",
+    "contribution",
+    "threshold",
+    "priority",
+    "frequency",
+    "improvement_percentage",
+    "improvement",
+    "potential",
+    "impact"
   ],
-  "tags": ["mia", "voice", "knowledge-synthesis", "improvement-strategy", "continuous-learning"],
+  "tags": [
+    "continuous-learning",
+    "improvement-strategy",
+    "knowledge-synthesis",
+    "mia",
+    "voice"
+  ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-27T00:00:00.000Z",
-  "updatedAt": "2025-01-27T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-27T00:00:00.000Z"
 }

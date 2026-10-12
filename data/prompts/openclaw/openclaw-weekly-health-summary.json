@@ -10,9 +10,16 @@
     "error_counts",
     "disk_usage"
   ],
-  "tags": ["openclaw", "health", "reporting", "weekly"],
+  "tags": [
+    "health",
+    "openclaw",
+    "reporting",
+    "weekly"
+  ],
   "category": "openclaw",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-03-28T00:00:00.000Z",
-  "updatedAt": "2026-03-28T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-03-28T00:00:00.000Z"
 }

@@ -14,27 +14,33 @@
     "iteration_goal"
   ],
   "tags": [
-    "innovation",
-    "auto-generated",
-    "claudepy",
-    "android",
-    "gradle",
     "adb",
+    "android",
+    "auto-generated",
     "build",
-    "test",
     "ci",
+    "claudepy",
+    "gradle",
+    "innovation",
     "orchestration",
+    "test",
     "workflow"
   ],
-  "category": "claudepy-workflow",
-  "version": 1,
+  "category": "claudepy-workflows",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-06-19T07:00:00.000Z",
   "updatedAt": "2026-06-19T07:00:00.000Z",
   "metadata": {
     "author": "prompt-innovation-cron",
     "innovation_cycle": "2026-06-19",
     "targets_gap": "claudepy-workflow-prompts (1 → 2 of 10 target)",
-    "cross_domain": ["android", "gradle", "adb"],
+    "cross_domain": [
+      "android",
+      "gradle",
+      "adb"
+    ],
     "estimated_impact": "High — eliminates dropped-step bugs in iterative Android dev loops; encodes the Gradle + ADB + logcat cadence the user runs by hand today"
   }
 }

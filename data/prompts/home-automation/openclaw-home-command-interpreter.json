@@ -10,9 +10,17 @@
     "time_of_day",
     "active_mood"
   ],
-  "tags": ["home", "zigbee", "mqtt", "lights", "kdeconnect"],
+  "tags": [
+    "home",
+    "kdeconnect",
+    "lights",
+    "mqtt",
+    "zigbee"
+  ],
   "category": "home-automation",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-03-28T00:00:00.000Z",
-  "updatedAt": "2026-03-28T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-03-28T00:00:00.000Z"
 }

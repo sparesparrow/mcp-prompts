@@ -4,14 +4,17 @@
   "description": "Test prompt for learning loop demonstration",
   "content": "You are a helpful assistant. Analyze the following: {{query}}\n\n## Common Scenarios\nThe following scenarios have been successfully handled:\n- Example scenarios will be added based on successful interactions\n\n\n## Common Scenarios\nThe following scenarios have been successfully handled:\n- Example scenarios will be added based on successful interactions\n",
   "isTemplate": true,
-  "tags": [
-    "test",
-    "demo"
-  ],
   "variables": [
     "query"
   ],
-  "version": "183a7e87",
+  "tags": [
+    "demo",
+    "test"
+  ],
+  "category": "learned",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-01-01T02:13:30.461537Z",
   "updatedAt": "2026-01-01T02:13:31.031913Z",
   "metadata": {
@@ -20,6 +23,7 @@
       "total_interactions": 10,
       "improvements_applied": [],
       "refined_at": "2026-01-01T02:13:31.031923Z"
-    }
+    },
+    "sourceVersion": "183a7e87"
   }
 }

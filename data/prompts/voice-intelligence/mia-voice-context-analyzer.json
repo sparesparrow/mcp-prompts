@@ -26,11 +26,26 @@
     "ambient_conditions",
     "no_context_accuracy",
     "partial_context_accuracy",
-    "full_context_accuracy"
+    "full_context_accuracy",
+    "improvement",
+    "score",
+    "impact",
+    "confidence",
+    "improvement_with_context",
+    "adjustment_value",
+    "effectiveness"
   ],
-  "tags": ["mia", "voice", "context-awareness", "command-intelligence", "accuracy-improvement"],
+  "tags": [
+    "accuracy-improvement",
+    "command-intelligence",
+    "context-awareness",
+    "mia",
+    "voice"
+  ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-27T00:00:00.000Z",
-  "updatedAt": "2025-01-27T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-27T00:00:00.000Z"
 }
