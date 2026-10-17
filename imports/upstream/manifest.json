@@ -1,0 +1,59 @@
+{
+  "batch": 1,
+  "complete": false,
+  "active": false,
+  "files": [
+    {
+      "source_repository": "sparesparrow/mcp-project-orchestrator",
+      "source_path": "data/prompts/architecture-design-assistant.json",
+      "source_blob_sha": "d33caa430d48a24ae9a13b116df52e4b6f4c1201",
+      "destination": "imports/upstream/mcp-project-orchestrator/data/prompts/architecture-design-assistant.json",
+      "license": "MIT"
+    },
+    {
+      "source_repository": "sparesparrow/mcp-prompts-catalog",
+      "source_path": "prompts/project-analysis-assistant.json",
+      "source_blob_sha": "a24ec9a1efcb2463d945ba6e42db114173856390",
+      "destination": "imports/upstream/mcp-prompts-catalog/prompts/project-analysis-assistant.json",
+      "license": "MIT"
+    },
+    {
+      "source_repository": "sparesparrow/mia",
+      "source_path": "agents/orchestrator/system-prompt.md",
+      "source_blob_sha": "23b505acd507bf51b84470fe2cd295dc5d2ec754",
+      "destination": "imports/upstream/mia/agents/orchestrator/system-prompt.md",
+      "license": "MIT"
+    },
+    {
+      "source_repository": "sparesparrow/mia",
+      "source_path": "agents/executor/system-prompt.md",
+      "source_blob_sha": "3a317a05c3de113d6980c7204e8b23ee5d72298e",
+      "destination": "imports/upstream/mia/agents/executor/system-prompt.md",
+      "license": "MIT"
+    },
+    {
+      "source_repository": "sparesparrow/mia",
+      "source_path": "agents/evaluator/system-prompt.md",
+      "source_blob_sha": "cfd1d8300ca1c69edc053463bb4ad1262e98cb35",
+      "destination": "imports/upstream/mia/agents/evaluator/system-prompt.md",
+      "license": "MIT"
+    }
+  ],
+  "pending_sources": [
+    {
+      "repository": "sparesparrow/hard-coder",
+      "path": "prompts.yaml",
+      "source_blob_sha": "c638c291ef69f27fc85777c8412cc5a70f92dce2",
+      "repository_license": "GPLv3",
+      "status": "not copied"
+    },
+    {
+      "repository": "sparesparrow/cursor-rules",
+      "path": ".cursor/rules/domain/09-memory-cascade.rules.mdc",
+      "source_blob_sha": "e3c303b4d5676a758504152b63db9b1f24d36da7",
+      "repository_license": "GPLv3",
+      "status": "not copied"
+    }
+  ],
+  "remaining_scope": "Other prompts and skills identified in the five source repositories are not included in this batch."
+}
