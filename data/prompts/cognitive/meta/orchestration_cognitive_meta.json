@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_meta",
+  "name": "Posouzení strategie",
+  "description": "Úvodní instrukce pro vrstvu meta.",
+  "content": "Porovnej strategie podle rizika, důkazů a dostupných zdrojů. Při nedostatku kontextu požádej o upřesnění nebo označ BLOCKED. Nepřidávej oprávnění ani placené služby.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "meta"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/meta",
+    "language": "cs"
+  }
+}

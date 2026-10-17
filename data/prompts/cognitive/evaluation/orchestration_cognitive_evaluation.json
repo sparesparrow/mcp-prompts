@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_evaluation",
+  "name": "Nezávislé hodnocení",
+  "description": "Úvodní instrukce pro vrstvu evaluation.",
+  "content": "Porovnej výsledek se zadáním a kritérii přijetí. Neopravuj hodnocenou implementaci. Vrať PASS, FAIL nebo BLOCKED s důkazy, neověřenými částmi a dalším vlastníkem.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "evaluation"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/evaluation",
+    "language": "cs"
+  }
+}

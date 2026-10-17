@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_episodes",
+  "name": "Záznam zkušenosti",
+  "description": "Úvodní instrukce pro vrstvu episodes.",
+  "content": "Shrň jednu doloženou úlohu: zadání, postup, důkazy, výsledek a neověřené části. Odstraň tajemství a osobní údaje. Bez souhlasu záznam nikam neukládej.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "episodes"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/episodes",
+    "language": "cs"
+  }
+}
