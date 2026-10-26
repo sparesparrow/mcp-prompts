@@ -59,8 +59,9 @@ For Claude Desktop, add to `claude_desktop_config.json` (other clients take the 
 ### 4. Use in Claude
 
 Ask Claude:
-- "List all prompts tagged with esp32"
-- "Get the esp32-fft-configuration-guide prompt"
+- "List all prompts tagged with orchestration"
+- "Get the claudepy-esp32-android-bridge-workflow prompt"
+- "Apply the claudepy-esp32-android-bridge-workflow template with esp32_firmware_path set to ./firmware"
 - "Create a new prompt for Python FastAPI best practices"
 
 ## Orchestrating Projects
