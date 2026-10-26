@@ -64,6 +64,34 @@ Ask Claude:
 - "Apply the claudepy-esp32-android-bridge-workflow template with esp32_firmware_path set to ./firmware"
 - "Create a new prompt for Python FastAPI best practices"
 
+## HTTP Mode
+
+The same prompts are also available as a JSON API, for clients that don't speak MCP:
+
+```bash
+pnpm build
+PORT=3003 PROMPTS_DIR=$PWD/data/prompts pnpm start:http
+# or: npx mcp-prompts-http, or the default Docker image (port 3003)
+```
+
+| Method and path | Does |
+|---|---|
+| `GET /health`, `/ready`, `/version` | Liveness, readiness, package version |
+| `GET /v1/prompts?tags=a,b&search=text` | List prompt summaries |
+| `POST /v1/prompts` | Add a prompt (same fields as `add_prompt`) |
+| `GET` / `PUT` / `DELETE /v1/prompts/:id` | Read, update or delete one prompt |
+| `POST /v1/prompts/:id/apply` | Fill a template: `{ "variables": { ... } }` → `{ "result": "..." }` |
+| `GET /v1/stats` | Same counts as `get_stats` |
+| `GET /mcp/tools`, `POST /mcp/tools/:name` | Call any MCP tool by name: `{ "arguments": { ... } }` |
+
+```bash
+curl -s -X POST localhost:3003/v1/prompts/claudepy-esp32-android-bridge-workflow/apply \
+  -H 'Content-Type: application/json' -d '{"variables":{"esp32_firmware_path":"./firmware"}}'
+```
+
+Invalid input answers 400, unknown prompts 404. Set `CORS_ORIGIN` to allow browser clients.
+Changes made over HTTP live in memory, like those made over MCP; the files in `data/prompts` are not rewritten.
+
 ## Orchestrating Projects
 
 Use the orchestrate script to analyze entire projects:

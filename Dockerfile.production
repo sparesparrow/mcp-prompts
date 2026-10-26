@@ -87,4 +87,4 @@ EXPOSE 3003
 ENTRYPOINT ["dumb-init", "--"]
 
 # Start the application
-CMD ["node", "dist/mcp-server-standalone.js"]
+CMD ["node", "dist/index.js"]

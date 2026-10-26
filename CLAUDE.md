@@ -108,7 +108,7 @@ src/
 ├── index.ts                # HTTP server entry point
 ├── mcp-server-standalone.ts # MCP stdio entry point
 ├── cli.ts                  # CLI entry point
-├── http-server.ts          # Express HTTP server
+├── http-server.ts          # HTTP server (node:http, JSON API)
 ├── config.ts               # Configuration
 └── schemas.ts              # Zod validation schemas
 ```
@@ -140,10 +140,12 @@ This server runs in two distinct modes controlled by the `MODE` environment vari
 - Tools exposed via `server.tool()` registration
 
 ### HTTP Mode (`MODE=http`)
-- REST API with Express
-- SSE support for streaming
-- Entry point: `src/index.ts` → `src/http-server.ts`
-- Endpoints: `/v1/prompts`, `/mcp/tools`, `/health`, etc.
+- JSON API on `node:http` (no web framework), sharing `src/prompt-store.ts` with the stdio server
+- Entry point: `src/index.ts` → `src/http-server.ts`; `pnpm start:http` or `mcp-prompts start --mode http`
+- Endpoints: `GET /health`, `/ready`, `/version`; `GET|POST /v1/prompts`;
+  `GET|PUT|DELETE /v1/prompts/:id`; `POST /v1/prompts/:id/apply`; `GET /v1/stats`;
+  `GET /mcp/tools` and `POST /mcp/tools/:name` (body `{ "arguments": {...} }`)
+- Errors: 400 invalid input, 404 unknown prompt or path, 405 wrong method, 413 body over 1 MB
 
 ## MCP Tools Implementation
 
@@ -544,9 +546,7 @@ Templates use `{{variableName}}` syntax for variable substitution:
 
 ## Security Considerations
 
-- Helmet middleware for HTTP headers
-- CORS configuration
-- Rate limiting per user/tier
+- HTTP mode accepts JSON bodies up to 1 MB; CORS headers are sent only when `CORS_ORIGIN` is set
 - Input validation with Zod
 - IAM roles for AWS (no hardcoded credentials in production)
 - Non-root user in Docker containers

@@ -43,9 +43,7 @@ ENV HOST=0.0.0.0
 # Expose port for health checks
 EXPOSE 3003
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
+# No HEALTHCHECK: this image runs the MCP server over stdio, which has no HTTP endpoint to probe.
 
 # Start the MCP server
 CMD ["node", "dist/mcp-server-standalone.js"]
