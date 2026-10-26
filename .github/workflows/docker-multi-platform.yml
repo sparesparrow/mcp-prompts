@@ -1,24 +1,30 @@
 name: Multi-Platform Docker Build
 
+# Build check for pull requests: every image variant must build for both
+# platforms. Publishing happens in docker-publish.yml.
+#
+# Each platform builds natively on its own runner. Under QEMU emulation,
+# Node crashed during pnpm install on arm64 ("uncaught target signal 4
+# (Illegal instruction)") and the job hung until it was cancelled.
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*' ]
   pull_request:
     branches: [ main ]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
-
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
-        variant: [default, mcp, aws, simple]
+        variant: [default, mcp, file]
         platform: [linux/amd64, linux/arm64]
-    
+        include:
+          - platform: linux/amd64
+            runner: ubuntu-latest
+          - platform: linux/arm64
+            runner: ubuntu-24.04-arm
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
@@ -26,48 +32,12 @@ jobs:
     - name: Set up Docker Buildx
       uses: docker/setup-buildx-action@v3
 
-    - name: Log in to Container Registry
-      uses: docker/login-action@v3
-      with:
-        registry: ${{ env.REGISTRY }}
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
-
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-        tags: |
-          type=ref,event=branch
-          type=ref,event=pr
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=raw,value=${{ matrix.variant }}
-
-    - name: Build and push Docker image
+    - name: Build Docker image
       uses: docker/build-push-action@v5
       with:
         context: .
         file: ./Dockerfile${{ matrix.variant != 'default' && format('.{0}', matrix.variant) || '' }}
         platforms: ${{ matrix.platform }}
-        push: true
-        tags: ${{ steps.meta.outputs.tags }}
-        labels: ${{ steps.meta.outputs.labels }}
-        cache-from: type=gha
-        cache-to: type=gha,mode=max
-        build-args: |
-          BUILDPLATFORM=${{ matrix.platform }}
-
-    - name: Run Trivy vulnerability scanner
-      uses: aquasecurity/trivy-action@master
-      with:
-        image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-
-    - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
-      with:
-        sarif_file: 'trivy-results.sarif'
+        push: false
+        cache-from: type=gha,scope=${{ matrix.variant }}-${{ matrix.platform }}
+        cache-to: type=gha,mode=max,scope=${{ matrix.variant }}-${{ matrix.platform }}

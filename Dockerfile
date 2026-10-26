@@ -5,7 +5,7 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install dependencies and build
-RUN corepack enable && pnpm install
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install
 COPY . .
 RUN pnpm run build
 
@@ -21,7 +21,7 @@ RUN adduser -S mcp-prompts -u 1001
 COPY package.json pnpm-lock.yaml ./
 
 # Install production dependencies only
-RUN corepack enable && pnpm install --prod && pnpm store prune
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --prod && pnpm store prune
 
 # Copy built application and data from builder stage
 COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
@@ -40,8 +40,8 @@ EXPOSE 3003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
+  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1)).end()"
 
 # Start the application
-CMD ["node", "./dist/index.js"]
+CMD ["node", "dist/index.js"]
 

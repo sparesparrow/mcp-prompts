@@ -17,6 +17,8 @@ jobs:
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
+    # arm64 is built under QEMU here; fail instead of hanging if emulation crashes.
+    timeout-minutes: 45
     permissions:
       contents: read
       packages: write
@@ -30,12 +32,6 @@ jobs:
           - name: mcp
             file: Dockerfile.mcp
             tags: mcp
-          - name: aws
-            file: Dockerfile.aws
-            tags: aws
-          - name: memory
-            file: Dockerfile.memory
-            tags: memory
           - name: file
             file: Dockerfile.file
             tags: file

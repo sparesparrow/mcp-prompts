@@ -6,7 +6,8 @@
   "types": "dist/mcp-server-standalone.d.ts",
   "bin": {
     "mcp-prompts": "dist/mcp-server-standalone.js",
-    "orchestrate-project": "scripts/orchestrate-project.sh"
+    "orchestrate-project": "scripts/orchestrate-project.sh",
+    "mcp-prompts-http": "dist/index.js"
   },
   "files": [
     "dist",
@@ -38,11 +39,13 @@
   },
   "homepage": "https://github.com/sparesparrow/mcp-prompts#readme",
   "scripts": {
-    "build": "tsc && swc src -d dist",
+    "build": "tsc && swc src -d dist --strip-leading-paths",
     "build:clean": "pnpm run clean && pnpm run build",
     "clean": "rm -rf dist",
     "dev": "tsx watch src/mcp-server-standalone.ts",
+    "dev:http": "tsx watch src/index.ts",
     "start": "node dist/mcp-server-standalone.js",
+    "start:http": "node dist/index.js",
     "orchestrate": "bash scripts/orchestrate-project.sh",
     "test": "vitest run",
     "test:watch": "vitest",
@@ -53,17 +56,22 @@
     "prepublishOnly": "pnpm run build"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.25.1",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "pino": "^8.21.0",
-    "zod": "^3.25.71"
+    "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@swc/cli": "^0.1.65",
+    "@eslint/js": "^9.39.5",
+    "@swc/cli": "^0.8.1",
     "@swc/core": "^1.13.5",
     "@types/node": "^20.19.17",
+    "@typescript-eslint/eslint-plugin": "^8.72.0",
+    "@typescript-eslint/parser": "^8.72.0",
+    "eslint": "^9.39.5",
+    "globals": "^15.15.0",
     "tsx": "^4.19.0",
     "typescript": "^5.9.3",
-    "vitest": "^1.6.1"
+    "vitest": "^4.1.12"
   },
   "engines": {
     "node": ">=18.0.0",

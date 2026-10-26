@@ -41,7 +41,7 @@ export const promptBaseSchema = z.object({
   createdAt: z.string().datetime().optional(),
   updatedAt: z.string().datetime().optional(),
   isLatest: z.boolean().default(true),
-  metadata: z.record(z.any()).default({}),
+  metadata: z.record(z.string(), z.any()).default({}),
   accessLevel: z.string().default('public'),
   authorId: z.string().optional(),
   promptType: z.enum(['standard', 'subagent_registry', 'main_agent_template', 'project_orchestration_template']).default('standard'),
@@ -72,7 +72,7 @@ export const promptSchemas = {
     template: z.string().min(1).optional(), // Use 'template' not 'content'
     tags: z.array(z.string()).optional(),
     variables: z.array(z.union([z.string(), z.object({ name: z.string() })])).optional(),
-    metadata: z.record(z.any()).optional(),
+    metadata: z.record(z.string(), z.any()).optional(),
     accessLevel: z.string().optional(),
     promptType: z.enum(['standard', 'subagent_registry', 'main_agent_template', 'project_orchestration_template']).optional(),
     agentConfig: agentConfigSchema.optional(),

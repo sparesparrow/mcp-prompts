@@ -6,28 +6,7 @@ import { z } from 'zod';
 import { logger } from './utils.js';
 import * as fs from 'fs';
 import * as path from 'path';
-
-// Define the prompt schema
-const PromptSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  content: z.string(),
-  isTemplate: z.boolean().default(false),
-  tags: z.array(z.string()).default([]),
-  variables: z.array(z.union([
-    z.string(),
-    z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      required: z.boolean().default(true),
-      type: z.enum(['string', 'number', 'boolean']).default('string')
-    })
-  ])).optional(),
-  metadata: z.record(z.any()).optional()
-});
-
-const CreatePromptParams = PromptSchema.omit({ id: true });
-const UpdatePromptParams = PromptSchema.partial().omit({ id: true });
+import { CreatePromptParams, PromptStore, UpdatePromptParams } from './prompt-store.js';
 
 // Report the installed package version rather than a hard-coded one that drifts.
 function packageVersion(): string {
@@ -36,75 +15,6 @@ function packageVersion(): string {
     return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
   } catch {
     return '0.0.0';
-  }
-}
-
-// In-memory storage for prompts
-const prompts = new Map();
-
-// Recursively load JSON files from a directory
-function loadPromptsFromDirectory(dir: string, prompts: Map<string, any>): number {
-  let count = 0;
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        // Recursively load from subdirectories
-        count += loadPromptsFromDirectory(fullPath, prompts);
-      } else if (entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'index.json') {
-        try {
-          const promptData = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
-
-          // Store prompt with all its data including content
-          prompts.set(promptData.id, {
-            ...promptData,
-            createdAt: promptData.createdAt || new Date().toISOString(),
-            updatedAt: promptData.updatedAt || new Date().toISOString(),
-            version: promptData.version || 1
-          });
-          count++;
-        } catch (err) {
-          logger.warn(`Failed to load prompt from ${fullPath}:`, err);
-        }
-      }
-    }
-  } catch (err) {
-    logger.warn(`Failed to read directory ${dir}:`, err);
-  }
-
-  return count;
-}
-
-// Load prompts from data/prompts directory structure
-function loadSamplePrompts() {
-  try {
-    // First, try to load from PROMPTS_DIR environment variable, or fallback to relative path
-    const promptsDir = process.env.PROMPTS_DIR || path.join(process.cwd(), 'data', 'prompts');
-
-    if (fs.existsSync(promptsDir)) {
-      const totalLoaded = loadPromptsFromDirectory(promptsDir, prompts);
-      logger.info(`Loaded ${totalLoaded} prompts from directory structure`);
-    } else {
-      // Fallback to sample prompts if prompts directory doesn't exist
-      const sampleDataPath = path.join(process.cwd(), 'data', 'sample-prompts.json');
-      if (fs.existsSync(sampleDataPath)) {
-        const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'));
-        for (const prompt of sampleData.prompts) {
-          prompts.set(prompt.id, {
-            ...prompt,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            version: 1
-          });
-        }
-        logger.info(`Loaded ${sampleData.prompts.length} sample prompts`);
-      }
-    }
-  } catch (error) {
-    logger.warn('Could not load prompts:', error);
   }
 }
 
@@ -118,8 +28,8 @@ export async function createMcpServer() {
   // here except type instantiation too deep for tsc (TS2589) on these schemas.
   const registerTool = server.tool.bind(server) as (...args: unknown[]) => void;
 
-  // Load sample prompts
-  loadSamplePrompts();
+  const store = new PromptStore();
+  store.loadDefault();
 
   // Tool: Add a new prompt
   registerTool(
@@ -128,17 +38,8 @@ export async function createMcpServer() {
     CreatePromptParams.shape,
     async (params: unknown) => {
     try {
-      const validatedParams = CreatePromptParams.parse(params);
-      const id = `prompt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-      const prompt = {
-        ...validatedParams,
-        id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: 1
-      };
-      prompts.set(id, prompt);
-      logger.info(`Added prompt: ${id}`);
+      const prompt = store.add(CreatePromptParams.parse(params));
+      const id = prompt.id;
       return {
         content: [
           {
@@ -161,10 +62,7 @@ export async function createMcpServer() {
     async (params: unknown) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(params);
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
+      const prompt = store.get(id);
       return {
         content: [
           {
@@ -194,34 +92,7 @@ export async function createMcpServer() {
         search: z.string().optional()
       }).optional().parse(params);
 
-      let promptList = Array.from(prompts.values());
-
-      // Filter by tags if provided
-      if (validatedParams?.tags && validatedParams.tags.length > 0) {
-        promptList = promptList.filter(prompt => 
-          validatedParams.tags!.some(tag => prompt.tags.includes(tag))
-        );
-      }
-
-      // Filter by search term if provided
-      if (validatedParams?.search) {
-        const searchLower = validatedParams.search.toLowerCase();
-        promptList = promptList.filter(prompt => 
-          prompt.name.toLowerCase().includes(searchLower) ||
-          prompt.content.toLowerCase().includes(searchLower)
-        );
-      }
-
-      // Return summary format instead of full content to avoid large responses
-      const summaryList = promptList.map(prompt => ({
-        id: prompt.id,
-        name: prompt.name,
-        description: prompt.description || 'No description',
-        tags: prompt.tags,
-        isTemplate: prompt.isTemplate || false,
-        createdAt: prompt.createdAt,
-        version: prompt.version
-      }));
+      const summaryList = store.list({ tags: validatedParams?.tags, search: validatedParams?.search });
 
       return {
         content: [
@@ -251,20 +122,7 @@ export async function createMcpServer() {
         updates: UpdatePromptParams
       }).parse(params);
 
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-
-      const updatedPrompt = {
-        ...prompt,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-        version: prompt.version + 1
-      };
-
-      prompts.set(id, updatedPrompt);
-      logger.info(`Updated prompt: ${id}`);
+      const updatedPrompt = store.update(id, updates);
       return {
         content: [
           {
@@ -287,12 +145,7 @@ export async function createMcpServer() {
     async (params: unknown) => {
     try {
       const { id } = z.object({ id: z.string() }).parse(params);
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-      prompts.delete(id);
-      logger.info(`Deleted prompt: ${id}`);
+      const prompt = store.delete(id);
       return {
         content: [
           {
@@ -313,30 +166,16 @@ export async function createMcpServer() {
     'Fill a template prompt\'s {{variables}} and return the resulting text.',
     {
       id: z.string().describe('ID of a template prompt'),
-      variables: z.record(z.any()).describe('Values for the template variables, by name')
+      variables: z.record(z.string(), z.any()).describe('Values for the template variables, by name')
     },
     async (params: unknown) => {
     try {
       const { id, variables } = z.object({
         id: z.string(),
-        variables: z.record(z.any())
+        variables: z.record(z.string(), z.any())
       }).parse(params);
 
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-
-      if (!prompt.isTemplate) {
-        throw new Error(`Prompt "${prompt.name}" is not a template`);
-      }
-
-      let result = prompt.content;
-      // Simple variable substitution
-      for (const [key, value] of Object.entries(variables)) {
-        const placeholder = `{{${key}}}`;
-        result = result.replace(new RegExp(placeholder, 'g'), String(value));
-      }
+      const result = store.applyTemplate(id, variables);
 
       return {
         content: [
@@ -358,14 +197,7 @@ export async function createMcpServer() {
     'Counts of prompts and templates, with the tags and categories in use.',
     async () => {
     try {
-      const promptList = Array.from(prompts.values());
-      const stats = {
-        total: promptList.length,
-        templates: promptList.filter(p => p.isTemplate).length,
-        regular: promptList.filter(p => !p.isTemplate).length,
-        tags: Array.from(new Set(promptList.flatMap(p => p.tags || []))),
-        categories: Array.from(new Set(promptList.map(p => p.metadata?.category).filter(Boolean)))
-      };
+      const stats = store.stats();
 
       return {
         content: [
