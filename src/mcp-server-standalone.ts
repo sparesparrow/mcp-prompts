@@ -23,7 +23,7 @@ const PromptSchema = z.object({
       type: z.enum(['string', 'number', 'boolean']).default('string')
     })
   ])).optional(),
-  metadata: z.record(z.any()).optional()
+  metadata: z.record(z.string(), z.any()).optional()
 });
 
 const CreatePromptParams = PromptSchema.omit({ id: true });
@@ -313,13 +313,13 @@ export async function createMcpServer() {
     'Fill a template prompt\'s {{variables}} and return the resulting text.',
     {
       id: z.string().describe('ID of a template prompt'),
-      variables: z.record(z.any()).describe('Values for the template variables, by name')
+      variables: z.record(z.string(), z.any()).describe('Values for the template variables, by name')
     },
     async (params: unknown) => {
     try {
       const { id, variables } = z.object({
         id: z.string(),
-        variables: z.record(z.any())
+        variables: z.record(z.string(), z.any())
       }).parse(params);
 
       const prompt = prompts.get(id);

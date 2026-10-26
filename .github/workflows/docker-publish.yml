@@ -30,12 +30,6 @@ jobs:
           - name: mcp
             file: Dockerfile.mcp
             tags: mcp
-          - name: aws
-            file: Dockerfile.aws
-            tags: aws
-          - name: memory
-            file: Dockerfile.memory
-            tags: memory
           - name: file
             file: Dockerfile.file
             tags: file

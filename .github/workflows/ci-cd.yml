@@ -5,10 +5,17 @@ on:
     branches: [ main, develop ]
   pull_request:
     branches: [ main ]
+  # Deployments and releases need AWS credentials and run only when started by hand.
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  security-events: write
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '8'
+  # pnpm-lock.yaml is lockfile v9, which pnpm 8 cannot read
+  PNPM_VERSION: '9'
 
 jobs:
   test:
@@ -29,7 +36,7 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build application
         run: pnpm run build
 
@@ -60,10 +67,10 @@ jobs:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
-            run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Run security audit
-        run: pnpm audit --audit-level moderate
+        run: pnpm audit --audit-level high
 
       - name: Run CodeQL Analysis
         uses: github/codeql-action/init@v3
@@ -77,7 +84,7 @@ jobs:
     name: Deploy to Staging
     runs-on: ubuntu-latest
     needs: [test, security-scan]
-    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'workflow_dispatch'
     environment: staging
     steps:
       - name: Checkout code
@@ -101,7 +108,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION_STAGING }}
 
       - name: Install dependencies
-          run: pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build application
         run: pnpm run build
 
@@ -117,7 +124,7 @@ jobs:
     name: Deploy to Production
     runs-on: ubuntu-latest
     needs: [test, security-scan]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     environment: production
     steps:
       - name: Checkout code
@@ -141,7 +148,7 @@ jobs:
           aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Install dependencies
-          run: pnpm install
+        run: pnpm install --frozen-lockfile
       - name: Build application
         run: pnpm run build
 
@@ -157,27 +164,23 @@ jobs:
         run: ./scripts/deploy-web.sh ${{ secrets.WEB_BUCKET_NAME }}
 
       - name: Run health check
+        id: api-url
         run: |
           API_URL=$(cd cdk && cdk describe McpPromptsStack | jq -r '.McpPromptsStack.ApiGatewayUrl')
           echo "API URL: $API_URL"
+          echo "url=$API_URL" >> "$GITHUB_OUTPUT"
           curl -f "$API_URL/health" || exit 1
 
-      - name: Create deployment notification
-        uses: actions/github-script@v7
-        with:
-          script: |
-            github.rest.issues.createComment({
-              issue_number: context.issue.number,
-              owner: context.repo.owner,
-              repo: context.repo.repo,
-              body: `🚀 **Production deployment completed successfully!**\n\nAPI: ${{ steps.api-url.outputs.url }}\nWeb: ${{ steps.web-url.outputs.url }}`
-            })
+      - name: Deployment summary
+        run: |
+          echo "### Production deployment completed" >> "$GITHUB_STEP_SUMMARY"
+          echo "API: ${{ steps.api-url.outputs.url }}" >> "$GITHUB_STEP_SUMMARY"
 
   release:
     name: Create Release
     runs-on: ubuntu-latest
     needs: [deploy-production]
-    if: github.ref == 'refs/heads/main' && github.event_name == 'push' && contains(github.event.head_commit.message, 'release:')
+    if: github.ref == 'refs/heads/main' && github.event_name == 'workflow_dispatch'
     steps:
       - name: Checkout code
         uses: actions/checkout@v4

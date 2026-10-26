@@ -8,13 +8,21 @@ on:
   schedule:
     - cron: '0 2 * * 1' # Weekly on Monday at 2 AM
 
+permissions:
+  contents: read
+  security-events: write
+
 jobs:
   security-scan:
     runs-on: ubuntu-latest
-    
+    env:
+      SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Run Trivy vulnerability scanner
       uses: aquasecurity/trivy-action@master
@@ -25,31 +33,41 @@ jobs:
         output: 'trivy-results.sarif'
 
     - name: Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       with:
         sarif_file: 'trivy-results.sarif'
+        category: trivy
+
+    - name: Initialize CodeQL
+      uses: github/codeql-action/init@v3
+      with:
+        languages: javascript-typescript
 
     - name: Run CodeQL Analysis
-      uses: github/codeql-action/analyze@v2
-      with:
-        languages: javascript
+      uses: github/codeql-action/analyze@v3
 
+    # Runs only when the SNYK_TOKEN secret is configured.
     - name: Run Snyk to check for vulnerabilities
+      if: env.SNYK_TOKEN != ''
       uses: snyk/actions/node@master
-      env:
-        SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
       with:
         args: --severity-threshold=high
 
-    - name: Run npm audit
-      run: |
-        npm audit --audit-level=high
+    - name: Setup PNPM
+      uses: pnpm/action-setup@v4
+      with:
+        version: '9'
+
+    - name: Run pnpm audit
+      run: pnpm audit --audit-level=high
       continue-on-error: true
 
+    # Compares the pull request against its base; on pushes to main there is no range to scan.
     - name: Check for secrets
+      if: github.event_name == 'pull_request'
       uses: trufflesecurity/trufflehog@main
       with:
         path: ./
-        base: main
-        head: HEAD
-        extra_args: --debug --only-verified
+        base: ${{ github.event.pull_request.base.sha }}
+        head: ${{ github.event.pull_request.head.sha }}
+        extra_args: --only-verified

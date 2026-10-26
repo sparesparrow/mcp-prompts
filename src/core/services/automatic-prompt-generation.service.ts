@@ -232,8 +232,6 @@ export class AutomaticPromptGenerationService {
     }
 
     return ineffectivePrompts;
-
-    return ineffectivePrompts;
   }
 
   private async identifyUsagePatterns(): Promise<any[]> {
