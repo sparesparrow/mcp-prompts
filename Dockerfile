@@ -40,8 +40,8 @@ EXPOSE 3003
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 \
-  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode !== 200)).end()"
+  CMD node -e "require('http').request({hostname: 'localhost', port: process.env.PORT || 3003, path: '/health', timeout: 2000}, (res) => process.exit(res.statusCode === 200 ? 0 : 1)).on('error', () => process.exit(1)).end()"
 
 # Start the application
-CMD ["node", "dist/mcp-server-standalone.js"]
+CMD ["node", "dist/index.js"]
 
