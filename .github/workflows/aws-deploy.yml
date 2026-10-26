@@ -1,8 +1,8 @@
 name: AWS Deployment
 
+# Deploys need AWS credentials and run only when started by hand
+# (the AWS storage adapters are archived in archive/aws).
 on:
-  push:
-    branches: [ main ]
   workflow_dispatch:
     inputs:
       environment:
@@ -16,7 +16,7 @@ on:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '8'
+  PNPM_VERSION: '9'
 
 jobs:
   deploy:

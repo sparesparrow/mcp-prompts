@@ -381,12 +381,13 @@ export class McpServer {
     try {
       let result: any;
       switch (name) {
-        case 'get_prompt':
+        case 'get_prompt': {
           const prompt = await this.promptService.getPrompt(args?.id, args?.version);
           result = prompt ? prompt.toJSON() : null;
           break;
+        }
         
-        case 'list_prompts':
+        case 'list_prompts': {
           const prompts = args?.category
             ? await this.promptService.getPromptsByCategory(args.category, args?.limit || 20)
             : await this.promptService.getLatestPrompts(args?.limit || 20);
@@ -397,8 +398,9 @@ export class McpServer {
             result = prompts.map(p => p.toJSON());
           }
           break;
+        }
 
-        case 'list_categories':
+        case 'list_categories': {
           const allPromptsForCats = await this.promptService.getLatestPrompts(1000);
           const catCounts: Record<string, number> = {};
           for (const p of allPromptsForCats) {
@@ -408,23 +410,26 @@ export class McpServer {
             .map(([category, count]) => ({ category, count }))
             .sort((a, b) => b.count - a.count);
           break;
+        }
         
-        case 'search_prompts':
+        case 'search_prompts': {
           if (!args?.query) {
             throw new Error('Query parameter is required');
           }
           const searchResults = await this.promptService.searchPrompts(args.query, args.category);
           result = searchResults.map(p => p.toJSON());
           break;
+        }
         
-        case 'apply_template':
+        case 'apply_template': {
           if (!args?.promptId || !args?.variables) {
             throw new Error('promptId and variables are required');
           }
           result = await this.promptService.applyTemplate(args.promptId, args.variables);
           break;
+        }
         
-        case 'create_prompt':
+        case 'create_prompt': {
           if (!args?.name || !args?.content) {
             throw new Error('name and content are required');
           }
@@ -433,24 +438,27 @@ export class McpServer {
           const newPrompt = await this.promptService.createPrompt(createData);
           result = newPrompt.toJSON();
           break;
+        }
 
-        case 'update_prompt':
+        case 'update_prompt': {
           if (!args?.id) {
             throw new Error('id is required');
           }
           const updatedPrompt = await this.promptService.updatePrompt(args.id, args);
           result = updatedPrompt.toJSON();
           break;
+        }
 
-        case 'delete_prompt':
+        case 'delete_prompt': {
           if (!args?.id) {
             throw new Error('id is required');
           }
           await this.promptService.deletePrompt(args.id);
           result = 'Prompt deleted successfully';
           break;
+        }
 
-        case 'slash_command':
+        case 'slash_command': {
           if (!this.slashCommandsService) {
             throw new Error('Slash commands not available');
           }
@@ -459,8 +467,9 @@ export class McpServer {
           }
           result = await this.slashCommandsService.executeCommand(args.command, args.variables || {});
           break;
+        }
 
-        case 'list_slash_commands':
+        case 'list_slash_commands': {
           if (!this.slashCommandsService) {
             throw new Error('Slash commands not available');
           }
@@ -469,8 +478,9 @@ export class McpServer {
             : await this.slashCommandsService.getAvailableCommands();
           result = commands.slice(0, args?.limit || 20);
           break;
+        }
 
-        case 'suggest_slash_commands':
+        case 'suggest_slash_commands': {
           if (!this.slashCommandsService) {
             throw new Error('Slash commands not available');
           }
@@ -479,6 +489,7 @@ export class McpServer {
           }
           result = await this.slashCommandsService.getCommandSuggestions(args.query, args.limit || 10);
           break;
+        }
 
         default:
           return {
@@ -560,11 +571,12 @@ export class McpServer {
     // Legacy tool execution for HTTP compatibility
     try {
       switch (toolName) {
-        case 'get_prompt':
+        case 'get_prompt': {
           const prompt = await this.promptService.getPrompt(args.id, args.version);
           return { result: prompt ? prompt.toJSON() : null };
+        }
         
-        case 'list_prompts':
+        case 'list_prompts': {
           const promptsLegacy = args.category
             ? await this.promptService.getPromptsByCategory(args.category, args.limit || 20)
             : await this.promptService.getLatestPrompts(args.limit || 20);
@@ -573,26 +585,32 @@ export class McpServer {
             return { result: promptsLegacy.map(p => ({ id: p.id, name: p.name, tags: p.tags, category: p.category })) };
           }
           return { result: promptsLegacy.map(p => p.toJSON()) };
+        }
         
-        case 'search_prompts':
+        case 'search_prompts': {
           const searchResults = await this.promptService.searchPrompts(args.query, args.category);
           return { result: searchResults.map(p => p.toJSON()) };
+        }
         
-        case 'apply_template':
+        case 'apply_template': {
           const result = await this.promptService.applyTemplate(args.promptId, args.variables);
           return { result };
+        }
         
-        case 'create_prompt':
+        case 'create_prompt': {
           const newPrompt = await this.promptService.createPrompt(args);
           return { result: newPrompt.toJSON() };
+        }
 
-        case 'update_prompt':
+        case 'update_prompt': {
           const updatedPrompt = await this.promptService.updatePrompt(args.id, args);
           return { result: updatedPrompt.toJSON() };
+        }
 
-        case 'delete_prompt':
+        case 'delete_prompt': {
           await this.promptService.deletePrompt(args.id);
           return { result: 'Prompt deleted successfully' };
+        }
         
         default:
           throw new Error(`Unknown tool: ${toolName}`);
