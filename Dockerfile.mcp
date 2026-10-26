@@ -1,4 +1,6 @@
-FROM node:20-alpine AS builder
+# The build output is plain JavaScript, so build natively on the runner and only run the
+# production install on the target platform. Building under QEMU hung on arm64.
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 
 # Copy package files
