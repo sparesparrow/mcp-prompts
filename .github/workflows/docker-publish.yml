@@ -17,7 +17,8 @@ jobs:
   build-and-push:
     name: Build and Push Docker Images
     runs-on: ubuntu-latest
-    # arm64 is built under QEMU here; fail instead of hanging if emulation crashes.
+    # Only the production install runs under QEMU for arm64 (the build stage runs natively);
+    # fail instead of hanging if emulation crashes.
     timeout-minutes: 45
     permissions:
       contents: read
