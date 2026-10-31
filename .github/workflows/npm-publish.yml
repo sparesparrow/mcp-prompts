@@ -132,34 +132,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
-        if: steps.check-version.outputs.exists == 'false' && startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes in version ${{ steps.package-version.outputs.version }}
-
-            ### Features
-            - MCP Prompts Server with full protocol support
-            - Multiple storage backends (Memory, File, AWS)
-            - Template system with variable substitution
-            - REST API and CLI tools
-
-            ### Installation
-            ```bash
-            npm install @sparesparrow/mcp-prompts@${{ steps.package-version.outputs.version }}
-            ```
-
-            ### Docker
-            ```bash
-            docker pull ghcr.io/sparesparrow/mcp-prompts:${{ steps.package-version.outputs.version }}
-            ```
-          draft: false
-          prerelease: false
+      # The GitHub Release is created by hand (gh release create), which also creates the tag.
 
       - name: Version already published
         if: steps.check-version.outputs.exists == 'true'
