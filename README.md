@@ -18,51 +18,90 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 
 ## Packages
 
-- npm: [`@sparesparrow/mcp-prompts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts)
-- Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts)
-
-Published releases lag behind `main`. To run what this README describes, build from source as below.
+- **GitHub Packages (preferred, current):** [`@sparesparrow/mcp-prompts`](https://github.com/sparesparrow/mcp-prompts/pkgs/npm/mcp-prompts), registry `https://npm.pkg.github.com`
+- npm: [`@sparesparrow/mcp-prompts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts). It can lag behind GitHub Packages; check the version before relying on it.
+- Docker: `ghcr.io/sparesparrow/mcp-prompts` (Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts))
 
 ## Quick Start
 
-### 1. Install
+### 1. Install from GitHub Packages
 
-```bash
-pnpm install
-pnpm build
+GitHub Packages asks for a token even for public packages (without one the install fails with `401 Unauthorized`). Create a personal access token with the `read:packages` scope (or, with the GitHub CLI, run `gh auth refresh -h github.com -s read:packages`), then add this to `~/.npmrc`:
+
+```ini
+@sparesparrow:registry=https://npm.pkg.github.com
+//npm.pkg.github.com/:_authToken=YOUR_TOKEN
 ```
 
-### 2. Start MCP Server
+Keep the token out of any file you commit. Then install:
 
 ```bash
-pnpm start
+npm install -g @sparesparrow/mcp-prompts
+mcp-prompts   # starts the MCP server on stdio; stop it with Ctrl+C
 ```
 
-### 3. Configure your MCP client
+The package ships the prompts in `data/prompts`, and the server finds them wherever an MCP client starts it from. Set `PROMPTS_DIR` to use your own directory instead.
 
-For Claude Desktop, add to `claude_desktop_config.json` (other clients take the same command and env):
+To install from npm instead, run `npm install -g @sparesparrow/mcp-prompts` without the registry lines above.
+
+### 2. Add the server to your MCP client
+
+**Claude Code**, for every project:
+
+```bash
+claude mcp add -s user mcp-prompts -- mcp-prompts
+```
+
+Or for one project, commit a `.mcp.json` at its root (no paths or tokens in it). Claude Code asks you to approve it the first time:
 
 ```json
 {
   "mcpServers": {
-    "prompts": {
-      "command": "node",
-      "args": ["/absolute/path/to/mcp-prompts/dist/mcp-server-standalone.js"],
-      "env": {
-        "PROMPTS_DIR": "/absolute/path/to/mcp-prompts/data/prompts"
-      }
+    "mcp-prompts": {
+      "command": "mcp-prompts",
+      "args": []
     }
   }
 }
 ```
 
-### 4. Use in Claude
+Check it with `claude mcp list`. Use one of the two: registering the same name at both scopes gives you two servers.
+
+**Claude Desktop** and other clients take the same command in their config (for Claude Desktop, `claude_desktop_config.json`), with the same `mcpServers` block as above. If the client does not find `mcp-prompts` on its PATH, use the full path from `which mcp-prompts` as the `command`.
+
+### Build from source
+
+To run unreleased changes:
+
+```bash
+pnpm install
+pnpm build
+node dist/mcp-server-standalone.js    # or: pnpm start
+```
+
+and point your client at that file:
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "node",
+      "args": ["/absolute/path/to/mcp-prompts/dist/mcp-server-standalone.js"],
+      "env": { "PROMPTS_DIR": "/absolute/path/to/mcp-prompts/data/prompts" }
+    }
+  }
+}
+```
+
+### 3. Use in Claude
 
 Ask Claude:
 - "List all prompts tagged with orchestration"
 - "Get the claudepy-esp32-android-bridge-workflow prompt"
 - "Apply the claudepy-esp32-android-bridge-workflow template with esp32_firmware_path set to ./firmware"
-- "Create a new prompt for Python FastAPI best practices"
+- "Add a prompt for Python FastAPI best practices"
+
+Prompts added or changed through `add_prompt` / `update_prompt` live in memory and are lost when the server restarts. A prompt that must last is a JSON file under `data/prompts/` with a stable id, added by pull request.
 
 ## HTTP Mode
 
