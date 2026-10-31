@@ -1,9 +1,8 @@
 name: Release and Publish
 
+# Manual only: a tag push is published by npm-publish.yml (npm) and publish-github-packages.yml
+# (GitHub Packages). Running this on tags as well published every version three times.
 on:
-  push:
-    tags:
-      - 'v*'
   workflow_dispatch:
     inputs:
       version:
@@ -58,7 +57,7 @@ jobs:
       - name: Update package.json version
         run: |
           VERSION="${{ steps.version.outputs.version }}"
-          npm version $VERSION --no-git-tag-version
+          npm version $VERSION --no-git-tag-version --allow-same-version
           cat package.json | grep '"version"'
 
   publish-npm:
@@ -82,7 +81,7 @@ jobs:
       
       - name: Update version
         run: |
-          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
+          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -125,7 +124,7 @@ jobs:
       
       - name: Update version
         run: |
-          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
+          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -168,7 +167,7 @@ jobs:
       
       - name: Update version
         run: |
-          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version
+          npm version ${{ needs.prepare.outputs.version }} --no-git-tag-version --allow-same-version
       
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
