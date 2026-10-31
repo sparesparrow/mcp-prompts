@@ -179,13 +179,41 @@ jobs:
     needs: build-and-push
     if: github.event_name != 'pull_request'
     strategy:
+      fail-fast: false
       matrix:
-        variant: [mcp, memory, file]
+        # The tags build-and-push publishes: latest is the HTTP server, mcp and file run the stdio MCP server.
+        include:
+          - tag: latest
+            kind: http
+          - tag: mcp
+            kind: stdio
+          - tag: file
+            kind: stdio
     steps:
-      - name: Test ${{ matrix.variant }} image
+      - name: Pull ${{ matrix.tag }} image
+        run: docker pull ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
+
+      - name: Check /health on the HTTP server
+        if: matrix.kind == 'http'
         run: |
-          docker pull ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}
-          docker run --rm ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }} --version || echo "Version check not available"
+          docker run -d --name under-test -p 3003:3003 ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }}
+          for i in $(seq 1 30); do
+            if curl -fsS http://localhost:3003/health; then docker rm -f under-test; exit 0; fi
+            sleep 1
+          done
+          docker logs under-test
+          exit 1
+
+      - name: Check the MCP server answers tools/list over stdio
+        if: matrix.kind == 'stdio'
+        run: |
+          out=$(printf '%s\n' \
+            '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2025-06-18","capabilities":{},"clientInfo":{"name":"ci","version":"1"}}}' \
+            '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+            '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+            | timeout 60 docker run -i --rm ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.tag }})
+          echo "$out" | head -c 2000
+          echo "$out" | grep -q '"name":"get_prompt"'
 
   notify:
     name: Notify on Success
@@ -209,6 +237,4 @@ jobs:
           echo "🐳 Images:"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:mcp"
-          echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:aws"
-          echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:memory"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:file"
