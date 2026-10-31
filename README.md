@@ -18,8 +18,10 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 
 ## Packages
 
-- **GitHub Packages (preferred, current):** [`@sparesparrow/mcp-prompts`](https://github.com/sparesparrow/mcp-prompts/pkgs/npm/mcp-prompts), registry `https://npm.pkg.github.com`
-- npm: [`@sparesparrow/mcp-prompts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts). It can lag behind GitHub Packages; check the version before relying on it.
+- **GitHub Packages (preferred):** [`@sparesparrow/mcp-prompts`](https://github.com/sparesparrow/mcp-prompts/pkgs/npm/mcp-prompts), registry `https://npm.pkg.github.com`
+- npm: [`@sparesparrow/mcp-prompts`](https://www.npmjs.com/package/@sparesparrow/mcp-prompts), no token needed
+
+Both registries receive the same version from every `v*` tag (first together at 4.0.2); Docker images follow the same tag.
 - Docker: `ghcr.io/sparesparrow/mcp-prompts` (Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts))
 
 ## Quick Start
@@ -42,7 +44,7 @@ mcp-prompts   # starts the MCP server on stdio; stop it with Ctrl+C
 
 The package ships the prompts in `data/prompts`, and the server finds them wherever an MCP client starts it from. Set `PROMPTS_DIR` to use your own directory instead.
 
-To install from npm instead, run `npm install -g @sparesparrow/mcp-prompts` without the registry lines above.
+To install from npm instead, skip the `~/.npmrc` lines above and run `npm install -g @sparesparrow/mcp-prompts`. It is the same package, and npm needs no token.
 
 ### 2. Add the server to your MCP client
 
