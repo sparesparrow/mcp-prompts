@@ -30,6 +30,13 @@ describe('mcp-server-standalone over stdio', () => {
     expect(client.getServerVersion()?.version).toBe(pkg.version);
   });
 
+  it('sends usage instructions that name the template flow and the persistence limit', () => {
+    const instructions = client.getInstructions() ?? '';
+    for (const word of ['list_prompts', 'get_prompt', 'apply_template', 'variables', 'memory only']) {
+      expect(instructions).toContain(word);
+    }
+  });
+
   it('advertises the arguments of every tool that takes them', async () => {
     const { tools } = await client.listTools();
     const props = (name: string) =>
