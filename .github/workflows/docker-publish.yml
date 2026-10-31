@@ -180,7 +180,7 @@ jobs:
     if: github.event_name != 'pull_request'
     strategy:
       matrix:
-        variant: [mcp, memory, file]
+        variant: [mcp, file]  # no memory image is built (see the build matrix)
     steps:
       - name: Test ${{ matrix.variant }} image
         run: |
