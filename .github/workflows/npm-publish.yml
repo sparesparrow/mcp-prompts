@@ -173,7 +173,15 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Publish to GitHub Packages
-        run: pnpm publish --registry https://npm.pkg.github.com --no-git-checks || echo "Already published or error"
+        # Skip only when this exact version is already there (a published version cannot be
+        # overwritten); any other publish error fails the job.
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@sparesparrow/mcp-prompts@$VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "::warning::@sparesparrow/mcp-prompts@$VERSION is already on GitHub Packages. Skipping publish."
+          else
+            pnpm publish --registry https://npm.pkg.github.com --no-git-checks
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
