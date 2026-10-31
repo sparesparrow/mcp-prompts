@@ -1,6 +1,6 @@
 {
   "name": "@sparesparrow/mcp-prompts",
-  "version": "4.0.0",
+  "version": "4.0.1",
   "description": "Simple MCP server for managing AI prompts and agent configurations with direct claude CLI orchestration",
   "main": "dist/mcp-server-standalone.js",
   "types": "dist/mcp-server-standalone.d.ts",
