@@ -18,11 +18,27 @@ function packageVersion(): string {
   }
 }
 
+// Shown to the model by MCP clients, so it knows how to use the tools without a separate skill.
+const SERVER_INSTRUCTIONS = [
+  'Prompt library. This server exposes tools only (no MCP prompts capability), so prompts are not slash commands.',
+  '',
+  'Using a template:',
+  '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts.',
+  '2. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
+  '3. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
+  '4. Check the result contains no leftover {{ before you use it.',
+  '',
+  'Persistence: add_prompt and update_prompt change memory only. They are lost when the server restarts, and add_prompt assigns a random id. A prompt that must last is a JSON file under data/prompts/ with a stable id, added by pull request.',
+].join('\n');
+
 export async function createMcpServer() {
-  const server = new McpServer({
-    name: 'mcp-prompts',
-    version: packageVersion(),
-  });
+  const server = new McpServer(
+    {
+      name: 'mcp-prompts',
+      version: packageVersion(),
+    },
+    { instructions: SERVER_INSTRUCTIONS }
+  );
 
   // Each handler validates its own arguments with zod, so the SDK's generic overloads add nothing
   // here except type instantiation too deep for tsc (TS2589) on these schemas.
