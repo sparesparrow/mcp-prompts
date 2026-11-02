@@ -5,6 +5,9 @@ import { logger } from './utils.js';
 
 // Shared by the MCP stdio server and the HTTP server, so both serve the same prompts the same way.
 
+// The package root (dist/..), not the cwd: MCP clients start the server from the user's project.
+const PACKAGE_ROOT = path.join(__dirname, '..');
+
 export const PromptSchema = z.object({
   id: z.string(),
   name: z.string(),
@@ -82,16 +85,16 @@ export class PromptStore {
     return this.prompts.size;
   }
 
-  /** Loads prompts from PROMPTS_DIR (or ./data/prompts), falling back to data/sample-prompts.json. */
+  /** Loads prompts from PROMPTS_DIR (or the data/prompts shipped with the package), falling back to data/sample-prompts.json. */
   loadDefault(): void {
     try {
-      const promptsDir = process.env.PROMPTS_DIR || path.join(process.cwd(), 'data', 'prompts');
+      const promptsDir = process.env.PROMPTS_DIR || path.join(PACKAGE_ROOT, 'data', 'prompts');
       if (fs.existsSync(promptsDir)) {
         const totalLoaded = this.loadDirectory(promptsDir);
         logger.info(`Loaded ${totalLoaded} prompts from directory structure`);
         return;
       }
-      const sampleDataPath = path.join(process.cwd(), 'data', 'sample-prompts.json');
+      const sampleDataPath = path.join(PACKAGE_ROOT, 'data', 'sample-prompts.json');
       if (fs.existsSync(sampleDataPath)) {
         const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'));
         const now = new Date().toISOString();
