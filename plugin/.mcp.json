@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "prompts": {
+      "command": "npx",
+      "args": ["-y", "--package", "@sparesparrow/mcp-prompts@4.1.0", "mcp-prompts"],
+      "env": {
+        "NPM_CONFIG_USERCONFIG": "${CLAUDE_PLUGIN_ROOT}/npmrc/${user_config.registry}.npmrc",
+        "NODE_AUTH_TOKEN": "${user_config.github_token}",
+        "PROMPTS_EXTRA_DIRS": "${user_config.prompts_dir}",
+        "PROMPTS_CATALOG_URL": "${user_config.catalog_url}"
+      }
+    }
+  }
+}

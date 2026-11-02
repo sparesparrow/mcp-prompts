@@ -247,7 +247,7 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
   let store = options.store;
   if (!store) {
     store = new PromptStore();
-    store.loadDefault();
+    await store.loadConfigured();
   }
   const routes = buildRoutes(store);
 

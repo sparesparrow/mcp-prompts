@@ -45,7 +45,7 @@ export async function createMcpServer() {
   const registerTool = server.tool.bind(server) as (...args: unknown[]) => void;
 
   const store = new PromptStore();
-  store.loadDefault();
+  await store.loadConfigured();
 
   // Tool: Add a new prompt
   registerTool(
@@ -114,9 +114,11 @@ export async function createMcpServer() {
         content: [
           {
             type: 'text',
-            text: `Found ${summaryList.length} prompts:\n\n${summaryList.map(p =>
-              `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]`
-            ).join('\n')}`
+            text: `Found ${summaryList.length} prompts:\n\n${summaryList.map(p => {
+              // The id, then what a caller needs to choose without fetching: template or not, and the language.
+              const facts = [p.id, ...(p.isTemplate ? ['template'] : []), ...(p.language ? [`language ${p.language}`] : [])];
+              return `- **${p.name}** (${facts.join(', ')}): ${p.description} [${p.tags.join(', ')}]`;
+            }).join('\n')}`
           }
         ]
       };
