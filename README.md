@@ -24,6 +24,37 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 Both registries receive the same version from every `v*` tag (first together at 4.0.2); Docker images follow the same tag.
 - Docker: `ghcr.io/sparesparrow/mcp-prompts` (Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts))
 
+## Claude Code plugin
+
+The plugin starts the server for you, asks for your settings once, and adds three skills that do the tool calls:
+
+```
+/plugin install mcp-prompts --marketplace sparesparrow/mcp-prompts
+```
+
+Or in two steps: `/plugin marketplace add sparesparrow/mcp-prompts`, then `/plugin install mcp-prompts@sparesparrow`.
+
+Claude Code then asks for these settings; change them later in `/config`:
+
+| Setting | What it does |
+|---|---|
+| Package registry | `github` (default) or `npm`. Both serve the same build. `npm` needs no token and is the one that works in cloud sessions. |
+| GitHub token | A classic personal access token with `read:packages`, used only with `github`. Claude Code keeps it in secure storage and passes it to npm in `NODE_AUTH_TOKEN`; it is never written to a file. |
+| Your prompts folder | Your own prompt JSON files, loaded on top of the bundled ones (`PROMPTS_EXTRA_DIRS`). A prompt with the same `id` replaces the bundled one. |
+| Default tags | Comma-separated tags the skills search unless you name others, such as `mia-dev`. |
+| Preferred language | `any`, `cs` or `en`: which version to pick when a prompt exists in more than one language. |
+| Shared catalog URL | An `https` URL of a JSON catalog, such as one on GitHub Pages (`PROMPTS_CATALOG_URL`). |
+
+The skills:
+
+- `/mcp-prompts:find-prompt` searches by your default tags, a search text and your language.
+- `/mcp-prompts:use-prompt <id>` asks for each template variable, fills the template and checks that no `{{` is left.
+- `/mcp-prompts:save-prompt` writes a prompt as a JSON file into your folder. Unlike the `add_prompt` tool, which
+  keeps it in memory only, the file outlasts a restart. Reconnect the server in `/mcp` to load it.
+
+The plugin runs the server with `npx`, pinned to the plugin's version. For that one command it uses its own npm
+settings file (`plugin/npmrc/`) instead of your `~/.npmrc`, so a registry mirror or proxy set there is not used.
+
 ## Quick Start
 
 ### 1. Install from GitHub Packages
@@ -42,7 +73,15 @@ npm install -g @sparesparrow/mcp-prompts
 mcp-prompts   # starts the MCP server on stdio; stop it with Ctrl+C
 ```
 
-The package ships the prompts in `data/prompts`, and the server finds them wherever an MCP client starts it from. Set `PROMPTS_DIR` to use your own directory instead.
+The package ships the prompts in `data/prompts`, and the server finds them wherever an MCP client starts it from. Three environment variables change what it loads, each layer replacing the one before it for prompts with the same `id`:
+
+| Variable | What it loads |
+|---|---|
+| `PROMPTS_DIR` | A directory used *instead of* the bundled prompts. |
+| `PROMPTS_CATALOG_URL` | A JSON catalog fetched once at start: an array of prompts, or `{ "prompts": [...] }`. It must be `https` (plain `http` only to `localhost`). The server waits at most 5 s and reads at most 1 MB, and it skips entries that are not valid prompts. If the fetch fails, the other prompts stay. |
+| `PROMPTS_EXTRA_DIRS` | Your own directories, separated by `:` (`;` on Windows), loaded last. |
+
+`get_stats` reports how many prompts came from each source (`bundled`, `catalog`, `user`, and `session` for prompts added with `add_prompt`).
 
 To install from npm instead, skip the `~/.npmrc` lines above and run `npm install -g @sparesparrow/mcp-prompts`. It is the same package, and npm needs no token.
 

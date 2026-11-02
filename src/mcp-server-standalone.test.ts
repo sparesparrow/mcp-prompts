@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 import * as fs from 'fs';
+import * as os from 'os';
 import * as path from 'path';
 
 // Drives the real stdio entry point the way an MCP client does, so a tool registered without
@@ -68,5 +69,47 @@ describe('mcp-server-standalone over stdio', () => {
 
     const applied = await client.callTool({ name: 'apply_template', arguments: { id, variables: { who: 'world' } } });
     expect((applied.content as Array<{ text: string }>)[0].text).toContain('Hello world');
+  });
+});
+
+// The Claude Code plugin passes the user's own folder as PROMPTS_EXTRA_DIRS; the stdio server must load it on top of
+// the bundled prompts and say so in get_stats.
+describe('mcp-server-standalone with PROMPTS_EXTRA_DIRS', () => {
+  const root = path.join(__dirname, '..');
+  const client = new Client({ name: 'standalone-extra-dirs-test', version: '1.0.0' });
+  const mine = fs.mkdtempSync(path.join(os.tmpdir(), 'my-prompts-'));
+
+  beforeAll(async () => {
+    fs.writeFileSync(
+      path.join(mine, 'mine.json'),
+      JSON.stringify({
+        id: 'my-own-brief', name: 'My own brief', content: 'Mine {{x}}', isTemplate: true, variables: ['x'],
+        tags: ['mine-only'], metadata: { language: 'cs' }
+      })
+    );
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [path.join(root, 'node_modules', 'tsx', 'dist', 'cli.mjs'), path.join(root, 'src', 'mcp-server-standalone.ts')],
+      cwd: root,
+      env: { ...process.env, LOG_LEVEL: 'silent', PROMPTS_EXTRA_DIRS: mine } as Record<string, string>,
+      stderr: 'ignore',
+    });
+    await client.connect(transport);
+  }, 30_000);
+
+  afterAll(async () => {
+    await client.close();
+    fs.rmSync(mine, { recursive: true, force: true });
+  });
+
+  it('serves the user folder next to the bundled prompts', async () => {
+    const listed = await client.callTool({ name: 'list_prompts', arguments: { tags: ['mine-only'] } });
+    // The listing says what the find-prompt skill needs to choose: template or not, and the language.
+    expect((listed.content as Array<{ text: string }>)[0].text).toContain('(my-own-brief, template, language cs)');
+
+    const stats = await client.callTool({ name: 'get_stats', arguments: {} });
+    const sources = JSON.parse((stats.content as Array<{ text: string }>)[0].text).sources;
+    expect(sources.user).toBe(1);
+    expect(sources.bundled).toBeGreaterThan(0);
   });
 });

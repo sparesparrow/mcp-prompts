@@ -1,0 +1,53 @@
+{
+  "name": "mcp-prompts",
+  "displayName": "MCP Prompts",
+  "version": "4.1.0",
+  "description": "A prompt library with templates. Skills find, fill and save prompts; settings add your own folder, default tags, a preferred language and a shared catalog.",
+  "author": {
+    "name": "sparesparrow",
+    "url": "https://github.com/sparesparrow"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts#claude-code-plugin",
+  "repository": "https://github.com/sparesparrow/mcp-prompts",
+  "license": "MIT",
+  "keywords": ["prompts", "templates", "mcp"],
+  "userConfig": {
+    "registry": {
+      "type": "string",
+      "title": "Package registry",
+      "description": "Where the server package comes from. github needs the token below; npm needs no token and is the one that works in cloud sessions. Both serve the same build.",
+      "options": ["github", "npm"],
+      "default": "github"
+    },
+    "github_token": {
+      "type": "string",
+      "title": "GitHub token (read:packages)",
+      "description": "A personal access token (classic) with the read:packages scope. Used only with the github registry; GitHub asks for one even for public packages.",
+      "sensitive": true
+    },
+    "prompts_dir": {
+      "type": "directory",
+      "title": "Your prompts folder",
+      "description": "A folder of your own prompt JSON files, loaded on top of the bundled prompts (yours win on the same id). The save-prompt skill writes here."
+    },
+    "default_tags": {
+      "type": "string",
+      "title": "Default tags",
+      "description": "Comma-separated tags the skills search unless you name others, for example mia-dev.",
+      "default": ""
+    },
+    "language": {
+      "type": "string",
+      "title": "Preferred language",
+      "description": "When a prompt exists in more than one language, prefer this one (from the prompt's metadata.language).",
+      "options": ["any", "cs", "en"],
+      "default": "any"
+    },
+    "catalog_url": {
+      "type": "string",
+      "title": "Shared catalog URL",
+      "description": "An https URL of a JSON catalog of prompts (for example on GitHub Pages), loaded at start. If it fails, the bundled prompts stay.",
+      "default": ""
+    }
+  }
+}
