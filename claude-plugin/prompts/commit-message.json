@@ -1,0 +1,12 @@
+{
+  "id": "commit-message",
+  "name": "Commit message",
+  "description": "Writes a conventional commit message from a summary of the staged change.",
+  "content": "Write a git commit message for this change.\n\nChange summary:\n{{change_summary}}\n\nFormat:\n- First line: type(scope): imperative summary, 72 characters or fewer. Use {{commit_type}} as the type, or pick the closest of feat, fix, refactor, docs, test, ci, chore.\n- Blank line, then a body of short paragraphs explaining what changed and why. Wrap lines at 72 characters.\n- Do not mention tools, assistants or model names.\n\nReturn only the commit message, in a single code block.",
+  "isTemplate": true,
+  "tags": ["git", "commit", "writing"],
+  "variables": [
+    { "name": "change_summary", "description": "What changed and why, in your own words", "required": true, "type": "string" },
+    { "name": "commit_type", "description": "Conventional commit type, e.g. fix", "required": false, "type": "string" }
+  ]
+}

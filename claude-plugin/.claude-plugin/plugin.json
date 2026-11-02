@@ -1,0 +1,12 @@
+{
+  "name": "mcp-prompts",
+  "version": "4.0.2",
+  "description": "A prompt library for Claude: find, fill and save reusable prompt templates through the mcp-prompts server. Ships starter templates and reads your own prompts folder when you point MCP_PROMPTS_DIR at it.",
+  "author": {
+    "name": "sparesparrow"
+  },
+  "homepage": "https://github.com/sparesparrow/mcp-prompts",
+  "repository": "https://github.com/sparesparrow/mcp-prompts",
+  "license": "MIT",
+  "keywords": ["prompts", "templates", "mcp", "prompt-library"]
+}

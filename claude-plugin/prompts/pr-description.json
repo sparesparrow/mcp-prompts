@@ -1,0 +1,13 @@
+{
+  "id": "pr-description",
+  "name": "Pull request description",
+  "description": "Drafts a pull request body from a title, a summary and how it was tested.",
+  "content": "Write a pull request description.\n\nTitle: {{title}}\n\nSummary of the change:\n{{summary}}\n\nHow it was tested:\n{{testing_notes}}\n\nUse these sections, in this order:\n## What changed\nA short paragraph and a bullet list of the main edits.\n## Why\nThe problem this solves or the reason for the change.\n## Testing\nWhat was run and the result. State plainly anything that was not tested.\n## Notes for reviewers\nRisks, follow-ups or places to look first. Omit the section if there are none.\n\nKeep it factual and short.",
+  "isTemplate": true,
+  "tags": ["git", "pull-request", "writing"],
+  "variables": [
+    { "name": "title", "description": "Pull request title", "required": true, "type": "string" },
+    { "name": "summary", "description": "What the change does", "required": true, "type": "string" },
+    { "name": "testing_notes", "description": "What was run and what passed", "required": false, "type": "string" }
+  ]
+}
