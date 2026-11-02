@@ -1,0 +1,18 @@
+{
+  "name": "sparesparrow",
+  "description": "Plugins from sparesparrow: a prompt library for Claude Code, customisable with your own prompts folder.",
+  "owner": {
+    "name": "sparesparrow",
+    "url": "https://github.com/sparesparrow"
+  },
+  "plugins": [
+    {
+      "name": "mcp-prompts",
+      "source": "./claude-plugin",
+      "description": "A prompt library for Claude: find, fill and save reusable prompt templates through the mcp-prompts server.",
+      "version": "4.0.2",
+      "category": "productivity",
+      "homepage": "https://github.com/sparesparrow/mcp-prompts"
+    }
+  ]
+}

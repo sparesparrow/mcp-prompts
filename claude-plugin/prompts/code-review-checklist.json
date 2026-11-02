@@ -1,0 +1,12 @@
+{
+  "id": "code-review-checklist",
+  "name": "Code review checklist",
+  "description": "A focused review of a change: correctness, tests, security and maintainability, in that order.",
+  "content": "Review the following change in {{language}}.\n\nChange summary:\n{{change_summary}}\n\nWork through these in order and report only what you find:\n1. Correctness: does the code do what the summary says? Look for off-by-one errors, unhandled errors and null or empty inputs.\n2. Tests: is each new behaviour covered? Name any behaviour that is untested.\n3. Security: input validation, secrets in code, injection and unsafe defaults.\n4. Maintainability: naming, duplication and anything that will be hard to change later.\n\nFor each finding give the file and line, what goes wrong, and a suggested fix. If there is nothing to report in a section, say so in one line.",
+  "isTemplate": true,
+  "tags": ["review", "code", "checklist"],
+  "variables": [
+    { "name": "language", "description": "Programming language of the change, e.g. TypeScript", "required": true, "type": "string" },
+    { "name": "change_summary", "description": "What the change does and why", "required": true, "type": "string" }
+  ]
+}

@@ -1,0 +1,7 @@
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "${CLAUDE_PLUGIN_ROOT}/bin/start-mcp-prompts.sh"
+    }
+  }
+}
