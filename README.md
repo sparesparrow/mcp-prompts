@@ -71,6 +71,76 @@ Check it with `claude mcp list`. Use one of the two: registering the same name a
 
 **Claude Desktop** and other clients take the same command in their config (for Claude Desktop, `claude_desktop_config.json`), with the same `mcpServers` block as above. If the client does not find `mcp-prompts` on its PATH, use the full path from `which mcp-prompts` as the `command`.
 
+### Choose what gets installed
+
+By default an install serves every bundled prompt through the seven tools. You can instead choose:
+
+- which **plain prompts** and which **templates** to serve (two separate lists);
+- which **MCP capabilities** expose them: `tools`, `prompts` (each prompt becomes a slash command, with a template's variables as its arguments) and `resources` (each prompt is readable as `prompts://<id>`, for attaching as context);
+- whether the install is **read-only** (no `add_prompt`, `update_prompt` or `delete_prompt`).
+
+The same options go in the install command, the client config file, a dedicated config file or the URL:
+
+| Option | Flag | Environment | Config file | URL (`/mcp?…`) |
+|---|---|---|---|---|
+| Plain prompts to serve | `--prompts` | `MCP_PROMPTS_PROMPTS` | `prompts` | `prompts` |
+| Templates to serve | `--templates` | `MCP_PROMPTS_TEMPLATES` | `templates` | `templates` |
+| Leave out of both | `--exclude` | `MCP_PROMPTS_EXCLUDE` | `exclude` | `exclude` |
+| Capabilities (default `tools`) | `--expose` | `MCP_PROMPTS_EXPOSE` | `expose` | `expose` |
+| Read-only | `--read-only` | `MCP_PROMPTS_READ_ONLY` | `readOnly` | `readOnly` |
+| Library instead of the bundled one | `--prompts-dir` | `PROMPTS_DIR` | `promptsDir` | – |
+| Your own directories, served in full | `--dir` (repeat) | `MCP_PROMPTS_DIRS` | `dirs` | – |
+| Config file | `--config` | `MCP_PROMPTS_CONFIG` | – | – |
+
+A list is comma-separated, and its entries can be:
+
+- `all` (the default for each list) or `none`;
+- a **group**, meaning a directory of the library such as `mia-car` (`cognitive` also covers `cognitive/meta`);
+- a prompt **id**;
+- `tag:<tag>`.
+
+Flags override environment variables, which override the config file. Paths in a config file are relative to that file. Only the library is filtered: prompts in your own `--dir` directories, and prompts added while the server runs, are always served. An own prompt with a library prompt's id replaces it.
+
+See what there is to choose, and what a choice serves:
+
+```bash
+mcp-prompts catalog                                   # groups, with plain/template counts, tags and ids
+mcp-prompts catalog --prompts none --templates mia-car --json
+```
+
+Then install it in any of these forms. `mcp-prompts config` with the same options prints all four, ready to paste:
+
+```bash
+# Command
+claude mcp add -s user mcp-prompts -- mcp-prompts --prompts none --templates mia-car,openclaw --expose tools,prompts --read-only
+```
+
+The same in a client config (`.mcp.json`, `claude_desktop_config.json`, Cursor and others):
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "mcp-prompts",
+      "args": ["--prompts", "none", "--templates", "mia-car,openclaw", "--expose", "tools,prompts", "--read-only"]
+    }
+  }
+}
+```
+
+```bash
+# Dedicated config file (see examples/mcp-prompts.config.json), referenced from any client
+mcp-prompts --config /absolute/path/to/mcp-prompts.json
+
+# Docker: use the environment, since arguments after the image name replace its command
+docker run --rm -i -e MCP_PROMPTS_TEMPLATES=mia-car -e MCP_PROMPTS_PROMPTS=none -e MCP_PROMPTS_EXPOSE=tools,prompts ghcr.io/sparesparrow/mcp-prompts
+
+# URL, against a server started with mcp-prompts-http (see HTTP Mode)
+claude mcp add -s user --transport http mcp-prompts "http://localhost:3003/mcp?prompts=none&templates=mia-car,openclaw&expose=tools,prompts&readOnly=true"
+```
+
+A URL chooses from what that server serves. It can narrow the server's selection and turn read-only on, but it cannot widen the selection, turn read-only off, or name directories. Mistyped options stop the server with exit code 2, and a URL with them gets HTTP 400. An entry that matches nothing, or matches only the other list (`--prompts mia-car` when mia-car holds only templates), is logged as a warning.
+
 ### Build from source
 
 To run unreleased changes:
@@ -124,12 +194,14 @@ PORT=3003 PROMPTS_DIR=$PWD/data/prompts pnpm start:http
 | `POST /v1/prompts/:id/apply` | Fill a template: `{ "variables": { ... } }` → `{ "result": "..." }` |
 | `GET /v1/stats` | Same counts as `get_stats` |
 | `GET /mcp/tools`, `POST /mcp/tools/:name` | Call any MCP tool by name: `{ "arguments": { ... } }` |
+| `POST /mcp?…` | MCP itself (Streamable HTTP, stateless), for `claude mcp add --transport http`; the query string chooses prompts, templates and capabilities (see [Choose what gets installed](#choose-what-gets-installed)) |
 
 ```bash
 curl -s -X POST localhost:3003/v1/prompts/claudepy-esp32-android-bridge-workflow/apply \
   -H 'Content-Type: application/json' -d '{"variables":{"esp32_firmware_path":"./firmware"}}'
 ```
 
+`mcp-prompts-http` takes the same options as `mcp-prompts` (flags, environment, `--config`); they set what the whole server serves. With `--read-only`, the write routes and tools are left out.
 Invalid input answers 400, unknown prompts 404. Set `CORS_ORIGIN` to allow browser clients.
 Changes made over HTTP live in memory, like those made over MCP; the files in `data/prompts` are not rewritten.
 

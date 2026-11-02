@@ -144,8 +144,19 @@ This server runs in two distinct modes controlled by the `MODE` environment vari
 - Entry point: `src/index.ts` → `src/http-server.ts`; `pnpm start:http` or `mcp-prompts start --mode http`
 - Endpoints: `GET /health`, `/ready`, `/version`; `GET|POST /v1/prompts`;
   `GET|PUT|DELETE /v1/prompts/:id`; `POST /v1/prompts/:id/apply`; `GET /v1/stats`;
-  `GET /mcp/tools` and `POST /mcp/tools/:name` (body `{ "arguments": {...} }`)
+  `GET /mcp/tools` and `POST /mcp/tools/:name` (body `{ "arguments": {...} }`);
+  `POST /mcp` is MCP Streamable HTTP (stateless), its query string narrowing the selection
 - Errors: 400 invalid input, 404 unknown prompt or path, 405 wrong method, 413 body over 1 MB
+
+### Install options (both modes)
+- `src/server-options.ts` reads one set of options from flags, env (`MCP_PROMPTS_*`, `PROMPTS_DIR`),
+  a `--config` JSON file and, for `/mcp`, the URL query: `prompts` / `templates` (separate lists of
+  groups = library directories, ids or `tag:<tag>`; `all`/`none`), `exclude`, `expose`
+  (`tools,prompts,resources`), `readOnly`, `promptsDir`, `dirs`. Flags > env > config file.
+- `PromptStore.select()` returns a filtered view; only library prompts are filtered, `dirs` and
+  runtime-added prompts are always served. `src/mcp-prompts-server.ts` builds the MCP server for a view.
+- `mcp-prompts catalog` lists groups and what a selection serves; `mcp-prompts config` prints the
+  matching install command, client config, URL and config file.
 
 ## MCP Tools Implementation
 

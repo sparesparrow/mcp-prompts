@@ -1,8 +1,7 @@
 import * as http from 'http';
-import * as fs from 'fs';
-import * as path from 'path';
 import type { AddressInfo } from 'net';
 import { z, ZodError } from 'zod';
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import { logger } from './utils.js';
 import {
   CreatePromptParams,
@@ -11,8 +10,11 @@ import {
   PromptUsageError,
   UpdatePromptParams,
 } from './prompt-store.js';
+import { createMcpServer, packageVersion } from './mcp-prompts-server.js';
+import { DEFAULT_OPTIONS, OptionsError, optionsFromQuery, type ServerOptions } from './server-options.js';
 
-// HTTP mode: the same prompts and operations as the MCP stdio server, as a small JSON API.
+// HTTP mode: the same prompts and operations as the MCP stdio server, as a small JSON API, plus a
+// stateless MCP Streamable HTTP endpoint at /mcp whose query string picks a selection.
 // Built on node:http so the server needs no web framework.
 
 const MAX_BODY_BYTES = 1024 * 1024;
@@ -21,6 +23,8 @@ export interface RouteRequest {
   params: Record<string, string>;
   query: URLSearchParams;
   body: unknown;
+  /** The underlying request and response, for handlers that write the response themselves. */
+  raw?: { req: http.IncomingMessage; res: http.ServerResponse };
 }
 
 export interface RouteResponse {
@@ -44,8 +48,11 @@ export interface HttpServerApp {
 }
 
 export interface HttpServerOptions {
+  /** Prompts to serve; loaded from serverOptions (or PROMPTS_DIR) when left out. */
   store?: PromptStore;
   corsOrigin?: string;
+  /** What this server serves: the selection, MCP capabilities and read-only switch. */
+  serverOptions?: ServerOptions;
 }
 
 class HttpError extends Error {
@@ -54,23 +61,17 @@ class HttpError extends Error {
   }
 }
 
-function packageVersion(): string {
-  try {
-    const pkg = JSON.parse(fs.readFileSync(path.join(__dirname, '..', 'package.json'), 'utf8'));
-    return typeof pkg.version === 'string' ? pkg.version : '0.0.0';
-  } catch {
-    return '0.0.0';
-  }
-}
-
 const ApplyTemplateBody = z.object({ variables: z.record(z.string(), z.any()).default({}) });
 const ToolCallBody = z.object({ arguments: z.record(z.string(), z.any()).default({}) });
 
-function buildRoutes(store: PromptStore): Route[] {
+const WRITE_TOOLS = ['add_prompt', 'update_prompt', 'delete_prompt'];
+
+function buildRoutes(store: PromptStore, serverOptions: ServerOptions): Route[] {
   const version = packageVersion();
+  const { readOnly } = serverOptions;
 
   // The MCP tools, callable over HTTP with the same names and arguments.
-  const tools: Record<string, { description: string; run: (args: Record<string, unknown>) => unknown }> = {
+  const allTools: Record<string, { description: string; run: (args: Record<string, unknown>) => unknown }> = {
     list_prompts: {
       description: 'List prompts, optionally filtered by tags (any match) or a search term.',
       run: args => store.list(z.object({ tags: z.array(z.string()).optional(), search: z.string().optional() }).parse(args)),
@@ -106,8 +107,11 @@ function buildRoutes(store: PromptStore): Route[] {
       run: () => store.stats(),
     },
   };
+  const tools = Object.fromEntries(
+    Object.entries(allTools).filter(([name]) => !(readOnly && WRITE_TOOLS.includes(name)))
+  );
 
-  return [
+  const routes: Array<Route & { write?: boolean }> = [
     {
       method: 'GET',
       path: '/health',
@@ -141,6 +145,7 @@ function buildRoutes(store: PromptStore): Route[] {
     {
       method: 'POST',
       path: '/v1/prompts',
+      write: true,
       handler: (req, res) => {
         res.status(201).json(store.add(CreatePromptParams.parse(req.body)));
       },
@@ -155,6 +160,7 @@ function buildRoutes(store: PromptStore): Route[] {
     {
       method: 'PUT',
       path: '/v1/prompts/:id',
+      write: true,
       handler: (req, res) => {
         res.json(store.update(req.params.id, UpdatePromptParams.parse(req.body)));
       },
@@ -162,6 +168,7 @@ function buildRoutes(store: PromptStore): Route[] {
     {
       method: 'DELETE',
       path: '/v1/prompts/:id',
+      write: true,
       handler: (req, res) => {
         store.delete(req.params.id);
         res.status(204).end();
@@ -199,7 +206,42 @@ function buildRoutes(store: PromptStore): Route[] {
         res.json({ result: tool.run(args) });
       },
     },
+    {
+      // MCP Streamable HTTP, stateless: every POST gets its own server over the shared store, so
+      // the query string can choose a selection per client. It narrows what this server serves.
+      method: 'POST',
+      path: '/mcp',
+      handler: async req => {
+        if (!req.raw) throw new HttpError(500, 'The MCP endpoint needs the raw request');
+        let fromUrl;
+        try {
+          fromUrl = optionsFromQuery(req.query);
+        } catch (error) {
+          if (error instanceof OptionsError) throw new HttpError(400, error.message);
+          throw error;
+        }
+        const view = store.select({
+          prompts: fromUrl.prompts ?? 'all',
+          templates: fromUrl.templates ?? 'all',
+          exclude: fromUrl.exclude ?? [],
+        });
+        const server = await createMcpServer({
+          store: view,
+          expose: fromUrl.expose ?? serverOptions.expose,
+          // A URL can make the session read-only, never the reverse.
+          readOnly: readOnly || fromUrl.readOnly === true,
+        });
+        const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
+        req.raw.res.on('close', () => {
+          transport.close().catch(() => undefined);
+          server.close().catch(() => undefined);
+        });
+        await server.connect(transport);
+        await transport.handleRequest(req.raw.req, req.raw.res, req.body);
+      },
+    },
   ];
+  return routes.filter(route => !(readOnly && route.write)).map(({ write: _write, ...route }) => route);
 }
 
 /** Matches '/v1/prompts/:id' style patterns; returns the decoded params or null. */
@@ -244,17 +286,23 @@ function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 }
 
 export async function createServer(options: HttpServerOptions = {}): Promise<HttpServerApp> {
-  let store = options.store;
-  if (!store) {
-    store = new PromptStore();
-    store.loadDefault();
+  const serverOptions = options.serverOptions ?? DEFAULT_OPTIONS;
+  let base = options.store;
+  if (!base) {
+    base = new PromptStore();
+    if (options.serverOptions) {
+      base.load({ promptsDir: serverOptions.promptsDir, dirs: serverOptions.dirs });
+    } else {
+      base.loadDefault();
+    }
   }
-  const routes = buildRoutes(store);
+  for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
+  const routes = buildRoutes(base.select(serverOptions.selection), serverOptions);
 
   const server = http.createServer(async (req, res) => {
+    if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);
     const send = (code: number, data?: unknown) => {
       if (res.headersSent) return;
-      if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);
       if (data === undefined) {
         res.writeHead(code).end();
       } else {
@@ -272,7 +320,7 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
 
       if (req.method === 'OPTIONS' && options.corsOrigin) {
         res.setHeader('Access-Control-Allow-Methods', candidates.map(c => c.route.method).join(', '));
-        res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+        res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Mcp-Protocol-Version, Mcp-Session-Id');
         return send(204);
       }
 
@@ -289,7 +337,7 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
         json: data => { send(statusCode, data); return routeRes; },
         end: () => { send(statusCode); return routeRes; },
       };
-      await match.route.handler({ params: match.params, query: url.searchParams, body }, routeRes);
+      await match.route.handler({ params: match.params, query: url.searchParams, body, raw: { req, res } }, routeRes);
     } catch (error) {
       if (error instanceof HttpError) return send(error.statusCode, { error: error.message });
       if (error instanceof ZodError) return send(400, { error: 'Invalid request', details: error.issues });

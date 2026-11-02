@@ -40,7 +40,7 @@ USER mcp-prompts
 ENV NODE_ENV=production
 ENV MODE=mcp
 ENV STORAGE_TYPE=file
-ENV PROMPTS_DIR=/app/data
+ENV PROMPTS_DIR=/app/data/prompts
 ENV PORT=3003
 ENV HOST=0.0.0.0
 
