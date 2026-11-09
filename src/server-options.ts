@@ -20,6 +20,8 @@ export interface ServerOptions {
   promptsDir?: string;
   /** The user's own directories, always served in full. */
   dirs: string[];
+  /** Where add, update and delete are saved. Left out, they are kept in memory only. */
+  stateDir?: string;
 }
 
 /** One source's options; keys it leaves out keep the value from an earlier source. */
@@ -31,6 +33,7 @@ export interface OptionLayer {
   readOnly?: boolean;
   promptsDir?: string;
   dirs?: string[];
+  stateDir?: string;
 }
 
 export const DEFAULT_OPTIONS: ServerOptions = {
@@ -69,18 +72,28 @@ Choose what the install serves:
   --read-only           leave out add_prompt, update_prompt and delete_prompt
   --prompts-dir <dir>   library to choose from instead of the bundled prompts
   --dir <dir>           also serve every prompt in this directory, unfiltered (repeatable)
+  --state-dir <dir>     save add_prompt, update_prompt and delete_prompt to this directory and
+                        load them again at the next start (default: memory only)
   --config <file>       read options from a JSON file (keys: prompts, templates, exclude,
-                        expose, readOnly, promptsDir, dirs)
+                        expose, readOnly, promptsDir, dirs, stateDir)
   -h, --help            show this help
   -v, --version         show the version
 
 Environment variables: MCP_PROMPTS_PROMPTS, MCP_PROMPTS_TEMPLATES, MCP_PROMPTS_EXCLUDE,
 MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS (separated by
-"${path.delimiter}"), MCP_PROMPTS_CONFIG. Flags override environment variables, which override
-the config file.
+"${path.delimiter}"), MCP_PROMPTS_STATE_DIR, MCP_PROMPTS_CONFIG. Flags override environment
+variables, which override the config file.
 
 HTTP: the URL http://<host>:<port>/mcp takes prompts, templates, exclude, expose and readOnly as
 query parameters, and can only narrow what the server itself serves.
+mcp-prompts-http also reads HOST (default 127.0.0.1), PORT (default 3003), CORS_ORIGIN and:
+  MCP_PROMPTS_AUTH_TOKEN        bearer token every request except /health, /ready and /version
+                                must carry (or MCP_PROMPTS_AUTH_TOKEN_FILE, a file holding it)
+  MCP_PROMPTS_ALLOWED_HOSTS     Host header names to accept (default: loopback names when HOST
+                                is loopback, otherwise unchecked)
+  MCP_PROMPTS_ALLOWED_ORIGINS   browser origins to accept besides CORS_ORIGIN
+A server that listens beyond loopback and accepts writes must have a token; without one it
+refuses to start unless it is read-only or MCP_PROMPTS_ALLOW_INSECURE=true.
 `;
 
 function splitEntries(values: string | readonly string[]): string[] {
@@ -158,6 +171,7 @@ const ARG_OPTIONS = {
   'read-only': { type: 'boolean' },
   'prompts-dir': { type: 'string' },
   dir: { type: 'string', multiple: true },
+  'state-dir': { type: 'string' },
   config: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'v' },
@@ -187,6 +201,7 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
   if (values['read-only']) layer.readOnly = true;
   if (values['prompts-dir']) layer.promptsDir = resolvePath(values['prompts-dir'], cwd);
   if (values.dir) layer.dirs = values.dir.map(dir => resolvePath(dir, cwd));
+  if (values['state-dir']) layer.stateDir = resolvePath(values['state-dir'], cwd);
 
   return {
     command: positionals[0],
@@ -202,8 +217,14 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
 
 const ENV_KEYS = [
   'MCP_PROMPTS_PROMPTS', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_EXCLUDE', 'MCP_PROMPTS_EXPOSE',
-  'MCP_PROMPTS_READ_ONLY', 'MCP_PROMPTS_DIRS', 'MCP_PROMPTS_CONFIG',
+  'MCP_PROMPTS_READ_ONLY', 'MCP_PROMPTS_DIRS', 'MCP_PROMPTS_STATE_DIR', 'MCP_PROMPTS_CONFIG',
+  // Read by the HTTP entry point (config.ts); listed here so they are not reported as unknown.
+  'MCP_PROMPTS_AUTH_TOKEN', 'MCP_PROMPTS_AUTH_TOKEN_FILE', 'MCP_PROMPTS_ALLOWED_HOSTS',
+  'MCP_PROMPTS_ALLOWED_ORIGINS', 'MCP_PROMPTS_ALLOW_INSECURE',
 ];
+
+// Earlier releases and the old Docker and compose files set these; no storage backend reads them.
+const LEGACY_STORAGE_TYPES = ['file', 'memory'];
 
 /** Reads the options from environment variables; an empty variable counts as unset. */
 export function optionsFromEnv(
@@ -226,12 +247,23 @@ export function optionsFromEnv(
   if (promptsDir) layer.promptsDir = resolvePath(promptsDir, cwd);
   const dirs = get('MCP_PROMPTS_DIRS');
   if (dirs) layer.dirs = dirs.split(path.delimiter).filter(Boolean).map(dir => resolvePath(dir, cwd));
+  const stateDir = get('MCP_PROMPTS_STATE_DIR');
+  if (stateDir) layer.stateDir = resolvePath(stateDir, cwd);
   const config = get('MCP_PROMPTS_CONFIG');
 
   // A misspelt variable would otherwise be ignored without a word.
   const warnings = Object.keys(env)
     .filter(key => key.startsWith('MCP_PROMPTS_') && !ENV_KEYS.includes(key))
     .map(key => `ignoring unknown environment variable ${key}`);
+
+  // STORAGE_TYPE used to promise backends (postgres, aws) this server does not have; saying nothing
+  // let a deployment believe its prompts were going to a database.
+  const storageType = get('STORAGE_TYPE');
+  if (storageType && !LEGACY_STORAGE_TYPES.includes(storageType)) {
+    warnings.push(`STORAGE_TYPE=${storageType} is not supported: prompts are read from files, and changes are kept in memory unless MCP_PROMPTS_STATE_DIR is set`);
+  } else if (storageType === 'file' && !layer.stateDir) {
+    warnings.push('STORAGE_TYPE=file no longer selects anything: set MCP_PROMPTS_STATE_DIR to save changes to disk');
+  }
 
   return { layer, configPath: config ? resolvePath(config, cwd) : undefined, warnings };
 }
@@ -247,6 +279,7 @@ const ConfigFileSchema = z.strictObject({
   readOnly: z.boolean().optional(),
   promptsDir: z.string().optional(),
   dirs: z.array(z.string()).optional(),
+  stateDir: z.string().optional(),
 });
 
 /** Reads a JSON config file. Relative paths in it resolve against the file's directory. */
@@ -275,6 +308,7 @@ export function optionsFromConfigFile(file: string): OptionLayer {
   if (config.readOnly !== undefined) layer.readOnly = config.readOnly;
   if (config.promptsDir !== undefined) layer.promptsDir = resolvePath(config.promptsDir, base);
   if (config.dirs !== undefined) layer.dirs = config.dirs.map(dir => resolvePath(dir, base));
+  if (config.stateDir !== undefined) layer.stateDir = resolvePath(config.stateDir, base);
   return layer;
 }
 
@@ -310,6 +344,7 @@ export function mergeOptions(base: ServerOptions, ...layers: OptionLayer[]): Ser
     if (layer.readOnly !== undefined) result.readOnly = layer.readOnly;
     if (layer.promptsDir !== undefined) result.promptsDir = layer.promptsDir;
     if (layer.dirs !== undefined) result.dirs = layer.dirs;
+    if (layer.stateDir !== undefined) result.stateDir = layer.stateDir;
   }
   return result;
 }
@@ -337,9 +372,14 @@ export function resolveOptions(
   };
 }
 
-/** Loads the library and the user's directories, and selects what the options ask for. */
+/**
+ * Loads the library, the user's directories and what earlier runs saved to the state directory,
+ * and selects what the options ask for. Throws PromptStorageError when the state directory cannot
+ * be written and the options are not read-only.
+ */
 export function openStore(options: ServerOptions): { base: PromptStore; store: PromptStore; warnings: string[] } {
   const base = new PromptStore();
   base.load({ promptsDir: options.promptsDir, dirs: options.dirs });
+  if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
   return { base, store: base.select(options.selection), warnings: base.selectionWarnings(options.selection) };
 }

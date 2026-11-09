@@ -143,3 +143,32 @@ describe('optionsFromQuery', () => {
     expect(() => optionsFromQuery(new URLSearchParams('template=a'))).toThrow(/accepted: prompts, templates/);
   });
 });
+
+describe('state directory and legacy storage settings', () => {
+  it('reads the state directory from the flag, the environment and a config file', () => {
+    expect(parseCommandLine(['--state-dir', 'state'], '/work').layer.stateDir).toBe(path.resolve('/work', 'state'));
+    expect(optionsFromEnv({ MCP_PROMPTS_STATE_DIR: '/var/lib/mcp-prompts' }, '/work').layer.stateDir).toBe(path.resolve('/var/lib/mcp-prompts'));
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-options-'));
+    const file = path.join(dir, 'config.json');
+    fs.writeFileSync(file, JSON.stringify({ stateDir: './saved' }));
+    expect(optionsFromConfigFile(file).stateDir).toBe(path.join(dir, 'saved'));
+    expect(resolveOptions(['--state-dir', '/flag'], { MCP_PROMPTS_STATE_DIR: '/env' }, '/work').options.stateDir).toBe(path.resolve('/flag'));
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('does not report the HTTP settings as unknown variables', () => {
+    const { warnings } = optionsFromEnv({
+      MCP_PROMPTS_AUTH_TOKEN: 'x', MCP_PROMPTS_AUTH_TOKEN_FILE: '/run/secrets/token', MCP_PROMPTS_ALLOWED_HOSTS: 'h',
+      MCP_PROMPTS_ALLOWED_ORIGINS: 'o', MCP_PROMPTS_ALLOW_INSECURE: 'false', MCP_PROMPTS_STATE_DIR: '/s',
+    }, '/work');
+    expect(warnings).toEqual([]);
+  });
+
+  it('says so when STORAGE_TYPE asks for a backend that does not exist', () => {
+    expect(optionsFromEnv({ STORAGE_TYPE: 'postgres' }, '/work').warnings).toEqual([expect.stringContaining('STORAGE_TYPE=postgres is not supported')]);
+    expect(optionsFromEnv({ STORAGE_TYPE: 'aws' }, '/work').warnings[0]).toContain('MCP_PROMPTS_STATE_DIR');
+    expect(optionsFromEnv({ STORAGE_TYPE: 'file' }, '/work').warnings[0]).toContain('no longer selects anything');
+    expect(optionsFromEnv({ STORAGE_TYPE: 'file', MCP_PROMPTS_STATE_DIR: '/s' }, '/work').warnings).toEqual([]);
+    expect(optionsFromEnv({ STORAGE_TYPE: 'memory' }, '/work').warnings).toEqual([]);
+  });
+});

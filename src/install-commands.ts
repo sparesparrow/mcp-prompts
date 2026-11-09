@@ -54,6 +54,7 @@ export function optionArgs(options: ServerOptions): string[] {
   if (options.readOnly) args.push('--read-only');
   if (options.promptsDir) args.push('--prompts-dir', options.promptsDir);
   for (const dir of options.dirs) args.push('--dir', dir);
+  if (options.stateDir) args.push('--state-dir', options.stateDir);
   return args;
 }
 
@@ -68,6 +69,7 @@ export function optionConfigFile(options: ServerOptions): Record<string, unknown
   if (options.readOnly) config.readOnly = true;
   if (options.promptsDir) config.promptsDir = options.promptsDir;
   if (options.dirs.length > 0) config.dirs = options.dirs;
+  if (options.stateDir) config.stateDir = options.stateDir;
   return config;
 }
 
@@ -105,6 +107,7 @@ export function formatInstallSnippets(options: ServerOptions, name = 'mcp-prompt
   const serverArgs = [
     ...(options.promptsDir ? ['--prompts-dir', options.promptsDir] : []),
     ...options.dirs.flatMap(dir => ['--dir', dir]),
+    ...(options.stateDir ? ['--state-dir', options.stateDir] : []),
   ].map(shellQuote).join(' ');
 
   return [
