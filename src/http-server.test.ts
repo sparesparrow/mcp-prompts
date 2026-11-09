@@ -1,4 +1,8 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import * as fs from 'fs';
+import * as http from 'http';
+import * as os from 'os';
+import * as path from 'path';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createServer, startHttpServer, type HttpServerApp, type Route } from './http-server';
@@ -154,14 +158,182 @@ describe('http-server over HTTP', () => {
     expect(wrongMethod.headers.get('allow')).toBe('GET');
   });
 
-  it('rejects bodies over 1 MB', async () => {
+  it('answers 413 for bodies over 1 MB instead of resetting the connection', async () => {
     const res = await fetch(`${base}/v1/prompts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'big', content: 'x'.repeat(1024 * 1024 + 10) }),
-    }).catch(() => null);
-    // The server answers 413 and closes the connection; either outcome means it refused the body.
-    if (res) expect(res.status).toBe(413);
+    });
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: string }).error).toMatch(/too large/);
+  });
+
+  it('answers 400, not 500, for a path with broken percent-encoding', async () => {
+    const res = await request('GET', '/v1/prompts/%E0%A4%A');
+    expect(res.status).toBe(400);
+    expect(res.json.error).toMatch(/percent-encoding/);
+  });
+
+  it('answers HEAD like GET, without a body', async () => {
+    const res = await fetch(`${base}/health`, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+  });
+
+  it('takes a JSON body only as application/json', async () => {
+    // What a cross-site form post or a no-preflight fetch can send.
+    const res = await fetch(`${base}/v1/prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ name: 'x', content: 'y' }),
+    });
+    expect(res.status).toBe(415);
+  });
+
+  it('keeps description and category, accepts a chosen id and answers 409 when it is taken', async () => {
+    const created = await request('POST', '/v1/prompts', {
+      id: 'http-chosen', name: 'Chosen', content: 'c', description: 'kept', category: 'ops',
+    });
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ id: 'http-chosen', description: 'kept', category: 'ops' });
+    expect((await request('POST', '/v1/prompts', { id: 'http-chosen', name: 'Again', content: 'c' })).status).toBe(409);
+    expect((await request('POST', '/v1/prompts', { id: '../etc', name: 'Bad', content: 'c' })).status).toBe(400);
+    expect((await request('PUT', '/v1/prompts/http-chosen', {})).status).toBe(400);
+    expect((await request('PUT', '/v1/prompts/http-chosen', { name: '' })).status).toBe(400);
+    await request('DELETE', '/v1/prompts/http-chosen');
+  });
+
+  it('pages GET /v1/prompts on request and reports the total', async () => {
+    for (const n of [1, 2, 3]) await request('POST', '/v1/prompts', { id: `page-${n}`, name: `Page ${n}`, content: 'c', tags: ['paging'] });
+    const all = await request('GET', '/v1/prompts?tags=paging');
+    expect(all.json).toMatchObject({ total: 3, count: 3, has_more: false });
+    const first = await request('GET', '/v1/prompts?tags=paging&limit=2');
+    expect(first.json).toMatchObject({ total: 3, count: 2, has_more: true, next_offset: 2 });
+    const second = await request('GET', '/v1/prompts?tags=paging&limit=2&offset=2');
+    expect(second.json.prompts.map((p: { id: string }) => p.id)).toEqual(['page-3']);
+    expect((await request('GET', '/v1/prompts?limit=0')).status).toBe(400);
+    expect((await request('GET', '/v1/prompts?offset=-1')).status).toBe(400);
+    for (const n of [1, 2, 3]) await request('DELETE', `/v1/prompts/page-${n}`);
+  });
+});
+
+describe('HTTP access control', () => {
+  const token = 'test-token-0123456789abcdef';
+  let guarded: HttpServerApp;
+  let local: HttpServerApp;
+
+  // fetch cannot set Host, so these go through node:http.
+  const raw = (app: HttpServerApp, options: { method?: string; path: string; headers?: Record<string, string>; body?: string }) =>
+    new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>((resolve, reject) => {
+      const req = http.request({
+        host: '127.0.0.1', port: app.address()!.port, method: options.method ?? 'GET', path: options.path, headers: options.headers,
+      }, res => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+      });
+      req.on('error', reject);
+      if (options.body) req.write(options.body);
+      req.end();
+    });
+
+  beforeAll(async () => {
+    guarded = await startHttpServer(0, '127.0.0.1', { store: new PromptStore(), authToken: token });
+    local = await startHttpServer(0, '127.0.0.1', { store: new PromptStore() });
+  });
+  afterAll(async () => {
+    await guarded.close();
+    await local.close();
+  });
+
+  it('requires the bearer token for the API and MCP, but not for the health probes', async () => {
+    expect((await raw(guarded, { path: '/health' })).status).toBe(200);
+    expect((await raw(guarded, { path: '/version' })).status).toBe(200);
+
+    const denied = await raw(guarded, { path: '/v1/prompts' });
+    expect(denied.status).toBe(401);
+    expect(denied.headers['www-authenticate']).toMatch(/^Bearer/);
+    expect((await raw(guarded, { path: '/v1/prompts', headers: { Authorization: 'Bearer wrong-token-0123456789' } })).status).toBe(401);
+    expect((await raw(guarded, { path: '/v1/prompts', headers: { Authorization: `Bearer ${token}` } })).status).toBe(200);
+
+    const write = { method: 'POST', path: '/v1/prompts', body: JSON.stringify({ name: 'n', content: 'c' }) };
+    expect((await raw(guarded, { ...write, headers: { 'Content-Type': 'application/json' } })).status).toBe(401);
+    expect((await raw(guarded, { ...write, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } })).status).toBe(201);
+    expect((await raw(guarded, { method: 'POST', path: '/mcp', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status).toBe(401);
+  });
+
+  it('lets an MCP client in with the token in its headers', async () => {
+    const url = new URL(`http://127.0.0.1:${guarded.address()!.port}/mcp`);
+    const client = new Client({ name: 'auth-test', version: '1.0.0' });
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+    expect((await client.listTools()).tools.length).toBeGreaterThan(0);
+    await client.close();
+
+    const anonymous = new Client({ name: 'auth-test', version: '1.0.0' });
+    await expect(anonymous.connect(new StreamableHTTPClientTransport(url))).rejects.toThrow();
+  });
+
+  it('refuses a request that arrives under another site\'s name (DNS rebinding)', async () => {
+    const rebound = await raw(local, { path: '/v1/prompts', headers: { Host: 'evil.example' } });
+    expect(rebound.status).toBe(403);
+    expect(rebound.body).toMatch(/MCP_PROMPTS_ALLOWED_HOSTS/);
+    expect((await raw(local, { path: '/v1/prompts', headers: { Host: `localhost:${local.address()!.port}` } })).status).toBe(200);
+  });
+
+  it('refuses a write sent by a web page from another origin, and allows a local page', async () => {
+    const write = { method: 'POST', path: '/v1/prompts', body: JSON.stringify({ name: 'planted', content: 'c' }) };
+    const foreign = await raw(local, { ...write, headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' } });
+    expect(foreign.status).toBe(403);
+    const mcp = await raw(local, { method: 'POST', path: '/mcp', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' });
+    expect(mcp.status).toBe(403);
+    const inspector = await raw(local, { ...write, headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:6274' } });
+    expect(inspector.status).toBe(201);
+    const listed = JSON.parse((await raw(local, { path: '/v1/prompts' })).body) as { prompts: Array<{ name: string }> };
+    expect(listed.prompts.map(p => p.name)).toEqual(['planted']);
+  });
+});
+
+describe('startHttpServer start-up', () => {
+  it('refuses to listen beyond loopback with writes enabled and no token', async () => {
+    await expect(startHttpServer(0, '0.0.0.0', { store: new PromptStore() })).rejects.toThrow(/MCP_PROMPTS_AUTH_TOKEN/);
+  });
+
+  it('listens beyond loopback when read-only, with a token, or when told the risk is handled', async () => {
+    const readOnly = await startHttpServer(0, '0.0.0.0', {
+      store: new PromptStore(), serverOptions: mergeOptions(DEFAULT_OPTIONS, { readOnly: true }),
+    });
+    const withToken = await startHttpServer(0, '0.0.0.0', { store: new PromptStore(), authToken: 'a-long-enough-secret-token' });
+    const insecure = await startHttpServer(0, '0.0.0.0', { store: new PromptStore(), allowInsecure: true });
+    // Beyond loopback the server cannot know its public name, so any Host is accepted unless listed.
+    const res = await fetch(`http://127.0.0.1:${readOnly.address()!.port}/v1/prompts`);
+    expect(res.status).toBe(200);
+    await Promise.all([readOnly.close(), withToken.close(), insecure.close()]);
+  });
+
+  it('rejects instead of crashing when the port is taken', async () => {
+    const first = await startHttpServer(0, '127.0.0.1', { store: new PromptStore() });
+    await expect(startHttpServer(first.address()!.port, '127.0.0.1', { store: new PromptStore() })).rejects.toMatchObject({ code: 'EADDRINUSE' });
+    await first.close();
+  });
+
+  it('saves changes to the state directory of its options and serves them after a restart', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-http-state-'));
+    const fixture = makeFixtureLibrary();
+    const serverOptions = mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixture.library, stateDir: path.join(dir, 'state') });
+    const post = (app: HttpServerApp, body: unknown) => fetch(`http://127.0.0.1:${app.address()!.port}/v1/prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+
+    const first = await startHttpServer(0, '127.0.0.1', { serverOptions });
+    expect((await post(first, { id: 'saved-over-http', name: 'Saved', content: 'c' })).status).toBe(201);
+    await first.close();
+
+    const second = await startHttpServer(0, '127.0.0.1', { serverOptions });
+    const got = await fetch(`http://127.0.0.1:${second.address()!.port}/v1/prompts/saved-over-http`);
+    expect(got.status).toBe(200);
+    const stats = await (await fetch(`http://127.0.0.1:${second.address()!.port}/v1/stats`)).json() as { storage: string; total: number };
+    expect(stats).toMatchObject({ storage: 'file', total: 7 });
+    await second.close();
+    fixture.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
   });
 });
 
