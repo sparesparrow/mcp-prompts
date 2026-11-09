@@ -263,8 +263,43 @@ describe('mcp-prompts commands', () => {
   it('--help lists the options', () => {
     const { status, stdout } = run(['--help']);
     expect(status).toBe(0);
-    for (const flag of ['--prompts', '--templates', '--exclude', '--expose', '--read-only', '--dir', '--config', 'MCP_PROMPTS_TEMPLATES']) {
+    for (const flag of ['--prompts', '--templates', '--exclude', '--expose', '--read-only', '--dir', '--state-dir', '--config', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_AUTH_TOKEN']) {
       expect(stdout).toContain(flag);
     }
+  }, 30_000);
+
+  it('config carries the state directory into the command and the config file', () => {
+    const { stdout } = run(['config', '--state-dir', '/var/lib/mcp-prompts']);
+    expect(stdout).toContain('-- mcp-prompts --state-dir /var/lib/mcp-prompts');
+    expect(stdout).toContain('"stateDir": "/var/lib/mcp-prompts"');
+  }, 30_000);
+
+  it('exits with one line, not a stack trace, when the state directory cannot be written', () => {
+    const blocked = path.join(fixture.root, 'a-file');
+    fs.writeFileSync(blocked, '');
+    const { status, stderr, stdout } = run(['--state-dir', path.join(blocked, 'state')]);
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/^mcp-prompts: State directory .* is not writable/);
+    expect(stderr).not.toContain('    at ');
+    expect(stdout).toBe('');
+  }, 30_000);
+});
+
+describe('mcp-server-standalone with a state directory', () => {
+  let fixture: FixtureLibrary;
+  beforeAll(() => { fixture = makeFixtureLibrary(); });
+  afterAll(() => fixture.cleanup());
+
+  it('keeps what one run of the binary added for the next run', async () => {
+    const args = ['--prompts-dir', fixture.library, '--state-dir', path.join(fixture.root, 'state')];
+    const first = await connect(args);
+    const added = await first.callTool({ name: 'add_prompt', arguments: { id: 'across-runs', name: 'Across runs', content: 'kept' } });
+    expect(added.structuredContent).toMatchObject({ id: 'across-runs', persisted: true });
+    await first.close();
+
+    const second = await connect(args);
+    const fetched = await second.callTool({ name: 'get_prompt', arguments: { id: 'across-runs' } });
+    expect(fetched.structuredContent).toMatchObject({ name: 'Across runs', content: 'kept' });
+    await second.close();
   }, 30_000);
 });

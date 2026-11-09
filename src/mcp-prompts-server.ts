@@ -7,12 +7,23 @@ import {
   ListResourceTemplatesRequestSchema,
   McpError,
   ReadResourceRequestSchema,
+  type CallToolResult,
+  type ToolAnnotations,
 } from '@modelcontextprotocol/sdk/types.js';
-import { z } from 'zod';
+import { z, ZodError } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils.js';
-import { CreatePromptParams, PromptNotFoundError, PromptStore, StoredPrompt, UpdatePromptParams } from './prompt-store.js';
+import {
+  CreatePromptParams,
+  PromptConflictError,
+  PromptNotFoundError,
+  PromptStorageError,
+  PromptStore,
+  PromptUsageError,
+  StoredPrompt,
+  UpdatePromptParams,
+} from './prompt-store.js';
 import type { Capability } from './server-options.js';
 
 // Builds the MCP server for one install: the prompts it serves (a store, possibly a selection of
@@ -56,6 +67,8 @@ export function buildInstructions(options: {
   expose: Capability[];
   readOnly: boolean;
   selectionNote?: string;
+  /** Changes are saved to a state directory and survive a restart. */
+  persistent?: boolean;
 }): string {
   const tools = options.expose.includes('tools');
   const prompts = options.expose.includes('prompts');
@@ -80,16 +93,18 @@ export function buildInstructions(options: {
     lines.push(
       '',
       'Using a template:',
-      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts.',
+      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts. It returns up to `limit` prompts (default 50); when has_more is true, call it again with offset set to next_offset.',
       '2. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
       '3. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
-      '4. Check the result contains no leftover {{ before you use it.',
+      '4. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
     );
   }
   if (options.readOnly) {
     lines.push('', 'Read-only: this install has no add_prompt, update_prompt or delete_prompt.');
   } else if (tools) {
-    lines.push('', 'Persistence: add_prompt and update_prompt change memory only. They are lost when the server restarts, and add_prompt assigns a random id. A prompt that must last is a JSON file under data/prompts/ with a stable id, added by pull request.');
+    lines.push('', options.persistent
+      ? 'Persistence: add_prompt, update_prompt and delete_prompt are saved to this server\'s state directory and survive a restart. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id.'
+      : 'Persistence: add_prompt, update_prompt and delete_prompt change memory only and are lost when the server restarts. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id. A prompt that must last is a JSON file under data/prompts/ with a stable id, added by pull request.');
   }
   return lines.join('\n');
 }
@@ -117,7 +132,7 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
 
   const server = new McpServer(
     { name: 'mcp-prompts', version: packageVersion() },
-    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts) }) }
+    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts), persistent: Boolean(prompts.stateDir) }) }
   );
 
   // Clients that list prompts or resources hear about changes made through the tools.
@@ -134,142 +149,269 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
   return server;
 }
 
+// What the tools return as structuredContent. Clients check results against these, so they
+// describe exactly what the handlers produce; the prompt schema is loose because library files
+// carry keys of their own (lang, status, agentConfig).
+const VersionSchema = z.union([z.number(), z.string()]);
+const SummarySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string(),
+  tags: z.array(z.string()),
+  isTemplate: z.boolean(),
+  category: z.string().optional(),
+  createdAt: z.string(),
+  version: VersionSchema,
+});
+const PageSchema = z.object({
+  total: z.number().int().describe('Prompts matching the filter'),
+  count: z.number().int().describe('Prompts in this page'),
+  offset: z.number().int(),
+  limit: z.number().int(),
+  has_more: z.boolean(),
+  next_offset: z.number().int().optional().describe('Offset of the next page; present when has_more is true'),
+  prompts: z.array(SummarySchema),
+});
+const PromptOutputSchema = z.looseObject({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  content: z.string(),
+  isTemplate: z.boolean(),
+  tags: z.array(z.string()),
+  category: z.string().optional(),
+  variables: z.array(z.union([z.string(), z.looseObject({ name: z.string() })])).optional(),
+  metadata: z.record(z.string(), z.any()).optional(),
+  version: VersionSchema,
+  createdAt: z.string(),
+  updatedAt: z.string(),
+});
+const ChangeSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  version: VersionSchema,
+  persisted: z.boolean().describe('True when the change was saved to the state directory, false when it is in memory only'),
+});
+const RenderSchema = z.object({
+  id: z.string(),
+  text: z.string().describe('The template with the given values filled in'),
+  missing: z.array(z.string()).describe('Placeholders left in the text because no value was given'),
+  unused: z.array(z.string()).describe('Values given that the template does not use'),
+});
+const StatsSchema = z.object({
+  total: z.number().int(),
+  templates: z.number().int(),
+  regular: z.number().int(),
+  tags: z.array(z.string()),
+  categories: z.array(z.string()),
+  storage: z.enum(['memory', 'file']),
+});
+
+const ListPromptsInput = z.strictObject({
+  tags: z.array(z.string()).optional().describe('Return prompts carrying any of these tags'),
+  search: z.string().optional().describe('Text to look for in the name, description or content (case-insensitive)'),
+  category: z.string().optional().describe('Return prompts of this category, e.g. "embedded" (get_stats lists the categories)'),
+  isTemplate: z.boolean().optional().describe('true for templates only, false for plain prompts only'),
+  limit: z.number().int().min(1).max(100).default(50).describe('Most prompts to return (1-100, default 50)'),
+  offset: z.number().int().min(0).default(0).describe('Prompts to skip; use next_offset from the previous page'),
+});
+const IdInput = z.strictObject({ id: z.string().min(1).describe('Prompt ID, as returned by list_prompts') });
+const AddPromptInput = z.strictObject(CreatePromptParams.shape);
+const UpdatePromptInput = z.strictObject({
+  id: z.string().min(1).describe('Prompt ID'),
+  updates: z.strictObject(UpdatePromptParams.shape).describe('The fields to change; fields left out keep their value'),
+});
+const ApplyTemplateInput = z.strictObject({
+  id: z.string().min(1).describe('ID of a template prompt'),
+  variables: z.record(z.string(), z.any()).default({}).describe('Values for the template variables, by name, e.g. {"module": "app"}'),
+});
+const NoInput = z.strictObject({});
+
+const READ_ONLY: ToolAnnotations = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+
+interface ToolConfig {
+  title: string;
+  description: string;
+  inputSchema: z.ZodType;
+  outputSchema: z.ZodType;
+  annotations: ToolAnnotations;
+}
+
+const MAX_LISTED_DESCRIPTION = 200;
+
+function text(value: string): CallToolResult['content'][number] {
+  return { type: 'text', text: value };
+}
+
+/** A tool result: text for the model to read, and the same facts as structured content. */
+function result(content: CallToolResult['content'], structured: object): CallToolResult {
+  return { content, structuredContent: structured as Record<string, unknown> };
+}
+
+/** What went wrong, said so the caller can fix it; internals stay in the log. */
+function describeFailure(action: string, error: unknown): string {
+  if (error instanceof PromptNotFoundError) return `${error.message}. Call list_prompts to see the ids this server serves.`;
+  if (error instanceof PromptConflictError) return `${error.message}. Choose another id, or change the existing prompt with update_prompt.`;
+  if (error instanceof PromptUsageError || error instanceof PromptStorageError) return error.message;
+  if (error instanceof ZodError) {
+    return `Invalid arguments: ${error.issues.map(issue => `${issue.path.join('.') || 'arguments'}: ${issue.message}`).join('; ')}`;
+  }
+  logger.error({ err: error }, `Unexpected error while ${action}`);
+  return `Internal error while ${action}; the server log has the details.`;
+}
+
 function registerTools(server: McpServer, store: PromptStore, readOnly: boolean, changed: () => void): void {
-  // Each handler validates its own arguments with zod, so the SDK's generic overloads add nothing
-  // here except type instantiation too deep for tsc (TS2589) on these schemas.
-  const registerTool = server.tool.bind(server) as (...args: unknown[]) => void;
+  // The SDK's generic registerTool overloads make tsc give up on these schemas (TS2589, type
+  // instantiation too deep). The SDK still validates arguments against inputSchema before a
+  // handler runs and results against outputSchema after, so the handlers take the parsed type.
+  const register = server.registerTool.bind(server) as unknown as (
+    name: string,
+    config: ToolConfig,
+    handler: (args: never) => CallToolResult
+  ) => unknown;
 
-  if (!readOnly) {
-    registerTool(
-      'add_prompt',
-      'Add a new prompt. Set isTemplate and variables to make it a template that apply_template can fill.',
-      CreatePromptParams.shape,
-      async (params: unknown) => {
-        try {
-          const prompt = store.add(CreatePromptParams.parse(params));
-          changed();
-          return { content: [{ type: 'text', text: `Prompt "${prompt.name}" added successfully with ID: ${prompt.id}` }] };
-        } catch (error) {
-          logger.error('Error adding prompt:', error);
-          throw new Error(`Failed to add prompt: ${error}`);
-        }
+  const tool = <Schema extends z.ZodType>(
+    name: string,
+    config: Omit<ToolConfig, 'inputSchema'> & { inputSchema: Schema },
+    action: string,
+    run: (args: z.output<Schema>) => CallToolResult
+  ) => {
+    register(name, config, ((args: z.output<Schema>) => {
+      try {
+        return run(args);
+      } catch (error) {
+        return { isError: true, content: [text(describeFailure(action, error))] };
       }
+    }) as (args: never) => CallToolResult);
+  };
+
+  const persisted = () => Boolean(store.stateDir);
+  const storageNote = () => persisted()
+    ? 'Saved to the state directory; it survives a restart.'
+    : 'Kept in memory only; it is lost when the server restarts.';
+  const change = (prompt: StoredPrompt) => ({ id: prompt.id, name: prompt.name, version: prompt.version, persisted: persisted() });
+
+  tool('list_prompts', {
+    title: 'List prompts',
+    description:
+      'List the prompts this server serves, as summaries (id, name, description, tags, isTemplate, category, version). ' +
+      'Filter with tags (any match), category, isTemplate and search (name, description and content). ' +
+      'Returns up to `limit` prompts starting at `offset`; when has_more is true, call again with offset = next_offset. ' +
+      'Use get_prompt for the content of one prompt.',
+    inputSchema: ListPromptsInput,
+    outputSchema: PageSchema,
+    annotations: READ_ONLY,
+  }, 'listing prompts', ({ limit, offset, ...filter }) => {
+    const page = store.page(filter, { limit, offset });
+    const range = page.count === 0
+      ? (page.total > 0 ? `, none at offset ${page.offset}` : '')
+      : page.count < page.total ? `, showing ${page.offset + 1}-${page.offset + page.count}` : '';
+    const lines = page.prompts.map(p => {
+      const description = p.description.length > MAX_LISTED_DESCRIPTION
+        ? `${p.description.slice(0, MAX_LISTED_DESCRIPTION - 1)}…`
+        : p.description;
+      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${p.isTemplate ? ' (template)' : ''}`;
+    });
+    const more = page.has_more ? `\n\nMore: call list_prompts again with offset=${page.next_offset}.` : '';
+    return result([text(`Found ${page.total} prompts${range}:\n\n${lines.join('\n')}${more}`)], page);
+  });
+
+  tool('get_prompt', {
+    title: 'Get a prompt',
+    description:
+      'Get one prompt by id, as JSON: its content, description, tags, and for a template the `variables` it needs. ' +
+      'Fails with an error naming the id when no such prompt is served.',
+    inputSchema: IdInput,
+    outputSchema: PromptOutputSchema,
+    annotations: READ_ONLY,
+  }, 'getting the prompt', ({ id }) => {
+    const prompt = store.get(id);
+    return result([text(JSON.stringify(prompt, null, 2))], prompt);
+  });
+
+  tool('apply_template', {
+    title: 'Fill a template',
+    description:
+      'Fill a template prompt\'s {{variables}} and return the resulting text. Only prompts with isTemplate true can be applied. ' +
+      'A placeholder with no value stays in the text as written and is named in `missing`; a value the template does not use is named in `unused`. ' +
+      '{{name^}} inserts the value with its first letter upper-cased.',
+    inputSchema: ApplyTemplateInput,
+    outputSchema: RenderSchema,
+    annotations: READ_ONLY,
+  }, 'applying the template', ({ id, variables }) => {
+    const rendered = store.render(id, variables);
+    const notes: string[] = [];
+    if (rendered.missing.length > 0) {
+      const shown = rendered.missing.slice(0, 10).map(name => `{{${name}}}`).join(', ');
+      const rest = rendered.missing.length > 10 ? ` and ${rendered.missing.length - 10} more` : '';
+      notes.push(`Not filled: ${shown}${rest}. Call apply_template again with a value for each; get_prompt lists the template's variables.`);
+    }
+    if (rendered.unused.length > 0) {
+      notes.push(`Not used by this template: ${rendered.unused.join(', ')} (check the spelling against get_prompt's variables).`);
+    }
+    // The filled text stays a block of its own so it can be used as it is.
+    return result(
+      [text(rendered.text), ...(notes.length > 0 ? [text(`[mcp-prompts] ${notes.join(' ')}`)] : [])],
+      { id, ...rendered }
     );
-  }
+  });
 
-  registerTool(
-    'get_prompt',
-    'Get a prompt by its ID.',
-    { id: z.string().describe('Prompt ID, as returned by list_prompts') },
-    async (params: unknown) => {
-      try {
-        const { id } = z.object({ id: z.string() }).parse(params);
-        return { content: [{ type: 'text', text: JSON.stringify(store.get(id), null, 2) }] };
-      } catch (error) {
-        logger.error('Error getting prompt:', error);
-        throw new Error(`Failed to get prompt: ${error}`);
-      }
-    }
-  );
+  tool('get_stats', {
+    title: 'Library statistics',
+    description: 'Counts of prompts and templates, the tags and categories in use, and whether changes are saved to disk (`storage`).',
+    inputSchema: NoInput,
+    outputSchema: StatsSchema,
+    annotations: READ_ONLY,
+  }, 'getting the statistics', () => {
+    const stats = store.stats();
+    return result([text(JSON.stringify(stats, null, 2))], stats);
+  });
 
-  registerTool(
-    'list_prompts',
-    'List prompts, optionally filtered by tags (any match) or a search term.',
-    {
-      tags: z.array(z.string()).optional().describe('Return prompts carrying any of these tags'),
-      search: z.string().optional().describe('Text to look for in the name, description or content')
-    },
-    async (params: unknown) => {
-      try {
-        const validatedParams = z.object({
-          tags: z.array(z.string()).optional(),
-          search: z.string().optional()
-        }).optional().parse(params);
-        const summaryList = store.list({ tags: validatedParams?.tags, search: validatedParams?.search });
-        return {
-          content: [{
-            type: 'text',
-            text: `Found ${summaryList.length} prompts:\n\n${summaryList.map(p =>
-              `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]`
-            ).join('\n')}`
-          }]
-        };
-      } catch (error) {
-        logger.error('Error listing prompts:', error);
-        throw new Error(`Failed to list prompts: ${error}`);
-      }
-    }
-  );
+  if (readOnly) return;
 
-  if (!readOnly) {
-    registerTool(
-      'update_prompt',
-      'Update fields of an existing prompt; its version is incremented.',
-      { id: z.string().describe('Prompt ID'), updates: UpdatePromptParams },
-      async (params: unknown) => {
-        try {
-          const { id, updates } = z.object({ id: z.string(), updates: UpdatePromptParams }).parse(params);
-          const updatedPrompt = store.update(id, updates);
-          changed();
-          return { content: [{ type: 'text', text: `Prompt "${updatedPrompt.name}" updated successfully` }] };
-        } catch (error) {
-          logger.error('Error updating prompt:', error);
-          throw new Error(`Failed to update prompt: ${error}`);
-        }
-      }
-    );
+  tool('add_prompt', {
+    title: 'Add a prompt',
+    description:
+      'Add a new prompt. Set isTemplate and variables to make it a template that apply_template can fill. ' +
+      'Give `id` to choose a stable id (it fails if the id is taken); otherwise a random one is assigned. ' +
+      'The result says whether the prompt was saved to disk or is kept in memory only.',
+    inputSchema: AddPromptInput,
+    outputSchema: ChangeSchema,
+    annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
+  }, 'adding the prompt', params => {
+    const prompt = store.add(params);
+    changed();
+    return result([text(`Prompt "${prompt.name}" added successfully with ID: ${prompt.id}\n${storageNote()}`)], change(prompt));
+  });
 
-    registerTool(
-      'delete_prompt',
-      'Delete a prompt by its ID.',
-      { id: z.string().describe('Prompt ID') },
-      async (params: unknown) => {
-        try {
-          const { id } = z.object({ id: z.string() }).parse(params);
-          const prompt = store.delete(id);
-          changed();
-          return { content: [{ type: 'text', text: `Prompt "${prompt.name}" deleted successfully` }] };
-        } catch (error) {
-          logger.error('Error deleting prompt:', error);
-          throw new Error(`Failed to delete prompt: ${error}`);
-        }
-      }
-    );
-  }
+  tool('update_prompt', {
+    title: 'Update a prompt',
+    description:
+      'Change fields of an existing prompt; fields left out of `updates` keep their value, and the version goes up. ' +
+      'Replaces the previous values, which are not kept.',
+    inputSchema: UpdatePromptInput,
+    outputSchema: ChangeSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
+  }, 'updating the prompt', ({ id, updates }) => {
+    const prompt = store.update(id, updates);
+    changed();
+    return result([text(`Prompt "${prompt.name}" updated successfully (version ${prompt.version})\n${storageNote()}`)], change(prompt));
+  });
 
-  registerTool(
-    'apply_template',
-    'Fill a template prompt\'s {{variables}} and return the resulting text.',
-    {
-      id: z.string().describe('ID of a template prompt'),
-      variables: z.record(z.string(), z.any()).describe('Values for the template variables, by name')
-    },
-    async (params: unknown) => {
-      try {
-        const { id, variables } = z.object({
-          id: z.string(),
-          variables: z.record(z.string(), z.any())
-        }).parse(params);
-        return { content: [{ type: 'text', text: store.applyTemplate(id, variables) }] };
-      } catch (error) {
-        logger.error('Error applying template:', error);
-        throw new Error(`Failed to apply template: ${error}`);
-      }
-    }
-  );
-
-  registerTool(
-    'get_stats',
-    'Counts of prompts and templates, with the tags and categories in use.',
-    async () => {
-      try {
-        return { content: [{ type: 'text', text: JSON.stringify(store.stats(), null, 2) }] };
-      } catch (error) {
-        logger.error('Error getting stats:', error);
-        throw new Error(`Failed to get stats: ${error}`);
-      }
-    }
-  );
+  tool('delete_prompt', {
+    title: 'Delete a prompt',
+    description: 'Delete a prompt by its id. This cannot be undone through the tools.',
+    inputSchema: IdInput,
+    outputSchema: ChangeSchema,
+    annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
+  }, 'deleting the prompt', ({ id }) => {
+    const prompt = store.delete(id);
+    changed();
+    const note = persisted()
+      ? 'The deletion is saved; it stays deleted after a restart.'
+      : 'Deleted from memory only; a prompt from the library comes back when the server restarts.';
+    return result([text(`Prompt "${prompt.name}" deleted successfully\n${note}`)], change(prompt));
+  });
 }
 
 // Prompts and resources are served by handlers that read the store on every request, so prompts

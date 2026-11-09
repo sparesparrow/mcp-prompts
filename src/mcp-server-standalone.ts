@@ -5,6 +5,7 @@ import { logger } from './utils.js';
 import { createMcpServer, packageVersion, type McpServerOptions } from './mcp-prompts-server.js';
 import { formatCatalog, formatInstallSnippets } from './install-commands.js';
 import { HELP_TEXT, OptionsError, openStore, resolveOptions } from './server-options.js';
+import { PromptStorageError } from './prompt-store.js';
 
 // The `mcp-prompts` binary: serves MCP over stdio, or with `catalog` / `config` shows what an install
 // can serve and how to install exactly that. Options come from flags, environment variables and a
@@ -58,7 +59,16 @@ export async function main(
     return 0;
   }
 
-  const { store, warnings } = openStore(options);
+  let opened;
+  try {
+    opened = openStore(options);
+  } catch (error) {
+    // The state directory cannot be written: say so in one line instead of a stack trace.
+    if (!(error instanceof PromptStorageError)) throw error;
+    process.stderr.write(`mcp-prompts: ${error.message}\n`);
+    return 1;
+  }
+  const { store, warnings } = opened;
   const allWarnings = [...resolved.warnings, ...warnings];
 
   if (commandLine.command === 'catalog' || commandLine.command === 'config') {
@@ -73,7 +83,14 @@ export async function main(
 
   // stdout carries JSON-RPC from here on; warnings go to the log on stderr.
   for (const warning of allWarnings) logger.warn(warning);
-  await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly });
+  const server = await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly });
+  // As PID 1 in a container node ignores SIGTERM unless something handles it, and `docker stop`
+  // would wait out its timeout and kill the process.
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      server.close().then(() => process.exit(0), () => process.exit(1));
+    });
+  }
   return undefined;
 }
 
