@@ -1,0 +1,8 @@
+{
+  "prompts": ["main-agents", "subagents"],
+  "templates": ["mia-car", "openclaw", "tag:voice"],
+  "exclude": ["mia-car-emergency-response"],
+  "expose": ["tools", "prompts", "resources"],
+  "readOnly": true,
+  "dirs": ["./my-prompts"]
+}

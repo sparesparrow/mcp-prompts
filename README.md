@@ -71,6 +71,102 @@ Check it with `claude mcp list`. Use one of the two: registering the same name a
 
 **Claude Desktop** and other clients take the same command in their config (for Claude Desktop, `claude_desktop_config.json`), with the same `mcpServers` block as above. If the client does not find `mcp-prompts` on its PATH, use the full path from `which mcp-prompts` as the `command`.
 
+### Install a profile
+
+By default an install serves every bundled prompt, so every unfiltered `list_prompts` call returns
+all of them. A **profile** serves only the prompts one kind of work needs:
+
+| Profile | For | Prompts | A `list_prompts` call returns |
+|---|---|---|---|
+| `software-dev` | Analysing and reviewing a software project | 13 | 21% of the whole library's |
+| `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 | 23% |
+| `mia-vehicle` | The MIA in-car assistant at run time | 8 | 13% |
+| `voice-home` | Voice commands and home automation | 13 | 37% |
+| `learning-loop` | The self-improvement loop | 8 | 11% |
+
+```bash
+claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev
+mcp-prompts profiles          # what each profile serves, and which prompts are in none
+```
+
+Several names (`--profile software-dev,embedded-iot`) serve the prompts of any of them. The
+profiles live in [`data/prompts/profiles.json`](data/prompts/profiles.json);
+[deploy/README.md](deploy/README.md) says what is in each, how the sizes were measured, how to
+install one over Docker or HTTP, and how to change or add one.
+
+### Choose what gets installed
+
+Beyond the profiles, you can choose yourself:
+
+- which **plain prompts** and which **templates** to serve (two separate lists);
+- which **MCP capabilities** expose them: `tools`, `prompts` (each prompt becomes a slash command, with a template's variables as its arguments) and `resources` (each prompt is readable as `prompts://<id>`, for attaching as context);
+- whether the install is **read-only** (no `add_prompt`, `update_prompt` or `delete_prompt`).
+
+The same options go in the install command, the client config file, a dedicated config file or the URL:
+
+| Option | Flag | Environment | Config file | URL (`/mcp?…`) |
+|---|---|---|---|---|
+| Profiles to serve | `--profile` | `MCP_PROMPTS_PROFILE` | `profile` | `profile` |
+| Plain prompts to serve | `--prompts` | `MCP_PROMPTS_PROMPTS` | `prompts` | `prompts` |
+| Templates to serve | `--templates` | `MCP_PROMPTS_TEMPLATES` | `templates` | `templates` |
+| Leave out of both | `--exclude` | `MCP_PROMPTS_EXCLUDE` | `exclude` | `exclude` |
+| Capabilities (default `tools`) | `--expose` | `MCP_PROMPTS_EXPOSE` | `expose` | `expose` |
+| Read-only | `--read-only` | `MCP_PROMPTS_READ_ONLY` | `readOnly` | `readOnly` |
+| Library instead of the bundled one | `--prompts-dir` | `PROMPTS_DIR` | `promptsDir` | – |
+| Your own directories, served in full | `--dir` (repeat) | `MCP_PROMPTS_DIRS` | `dirs` | – |
+| Save changes to a directory | `--state-dir` | `MCP_PROMPTS_STATE_DIR` | `stateDir` | – |
+| Config file | `--config` | `MCP_PROMPTS_CONFIG` | – | – |
+
+A list is comma-separated, and its entries can be:
+
+- `all` (the default for each list) or `none`;
+- a **group**, meaning a directory of the library such as `mia-car` (`cognitive` also covers `cognitive/meta`);
+- a prompt **id**;
+- `tag:<tag>`.
+
+Flags override environment variables, which override the config file. Paths in a config file are relative to that file. The lists narrow a profile when both are given. Only the library is filtered: prompts in your own `--dir` directories, and prompts added while the server runs, are always served. An own prompt with a library prompt's id replaces it.
+
+See what there is to choose, and what a choice serves:
+
+```bash
+mcp-prompts catalog                                   # groups, with plain/template counts, tags and ids
+mcp-prompts catalog --prompts none --templates mia-car --json
+```
+
+Then install it in any of these forms. `mcp-prompts config` with the same options prints all four, ready to paste:
+
+```bash
+# Command
+claude mcp add -s user mcp-prompts -- mcp-prompts --prompts none --templates mia-car,openclaw --expose tools,prompts --read-only
+```
+
+The same in a client config (`.mcp.json`, `claude_desktop_config.json`, Cursor and others):
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": {
+      "command": "mcp-prompts",
+      "args": ["--prompts", "none", "--templates", "mia-car,openclaw", "--expose", "tools,prompts", "--read-only"]
+    }
+  }
+}
+```
+
+```bash
+# Dedicated config file (see examples/mcp-prompts.config.json), referenced from any client
+mcp-prompts --config /absolute/path/to/mcp-prompts.json
+
+# Docker: the mcp tag is the stdio server; options go after the image name or in the environment
+docker run --rm -i ghcr.io/sparesparrow/mcp-prompts:mcp --prompts none --templates mia-car --expose tools,prompts
+docker run --rm -i -e MCP_PROMPTS_PROFILE=mia-vehicle ghcr.io/sparesparrow/mcp-prompts:mcp
+
+# URL, against a server started with mcp-prompts-http (see HTTP Mode)
+claude mcp add -s user --transport http mcp-prompts "http://localhost:3003/mcp?prompts=none&templates=mia-car,openclaw&expose=tools,prompts&readOnly=true"
+```
+
+A URL chooses from what that server serves. It can narrow the server's selection and turn read-only on, but it cannot widen the selection, turn read-only off, or name directories. Mistyped options, and a profile the library does not have, stop the server with exit code 2, and a URL with them gets HTTP 400. An entry that matches nothing, or matches only the other list (`--prompts mia-car` when mia-car holds only templates), is logged as a warning.
+
 ### Build from source
 
 To run unreleased changes:
@@ -103,7 +199,7 @@ Ask Claude:
 - "Apply the claudepy-esp32-android-bridge-workflow template with esp32_firmware_path set to ./firmware"
 - "Add a prompt for Python FastAPI best practices"
 
-Prompts added or changed through `add_prompt` / `update_prompt` live in memory and are lost when the server restarts. A prompt that must last is a JSON file under `data/prompts/` with a stable id, added by pull request.
+Prompts added or changed through `add_prompt` / `update_prompt` live in memory and are lost when the server restarts, unless the server has a state directory: with `--state-dir ~/.local/share/mcp-prompts` each change is saved there as a JSON file and loaded at the next start. Every MCP client on a machine starts its own server; pointed at the same directory they see each other's changes without a restart. `get_stats` says which applies (`"storage": "file"` or `"memory"`). A prompt that belongs in the bundled library is a JSON file under `data/prompts/` with a stable id, added by pull request.
 
 ## HTTP Mode
 
@@ -111,27 +207,38 @@ The same prompts are also available as a JSON API, for clients that don't speak 
 
 ```bash
 pnpm build
-PORT=3003 PROMPTS_DIR=$PWD/data/prompts pnpm start:http
-# or: npx mcp-prompts-http, or the default Docker image (port 3003)
+PORT=3003 pnpm start:http
+# or: mcp-prompts-http, or the default Docker image (port 3003), or: docker compose up -d --wait --build
 ```
+
+It listens on `127.0.0.1` unless `HOST` says otherwise.
 
 | Method and path | Does |
 |---|---|
-| `GET /health`, `/ready`, `/version` | Liveness, readiness, package version |
-| `GET /v1/prompts?tags=a,b&search=text` | List prompt summaries |
+| `GET /health`, `/ready`, `/version` | Liveness; readiness and mode (`readOnly`, `auth`, `storage`); package version |
+| `GET /v1/prompts?tags=a,b&search=text&category=c&isTemplate=true&limit=20&offset=0` | List prompt summaries, with `total` and `has_more` |
 | `POST /v1/prompts` | Add a prompt (same fields as `add_prompt`) |
 | `GET` / `PUT` / `DELETE /v1/prompts/:id` | Read, update or delete one prompt |
-| `POST /v1/prompts/:id/apply` | Fill a template: `{ "variables": { ... } }` → `{ "result": "..." }` |
+| `POST /v1/prompts/:id/apply` | Fill a template: `{ "variables": { ... } }` → `{ "result": "...", "missing": [], "unused": [] }` |
 | `GET /v1/stats` | Same counts as `get_stats` |
 | `GET /mcp/tools`, `POST /mcp/tools/:name` | Call any MCP tool by name: `{ "arguments": { ... } }` |
+| `POST /mcp?…` | MCP itself (Streamable HTTP, stateless), for `claude mcp add --transport http`; the query string chooses a profile, prompts, templates and capabilities (see [Install a profile](#install-a-profile)) |
 
 ```bash
 curl -s -X POST localhost:3003/v1/prompts/claudepy-esp32-android-bridge-workflow/apply \
   -H 'Content-Type: application/json' -d '{"variables":{"esp32_firmware_path":"./firmware"}}'
 ```
 
-Invalid input answers 400, unknown prompts 404. Set `CORS_ORIGIN` to allow browser clients.
-Changes made over HTTP live in memory, like those made over MCP; the files in `data/prompts` are not rewritten.
+`mcp-prompts-http` takes the same options as `mcp-prompts` (flags, environment, `--config`); they set what the whole server serves. With `--read-only`, the write routes and tools are left out.
+Invalid input answers 400, unknown prompts 404, a taken id 409. Set `CORS_ORIGIN` to allow browser clients.
+Changes made over HTTP live in memory, like those made over MCP, unless `--state-dir` is set; the files in `data/prompts` are never rewritten.
+
+Prompts are instructions agents act on, so the server is careful about who may change them:
+
+- `MCP_PROMPTS_AUTH_TOKEN` (or `MCP_PROMPTS_AUTH_TOKEN_FILE`): when set, every request except `/health`, `/ready` and `/version` must send `Authorization: Bearer <token>`.
+- Listening beyond loopback (`HOST=0.0.0.0`) with writes enabled and no token is refused at start. Serve read-only, set a token, or set `MCP_PROMPTS_ALLOW_INSECURE=true` behind a proxy that authenticates.
+- `MCP_PROMPTS_ALLOWED_HOSTS` and `MCP_PROMPTS_ALLOWED_ORIGINS` list the Host names and browser origins to accept; on loopback only loopback names are.
+- The Docker image is read-only unless `MCP_PROMPTS_READ_ONLY=false` is set together with a token.
 
 ## Orchestrating Projects
 
@@ -153,12 +260,12 @@ This automatically:
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List prompts, filtered by tags or a search term |
+| `list_prompts` | List prompts, filtered by tags, category, kind or a search term, a page at a time |
 | `get_prompt` | Retrieve a prompt by ID |
 | `add_prompt` | Add a new prompt or template |
 | `update_prompt` | Modify existing prompt |
 | `delete_prompt` | Remove prompt |
-| `apply_template` | Fill a template prompt's `{{variables}}` |
+| `apply_template` | Fill a template prompt's `{{variables}}`, naming any left unfilled |
 | `get_stats` | Repository statistics |
 
 ## Prompts Organization
@@ -180,7 +287,8 @@ data/prompts/
 │                         # domain knowledge
 ├── claudepy-workflows/, openclaw/
 │                         # agent workflow and routing prompts
-└── learned/              # prompts produced by the learning loop
+├── learned/              # prompts produced by the learning loop
+└── profiles.json         # the profiles: which of the above each kind of work gets
 ```
 
 ## Architecture

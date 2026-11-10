@@ -39,5 +39,14 @@ jobs:
         file: ./Dockerfile${{ matrix.variant != 'default' && format('.{0}', matrix.variant) || '' }}
         platforms: ${{ matrix.platform }}
         push: false
+        load: true
+        tags: mcp-prompts:pr-${{ matrix.variant }}
         cache-from: type=gha,scope=${{ matrix.variant }}-${{ matrix.platform }}
         cache-to: type=gha,mode=max,scope=${{ matrix.variant }}-${{ matrix.platform }}
+
+    # Each runner is the platform it builds, so the image runs natively. Every variant's
+    # entry point takes --version and exits; a build that cannot start fails here.
+    - name: Run the image
+      run: |
+        VERSION=$(node -p "require('./package.json').version")
+        test "$(docker run --rm mcp-prompts:pr-${{ matrix.variant }} --version)" = "$VERSION"

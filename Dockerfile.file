@@ -1,53 +1,39 @@
-# Multi-stage build for MCP Prompts with File Storage
-# The build output is plain JavaScript, so build natively on the runner and only run the
-# production install on the target platform. Building under QEMU hung on arm64.
-FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
+# stdio image that saves changes (tag: file): add_prompt, update_prompt and delete_prompt are
+# written to /data and loaded again at the next start. Mount a volume there:
+#   docker run -i --rm -v mcp-prompts-data:/data <image>
+# Without a volume the changes end with the container, as in the mcp image.
+# deploy/docker-stdio shows the client configuration.
+#
+# Both the build and the dependency install run on the build machine's own platform: the output
+# is plain JavaScript and no production dependency has native code, so node_modules is the same
+# for every target. Nothing but file copies runs under emulation (pnpm under QEMU hung on arm64),
+# and the runtime image carries no package manager.
+FROM --platform=$BUILDPLATFORM node:22-alpine AS builder
 WORKDIR /app
 
-# Copy package files
 COPY package.json pnpm-lock.yaml ./
-
-# Install dependencies and build
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --no-frozen-lockfile
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --frozen-lockfile
 COPY . .
-RUN pnpm run build
+RUN pnpm run build && pnpm prune --prod
 
-# Production stage
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 WORKDIR /app
 
-# Create app user for security
-RUN addgroup -g 1001 -S nodejs
-RUN adduser -S mcp-prompts -u 1001
+RUN addgroup -g 1001 -S nodejs && adduser -S mcp-prompts -u 1001 -G nodejs
 
-# Copy package files
-COPY package.json pnpm-lock.yaml ./
-
-# Install production dependencies only
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate && pnpm install --prod --no-frozen-lockfile && pnpm store prune
-
-# Copy built application and data from builder stage
+COPY --from=builder --chown=mcp-prompts:nodejs /app/package.json ./package.json
+COPY --from=builder --chown=mcp-prompts:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
-COPY --from=builder --chown=mcp-prompts:nodejs /app/data ./data
+COPY --from=builder --chown=mcp-prompts:nodejs /app/data/prompts ./data/prompts
+COPY --from=builder --chown=mcp-prompts:nodejs /app/data/sample-prompts.json ./data/sample-prompts.json
 
-# Create data directory for file storage
-RUN mkdir -p /app/data/prompts && chown -R mcp-prompts:nodejs /app/data
+RUN mkdir -p /data && chown mcp-prompts:nodejs /data
+VOLUME /data
 
-# Switch to non-root user
 USER mcp-prompts
 
-# Set environment for file storage
 ENV NODE_ENV=production
-ENV MODE=mcp
-ENV STORAGE_TYPE=file
-ENV PROMPTS_DIR=/app/data
-ENV PORT=3003
-ENV HOST=0.0.0.0
+ENV MCP_PROMPTS_STATE_DIR=/data
 
-# Expose port for health checks
-EXPOSE 3003
-
-# No HEALTHCHECK: this image runs the MCP server over stdio, which has no HTTP endpoint to probe.
-
-# Start the MCP server with file storage
-CMD ["node", "dist/mcp-server-standalone.js"]
+# No port and no HEALTHCHECK: the server speaks MCP over stdin and stdout.
+ENTRYPOINT ["node", "dist/mcp-server-standalone.js"]

@@ -90,3 +90,11 @@ For enterprise deployments, contact the maintainers or refer to the project's ma
 ---
 
 **Note**: This is an archived, optional component. The main mcp-prompts MCP server (in the parent directory) is the recommended approach for most users.
+
+## Compose files and the production Dockerfile
+
+`docker-compose.aws.yml`, `docker-compose.memory.yml` and `docker-compose.postgres.yml` build
+`Dockerfile.aws`, `Dockerfile.memory` and `Dockerfile.postgres`, which live here, so they stopped
+working at the repository root when those were archived. `Dockerfile.production` sets
+`STORAGE_TYPE=aws` and listens on every interface with writes enabled and no token, which the
+server now refuses to start with. They are kept here with the code they belong to.
