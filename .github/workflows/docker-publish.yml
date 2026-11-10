@@ -178,14 +178,32 @@ jobs:
     runs-on: ubuntu-latest
     needs: build-and-push
     if: github.event_name != 'pull_request'
-    strategy:
-      matrix:
-        variant: [mcp, file]  # no memory image is built (see the build matrix)
     steps:
-      - name: Test ${{ matrix.variant }} image
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # A failure here fails the job. The check used to end in "|| echo", and the images took no
+      # arguments, so it passed whatever the image did.
+      - name: The stdio images start, report the package version and know the profiles
         run: |
-          docker pull ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }}
-          docker run --rm ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:${{ matrix.variant }} --version || echo "Version check not available"
+          VERSION=$(node -p "require('./package.json').version")
+          for variant in mcp file; do
+            image=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:$variant
+            docker pull "$image"
+            test "$(docker run --rm "$image" --version)" = "$VERSION"
+            docker run --rm "$image" profiles --json | grep -q '"software-dev"'
+          done
+
+      - name: The HTTP image serves read-only and answers its probes
+        run: |
+          image=${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest
+          docker pull "$image"
+          docker run -d --name http -p 127.0.0.1:3003:3003 "$image"
+          for i in $(seq 1 30); do curl -sf localhost:3003/health > /dev/null && break; sleep 1; done
+          curl -sf localhost:3003/ready | tee ready.json
+          grep -q '"readOnly":true' ready.json
+          test "$(curl -s -o /dev/null -w '%{http_code}' -X POST -H 'Content-Type: application/json' -d '{"name":"n","content":"c"}' localhost:3003/v1/prompts)" = "405"
+          docker rm -f http
 
   notify:
     name: Notify on Success
@@ -209,6 +227,4 @@ jobs:
           echo "🐳 Images:"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:latest"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:mcp"
-          echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:aws"
-          echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:memory"
           echo "   - ${{ env.REGISTRY_GHCR }}/${{ env.IMAGE_NAME }}:file"

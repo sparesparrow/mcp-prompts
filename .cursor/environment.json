@@ -50,8 +50,7 @@
   },
   "docker": {
     "compose": {
-      "default": "docker-compose.yml",
-      "mcp": "docker-compose.mcp.yml"
+      "default": "docker-compose.yml"
     },
     "services": {
       "mcp-prompts": {
