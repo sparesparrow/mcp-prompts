@@ -207,7 +207,9 @@ function stringifyValue(value: unknown): string {
 
 // {{name}} with optional spaces inside the braces. A trailing ^ (as in bash's ${name^}) upper-cases
 // the first letter of the value, which the bundled Gradle templates use for task names.
-const PLACEHOLDER = /\{\{\s*([^{}]+?)\s*\}\}/g;
+// The spaces are trimmed in code: with \s* on both sides of a lazy group the pattern took time
+// cubic in the length of an unclosed "{{   ...", and a prompt may be a megabyte long.
+const PLACEHOLDER = /\{\{([^{}]+)\}\}/g;
 
 /**
  * Fills {{name}} placeholders in one pass over the text, so a value that itself contains {{other}}
@@ -218,7 +220,10 @@ export function renderTemplate(content: string, variables: Record<string, unknow
     Object.prototype.hasOwnProperty.call(variables, name) && variables[name] !== undefined && variables[name] !== null;
   const missing = new Set<string>();
   const used = new Set<string>();
-  const text = content.replace(PLACEHOLDER, (placeholder: string, rawName: string) => {
+  const text = content.replace(PLACEHOLDER, (placeholder: string, inner: string) => {
+    const rawName = inner.trim();
+    // Braces around nothing but spaces are text, not a placeholder.
+    if (rawName === '') return placeholder;
     if (has(rawName)) {
       used.add(rawName);
       return stringifyValue(variables[rawName]);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAccessPolicy, checkAccess, checkSource, checkToken, hostnameOf, isLoopbackHost, startupRefusal } from './http-security';
+import { bearerToken, buildAccessPolicy, checkAccess, checkSource, checkToken, hostnameOf, isLoopbackHost, startupRefusal } from './http-security';
 
 const request = (headers: Record<string, string>) => ({ headers });
 
@@ -87,5 +87,32 @@ describe('checkAccess', () => {
     expect(checkToken(policy, request({ host: 'localhost' }))).toMatchObject({ status: 401 });
     // A rebound request is refused as such even when it carries the right token.
     expect(checkAccess(policy, request({ host: 'evil.example', authorization: 'Bearer correct-horse-battery-staple' }))).toMatchObject({ status: 403 });
+  });
+});
+
+describe('headers built to be slow', () => {
+  // Read before any credential is checked, so anyone who can reach the port chooses them.
+  const policy = buildAccessPolicy('0.0.0.0', { token: 'correct-horse-battery-staple', allowedOrigins: ['https://app.example///'] });
+  const timed = (run: () => unknown) => {
+    const started = Date.now();
+    run();
+    return Date.now() - started;
+  };
+
+  it('reads the bearer token without a backtracking pattern', () => {
+    expect(bearerToken('Bearer abc')).toBe('abc');
+    expect(bearerToken('  bearer   abc def  ')).toBe('abc def');
+    expect(bearerToken('Bearerabc')).toBeUndefined();
+    expect(bearerToken('Bearer')).toBeUndefined();
+    expect(bearerToken('Basic abc')).toBeUndefined();
+    expect(bearerToken(['Bearer abc'])).toBeUndefined();
+    expect(timed(() => checkToken(policy, request({ host: 'h', authorization: `Bearer${' '.repeat(2_000_000)}` })))).toBeLessThan(500);
+  });
+
+  it('compares an origin in time linear in its length', () => {
+    expect(checkSource(policy, request({ host: 'h', origin: 'https://APP.example//' }))).toBeUndefined();
+    const hostile = `${'/'.repeat(2_000_000)}x`;
+    expect(timed(() => checkSource(policy, request({ host: 'h', origin: hostile })))).toBeLessThan(500);
+    expect(checkSource(policy, request({ host: 'h', origin: hostile }))).toMatchObject({ status: 403 });
   });
 });

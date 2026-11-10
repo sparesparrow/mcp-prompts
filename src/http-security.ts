@@ -69,7 +69,7 @@ export function buildAccessPolicy(
   return {
     token: options.token,
     allowedHosts: hosts ?? (loopback ? ['localhost', '127.0.0.1', '[::1]'] : undefined),
-    allowedOrigins: allowedOrigins.map(origin => origin.trim().toLowerCase().replace(/\/+$/, '')),
+    allowedOrigins: allowedOrigins.map(normalizeOrigin),
     allowAnyOrigin: options.corsOrigin === '*',
     allowLoopbackOrigins: loopback,
   };
@@ -95,9 +95,32 @@ function sameSecret(given: string, expected: string): boolean {
   return crypto.timingSafeEqual(a, b);
 }
 
+// Headers are read before any credential is checked, so whoever can reach the port chooses their
+// contents. They are taken apart with loops and string methods: patterns such as /\/+$/ and
+// /^Bearer\s+(.+)$/ take time quadratic in the header's length on input built for it.
+
+/** Lower-case, trimmed, without trailing slashes. */
+function normalizeOrigin(origin: string): string {
+  const value = origin.trim().toLowerCase();
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 0x2f) end--;
+  return value.slice(0, end);
+}
+
+/** The token of an "Authorization: Bearer <token>" header (any letter case), or undefined. */
+export function bearerToken(header: unknown): string | undefined {
+  if (typeof header !== 'string') return undefined;
+  const value = header.trim();
+  if (value.slice(0, 6).toLowerCase() !== 'bearer') return undefined;
+  const rest = value.slice(6);
+  const token = rest.trimStart();
+  // The scheme and the token are separated by at least one space.
+  return token.length > 0 && token.length < rest.length ? token : undefined;
+}
+
 function originAllowed(policy: AccessPolicy, origin: string): boolean {
   if (policy.allowAnyOrigin) return true;
-  const normalized = origin.trim().toLowerCase().replace(/\/+$/, '');
+  const normalized = normalizeOrigin(origin);
   if (policy.allowedOrigins.includes(normalized)) return true;
   if (!policy.allowLoopbackOrigins) return false;
   try {
@@ -126,9 +149,8 @@ export function checkSource(policy: AccessPolicy, req: Pick<IncomingMessage, 'he
 /** The token check: does this request carry the configured bearer token? */
 export function checkToken(policy: AccessPolicy, req: Pick<IncomingMessage, 'headers'>): AccessDenied | undefined {
   if (!policy.token) return undefined;
-  const header = req.headers.authorization;
-  const match = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null;
-  if (!match || !sameSecret(match[1], policy.token)) {
+  const token = bearerToken(req.headers.authorization);
+  if (token === undefined || !sameSecret(token, policy.token)) {
     return { status: 401, message: 'Missing or wrong bearer token; send the header "Authorization: Bearer <token>"' };
   }
   return undefined;

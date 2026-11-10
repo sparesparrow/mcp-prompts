@@ -389,6 +389,17 @@ describe('renderTemplate', () => {
     expect(renderTemplate('{{o}} {{l}} {{t}}', { o: { x: 1 }, l: [1, 2], t: true }).text).toBe('{"x":1} [1,2] true');
   });
 
+  it('scans a megabyte of unclosed braces and spaces in linear time', () => {
+    // The pattern used to take time cubic in the run of spaces: 2,000 of them took a second.
+    const hostile = `{{${' '.repeat(1_000_000)}`;
+    const started = Date.now();
+    expect(renderTemplate(hostile, { name: 'x' }).text).toBe(hostile);
+    expect(renderTemplate(`${'{{ a '.repeat(100_000)}}}`, { a: 'x' }).missing).toEqual([]);
+    expect(Date.now() - started).toBeLessThan(1000);
+    // Braces around nothing but spaces are text.
+    expect(renderTemplate('{{   }} and {{  name  }}', { name: 'x' })).toEqual({ text: '{{   }} and x', missing: [], unused: [] });
+  });
+
   it('does not treat inherited properties as values', () => {
     expect(renderTemplate('{{toString}} {{constructor}}', {}).missing).toEqual(['toString', 'constructor']);
   });
