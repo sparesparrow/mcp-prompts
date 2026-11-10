@@ -1,22 +1,44 @@
+# The HTTP server from this checkout: MCP Streamable HTTP at /mcp and a JSON API at /v1.
+# Read-only, on this machine only. Every client chooses a profile in its own URL, for example
+#   http://localhost:3003/mcp?profile=software-dev
+# so one server serves each kind of work its own short list. deploy/README.md has the profiles.
+#
+#   docker compose up -d --wait --build
+#   curl -s localhost:3003/ready
+#
+# Settings come from the environment or a .env file beside this file.
+name: mcp-prompts
+
 services:
   mcp-prompts:
+    image: ${MCP_PROMPTS_IMAGE:-mcp-prompts:local}
     build:
       context: .
       dockerfile: Dockerfile
+    restart: unless-stopped
     environment:
-      - HOST=0.0.0.0
-      - PORT=3003
-      - MODE=http
-      - STORAGE_TYPE=memory
-      - PROMPTS_DIR=/app/data/prompts
-    volumes:
-      - ./data:/app/data
+      MCP_PROMPTS_READ_ONLY: "true"
+      # Serve only these profiles to everyone (comma-separated). Empty serves the whole library
+      # and leaves the choice to each client's URL.
+      MCP_PROMPTS_PROFILE: ${MCP_PROMPTS_PROFILE:-}
+      # Capabilities for clients whose URL has no expose=.
+      MCP_PROMPTS_EXPOSE: ${MCP_PROMPTS_EXPOSE:-tools}
+      # The names this server answers to, once it has a public one (also stops DNS rebinding).
+      MCP_PROMPTS_ALLOWED_HOSTS: ${MCP_PROMPTS_ALLOWED_HOSTS:-}
+      # Optional: require "Authorization: Bearer <token>" for everything but the health probes.
+      MCP_PROMPTS_AUTH_TOKEN: ${MCP_PROMPTS_AUTH_TOKEN:-}
+      LOG_LEVEL: ${LOG_LEVEL:-info}
     ports:
-      - "3003:3003"
+      # This machine only. Set MCP_PROMPTS_BIND=0.0.0.0 to serve the network.
+      - "${MCP_PROMPTS_BIND:-127.0.0.1}:${MCP_PROMPTS_PORT:-3003}:3003"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
     healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--spider", "http://localhost:3003/health"]
+      # Healthy only while the server is read-only. An image too old to know
+      # MCP_PROMPTS_READ_ONLY would accept writes from anyone; it fails this check.
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3003/ready').then(r => r.json()).then(j => process.exit(j.status === 'ready' && j.readOnly === true ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
-      timeout: 10s
+      timeout: 5s
+      start_period: 5s
       retries: 3
-      start_period: 40s
-
