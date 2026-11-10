@@ -66,7 +66,10 @@ export async function main(
 
   let opened;
   try {
-    opened = openStore(options);
+    // profiles, catalog and config only print. They read what a state directory holds but must
+    // not create it: "mcp-prompts config --state-dir /var/lib/mcp-prompts" used to make that
+    // directory, or fail without printing anything when it could not.
+    opened = openStore(commandLine.command !== undefined ? { ...options, readOnly: true } : options);
   } catch (error) {
     if (error instanceof OptionsError) {
       // A profile the library does not have.

@@ -338,6 +338,29 @@ describe('mcp-prompts commands', () => {
     expect(stdout).toContain('"stateDir": "/var/lib/mcp-prompts"');
   }, 30_000);
 
+  it('the commands print without creating the state directory, or needing to be able to', () => {
+    const absent = path.join(fixture.root, 'state-not-created');
+    for (const command of ['config', 'catalog', 'profiles']) {
+      const { status, stdout } = run([command, '--prompts-dir', fixture.library, '--state-dir', absent]);
+      expect(status, command).toBe(0);
+      expect(stdout.length, command).toBeGreaterThan(0);
+    }
+    expect(fs.existsSync(absent)).toBe(false);
+    // A directory that could never be made (its parent is a file) is no obstacle to printing.
+    const blocked = path.join(fixture.root, 'a-file-for-config');
+    fs.writeFileSync(blocked, '');
+    expect(run(['config', '--state-dir', path.join(blocked, 'state')]).status).toBe(0);
+  }, 30_000);
+
+  it('catalog lists what a state directory holds', () => {
+    const state = path.join(fixture.root, 'state-for-catalog');
+    fs.mkdirSync(state);
+    fs.writeFileSync(path.join(state, 'saved.json'), JSON.stringify({ id: 'saved', name: 'Saved', content: 's' }));
+    const catalog = JSON.parse(run(['catalog', '--json', '--prompts-dir', fixture.library, '--state-dir', state]).stdout);
+    expect(catalog.served.find((p: { id: string }) => p.id === 'saved')).toMatchObject({ source: 'runtime' });
+    expect(fs.readdirSync(state)).toEqual(['saved.json']);
+  }, 30_000);
+
   it('exits with one line, not a stack trace, when the state directory cannot be written', () => {
     const blocked = path.join(fixture.root, 'a-file');
     fs.writeFileSync(blocked, '');
