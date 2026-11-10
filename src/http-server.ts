@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { z, ZodError } from 'zod';
@@ -14,7 +15,7 @@ import {
 } from './prompt-store.js';
 import { createMcpServer, packageVersion } from './mcp-prompts-server.js';
 import { DEFAULT_OPTIONS, OptionsError, openStore, optionsFromQuery, type ServerOptions } from './server-options.js';
-import { buildAccessPolicy, checkAccess, startupRefusal, type AccessPolicy } from './http-security.js';
+import { buildAccessPolicy, checkSource, checkToken, startupRefusal, type AccessPolicy } from './http-security.js';
 
 // HTTP mode: the same prompts and operations as the MCP stdio server, as a small JSON API, plus a
 // stateless MCP Streamable HTTP endpoint at /mcp whose query string picks a selection.
@@ -43,7 +44,7 @@ export interface Route {
   method: 'GET' | 'POST' | 'PUT' | 'DELETE';
   path: string;
   handler: (req: RouteRequest, res: RouteResponse) => void | Promise<void>;
-  /** Answered without the auth token (health probes). */
+  /** A health probe: answered whatever the Host, Origin or token. */
   public?: boolean;
 }
 
@@ -101,7 +102,7 @@ const ToolCallBody = z.object({ arguments: z.record(z.string(), z.any()).default
 
 const WRITE_TOOLS = ['add_prompt', 'update_prompt', 'delete_prompt'];
 
-function buildRoutes(store: PromptStore, serverOptions: ServerOptions): Route[] {
+function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: AccessPolicy): Route[] {
   const version = packageVersion();
   const { readOnly } = serverOptions;
 
@@ -159,8 +160,26 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions): Route[] 
       method: 'GET',
       path: '/ready',
       public: true,
+      // Readiness, and the mode the server runs in, so that a health check can insist on it:
+      // deploy/http-catalog is healthy only while read-only, deploy/http-workspace only while it
+      // requires a token and saves to disk. An image too old to know those settings fails the check.
       handler: (_req, res) => {
-        res.json({ status: 'ready', service: 'mcp-prompts' });
+        const stateDir = store.stateDir;
+        if (stateDir) {
+          try {
+            fs.accessSync(stateDir, fs.constants.R_OK | fs.constants.W_OK);
+          } catch {
+            res.status(503).json({ status: 'unavailable', service: 'mcp-prompts', reason: 'the state directory cannot be written' });
+            return;
+          }
+        }
+        res.json({
+          status: 'ready',
+          service: 'mcp-prompts',
+          readOnly,
+          auth: access.token ? 'token' : 'none',
+          storage: stateDir ? 'file' : 'memory',
+        });
       },
     },
     {
@@ -224,7 +243,9 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions): Route[] 
       path: '/v1/prompts/:id/apply',
       handler: (req, res) => {
         const { variables } = ApplyTemplateBody.parse(req.body ?? {});
-        res.json({ id: req.params.id, result: store.applyTemplate(req.params.id, variables) });
+        const rendered = store.render(req.params.id, variables);
+        // `result` is the text, as before; `missing` and `unused` say whether it is complete.
+        res.json({ id: req.params.id, result: rendered.text, missing: rendered.missing, unused: rendered.unused });
       },
     },
     {
@@ -362,13 +383,13 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
     }
   }
   for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
-  const routes = buildRoutes(base.select(serverOptions.selection), serverOptions);
   const access = options.access ?? buildAccessPolicy('127.0.0.1', {
     token: options.authToken,
     allowedHosts: options.allowedHosts,
     allowedOrigins: options.allowedOrigins,
     corsOrigin: options.corsOrigin,
   });
+  const routes = buildRoutes(base.select(serverOptions.selection), serverOptions, access);
 
   const server = http.createServer(async (req, res) => {
     if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);
@@ -382,15 +403,35 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       }
     };
 
+    // What an operator needs when a client reports "it does not connect": refusals at the default
+    // log level, every request at LOG_LEVEL=debug. Neither the query string nor any header value
+    // that could hold the token is written.
+    const started = Date.now();
+    res.on('finish', () => {
+      const entry = { method: req.method, path: (req.url ?? '/').split('?')[0], status: res.statusCode, ms: Date.now() - started };
+      if (res.statusCode === 401 || res.statusCode === 403) {
+        logger.warn({ ...entry, from: req.socket.remoteAddress, host: req.headers.host, origin: req.headers.origin }, 'Refused request');
+      } else {
+        logger.debug(entry, 'Request');
+      }
+    });
+
     try {
       const url = new URL(req.url ?? '/', 'http://localhost');
       const candidates = routes
         .map(route => ({ route, params: matchPath(route.path, url.pathname) }))
         .filter((c): c is { route: Route; params: Record<string, string> } => c.params !== null);
 
-      // Host and Origin are checked on every request, the preflight included.
-      const refused = checkAccess(access, req, { publicRoute: true });
-      if (refused) return send(refused.status, { error: refused.message });
+      // HEAD is GET without the body; node leaves the body out by itself.
+      const method = req.method === 'HEAD' ? 'GET' : req.method;
+      const match = candidates.find(c => c.route.method === method);
+      const isProbe = match?.route.public === true;
+
+      // Host and Origin are checked before anything is revealed, the CORS preflight included.
+      if (!isProbe) {
+        const refused = checkSource(access, req);
+        if (refused) return send(refused.status, { error: refused.message });
+      }
 
       if (candidates.length === 0) return send(404, { error: `Not found: ${url.pathname}` });
 
@@ -400,18 +441,17 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
         return send(204);
       }
 
-      // HEAD is GET without the body; node leaves the body out by itself.
-      const method = req.method === 'HEAD' ? 'GET' : req.method;
-      const match = candidates.find(c => c.route.method === method);
       if (!match) {
         res.setHeader('Allow', candidates.map(c => c.route.method).join(', '));
         return send(405, { error: `Method ${req.method} not allowed on ${url.pathname}` });
       }
 
-      const denied = checkAccess(access, req, { publicRoute: match.route.public });
-      if (denied) {
-        if (denied.status === 401) res.setHeader('WWW-Authenticate', 'Bearer realm="mcp-prompts"');
-        return send(denied.status, { error: denied.message });
+      if (!isProbe) {
+        const denied = checkToken(access, req);
+        if (denied) {
+          res.setHeader('WWW-Authenticate', 'Bearer realm="mcp-prompts"');
+          return send(denied.status, { error: denied.message });
+        }
       }
 
       const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : undefined;

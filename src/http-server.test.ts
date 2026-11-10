@@ -50,9 +50,35 @@ describe('http-server routes', () => {
     expect(new Date(payload.timestamp).toString()).not.toBe('Invalid Date');
   });
 
-  it('/ready returns status=ready, service=mcp-prompts', async () => {
+  it('/ready returns status=ready and the mode the server runs in', async () => {
     const app = await createServer({ store: new PromptStore() });
-    expect(callHandler(findRoute(app, 'GET', '/ready'))).toEqual({ status: 'ready', service: 'mcp-prompts' });
+    expect(callHandler(findRoute(app, 'GET', '/ready'))).toEqual({
+      status: 'ready', service: 'mcp-prompts', readOnly: false, auth: 'none', storage: 'memory',
+    });
+    const catalog = await createServer({
+      store: new PromptStore(),
+      serverOptions: mergeOptions(DEFAULT_OPTIONS, { readOnly: true }),
+      authToken: 'correct-horse-battery-staple',
+    });
+    expect(callHandler(findRoute(catalog, 'GET', '/ready'))).toMatchObject({ readOnly: true, auth: 'token' });
+  });
+
+  it('/ready answers 503 once the state directory can no longer be written', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ready-state-'));
+    const store = new PromptStore();
+    store.openStateDir(dir);
+    const app = await startHttpServer(0, '127.0.0.1', { store });
+    const ready = () => fetch(`http://127.0.0.1:${app.address()!.port}/ready`);
+    try {
+      expect(await (await ready()).json()).toMatchObject({ status: 'ready', storage: 'file' });
+      // The volume goes away (unmounted, deleted): a load balancer should stop sending writes here.
+      fs.rmSync(dir, { recursive: true, force: true });
+      const gone = await ready();
+      expect(gone.status).toBe(503);
+      expect(await gone.json()).toMatchObject({ status: 'unavailable' });
+    } finally {
+      await app.close();
+    }
   });
 
   it('/version returns the package version and service name', async () => {
@@ -115,7 +141,10 @@ describe('http-server over HTTP', () => {
     expect(updated.json).toMatchObject({ name: 'Greeting v2', version: 2 });
 
     const applied = await request('POST', `/v1/prompts/${id}/apply`, { variables: { who: 'Brno', place: 'MCP' } });
-    expect(applied.json.result).toBe('Hello Brno from MCP');
+    expect(applied.json).toEqual({ id, result: 'Hello Brno from MCP', missing: [], unused: [] });
+    // A value left out or misspelt is reported, as the MCP tool does, instead of only staying in the text.
+    const partial = await request('POST', `/v1/prompts/${id}/apply`, { variables: { who: 'Brno', plcae: 'MCP' } });
+    expect(partial.json).toMatchObject({ result: 'Hello Brno from {{place}}', missing: ['place'], unused: ['plcae'] });
 
     const stats = await request('GET', '/v1/stats');
     expect(stats.json).toMatchObject({ total: 1, templates: 1 });
@@ -276,6 +305,8 @@ describe('HTTP access control', () => {
     expect(rebound.status).toBe(403);
     expect(rebound.body).toMatch(/MCP_PROMPTS_ALLOWED_HOSTS/);
     expect((await raw(local, { path: '/v1/prompts', headers: { Host: `localhost:${local.address()!.port}` } })).status).toBe(200);
+    // Probes are called by address from load balancers and container runtimes.
+    expect((await raw(local, { path: '/health', headers: { Host: '10.0.0.7:3003' } })).status).toBe(200);
   });
 
   it('refuses a write sent by a web page from another origin, and allows a local page', async () => {

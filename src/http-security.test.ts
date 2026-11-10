@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildAccessPolicy, checkAccess, hostnameOf, isLoopbackHost, startupRefusal } from './http-security';
+import { buildAccessPolicy, checkAccess, checkSource, checkToken, hostnameOf, isLoopbackHost, startupRefusal } from './http-security';
 
 const request = (headers: Record<string, string>) => ({ headers });
 
@@ -79,6 +79,13 @@ describe('checkAccess', () => {
     expect(checkAccess(policy, request({ host: 'h', authorization: `Basic ${token}` }))).toMatchObject({ status: 401 });
     expect(checkAccess(policy, request({ host: 'h', authorization: `Bearer ${token}` }))).toBeUndefined();
     expect(checkAccess(policy, request({ host: 'h', authorization: `bearer ${token}` }))).toBeUndefined();
-    expect(checkAccess(policy, request({ host: 'h' }), { publicRoute: true })).toBeUndefined();
+  });
+
+  it('checks where a request comes from separately from its token', () => {
+    const policy = buildAccessPolicy('127.0.0.1', { token: 'correct-horse-battery-staple' });
+    expect(checkSource(policy, request({ host: 'localhost' }))).toBeUndefined();
+    expect(checkToken(policy, request({ host: 'localhost' }))).toMatchObject({ status: 401 });
+    // A rebound request is refused as such even when it carries the right token.
+    expect(checkAccess(policy, request({ host: 'evil.example', authorization: 'Bearer correct-horse-battery-staple' }))).toMatchObject({ status: 403 });
   });
 });

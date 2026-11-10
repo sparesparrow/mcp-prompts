@@ -8,7 +8,11 @@ import type { IncomingMessage } from 'http';
 // Three checks, in this order:
 //   Host    a request whose Host header names another site reached us through DNS rebinding
 //   Origin  a browser page from another site is calling us (a plain form post needs no CORS preflight)
-//   Token   when one is configured, every request except the health probes must carry it
+//   Token   when one is configured, the request must carry it
+//
+// The health probes (/health, /ready, /version) skip all three: load balancers and container
+// runtimes call them by IP address and without credentials. They reveal the version and the mode
+// (read-only or not, token required or not, saving to disk or not), and no prompt.
 
 export interface AccessPolicy {
   /** Bearer token; when set, every route that is not public requires it. */
@@ -104,26 +108,33 @@ function originAllowed(policy: AccessPolicy, origin: string): boolean {
   }
 }
 
-/** Checks one request against the policy. Public routes (health probes) skip the token only. */
-export function checkAccess(policy: AccessPolicy, req: Pick<IncomingMessage, 'headers'>, options: { publicRoute?: boolean } = {}): AccessDenied | undefined {
+/** The Host and Origin checks: is this request coming from where the server expects callers? */
+export function checkSource(policy: AccessPolicy, req: Pick<IncomingMessage, 'headers'>): AccessDenied | undefined {
   const host = req.headers.host;
   if (policy.allowedHosts) {
     if (!host || !policy.allowedHosts.includes(hostnameOf(host))) {
       return { status: 403, message: `Host ${host ?? '(none)'} is not allowed; add it to MCP_PROMPTS_ALLOWED_HOSTS if this server is meant to answer to that name` };
     }
   }
-
   const origin = req.headers.origin;
   if (typeof origin === 'string' && origin !== '' && !originAllowed(policy, origin)) {
     return { status: 403, message: `Origin ${origin} is not allowed; add it to MCP_PROMPTS_ALLOWED_ORIGINS to let pages from it call this server` };
   }
+  return undefined;
+}
 
-  if (policy.token && !options.publicRoute) {
-    const header = req.headers.authorization;
-    const match = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null;
-    if (!match || !sameSecret(match[1], policy.token)) {
-      return { status: 401, message: 'Missing or wrong bearer token; send the header "Authorization: Bearer <token>"' };
-    }
+/** The token check: does this request carry the configured bearer token? */
+export function checkToken(policy: AccessPolicy, req: Pick<IncomingMessage, 'headers'>): AccessDenied | undefined {
+  if (!policy.token) return undefined;
+  const header = req.headers.authorization;
+  const match = typeof header === 'string' ? /^Bearer\s+(.+)$/i.exec(header.trim()) : null;
+  if (!match || !sameSecret(match[1], policy.token)) {
+    return { status: 401, message: 'Missing or wrong bearer token; send the header "Authorization: Bearer <token>"' };
   }
   return undefined;
+}
+
+/** All checks for a route that is not a health probe. */
+export function checkAccess(policy: AccessPolicy, req: Pick<IncomingMessage, 'headers'>): AccessDenied | undefined {
+  return checkSource(policy, req) ?? checkToken(policy, req);
 }
