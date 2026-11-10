@@ -229,8 +229,12 @@ export function renderTemplate(content: string, variables: Record<string, unknow
   };
 }
 
-function writeFileAtomic(file: string, data: string): void {
-  // Write beside the target and rename over it, so a crash or a full disk never leaves half a file.
+/**
+ * Writes beside the target and moves the result into place, so a crash or a full disk never
+ * leaves half a file. With exclusive the write fails with EEXIST when the target already exists,
+ * even if another process created it a moment ago.
+ */
+function writeFileAtomic(file: string, data: string, options: { exclusive?: boolean } = {}): void {
   const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`);
   const fd = fs.openSync(tmp, 'wx', 0o600);
   try {
@@ -240,11 +244,36 @@ function writeFileAtomic(file: string, data: string): void {
     fs.closeSync(fd);
   }
   try {
-    fs.renameSync(tmp, file);
-  } catch (error) {
+    if (!options.exclusive) {
+      fs.renameSync(tmp, file);
+      return;
+    }
+    try {
+      // A hard link is the atomic "create only if absent"; rename would replace the other file.
+      fs.linkSync(tmp, file);
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw error;
+      // File systems without hard links (some network and removable ones).
+      fs.copyFileSync(tmp, file, fs.constants.COPYFILE_EXCL);
+    }
+  } finally {
     fs.rmSync(tmp, { force: true });
-    throw error;
   }
+}
+
+/** A temporary file this old was left by a write that never finished, not by one in progress. */
+const STALE_TMP_MS = 60_000;
+
+/**
+ * A directory's timestamp only moves in steps: a few milliseconds on most file systems, one or
+ * two seconds on some. A change made within a step of the last scan can leave the timestamp as
+ * it was, so a scan that close to the timestamp is repeated.
+ */
+const FINE_MTIME_MS = 50;
+const COARSE_MTIME_MS = 2_000;
+
+function byName(a: fs.Dirent, b: fs.Dirent): number {
+  return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
 
 const TOMBSTONES_FILE = '.deleted.json';
@@ -318,6 +347,14 @@ interface SharedState {
   library?: string;
   /** Where add, update and delete are saved; undefined keeps them in memory only. */
   stateDir?: string;
+  /**
+   * Set once a state directory is open: what the library and the user's directories hold, before
+   * anything saved is applied. The served prompts are rebuilt from it whenever the state directory
+   * changes, which is how several servers sharing one directory see each other's changes.
+   */
+  pristine?: { prompts: Map<string, StoredPrompt>; origins: Map<string, PromptOrigin> };
+  /** The open state directory, what it looked like when last read, and the files reported as unusable. */
+  watch?: { dir: string; mtimeMs: number; scannedAt: number; writable: boolean; reported: Set<string> };
 }
 
 export class PromptStore {
@@ -384,6 +421,15 @@ export class PromptStore {
     return count;
   }
 
+  /** Records a prompt read from the library, the samples or one of the user's directories. */
+  private put(prompt: StoredPrompt, origin: PromptOrigin): void {
+    this.shared.prompts.set(prompt.id, prompt);
+    this.shared.origins.set(prompt.id, origin);
+    // Loaded after the state directory was opened: part of what a rebuild starts from.
+    this.shared.pristine?.prompts.set(prompt.id, prompt);
+    this.shared.pristine?.origins.set(prompt.id, origin);
+  }
+
   private loadSamples(): number {
     const sampleDataPath = path.join(PACKAGE_ROOT, 'data', 'sample-prompts.json');
     if (!fs.existsSync(sampleDataPath)) return 0;
@@ -392,8 +438,7 @@ export class PromptStore {
     for (const raw of Array.isArray(sampleData?.prompts) ? sampleData.prompts : []) {
       const prompt = this.checkPromptData(raw, `${sampleDataPath} (${String(raw?.id)})`);
       if (!prompt) continue;
-      this.shared.prompts.set(prompt.id, prompt);
-      this.shared.origins.set(prompt.id, { kind: 'library', group: '' });
+      this.put(prompt, { kind: 'library', group: '' });
       count++;
     }
     logger.info(`Loaded ${count} sample prompts`);
@@ -401,57 +446,108 @@ export class PromptStore {
   }
 
   /**
-   * Recursively loads every *.json prompt under dir (index.json excluded). Library prompts are
-   * grouped by their directory relative to dir. Returns how many loaded.
+   * Recursively loads every *.json prompt under dir (index.json and hidden entries excluded),
+   * following symbolic links. Library prompts are grouped by their directory relative to dir.
+   * Returns how many prompts loaded; two files with one id count once, and the later file wins.
    */
   loadDirectory(dir: string, kind: 'library' | 'user' = 'library'): number {
-    return this.loadTree(dir, dir, kind);
+    const visited = new Set<string>();
+    try {
+      visited.add(fs.realpathSync(dir));
+    } catch {
+      // loadTree reports a directory it cannot read.
+    }
+    const count = this.loadTree(dir, dir, kind, new Map(), visited);
+    // Saved edits and deletions apply to what was just loaded as well.
+    if (this.shared.watch) this.applyState();
+    return count;
   }
 
-  private loadTree(root: string, dir: string, kind: 'library' | 'user'): number {
-    let count = 0;
+  private loadTree(root: string, dir: string, kind: 'library' | 'user', files: Map<string, string>, visited: Set<string>): number {
+    let entries: fs.Dirent[];
     try {
-      for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-        const fullPath = path.join(dir, entry.name);
-        if (entry.isDirectory()) {
-          count += this.loadTree(root, fullPath, kind);
-        } else if (entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'index.json') {
-          const prompt = this.readPromptFile(fullPath);
-          if (!prompt) continue;
-          this.shared.prompts.set(prompt.id, prompt);
-          this.shared.origins.set(
-            prompt.id,
-            kind === 'user'
-              ? { kind: 'user', dir: root }
-              : { kind: 'library', group: path.relative(root, dir).split(path.sep).join('/') }
-          );
-          count++;
-        }
-      }
+      // By name, so every machine loads the prompts, and therefore lists them, in the same order.
+      entries = fs.readdirSync(dir, { withFileTypes: true }).sort(byName);
     } catch (err) {
       logger.warn({ err }, `Failed to read directory ${dir}`);
+      return 0;
+    }
+    let count = 0;
+    for (const entry of entries) {
+      // Hidden entries are never prompts: .git, editors' swap files, and the ..data and
+      // ..<timestamp> directories behind a Kubernetes ConfigMap mount (whose visible files are
+      // links into them).
+      if (entry.name.startsWith('.')) continue;
+      const fullPath = path.join(dir, entry.name);
+      let isDirectory = entry.isDirectory();
+      let isFile = entry.isFile();
+      if (entry.isSymbolicLink()) {
+        try {
+          const target = fs.statSync(fullPath);
+          isDirectory = target.isDirectory();
+          isFile = target.isFile();
+        } catch {
+          logger.warn(`Skipped ${fullPath}: the link points to nothing`);
+          continue;
+        }
+      }
+      if (isDirectory) {
+        // A link back up the tree would otherwise be followed forever.
+        let real: string;
+        try {
+          real = fs.realpathSync(fullPath);
+        } catch {
+          continue;
+        }
+        if (visited.has(real)) continue;
+        visited.add(real);
+        count += this.loadTree(root, fullPath, kind, files, visited);
+      } else if (isFile && entry.name.endsWith('.json') && entry.name !== 'index.json') {
+        const prompt = this.readPromptFile(fullPath);
+        if (!prompt) continue;
+        const earlier = files.get(prompt.id);
+        if (earlier) {
+          logger.warn(`Duplicate prompt id "${prompt.id}": ${fullPath} replaces ${earlier}`);
+        } else {
+          count++;
+        }
+        files.set(prompt.id, fullPath);
+        this.put(
+          prompt,
+          kind === 'user'
+            ? { kind: 'user', dir: root }
+            : { kind: 'library', group: path.relative(root, dir).split(path.sep).join('/') }
+        );
+      }
     }
     return count;
   }
 
-  /** Reads one prompt file; logs why and returns undefined when it cannot be served. */
-  private readPromptFile(file: string): StoredPrompt | undefined {
+  /**
+   * Reads one prompt file; logs why and returns undefined when it cannot be served. The state
+   * directory is read again whenever it changes, so there a file is reported once (`reported`).
+   */
+  private readPromptFile(file: string, reported?: Set<string>): StoredPrompt | undefined {
+    const quiet = reported?.has(file) ?? false;
+    reported?.add(file);
     let raw: unknown;
     try {
       raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (err) {
-      logger.warn({ err }, `Skipped ${file}: it is not readable JSON`);
+      if (!quiet) logger.warn({ err }, `Skipped ${file}: it is not readable JSON`);
       return undefined;
     }
-    return this.checkPromptData(raw, file);
+    const prompt = this.checkPromptData(raw, file, quiet);
+    if (prompt) reported?.delete(file);
+    return prompt;
   }
 
-  private checkPromptData(raw: unknown, source: string): StoredPrompt | undefined {
+  private checkPromptData(raw: unknown, source: string, quiet = false): StoredPrompt | undefined {
     const checked = PromptFileSchema.safeParse(raw);
     if (!checked.success) {
       const [issue] = checked.error.issues;
       const where = issue.path.length > 0 ? issue.path.join('.') : 'file';
-      logger.warn(`Skipped ${source}: ${where}: ${issue.message}`);
+      if (!quiet) logger.warn(`Skipped ${source}: ${where}: ${issue.message}`);
       return undefined;
     }
     // Keep the file's own keys as they are; only fill in what every operation relies on.
@@ -470,7 +566,9 @@ export class PromptStore {
   /**
    * Saves add, update and delete under dir from now on, after loading what earlier runs saved
    * there: saved prompts replace library ones with the same id, and deleted ids stay deleted.
-   * With readOnly the directory is only read. Returns how many saved prompts were loaded.
+   * The directory is read again whenever it changes, so servers sharing it see each other's
+   * changes. With readOnly it is only read, and this store refuses changes.
+   * Returns how many saved prompts were loaded.
    */
   openStateDir(dir: string, options: { readOnly?: boolean } = {}): number {
     const readOnly = options.readOnly ?? false;
@@ -478,9 +576,13 @@ export class PromptStore {
       try {
         fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
         fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
-        // Left behind by a write that was interrupted before its rename.
+        // Left behind by a write that was interrupted before it finished. Recent ones are left
+        // alone: another server sharing the directory may be in the middle of a write.
+        const now = Date.now();
         for (const name of fs.readdirSync(dir)) {
-          if (name.startsWith('.') && name.endsWith('.tmp')) fs.rmSync(path.join(dir, name), { force: true });
+          if (!name.startsWith('.') || !name.endsWith('.tmp')) continue;
+          const file = path.join(dir, name);
+          if (now - fs.statSync(file).mtimeMs > STALE_TMP_MS) fs.rmSync(file, { force: true });
         }
       } catch (error) {
         throw new PromptStorageError(
@@ -493,23 +595,74 @@ export class PromptStore {
       return 0;
     }
 
-    for (const id of this.readTombstones(dir)) {
-      this.shared.prompts.delete(id);
-      this.shared.origins.delete(id);
-    }
-    let count = 0;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.startsWith('.')) continue;
-      const prompt = this.readPromptFile(path.join(dir, entry.name));
-      if (!prompt) continue;
-      this.shared.prompts.set(prompt.id, prompt);
-      // A saved edit of a library prompt stays a library prompt, so selections still apply to it.
-      if (!this.shared.origins.has(prompt.id)) this.shared.origins.set(prompt.id, { kind: 'runtime' });
-      count++;
-    }
+    this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) };
+    this.shared.watch = { dir, mtimeMs: -1, scannedAt: 0, writable: !readOnly, reported: new Set() };
     if (!readOnly) this.shared.stateDir = dir;
+    const count = this.applyState();
     logger.info(`Loaded ${count} saved prompts from ${dir}`);
     return count;
+  }
+
+  /**
+   * Rebuilds what is served: the library and the user's directories, without the ids recorded as
+   * deleted, with every saved prompt put over or beside them. Returns the number of saved prompts.
+   */
+  private applyState(): number {
+    const { watch, pristine } = this.shared;
+    if (!watch || !pristine) return 0;
+    let mtimeMs: number;
+    let entries: fs.Dirent[];
+    try {
+      // The timestamp first: a change made while the files are read is then seen by the next check.
+      mtimeMs = fs.statSync(watch.dir).mtimeMs;
+      entries = fs.readdirSync(watch.dir, { withFileTypes: true }).sort(byName);
+    } catch (err) {
+      logger.warn({ err }, `Could not read state directory ${watch.dir}; serving what was read before`);
+      return 0;
+    }
+    const prompts = new Map(pristine.prompts);
+    const origins = new Map(pristine.origins);
+    for (const id of this.readTombstones(watch.dir)) {
+      prompts.delete(id);
+      origins.delete(id);
+    }
+    let count = 0;
+    for (const entry of entries) {
+      if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.startsWith('.')) continue;
+      const prompt = this.readPromptFile(path.join(watch.dir, entry.name), watch.reported);
+      if (!prompt) continue;
+      prompts.set(prompt.id, prompt);
+      // A saved edit of a library prompt stays a library prompt, so selections still apply to it.
+      origins.set(prompt.id, pristine.origins.get(prompt.id) ?? { kind: 'runtime' });
+      count++;
+    }
+    this.shared.prompts = prompts;
+    this.shared.origins = origins;
+    watch.mtimeMs = mtimeMs;
+    watch.scannedAt = Date.now();
+    return count;
+  }
+
+  /** Reads the state directory again if it changed since it was last read. */
+  private refresh(): void {
+    const watch = this.shared.watch;
+    if (!watch) return;
+    let mtimeMs: number;
+    try {
+      mtimeMs = fs.statSync(watch.dir).mtimeMs;
+    } catch {
+      return;
+    }
+    // Whole seconds mean a file system that keeps no finer time than that.
+    const granularity = Number.isInteger(mtimeMs / 1000) ? COARSE_MTIME_MS : FINE_MTIME_MS;
+    if (mtimeMs === watch.mtimeMs && watch.scannedAt - mtimeMs >= granularity) return;
+    this.applyState();
+  }
+
+  private assertWritable(): void {
+    if (this.shared.watch && !this.shared.watch.writable) {
+      throw new PromptUsageError('This server reads its state directory read-only, so prompts cannot be changed here');
+    }
   }
 
   private stateFile(id: string): string {
@@ -546,6 +699,7 @@ export class PromptStore {
     try {
       write();
     } catch (error) {
+      if (error instanceof PromptConflictError) throw error;
       logger.error({ err: error }, `Could not save ${what} to ${this.shared.stateDir}`);
       // The log has the path and the full error; callers get the error code only.
       const code = (error as NodeJS.ErrnoException)?.code ?? 'write failed';
@@ -564,6 +718,7 @@ export class PromptStore {
 
   /** Every prompt this store serves, in load order. */
   all(): StoredPrompt[] {
+    this.refresh();
     return Array.from(this.shared.prompts.values()).filter(prompt => this.isVisible(prompt));
   }
 
@@ -613,12 +768,15 @@ export class PromptStore {
   }
 
   get(id: string): StoredPrompt {
+    this.refresh();
     const prompt = this.shared.prompts.get(id);
     if (!prompt || !this.isVisible(prompt)) throw new PromptNotFoundError(id);
     return prompt;
   }
 
   add(input: CreatePromptInput): StoredPrompt {
+    this.assertWritable();
+    this.refresh();
     const { id: requestedId, ...fields } = input;
     // An id taken by a prompt outside this view's selection is taken all the same.
     if (requestedId !== undefined && this.shared.prompts.has(requestedId)) throw new PromptConflictError(requestedId);
@@ -626,16 +784,25 @@ export class PromptStore {
     const now = new Date().toISOString();
     const prompt: StoredPrompt = { ...fields, id, createdAt: now, updatedAt: now, version: 1 };
     this.saving(`prompt ${id}`, () => {
-      writeFileAtomic(this.stateFile(id), `${JSON.stringify(prompt, null, 2)}\n`);
+      try {
+        // Exclusive: another server sharing the directory may have saved this id a moment ago.
+        writeFileAtomic(this.stateFile(id), `${JSON.stringify(prompt, null, 2)}\n`, { exclusive: true });
+      } catch (error) {
+        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new PromptConflictError(id);
+        throw error;
+      }
       this.writeTombstones(ids => ids.delete(id));
     });
     this.shared.prompts.set(id, prompt);
-    this.shared.origins.set(id, { kind: 'runtime' });
+    // An id the library also has (deleted earlier, now added again) keeps its place in the
+    // library, as it will after a restart; anything else was added at runtime.
+    this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
     logger.info(`Added prompt: ${id}`);
     return prompt;
   }
 
   update(id: string, updates: UpdatePromptInput): StoredPrompt {
+    this.assertWritable();
     const prompt = this.get(id);
     const changes = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
     if (Object.keys(changes).length === 0) {
@@ -655,12 +822,12 @@ export class PromptStore {
   }
 
   delete(id: string): StoredPrompt {
+    this.assertWritable();
     const prompt = this.get(id);
-    const origin = this.originOf(id);
     this.saving(`the deletion of prompt ${id}`, () => {
-      // A prompt that also exists in the library or a user directory would come back at the next
-      // start, so its id is recorded as deleted.
-      if (origin.kind !== 'runtime') this.writeTombstones(ids => ids.add(id));
+      // A prompt that also exists in the library or a user directory would come back the next
+      // time the directory is read, so its id is recorded as deleted.
+      if (this.shared.pristine?.prompts.has(id)) this.writeTombstones(ids => ids.add(id));
       fs.rmSync(this.stateFile(id), { force: true });
     });
     this.shared.prompts.delete(id);
@@ -706,6 +873,7 @@ export class PromptStore {
 
   /** The library's groups and tags, with how much of each this store serves. */
   catalog(): Catalog {
+    this.refresh();
     const groups = new Map<string, CatalogGroup>();
     const tags = new Map<string, number>();
     const totals = { prompts: 0, templates: 0, selectedPrompts: 0, selectedTemplates: 0 };
@@ -751,6 +919,7 @@ export class PromptStore {
    * of the other kind (a group of templates listed under prompts, say).
    */
   selectionWarnings(selection: Selection): string[] {
+    this.refresh();
     const library = this.libraryPrompts();
     const count = (entry: string, templates: boolean) =>
       library.filter(({ prompt, group }) => Boolean(prompt.isTemplate) === templates && matchesEntry(entry, prompt, group)).length;

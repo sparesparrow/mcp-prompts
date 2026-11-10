@@ -279,6 +279,92 @@ describe('PromptStore loading', () => {
   });
 });
 
+describe('PromptStore loading from links and duplicates', () => {
+  let root: string;
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-links-'));
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const prompt = (id: string, name = id) => JSON.stringify({ id, name, content: `${id} content` });
+  const load = (dir: string) => {
+    const store = new PromptStore();
+    const count = store.load({ promptsDir: dir });
+    return { store, count };
+  };
+
+  it('follows symbolic links to files and directories', () => {
+    const lib = path.join(root, 'linked');
+    const elsewhere = path.join(root, 'elsewhere');
+    fs.mkdirSync(path.join(lib, 'team'), { recursive: true });
+    fs.mkdirSync(elsewhere);
+    fs.writeFileSync(path.join(elsewhere, 'far.json'), prompt('far'));
+    fs.writeFileSync(path.join(elsewhere, 'single.json'), prompt('single'));
+    fs.symlinkSync(path.join(elsewhere, 'single.json'), path.join(lib, 'team', 'single.json'));
+    fs.symlinkSync(elsewhere, path.join(lib, 'shared'));
+    fs.symlinkSync(path.join(root, 'no-such-file.json'), path.join(lib, 'broken.json'));
+
+    const { store, count } = load(lib);
+    // The linked directory also holds single.json; one id is one prompt.
+    expect(count).toBe(2);
+    expect(store.catalog().served).toEqual(expect.arrayContaining([
+      expect.objectContaining({ id: 'far', group: 'shared' }),
+      expect.objectContaining({ id: 'single' }),
+    ]));
+  });
+
+  it('reads a Kubernetes ConfigMap mount, whose files are links into hidden directories', () => {
+    const mount = path.join(root, 'configmap');
+    const generation = '..2026_11_10_09_00_00.1234567890';
+    fs.mkdirSync(path.join(mount, generation), { recursive: true });
+    fs.writeFileSync(path.join(mount, generation, 'hello.json'), prompt('hello'));
+    fs.symlinkSync(generation, path.join(mount, '..data'));
+    fs.symlinkSync(path.join('..data', 'hello.json'), path.join(mount, 'hello.json'));
+
+    const { store, count } = load(mount);
+    expect(count).toBe(1);
+    // In the root group, not in a group named after the mount's current generation.
+    expect(store.catalog().served).toEqual([{ id: 'hello', name: 'hello', template: false, source: 'library', group: '' }]);
+  });
+
+  it('stops at a link that leads back up the tree', () => {
+    const lib = path.join(root, 'cycle');
+    fs.mkdirSync(path.join(lib, 'a'), { recursive: true });
+    fs.writeFileSync(path.join(lib, 'a', 'one.json'), prompt('one'));
+    fs.symlinkSync(lib, path.join(lib, 'a', 'back'));
+    expect(load(lib).count).toBe(1);
+  });
+
+  it('skips hidden files and directories', () => {
+    const lib = path.join(root, 'hidden');
+    fs.mkdirSync(path.join(lib, '.drafts'), { recursive: true });
+    fs.writeFileSync(path.join(lib, '.drafts', 'draft.json'), prompt('draft'));
+    fs.writeFileSync(path.join(lib, '.swap.json'), prompt('swap'));
+    fs.writeFileSync(path.join(lib, 'kept.json'), prompt('kept'));
+    expect(load(lib).store.all().map(p => p.id)).toEqual(['kept']);
+  });
+
+  it('loads in name order whatever order the file system lists in', () => {
+    const lib = path.join(root, 'ordered');
+    fs.mkdirSync(path.join(lib, 'm'), { recursive: true });
+    for (const name of ['zulu', 'alpha', 'november']) fs.writeFileSync(path.join(lib, `${name}.json`), prompt(name));
+    fs.writeFileSync(path.join(lib, 'm', 'mike.json'), prompt('mike'));
+    expect(load(lib).store.all().map(p => p.id)).toEqual(['alpha', 'mike', 'november', 'zulu']);
+  });
+
+  it('counts two files with one id once and serves the later file', () => {
+    const lib = path.join(root, 'duplicates');
+    fs.mkdirSync(path.join(lib, 'a'), { recursive: true });
+    fs.mkdirSync(path.join(lib, 'b'), { recursive: true });
+    fs.writeFileSync(path.join(lib, 'a', 'first.json'), prompt('same', 'First'));
+    fs.writeFileSync(path.join(lib, 'b', 'second.json'), prompt('same', 'Second'));
+    const { store, count } = load(lib);
+    expect(count).toBe(1);
+    expect(store.size).toBe(1);
+    expect(store.get('same').name).toBe('Second');
+  });
+});
+
 describe('renderTemplate', () => {
   it('fills in one pass, so a value containing a placeholder is inserted as written', () => {
     const rendered = renderTemplate('A={{a}} B={{b}}', { a: '{{b}}', b: 'SECRET' });
@@ -405,5 +491,108 @@ describe('PromptStore state directory', () => {
     expect(store.get('kept')).toEqual(kept);
     expect(store.size).toBe(1);
     fs.rmSync(dir, { force: true });
+  });
+});
+
+describe('PromptStore state directory shared by several servers', () => {
+  let root: string;
+  let library: string;
+  let state: string;
+
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-shared-'));
+    library = path.join(root, 'library');
+    state = path.join(root, 'state');
+    fs.mkdirSync(path.join(library, 'ops'), { recursive: true });
+    fs.writeFileSync(path.join(library, 'ops', 'lib-a.json'), JSON.stringify({ id: 'lib-a', name: 'Library A', content: 'a' }));
+    fs.writeFileSync(path.join(library, 'ops', 'lib-b.json'), JSON.stringify({ id: 'lib-b', name: 'Library B', content: 'b' }));
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const open = (options: { readOnly?: boolean } = {}) => {
+    const store = new PromptStore();
+    store.load({ promptsDir: library });
+    store.openStateDir(state, options);
+    return store;
+  };
+  const note = (id: string, name: string) => CreatePromptParams.parse({ id, name, content: `${name} content` });
+
+  it('shows one server what another added, changed and deleted, without a restart', () => {
+    const first = open();
+    const second = open();
+    first.add(note('shared-note', 'From the first'));
+    expect(second.get('shared-note').name).toBe('From the first');
+    expect(second.list().map(p => p.id)).toContain('shared-note');
+
+    second.update('shared-note', { name: 'Edited by the second' });
+    second.update('lib-a', { name: 'Library A, edited' });
+    expect(first.get('shared-note')).toMatchObject({ name: 'Edited by the second', version: 2 });
+    expect(first.get('lib-a').name).toBe('Library A, edited');
+
+    first.delete('shared-note');
+    first.delete('lib-b');
+    expect(() => second.get('shared-note')).toThrow(PromptNotFoundError);
+    expect(() => second.get('lib-b')).toThrow(PromptNotFoundError);
+    expect(second.size).toBe(1);
+  });
+
+  it('refuses an id another server has taken instead of overwriting its prompt', () => {
+    const first = open();
+    const second = open();
+    first.add(note('claimed', 'First come'));
+    expect(() => second.add(note('claimed', 'Second come'))).toThrow(PromptConflictError);
+    expect(JSON.parse(fs.readFileSync(path.join(state, 'claimed.json'), 'utf8')).name).toBe('First come');
+    // A file this server has not read yet is protected too (here: one it cannot serve).
+    fs.writeFileSync(path.join(state, 'unreadable.json'), '{ not json');
+    expect(() => second.add(note('unreadable', 'Mine'))).toThrow(PromptConflictError);
+    expect(fs.readFileSync(path.join(state, 'unreadable.json'), 'utf8')).toBe('{ not json');
+    expect(fs.readdirSync(state).filter(name => name.endsWith('.tmp'))).toEqual([]);
+    fs.rmSync(path.join(state, 'unreadable.json'));
+  });
+
+  it('keeps a library prompt deleted after it was added again and deleted again', () => {
+    const store = open();
+    // lib-b was deleted by the first test.
+    store.add(note('lib-b', 'B, written anew'));
+    expect(store.catalog().served.find(p => p.id === 'lib-b')).toMatchObject({ source: 'library', group: 'ops' });
+    store.delete('lib-b');
+    expect(() => open().get('lib-b')).toThrow(PromptNotFoundError);
+  });
+
+  it('lets a read-only server follow the changes and refuses changes through it', () => {
+    const writer = open();
+    const reader = open({ readOnly: true });
+    writer.add(note('late', 'Added after the reader started'));
+    expect(reader.get('late').name).toBe('Added after the reader started');
+    expect(() => reader.add(note('nope', 'Nope'))).toThrow(PromptUsageError);
+    expect(() => reader.update('late', { name: 'Changed' })).toThrow(/read-only/);
+    expect(() => reader.delete('late')).toThrow(PromptUsageError);
+    expect(writer.get('late').name).toBe('Added after the reader started');
+  });
+
+  it('applies saved changes to a directory loaded after the state directory was opened', () => {
+    const own = path.join(root, 'own');
+    fs.mkdirSync(own);
+    fs.writeFileSync(path.join(own, 'mine.json'), JSON.stringify({ id: 'mine', name: 'Mine', content: 'm' }));
+    const first = open();
+    first.loadDirectory(own, 'user');
+    first.update('mine', { name: 'Mine, edited' });
+    const second = open();
+    second.loadDirectory(own, 'user');
+    expect(second.get('mine').name).toBe('Mine, edited');
+    expect(second.catalog().served.find(p => p.id === 'mine')).toMatchObject({ source: 'user' });
+  });
+
+  it('removes only temporary files old enough to be abandoned when it opens the directory', () => {
+    const abandoned = path.join(state, '.old.json.1.aaaa.tmp');
+    const inProgress = path.join(state, '.new.json.2.bbbb.tmp');
+    fs.writeFileSync(abandoned, 'x');
+    fs.writeFileSync(inProgress, 'x');
+    const hourAgo = new Date(Date.now() - 3_600_000);
+    fs.utimesSync(abandoned, hourAgo, hourAgo);
+    open();
+    expect(fs.existsSync(abandoned)).toBe(false);
+    expect(fs.existsSync(inProgress)).toBe(true);
+    fs.rmSync(inProgress);
   });
 });
