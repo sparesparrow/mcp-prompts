@@ -422,6 +422,22 @@ describe('MCP over HTTP at /mcp', () => {
     expect(client.getInstructions()).toContain('2 of the 6 library prompts');
   });
 
+  it('serves a profile named in the URL, and refuses one the library does not have', async () => {
+    const client = await connect(urlOf(open, '?profile=greetings&expose=tools,prompts'));
+    expect((await client.listPrompts()).prompts.map(p => p.name)).toEqual(['a-greet', 'a-deep']);
+    expect(client.getInstructions()).toContain('2 of the 6 library prompts (profile greetings)');
+    // Two clients of one server, each with its own profile.
+    const other = await connect(urlOf(open, '?profile=notes'));
+    const listed = await other.callTool({ name: 'list_prompts', arguments: {} });
+    expect((listed.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['b-plain', 'root-note']);
+
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' });
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+    const unknown = await fetch(urlOf(open, '?profile=greeting'), { method: 'POST', headers, body });
+    expect(unknown.status).toBe(400);
+    expect(((await unknown.json()) as { error: string }).error).toContain('unknown profile "greeting": this library has greetings, notes');
+  });
+
   it('can only narrow what the server itself serves', async () => {
     // The server serves alpha templates and is read-only; the URL asks for beta and writes.
     const client = await connect(urlOf(narrowed, '?templates=alpha/deep,beta&readOnly=false'));

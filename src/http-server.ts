@@ -14,7 +14,7 @@ import {
   UpdatePromptParams,
 } from './prompt-store.js';
 import { createMcpServer, packageVersion } from './mcp-prompts-server.js';
-import { DEFAULT_OPTIONS, OptionsError, openStore, optionsFromQuery, type ServerOptions } from './server-options.js';
+import { DEFAULT_OPTIONS, OptionsError, openStore, optionsFromQuery, selectFor, type OptionLayer, type ServerOptions } from './server-options.js';
 import { buildAccessPolicy, checkSource, checkToken, startupRefusal, type AccessPolicy } from './http-security.js';
 
 // HTTP mode: the same prompts and operations as the MCP stdio server, as a small JSON API, plus a
@@ -279,23 +279,25 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       path: '/mcp',
       handler: async req => {
         if (!req.raw) throw new HttpError(500, 'The MCP endpoint needs the raw request');
-        let fromUrl;
+        let fromUrl: OptionLayer;
+        let view: PromptStore;
         try {
           fromUrl = optionsFromQuery(req.query);
+          // A profile in the URL, like the lists, chooses from what this server serves.
+          view = selectFor(store, {
+            profiles: fromUrl.profiles,
+            selection: { prompts: fromUrl.prompts ?? 'all', templates: fromUrl.templates ?? 'all', exclude: fromUrl.exclude ?? [] },
+          });
         } catch (error) {
           if (error instanceof OptionsError) throw new HttpError(400, error.message);
           throw error;
         }
-        const view = store.select({
-          prompts: fromUrl.prompts ?? 'all',
-          templates: fromUrl.templates ?? 'all',
-          exclude: fromUrl.exclude ?? [],
-        });
         const server = await createMcpServer({
           store: view,
           expose: fromUrl.expose ?? serverOptions.expose,
           // A URL can make the session read-only, never the reverse.
           readOnly: readOnly || fromUrl.readOnly === true,
+          profiles: fromUrl.profiles ?? serverOptions.profiles,
         });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
         req.raw.res.on('close', () => {
@@ -383,13 +385,15 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
     }
   }
   for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
+  // Throws OptionsError for a profile the library does not define.
+  const served = selectFor(base, serverOptions);
   const access = options.access ?? buildAccessPolicy('127.0.0.1', {
     token: options.authToken,
     allowedHosts: options.allowedHosts,
     allowedOrigins: options.allowedOrigins,
     corsOrigin: options.corsOrigin,
   });
-  const routes = buildRoutes(base.select(serverOptions.selection), serverOptions, access);
+  const routes = buildRoutes(served, serverOptions, access);
 
   const server = http.createServer(async (req, res) => {
     if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);

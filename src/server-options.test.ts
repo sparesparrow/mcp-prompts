@@ -140,7 +140,7 @@ describe('optionsFromQuery', () => {
 
   it('refuses unknown parameters, including paths', () => {
     expect(() => optionsFromQuery(new URLSearchParams('promptsDir=/etc'))).toThrow(/unknown query parameter promptsDir/);
-    expect(() => optionsFromQuery(new URLSearchParams('template=a'))).toThrow(/accepted: prompts, templates/);
+    expect(() => optionsFromQuery(new URLSearchParams('template=a'))).toThrow(/accepted: profile, prompts, templates/);
   });
 });
 
@@ -170,5 +170,31 @@ describe('state directory and legacy storage settings', () => {
     expect(optionsFromEnv({ STORAGE_TYPE: 'file' }, '/work').warnings[0]).toContain('no longer selects anything');
     expect(optionsFromEnv({ STORAGE_TYPE: 'file', MCP_PROMPTS_STATE_DIR: '/s' }, '/work').warnings).toEqual([]);
     expect(optionsFromEnv({ STORAGE_TYPE: 'memory' }, '/work').warnings).toEqual([]);
+  });
+});
+
+describe('profiles in the options', () => {
+  it('reads --profile, MCP_PROMPTS_PROFILE, the config key and the query parameter', () => {
+    expect(parseCommandLine(['--profile', 'software-dev,embedded-iot', '--profile', 'mia-vehicle']).layer.profiles)
+      .toEqual(['software-dev', 'embedded-iot', 'mia-vehicle']);
+    expect(optionsFromEnv({ MCP_PROMPTS_PROFILE: 'voice-home' }).layer.profiles).toEqual(['voice-home']);
+    expect(optionsFromQuery(new URLSearchParams('profile=software-dev&profile=learning-loop')).profiles)
+      .toEqual(['software-dev', 'learning-loop']);
+
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-profile-'));
+    const file = path.join(dir, 'mcp-prompts.json');
+    fs.writeFileSync(file, JSON.stringify({ profile: 'software-dev', exclude: ['x'] }));
+    expect(optionsFromConfigFile(file)).toEqual({ profiles: ['software-dev'], exclude: ['x'] });
+    // Flags override the environment, which overrides the file.
+    expect(resolveOptions(['--config', file], { MCP_PROMPTS_PROFILE: 'voice-home' }).options.profiles).toEqual(['voice-home']);
+    expect(resolveOptions(['--config', file, '--profile', 'mia-vehicle'], { MCP_PROMPTS_PROFILE: 'voice-home' }).options.profiles).toEqual(['mia-vehicle']);
+    expect(resolveOptions([], {}).options.profiles).toEqual([]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('rejects an empty or malformed profile name before anything is loaded', () => {
+    expect(() => parseCommandLine(['--profile', ''])).toThrow(/needs a profile name/);
+    expect(() => parseCommandLine(['--profile', 'Software Dev'])).toThrow(/is not a profile name/);
+    expect(() => optionsFromQuery(new URLSearchParams('profile=../etc'))).toThrow(OptionsError);
   });
 });

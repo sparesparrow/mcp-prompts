@@ -1,0 +1,30 @@
+{
+  "$comment": "Profiles: ready-made selections of this library, each for one kind of work. An install that names one (--profile <name>, MCP_PROMPTS_PROFILE, or ?profile=<name> in an HTTP URL) serves only these prompts, so list_prompts returns a fraction of the library. Entries are groups (directories), prompt ids or tag:<tag>, as for --prompts and --templates; 'prompts' lists plain prompts and 'templates' lists templates. Run 'mcp-prompts profiles' to see what each serves and which prompts are in none.",
+  "profiles": {
+    "software-dev": {
+      "description": "Analysing and reviewing a software project: an orchestrator per project type and the architecture, security and test analysts.",
+      "prompts": ["main-agents", "subagents", "software-design-life-story-analogy"],
+      "templates": "none"
+    },
+    "embedded-iot": {
+      "description": "Firmware, Raspberry Pi and Android work and the bridges between devices, with the MIA repository's pull-request workflow.",
+      "prompts": ["orchestration_main_embedded_iot", "orchestration_main_multiplatform_iot", "orchestration_main_android_app", "subagents"],
+      "templates": ["claudepy-workflows", "embedded", "mia-dev"]
+    },
+    "mia-vehicle": {
+      "description": "The MIA in-car assistant at run time: climate, diagnostics, maintenance, navigation, emergencies, car voice and GPIO.",
+      "prompts": "none",
+      "templates": ["mia-car", "mia-gpio-config"]
+    },
+    "voice-home": {
+      "description": "Voice-command understanding and home automation: MIA voice intelligence, the OpenClaw agents and the home command interpreter.",
+      "prompts": ["voice-intelligence"],
+      "templates": ["voice-intelligence", "openclaw", "home-automation"]
+    },
+    "learning-loop": {
+      "description": "The self-improvement loop: the seven cognitive-layer instructions and the analyzer that turns results into learnings.",
+      "prompts": ["cognitive"],
+      "templates": ["learning-loop-analyzer"]
+    }
+  }
+}

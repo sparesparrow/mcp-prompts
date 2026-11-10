@@ -62,6 +62,7 @@ if (resolved.commandLine.help) {
     .catch(error => {
       // One line saying what to change, not a stack trace: this is what an operator reads first.
       process.stderr.write(`mcp-prompts-http: ${error instanceof Error ? error.message : String(error)}\n`);
-      process.exit(1);
+      // 2 for a setting that has to be corrected (an unknown profile), as for the other options.
+      process.exit(error instanceof OptionsError ? 2 : 1);
     });
 }

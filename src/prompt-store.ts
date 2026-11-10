@@ -150,6 +150,16 @@ export class PromptConflictError extends Error {
   }
 }
 
+/** A profile was asked for that the library does not define. */
+export class UnknownProfileError extends Error {
+  constructor(public readonly unknown: string[], public readonly available: string[]) {
+    super(
+      `unknown profile ${unknown.map(name => `"${name}"`).join(', ')}: ` +
+      (available.length > 0 ? `this library has ${available.join(', ')}` : 'this library defines no profiles (it has no profiles.json)')
+    );
+  }
+}
+
 /** A change could not be saved to the state directory; the prompt was left as it was. */
 export class PromptStorageError extends Error {
   constructor(message: string) {
@@ -272,6 +282,9 @@ const STALE_TMP_MS = 60_000;
 const FINE_MTIME_MS = 50;
 const COARSE_MTIME_MS = 2_000;
 
+/** JSON files in a library that are not prompts: a generated index, and the profiles. */
+const NOT_PROMPTS = ['index.json', 'profiles.json'];
+
 function byName(a: fs.Dirent, b: fs.Dirent): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
@@ -293,6 +306,42 @@ export interface Selection {
 export type Selector = 'all' | string[];
 
 export const SELECT_ALL: Selection = { prompts: 'all', templates: 'all', exclude: [] };
+
+/**
+ * A named selection kept with the library, in <library>/profiles.json: the prompts one kind of
+ * work needs. An install that names a profile serves only those, so listings are short and an
+ * agent is not offered car prompts while it reviews a web backend.
+ */
+export interface Profile {
+  name: string;
+  description: string;
+  selection: Selection;
+}
+
+/** A profile with how much of the library it serves. */
+export interface ProfileSummary {
+  name: string;
+  description: string;
+  prompts: number;
+  templates: number;
+  /** Entries of the profile that match nothing in the library (see selectionWarnings). */
+  warnings: string[];
+}
+
+export const PROFILES_FILE = 'profiles.json';
+
+const ProfileSelector = z.union([z.literal('all'), z.literal('none'), z.array(z.string().min(1))]);
+const ProfilesFileSchema = z.looseObject({
+  profiles: z.record(
+    z.string().regex(/^[a-z0-9][a-z0-9-]*$/, 'a profile name is lower-case letters, digits and "-"'),
+    z.strictObject({
+      description: z.string().default(''),
+      prompts: ProfileSelector.default('all'),
+      templates: ProfileSelector.default('all'),
+      exclude: z.array(z.string().min(1)).default([]),
+    })
+  ),
+});
 
 /**
  * Where a prompt came from. Only library prompts are subject to a Selection: prompts from the
@@ -345,6 +394,8 @@ interface SharedState {
   prompts: Map<string, StoredPrompt>;
   origins: Map<string, PromptOrigin>;
   library?: string;
+  /** The library's profiles.json, by name. */
+  profiles: Map<string, Profile>;
   /** Where add, update and delete are saved; undefined keeps them in memory only. */
   stateDir?: string;
   /**
@@ -360,7 +411,7 @@ interface SharedState {
 export class PromptStore {
   // Views made by select() share this state and add filters, so a prompt added through any view
   // is stored once.
-  private shared: SharedState = { prompts: new Map(), origins: new Map() };
+  private shared: SharedState = { prompts: new Map(), origins: new Map(), profiles: new Map() };
   private filters: Visibility[] = [];
 
   /** Number of prompts this store serves. */
@@ -385,6 +436,79 @@ export class PromptStore {
     return view;
   }
 
+  /** The profiles the library defines, in the order of its profiles.json. */
+  get profileNames(): string[] {
+    return Array.from(this.shared.profiles.keys());
+  }
+
+  /**
+   * A view that serves the library prompts of the named profiles: of any of them, when several
+   * are named. Like select(), it only takes prompts away, and it leaves the user's own
+   * directories and prompts added at runtime alone. Throws UnknownProfileError for a name the
+   * library does not define.
+   */
+  selectProfiles(names: string[]): PromptStore {
+    if (names.length === 0) return this;
+    const unknown = names.filter(name => !this.shared.profiles.has(name));
+    if (unknown.length > 0) throw new UnknownProfileError(unknown, this.profileNames);
+    const filters = names.map(name => selectionFilter(this.shared.profiles.get(name)!.selection));
+    const view = new PromptStore();
+    view.shared = this.shared;
+    view.filters = [...this.filters, (prompt, origin) => filters.some(filter => filter(prompt, origin))];
+    return view;
+  }
+
+  /** Every profile of the library, with how many plain prompts and templates it serves. */
+  profiles(): ProfileSummary[] {
+    this.refresh();
+    const library = this.libraryPrompts();
+    return Array.from(this.shared.profiles.values(), profile => {
+      const serves = selectionFilter(profile.selection);
+      const served = library.filter(({ prompt, group }) => serves(prompt, { kind: 'library', group }));
+      return {
+        name: profile.name,
+        description: profile.description,
+        prompts: served.filter(({ prompt }) => !prompt.isTemplate).length,
+        templates: served.filter(({ prompt }) => prompt.isTemplate).length,
+        warnings: this.selectionWarnings(profile.selection),
+      };
+    });
+  }
+
+  /** Ids of library prompts that no profile serves; they are reachable only without a profile. */
+  unprofiled(): string[] {
+    this.refresh();
+    const filters = Array.from(this.shared.profiles.values(), profile => selectionFilter(profile.selection));
+    return this.libraryPrompts()
+      .filter(({ prompt, group }) => !filters.some(serves => serves(prompt, { kind: 'library', group })))
+      .map(({ prompt }) => prompt.id);
+  }
+
+  private loadProfiles(dir: string): void {
+    const file = path.join(dir, PROFILES_FILE);
+    if (!fs.existsSync(file)) return;
+    let parsed;
+    try {
+      parsed = ProfilesFileSchema.safeParse(JSON.parse(fs.readFileSync(file, 'utf8')));
+    } catch (err) {
+      logger.warn({ err }, `Ignored ${file}: it is not readable JSON`);
+      return;
+    }
+    if (!parsed.success) {
+      const [issue] = parsed.error.issues;
+      logger.warn(`Ignored ${file}: ${issue.path.join('.') || 'file'}: ${issue.message}`);
+      return;
+    }
+    const list = (selector: 'all' | 'none' | string[]): Selector => (selector === 'none' ? [] : selector);
+    for (const [name, profile] of Object.entries(parsed.data.profiles)) {
+      this.shared.profiles.set(name, {
+        name,
+        description: profile.description,
+        selection: { prompts: list(profile.prompts), templates: list(profile.templates), exclude: profile.exclude },
+      });
+    }
+  }
+
   /** Loads PROMPTS_DIR (or the data/prompts shipped with the package), falling back to data/sample-prompts.json. */
   loadDefault(): void {
     this.load({ promptsDir: process.env.PROMPTS_DIR || undefined });
@@ -401,6 +525,7 @@ export class PromptStore {
       if (fs.existsSync(promptsDir)) {
         count += this.loadDirectory(promptsDir);
         this.shared.library = promptsDir;
+        this.loadProfiles(promptsDir);
         logger.info(`Loaded ${count} prompts from directory structure`);
       } else {
         if (options.promptsDir) logger.warn(`Prompts directory ${options.promptsDir} does not exist`);
@@ -446,7 +571,7 @@ export class PromptStore {
   }
 
   /**
-   * Recursively loads every *.json prompt under dir (index.json and hidden entries excluded),
+   * Recursively loads every *.json prompt under dir (index.json, profiles.json and hidden entries excluded),
    * following symbolic links. Library prompts are grouped by their directory relative to dir.
    * Returns how many prompts loaded; two files with one id count once, and the later file wins.
    */
@@ -502,7 +627,7 @@ export class PromptStore {
         if (visited.has(real)) continue;
         visited.add(real);
         count += this.loadTree(root, fullPath, kind, files, visited);
-      } else if (isFile && entry.name.endsWith('.json') && entry.name !== 'index.json') {
+      } else if (isFile && entry.name.endsWith('.json') && !NOT_PROMPTS.includes(entry.name)) {
         const prompt = this.readPromptFile(fullPath);
         if (!prompt) continue;
         const earlier = files.get(prompt.id);

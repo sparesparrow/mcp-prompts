@@ -3,7 +3,7 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { logger } from './utils.js';
 import { createMcpServer, packageVersion, type McpServerOptions } from './mcp-prompts-server.js';
-import { formatCatalog, formatInstallSnippets } from './install-commands.js';
+import { formatCatalog, formatInstallSnippets, formatProfiles, type ProfileListing } from './install-commands.js';
 import { HELP_TEXT, OptionsError, openStore, resolveOptions } from './server-options.js';
 import { PromptStorageError } from './prompt-store.js';
 
@@ -21,7 +21,7 @@ export async function startMcpServer(options: McpServerOptions = {}) {
   return server;
 }
 
-const COMMANDS = ['catalog', 'config'];
+const COMMANDS = ['profiles', 'catalog', 'config'];
 
 /**
  * Runs the command line. Resolves to an exit code for commands that finish, or undefined once the
@@ -44,7 +44,7 @@ export async function main(
         ? '--mode http is gone: mcp-prompts serves MCP over stdio; start the HTTP server with mcp-prompts-http'
         : `unknown --mode "${mode}" (mcp-prompts serves MCP over stdio; mcp-prompts-http serves HTTP)`);
     }
-    if (json && command !== 'catalog') throw new OptionsError('--json goes with the catalog command');
+    if (json && command !== 'catalog' && command !== 'profiles') throw new OptionsError('--json goes with the catalog and profiles commands');
     if ((name !== undefined || url !== undefined) && command !== 'config') {
       throw new OptionsError('--name and --url go with the config command');
     }
@@ -68,17 +68,35 @@ export async function main(
   try {
     opened = openStore(options);
   } catch (error) {
+    if (error instanceof OptionsError) {
+      // A profile the library does not have.
+      process.stderr.write(`mcp-prompts: ${error.message}\nRun mcp-prompts profiles to see the profiles.\n`);
+      return 2;
+    }
     // The state directory cannot be written: say so in one line instead of a stack trace.
     if (!(error instanceof PromptStorageError)) throw error;
     process.stderr.write(`mcp-prompts: ${error.message}\n`);
     return 1;
   }
-  const { store, warnings } = opened;
+  const { base, store, warnings } = opened;
   const allWarnings = [...resolved.warnings, ...warnings];
 
-  if (commandLine.command === 'catalog' || commandLine.command === 'config') {
+  if (commandLine.command !== undefined) {
     for (const warning of allWarnings) process.stderr.write(`warning: ${warning}\n`);
-    if (commandLine.command === 'catalog') {
+    if (commandLine.command === 'profiles') {
+      // The library's own profiles, whatever this command line selects.
+      const { library, totals } = base.catalog();
+      const listing: ProfileListing = {
+        library,
+        total: { prompts: totals.prompts, templates: totals.templates },
+        profiles: base.profiles(),
+        unprofiled: base.unprofiled(),
+      };
+      for (const profile of listing.profiles) {
+        for (const warning of profile.warnings) process.stderr.write(`warning: profile ${profile.name}: ${warning}\n`);
+      }
+      process.stdout.write(`${commandLine.json ? JSON.stringify(listing, null, 2) : formatProfiles(listing)}\n`);
+    } else if (commandLine.command === 'catalog') {
       process.stdout.write(`${commandLine.json ? JSON.stringify(store.catalog(), null, 2) : formatCatalog(store.catalog())}\n`);
     } else {
       process.stdout.write(`${formatInstallSnippets(options, commandLine.name, commandLine.url)}\n`);
@@ -88,7 +106,7 @@ export async function main(
 
   // stdout carries JSON-RPC from here on; warnings go to the log on stderr.
   for (const warning of allWarnings) logger.warn(warning);
-  const server = await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly });
+  const server = await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly, profiles: options.profiles });
   // As PID 1 in a container node ignores SIGTERM unless something handles it, and `docker stop`
   // would wait out its timeout and kill the process.
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {

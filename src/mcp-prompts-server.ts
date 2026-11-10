@@ -36,6 +36,8 @@ export interface McpServerOptions {
   expose?: Capability[];
   /** Leave out add_prompt, update_prompt and delete_prompt. */
   readOnly?: boolean;
+  /** The profiles the store was narrowed to, named in the usage instructions. */
+  profiles?: string[];
 }
 
 export const RESOURCE_SCHEME = 'prompts://';
@@ -50,12 +52,17 @@ export function packageVersion(): string {
   }
 }
 
-/** "7 of 49 library prompts" when the store serves part of its library, otherwise undefined. */
-export function selectionNote(store: PromptStore): string | undefined {
+/**
+ * "7 of the 49 library prompts (profile software-dev)" when the store serves part of its library,
+ * otherwise undefined.
+ */
+export function selectionNote(store: PromptStore, profiles: string[] = []): string | undefined {
   const { totals } = store.catalog();
   const total = totals.prompts + totals.templates;
   const selected = totals.selectedPrompts + totals.selectedTemplates;
-  return selected < total ? `${selected} of the ${total} library prompts` : undefined;
+  if (selected >= total) return undefined;
+  const named = profiles.length > 0 ? ` (profile ${profiles.join(', ')})` : '';
+  return `${selected} of the ${total} library prompts${named}`;
 }
 
 /**
@@ -147,7 +154,7 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
 
   const server = new McpServer(
     { name: 'mcp-prompts', version: packageVersion() },
-    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts), persistent: Boolean(prompts.stateDir) }) }
+    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts, options.profiles), persistent: Boolean(prompts.stateDir) }) }
   );
 
   // Clients that list prompts or resources hear about changes made through the tools.

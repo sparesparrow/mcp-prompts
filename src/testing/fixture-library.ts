@@ -10,6 +10,7 @@ import * as path from 'path';
 //   library/alpha/deep/a-deep.json template tags: z
 //   library/beta/b-plain.json     plain     tags: y
 //   library/beta/b-tmpl.json      template  tags: x
+//   library/profiles.json         profiles: greetings (the alpha templates), notes (root-note and beta's plain prompts)
 //   own/o-tmpl.json               template  (the user's own directory)
 //   own/b-plain.json              plain     replaces the library's b-plain
 
@@ -40,6 +41,12 @@ export function makeFixtureLibrary(): FixtureLibrary {
   write(path.join(library, 'beta', 'b-plain.json'), plain('b-plain', ['y']));
   write(path.join(library, 'beta', 'b-tmpl.json'), { ...plain('b-tmpl', ['x']), isTemplate: true, content: 'B {{v}}', variables: ['v'] });
   write(path.join(library, 'index.json'), { ignored: true });
+  write(path.join(library, 'profiles.json'), {
+    profiles: {
+      greetings: { description: 'Greeting templates', prompts: 'none', templates: ['alpha'] },
+      notes: { description: 'Plain notes', prompts: ['root-note', 'beta'], templates: 'none' },
+    },
+  });
   write(path.join(own, 'o-tmpl.json'), { ...plain('o-tmpl', []), isTemplate: true, content: 'Own {{v}}', variables: ['v'] });
   write(path.join(own, 'b-plain.json'), { ...plain('b-plain', ['y']), name: 'My b-plain' });
   return { root, library, own, cleanup: () => fs.rmSync(root, { recursive: true, force: true }) };

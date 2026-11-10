@@ -10,6 +10,7 @@ import {
   PromptStore,
   PromptUsageError,
   SELECT_ALL,
+  UnknownProfileError,
   UpdatePromptParams,
   nextVersion,
   renderTemplate,
@@ -269,7 +270,7 @@ describe('PromptStore loading', () => {
     const walk = (dir: string) => {
       for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
         if (entry.isDirectory()) walk(path.join(dir, entry.name));
-        else if (entry.name.endsWith('.json') && entry.name !== 'index.json') files.push(entry.name);
+        else if (entry.name.endsWith('.json') && !['index.json', 'profiles.json'].includes(entry.name)) files.push(entry.name);
       }
     };
     walk(bundled);
@@ -594,5 +595,118 @@ describe('PromptStore state directory shared by several servers', () => {
     expect(fs.existsSync(abandoned)).toBe(false);
     expect(fs.existsSync(inProgress)).toBe(true);
     fs.rmSync(inProgress);
+  });
+});
+
+describe('PromptStore profiles', () => {
+  let fixture: FixtureLibrary;
+  beforeAll(() => { fixture = makeFixtureLibrary(); });
+  afterAll(() => fixture.cleanup());
+
+  const open = (dirs: string[] = []) => {
+    const store = new PromptStore();
+    store.load({ promptsDir: fixture.library, dirs });
+    return store;
+  };
+  const ids = (store: PromptStore) => store.all().map(p => p.id);
+
+  it('reads the profiles kept with the library, and does not serve their file as a prompt', () => {
+    const store = open();
+    expect(store.profileNames).toEqual(['greetings', 'notes']);
+    expect(store.size).toBe(6);
+    expect(store.profiles()).toEqual([
+      { name: 'greetings', description: 'Greeting templates', prompts: 0, templates: 2, warnings: [] },
+      { name: 'notes', description: 'Plain notes', prompts: 2, templates: 0, warnings: [] },
+    ]);
+    expect(store.unprofiled()).toEqual(['a-plain', 'b-tmpl']);
+  });
+
+  it('serves one profile, or the prompts of any of several', () => {
+    const store = open();
+    expect(ids(store.selectProfiles(['greetings']))).toEqual(['a-greet', 'a-deep']);
+    expect(ids(store.selectProfiles(['greetings', 'notes']))).toEqual(['a-greet', 'a-deep', 'b-plain', 'root-note']);
+    expect(store.selectProfiles([])).toBe(store);
+    // Outside the profile a prompt does not exist for this view, whatever asks for it.
+    expect(() => store.selectProfiles(['greetings']).get('root-note')).toThrow(PromptNotFoundError);
+  });
+
+  it('is narrowed further by a selection, never widened', () => {
+    const greetings = open().selectProfiles(['greetings']);
+    expect(ids(greetings.select({ ...SELECT_ALL, exclude: ['a-greet'] }))).toEqual(['a-deep']);
+    expect(ids(greetings.select({ ...SELECT_ALL, templates: ['beta'] }))).toEqual([]);
+  });
+
+  it('leaves the user\'s own directories and prompts added at runtime alone', () => {
+    const store = open([fixture.own]);
+    const view = store.selectProfiles(['greetings']);
+    view.add({ id: 'added', name: 'Added', content: 'x', isTemplate: false, tags: [] });
+    expect(ids(view)).toEqual(['a-greet', 'a-deep', 'b-plain', 'o-tmpl', 'added']);
+    expect(view.get('b-plain').name).toBe('My b-plain');
+  });
+
+  it('names the profiles there are when asked for one there is not', () => {
+    const store = open();
+    expect(() => store.selectProfiles(['greetings', 'greeting'])).toThrow(UnknownProfileError);
+    expect(() => store.selectProfiles(['greeting'])).toThrow('unknown profile "greeting": this library has greetings, notes');
+    expect(() => new PromptStore().selectProfiles(['any'])).toThrow(/defines no profiles/);
+  });
+
+  it('reports profile entries that match nothing, and ignores a profiles file it cannot read', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-profiles-'));
+    fs.writeFileSync(path.join(dir, 'p.json'), JSON.stringify({ id: 'p', name: 'P', content: 'p' }));
+    fs.writeFileSync(path.join(dir, 'profiles.json'), JSON.stringify({ profiles: { stale: { prompts: ['p', 'gone'], templates: 'none' } } }));
+    const store = new PromptStore();
+    store.load({ promptsDir: dir });
+    expect(store.profiles()[0]).toMatchObject({ name: 'stale', prompts: 1, warnings: ['prompts: "gone" matches no group, id or tag in the library'] });
+
+    fs.writeFileSync(path.join(dir, 'profiles.json'), JSON.stringify({ profiles: { 'Bad Name': {} } }));
+    const other = new PromptStore();
+    expect(other.load({ promptsDir: dir })).toBe(1);
+    expect(other.profileNames).toEqual([]);
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+// The profiles shipped with the bundled library. They are the point of a profile install: a
+// fraction of the library, with nothing from other kinds of work in it.
+describe('bundled profiles', () => {
+  const store = new PromptStore();
+  store.load({ promptsDir: path.join(__dirname, '..', 'data', 'prompts') });
+  const served = (name: string) => store.selectProfiles([name]).all();
+
+  it('have no entry that matches nothing in the library', () => {
+    expect(store.profileNames).toEqual(['software-dev', 'embedded-iot', 'mia-vehicle', 'voice-home', 'learning-loop']);
+    for (const profile of store.profiles()) {
+      expect(profile.warnings, profile.name).toEqual([]);
+      expect(profile.description.length, profile.name).toBeGreaterThan(20);
+    }
+  });
+
+  it('each serve a small part of the library', () => {
+    for (const profile of store.profiles()) {
+      const count = profile.prompts + profile.templates;
+      expect(count, profile.name).toBeGreaterThan(0);
+      expect(count, profile.name).toBeLessThanOrEqual(15);
+      expect(count, profile.name).toBeLessThan(store.size / 2);
+    }
+  });
+
+  it('keep vehicle, voice and home prompts out of software development', () => {
+    const dev = served('software-dev');
+    const foreign = ['mia', 'car', 'automotive', 'voice', 'openclaw', 'home', 'zigbee'];
+    expect(dev.filter(p => p.tags.some(tag => foreign.includes(tag))).map(p => p.id)).toEqual([]);
+    expect(dev.filter(p => /^(mia|openclaw)-/.test(p.id)).map(p => p.id)).toEqual([]);
+    // What it is for: an orchestrator per project type and the three analysts.
+    expect(dev.map(p => p.id)).toEqual(expect.arrayContaining([
+      'orchestration_main_python_backend', 'orchestration_main_web_frontend', 'orchestration_security_reviewer',
+    ]));
+  });
+
+  it('give the car assistant every car prompt and no development prompt', () => {
+    const car = served('mia-vehicle').map(p => p.id);
+    const group = store.catalog().served.filter(p => p.group === 'mia-car').map(p => p.id);
+    expect(group.length).toBeGreaterThan(0);
+    expect(car).toEqual(expect.arrayContaining(group));
+    expect(car.filter(id => id.startsWith('orchestration_'))).toEqual([]);
   });
 });

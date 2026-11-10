@@ -268,7 +268,50 @@ describe('mcp-prompts commands', () => {
     expect(bad.stderr).toContain('mcp-prompts --help');
     expect(bad.stdout).toBe('');
     expect(run(['catalogue']).stderr).toContain('unknown command "catalogue"');
-    expect(run(['--json']).stderr).toContain('--json goes with the catalog command');
+    expect(run(['--json']).stderr).toContain('--json goes with the catalog and profiles commands');
+  }, 30_000);
+
+  it('profiles lists the library\'s profiles, what each serves and what none serves', () => {
+    const { status, stdout } = run(['profiles', '--prompts-dir', fixture.library]);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/greetings\s+0\s+2\s+Greeting templates/);
+    expect(stdout).toMatch(/notes\s+2\s+0\s+Plain notes/);
+    expect(stdout).toMatch(/\(no profile\)\s+3\s+3/);
+    expect(stdout).toContain('In no profile (2), served only without one: a-plain, b-tmpl');
+
+    const listing = JSON.parse(run(['profiles', '--json', '--prompts-dir', fixture.library]).stdout);
+    expect(listing.profiles.map((profile: { name: string }) => profile.name)).toEqual(['greetings', 'notes']);
+    expect(listing.total).toEqual({ prompts: 3, templates: 3 });
+  }, 30_000);
+
+  it('serves only a profile\'s prompts and says so in the instructions', async () => {
+    const client = await connect(['--prompts-dir', fixture.library, '--profile', 'greetings']);
+    const listed = await client.callTool({ name: 'list_prompts', arguments: {} });
+    expect((listed.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['a-greet', 'a-deep']);
+    expect(client.getInstructions()).toContain('2 of the 6 library prompts (profile greetings)');
+    const outside = await client.callTool({ name: 'get_prompt', arguments: { id: 'root-note' } });
+    expect(outside.isError).toBe(true);
+    await client.close();
+
+    // The environment variable does the same, and --exclude narrows the profile.
+    const narrowed = await connect(['--prompts-dir', fixture.library, '--exclude', 'a-greet'], { MCP_PROMPTS_PROFILE: 'greetings,notes' });
+    const all = await narrowed.callTool({ name: 'list_prompts', arguments: {} });
+    expect((all.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['a-deep', 'b-plain', 'root-note']);
+    await narrowed.close();
+  }, 30_000);
+
+  it('refuses a profile the library does not have, naming the ones it has', () => {
+    const { status, stderr, stdout } = run(['--prompts-dir', fixture.library, '--profile', 'greeting']);
+    expect(status).toBe(2);
+    expect(stderr).toContain('unknown profile "greeting": this library has greetings, notes');
+    expect(stdout).toBe('');
+  }, 30_000);
+
+  it('config carries the profile into the command, the client config, the URL and the config file', () => {
+    const { stdout } = run(['config', '--prompts-dir', fixture.library, '--profile', 'greetings', '--read-only']);
+    expect(stdout).toContain('--profile greetings --read-only');
+    expect(stdout).toContain('/mcp?profile=greetings&readOnly=true');
+    expect(stdout).toContain('"profile": [');
   }, 30_000);
 
   it('still serves when started the 3.x way, as "mcp-prompts start"', async () => {
