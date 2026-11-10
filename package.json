@@ -6,16 +6,20 @@
   "types": "dist/mcp-server-standalone.d.ts",
   "bin": {
     "mcp-prompts": "dist/mcp-server-standalone.js",
-    "orchestrate-project": "scripts/orchestrate-project.sh",
-    "mcp-prompts-http": "dist/index.js"
+    "mcp-prompts-server": "dist/mcp-server-standalone.js",
+    "mcp-prompts-http": "dist/index.js",
+    "orchestrate-project": "scripts/orchestrate-project.sh"
   },
   "files": [
     "dist",
+    "!dist/**/*.tsbuildinfo",
     "README.md",
     "LICENSE",
     "examples",
     "scripts",
-    "data/prompts"
+    "!scripts/__pycache__",
+    "data/prompts",
+    "deploy"
   ],
   "keywords": [
     "mcp",
@@ -39,7 +43,7 @@
   },
   "homepage": "https://github.com/sparesparrow/mcp-prompts#readme",
   "scripts": {
-    "build": "tsc && swc src -d dist --strip-leading-paths",
+    "build": "tsc -p tsconfig.build.json && swc src -d dist --strip-leading-paths --ignore \"**/*.test.ts,**/*.spec.ts,**/testing/**,**/cli.ts,**/payment.service.ts,**/cloudwatch-metrics.ts\"",
     "build:clean": "pnpm run clean && pnpm run build",
     "clean": "rm -rf dist",
     "dev": "tsx watch src/mcp-server-standalone.ts",
@@ -79,9 +83,9 @@
   },
   "exports": {
     ".": {
+      "types": "./dist/mcp-server-standalone.d.ts",
       "import": "./dist/mcp-server-standalone.js",
-      "require": "./dist/mcp-server-standalone.js",
-      "types": "./dist/mcp-server-standalone.d.ts"
+      "require": "./dist/mcp-server-standalone.js"
     },
     "./package.json": "./package.json"
   },
@@ -89,15 +93,6 @@
     "type": "github",
     "url": "https://github.com/sponsors/sparesparrow"
   },
-  "os": [
-    "linux",
-    "darwin",
-    "win32"
-  ],
-  "cpu": [
-    "x64",
-    "arm64"
-  ],
   "publishConfig": {
     "access": "public"
   }
