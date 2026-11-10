@@ -58,6 +58,7 @@ export const HELP_TEXT = `Usage:
                                         print the install command, client config, URL and config
                                         file that serve what the options select
   mcp-prompts-http [options]            serve the HTTP API, with MCP at /mcp
+  (start and serve are accepted before the options, as in "mcp-prompts start", and change nothing)
 
 Choose what the install serves:
   --prompts <list>      plain prompts to serve (default: all)
@@ -154,6 +155,8 @@ export function resolvePath(value: string, base: string): string {
 export interface CommandLine {
   /** The subcommand (catalog, config), or undefined to serve. */
   command?: string;
+  /** --mode as given (3.x chose the transport with it); each entry point serves only its own. */
+  mode?: string;
   layer: OptionLayer;
   configPath?: string;
   help: boolean;
@@ -178,7 +181,13 @@ const ARG_OPTIONS = {
   json: { type: 'boolean' },
   name: { type: 'string' },
   url: { type: 'string' },
+  mode: { type: 'string', short: 'm' },
 } as const;
+
+// 3.x was started as `mcp-prompts start [--mode mcp]`, and client configs written for it still
+// say so (often through an unpinned `npx -y @sparesparrow/mcp-prompts start`). Serving is what
+// the binaries do without a command, so these words are accepted and mean nothing more.
+const SERVE_COMMANDS = ['start', 'serve'];
 
 /** Parses command-line arguments (without the node and script paths). Paths resolve against cwd. */
 export function parseCommandLine(argv: readonly string[], cwd: string = process.cwd()): CommandLine {
@@ -204,7 +213,8 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
   if (values['state-dir']) layer.stateDir = resolvePath(values['state-dir'], cwd);
 
   return {
-    command: positionals[0],
+    command: SERVE_COMMANDS.includes(positionals[0]) ? undefined : positionals[0],
+    mode: values.mode,
     layer,
     configPath: values.config ? resolvePath(values.config, cwd) : undefined,
     help: Boolean(values.help),

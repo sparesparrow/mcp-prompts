@@ -11,7 +11,11 @@ import { makeFixtureLibrary, type FixtureLibrary } from './testing/fixture-libra
 // The tools as a client sees them. The SDK client checks every structured result against the
 // tool's advertised output schema, so a handler that returns something else fails here.
 
-type ToolResult = { isError?: boolean; content: Array<{ type: string; text: string }>; structuredContent?: Record<string, unknown> };
+interface ToolResult {
+  isError?: boolean;
+  content: Array<{ type: string; text: string }>;
+  structuredContent?: Record<string, unknown>;
+}
 
 const open: Array<() => Promise<void>> = [];
 

@@ -5,7 +5,6 @@ import {
   ListPromptsRequestSchema,
   ListResourcesRequestSchema,
   ListResourceTemplatesRequestSchema,
-  McpError,
   ReadResourceRequestSchema,
   type CallToolResult,
   type ToolAnnotations,
@@ -115,9 +114,25 @@ function variableNames(prompt: StoredPrompt): Array<{ name: string; description?
   );
 }
 
-function notFound(error: unknown): never {
-  if (error instanceof PromptNotFoundError) throw new McpError(ErrorCode.InvalidParams, error.message);
-  throw error;
+/** The code the MCP specification gives a resources/read for a resource that does not exist. */
+export const RESOURCE_NOT_FOUND = -32002;
+
+/**
+ * A JSON-RPC error for a prompts/get or resources/read request. The SDK sends an error's code and
+ * message as they are; its own McpError puts "MCP error <code>:" in the message, which the client
+ * then adds a second time.
+ */
+function rpcError(code: number, message: string): Error {
+  return Object.assign(new Error(message), { code });
+}
+
+function getOrRpcError(store: PromptStore, id: string, code: number): StoredPrompt {
+  try {
+    return store.get(id);
+  } catch (error) {
+    if (error instanceof PromptNotFoundError) throw rpcError(code, error.message);
+    throw error;
+  }
 }
 
 export async function createMcpServer(options: McpServerOptions = {}): Promise<McpServer> {
@@ -432,12 +447,7 @@ function registerPrompts(server: McpServer, store: PromptStore): void {
   }));
 
   server.server.setRequestHandler(GetPromptRequestSchema, request => {
-    let prompt: StoredPrompt;
-    try {
-      prompt = store.get(request.params.name);
-    } catch (error) {
-      notFound(error);
-    }
+    const prompt = getOrRpcError(store, request.params.name, ErrorCode.InvalidParams);
     const text = prompt.isTemplate ? store.applyTemplate(prompt.id, request.params.arguments ?? {}) : prompt.content;
     return {
       ...(prompt.description ? { description: prompt.description } : {}),
@@ -474,14 +484,16 @@ function registerResources(server: McpServer, store: PromptStore): void {
   server.server.setRequestHandler(ReadResourceRequestSchema, request => {
     const { uri } = request.params;
     if (!uri.startsWith(RESOURCE_SCHEME)) {
-      throw new McpError(ErrorCode.InvalidParams, `Unknown resource ${uri}: expected ${RESOURCE_SCHEME}<id>`);
+      throw rpcError(ErrorCode.InvalidParams, `Unknown resource ${uri}: expected ${RESOURCE_SCHEME}<id>`);
     }
-    let prompt: StoredPrompt;
+    let id: string;
     try {
-      prompt = store.get(decodeURIComponent(uri.slice(RESOURCE_SCHEME.length)));
-    } catch (error) {
-      notFound(error);
+      id = decodeURIComponent(uri.slice(RESOURCE_SCHEME.length));
+    } catch {
+      // A stray % is the caller's mistake; it used to be reported as an internal error.
+      throw rpcError(ErrorCode.InvalidParams, `Malformed resource URI ${uri}: the id after ${RESOURCE_SCHEME} is not valid percent-encoding`);
     }
+    const prompt = getOrRpcError(store, id, RESOURCE_NOT_FOUND);
     return { contents: [{ uri, mimeType: 'text/plain', text: prompt.content }] };
   });
 }

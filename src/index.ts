@@ -13,9 +13,12 @@ try {
   if (resolved.commandLine.command !== undefined) {
     throw new OptionsError(`unexpected argument "${resolved.commandLine.command}" (catalog and config are mcp-prompts commands)`);
   }
-  const { json, name, url } = resolved.commandLine;
+  const { json, name, url, mode } = resolved.commandLine;
   if (json || name !== undefined || url !== undefined) {
     throw new OptionsError('--json, --name and --url go with the mcp-prompts catalog and config commands');
+  }
+  if (mode !== undefined && mode !== 'http') {
+    throw new OptionsError(`--mode ${mode}: mcp-prompts-http serves HTTP only; the stdio server is mcp-prompts`);
   }
 } catch (error) {
   if (!(error instanceof OptionsError)) throw error;

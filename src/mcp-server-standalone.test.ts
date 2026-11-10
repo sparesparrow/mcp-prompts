@@ -133,7 +133,11 @@ describe('mcp-server-standalone with install options on the command line', () =>
     });
     const filled = await client.getPrompt({ name: 'a-greet', arguments: { who: 'you' } });
     expect(textOf(filled.messages[0])).toBe('Hello you from {{place}}');
-    await expect(client.getPrompt({ name: 'a-plain' })).rejects.toThrow(/not found/);
+    // Invalid params, said once: the message used to arrive as "MCP error -32602: MCP error -32602: ...".
+    await expect(client.getPrompt({ name: 'a-plain' })).rejects.toMatchObject({
+      code: -32602,
+      message: 'MCP error -32602: Prompt with ID a-plain not found',
+    });
   });
 
   it('serves the chosen templates as prompts:// resources', async () => {
@@ -143,7 +147,14 @@ describe('mcp-server-standalone with install options on the command line', () =>
     expect(read.contents[0]).toMatchObject({ mimeType: 'text/plain', text: 'Hello {{who}} from {{place}}' });
     const { resourceTemplates } = await client.listResourceTemplates();
     expect(resourceTemplates[0].uriTemplate).toBe('prompts://{id}');
-    await expect(client.readResource({ uri: 'prompts://b-tmpl' })).rejects.toThrow(/not found/);
+    // The specification's code for a resource that does not exist.
+    await expect(client.readResource({ uri: 'prompts://b-tmpl' })).rejects.toMatchObject({
+      code: -32002,
+      message: 'MCP error -32002: Prompt with ID b-tmpl not found',
+    });
+    // Broken percent-encoding is the caller's mistake, not an internal error.
+    await expect(client.readResource({ uri: 'prompts://%E0%A4%A' })).rejects.toMatchObject({ code: -32602 });
+    await expect(client.readResource({ uri: 'file:///etc/passwd' })).rejects.toMatchObject({ code: -32602 });
   });
 
   it('tells the model what this install exposes and serves', () => {
@@ -258,6 +269,16 @@ describe('mcp-prompts commands', () => {
     expect(bad.stdout).toBe('');
     expect(run(['catalogue']).stderr).toContain('unknown command "catalogue"');
     expect(run(['--json']).stderr).toContain('--json goes with the catalog command');
+  }, 30_000);
+
+  it('still serves when started the 3.x way, as "mcp-prompts start"', async () => {
+    // Client configs written for 3.x say `npx -y @sparesparrow/mcp-prompts start`.
+    const client = await connect(['start', '--mode', 'mcp', '--prompts-dir', fixture.library]);
+    expect((await client.listTools()).tools).toHaveLength(7);
+    await client.close();
+    const http = run(['start', '--mode', 'http']);
+    expect(http.status).toBe(2);
+    expect(http.stderr).toContain('mcp-prompts-http');
   }, 30_000);
 
   it('--help lists the options', () => {

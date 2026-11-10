@@ -35,9 +35,14 @@ export async function main(
   let resolved;
   try {
     resolved = resolveOptions(argv, env, cwd);
-    const { command, json, name, url } = resolved.commandLine;
+    const { command, json, name, url, mode } = resolved.commandLine;
     if (command !== undefined && !COMMANDS.includes(command)) {
       throw new OptionsError(`unknown command "${command}" (commands: ${COMMANDS.join(', ')})`);
+    }
+    if (mode !== undefined && mode !== 'mcp') {
+      throw new OptionsError(mode === 'http'
+        ? '--mode http is gone: mcp-prompts serves MCP over stdio; start the HTTP server with mcp-prompts-http'
+        : `unknown --mode "${mode}" (mcp-prompts serves MCP over stdio; mcp-prompts-http serves HTTP)`);
     }
     if (json && command !== 'catalog') throw new OptionsError('--json goes with the catalog command');
     if ((name !== undefined || url !== undefined) && command !== 'config') {
