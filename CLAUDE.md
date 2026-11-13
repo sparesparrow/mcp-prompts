@@ -5,203 +5,138 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Package Information
 
 **Name:** @sparesparrow/mcp-prompts
-**Version:** 3.14.0
-**Description:** Cognitive development platform implementing MCP (Model Context Protocol) server for managing, versioning, and serving prompts with Claude Skills orchestration and self-improving AI-assisted development workflows
+**Version:** see `package.json` (4.0.x)
+**Description:** MCP (Model Context Protocol) server that stores, searches and serves prompts and prompt templates, over stdio and HTTP, with profiles that limit an install to the prompts one kind of work needs
 
 ## Build & Development Commands
 
-### Essential Commands
+These are all the scripts in `package.json`:
+
 ```bash
-# Install dependencies
 pnpm install
 
-# Build the project (TypeScript + SWC)
-pnpm run build
+pnpm run build               # tsc (types, declarations) + swc (JavaScript) into dist/
+pnpm run build:clean         # rm -rf dist, then build
+pnpm run type-check          # tsc --noEmit, tests included
+pnpm run lint                # eslint; warnings are expected, errors fail CI
+pnpm run lint:fix
 
-# Clean and rebuild
-pnpm run build:clean
+pnpm test                    # vitest run
+pnpm run test:watch
+pnpm run test:coverage
 
-# Run tests
-pnpm test                    # Run all tests once
-pnpm run test:watch          # Watch mode
-pnpm run test:coverage       # With coverage report
-
-# Lint and type checking
-pnpm run lint                # Check for issues
-pnpm run lint:fix            # Auto-fix issues
-pnpm run type-check          # TypeScript type checking only
+pnpm run dev                 # stdio server from source, restarting on change (tsx watch)
+pnpm run dev:http            # HTTP server from source
+pnpm start                   # node dist/mcp-server-standalone.js
+pnpm start:http              # node dist/index.js
+pnpm run orchestrate         # scripts/orchestrate-project.sh
 ```
 
-### Development Modes
+CI (`.github/workflows/test-matrix.yml`) runs lint, type-check, tests and build on Node 20 and 22.
+
 ```bash
-# Run in development with hot reload
-pnpm run dev                 # Auto-detects mode from MODE env var
-pnpm run dev:http            # HTTP REST API mode
-pnpm run dev:mcp             # MCP stdio mode
-
-# Run production build
-pnpm start                   # Auto-detects mode
-pnpm start:http             # HTTP mode
-pnpm start:mcp              # MCP mode
-```
-
-### Docker Commands
-```bash
-# Build specific variants
-pnpm run docker:build:mcp        # MCP stdio server
-pnpm run docker:build:aws        # AWS-integrated variant
-pnpm run docker:build:file       # File storage backend
-pnpm run docker:build:postgres   # PostgreSQL backend
-pnpm run docker:build:memory     # In-memory storage
-pnpm run docker:build:all        # Build all variants
-
-# Publishing
-pnpm run publish:dry             # Dry-run publish to npm
-pnpm run publish:npm             # Publish to npm registry
-pnpm run publish:patch           # Bump patch version and publish
-```
-
-### AWS Deployment
-```bash
-# CDK deployment
-pnpm run cdk:deploy          # Deploy all stacks
-pnpm run cdk:destroy         # Tear down infrastructure
-
-# Script-based deployment
-./scripts/deploy-aws.sh      # Manual deployment
-./scripts/cleanup-aws.sh     # Cleanup AWS resources
+docker build -t mcp-prompts:local .                 # HTTP image
+docker build -f Dockerfile.mcp -t mcp-prompts:mcp . # stdio image
+docker compose up -d --wait --build                 # HTTP server from this checkout, 127.0.0.1:3003
+node deploy/smoke-test.mjs -- node dist/mcp-server-standalone.js --profile software-dev
 ```
 
 ## Architecture Overview
 
-### Hexagonal Architecture Pattern
-
-The codebase follows **hexagonal architecture** (ports and adapters):
+The binaries run a small server built from these files:
 
 ```
 src/
-├── core/                    # Domain layer (pure business logic)
-│   ├── entities/           # Domain entities (Prompt, PromptMetadata)
-│   ├── services/           # Business logic services
-│   ├── ports/              # Interface definitions (contracts)
-│   ├── events/             # Domain events
-│   └── errors/             # Custom error types
-│
-├── adapters/               # Infrastructure implementations
-│   ├── memory-adapter.ts   # In-memory storage
-│   └── aws/                # AWS implementations
-│       ├── dynamodb-adapter.ts
-│       ├── s3-adapter.ts
-│       └── sqs-adapter.ts
-│
-├── mcp/                    # MCP protocol implementation
-│   ├── mcp-server.ts       # MCP server with tool registration
-│   └── mcp-server.test.ts
-│
-├── lambda/                 # AWS Lambda handlers
-│   ├── processor.ts
-│   ├── catalog-sync.ts
-│   ├── mcp-server.ts
-│   └── stripe-webhook.ts
-│
-├── monitoring/             # CloudWatch metrics
-├── index.ts                # HTTP server entry point
-├── mcp-server-standalone.ts # MCP stdio entry point
-├── cli.ts                  # CLI entry point
-├── http-server.ts          # HTTP server (node:http, JSON API)
-├── config.ts               # Configuration
-└── schemas.ts              # Zod validation schemas
+├── mcp-server-standalone.ts  # `mcp-prompts`: stdio entry point and the profiles/catalog/config commands
+├── index.ts                  # `mcp-prompts-http`: HTTP entry point
+├── mcp-prompts-server.ts     # builds the MCP server: tools, MCP prompts, resources, instructions
+├── http-server.ts            # node:http JSON API and MCP Streamable HTTP at /mcp
+├── http-security.ts          # Host, Origin and bearer-token checks
+├── prompt-store.ts           # loading, selections, profiles, templates, the state directory
+├── server-options.ts         # options from flags, environment, config file and URL query
+├── install-commands.ts       # text of the profiles, catalog and config commands
+├── config.ts                 # HTTP-only settings (HOST, PORT, token, allowed hosts)
+├── utils.ts                  # pino logger on stderr
+└── testing/                  # fixture library for tests
 ```
 
-### Key Architectural Principles
+`src/core`, `src/adapters` and `src/mcp/mcp-server.ts` are an older hexagonal implementation
+(entities, ports, services, file and memory repositories). They compile and have tests, but
+neither binary uses them. The AWS adapters, Lambda handlers and CDK stack are in `archive/aws`
+and `cdk/`.
 
-1. **Domain Purity**: Core domain logic (`src/core/`) has no dependencies on adapters or infrastructure
-2. **Dependency Injection**: All dependencies are injected via ports (interfaces)
-3. **Port-Adapter Pattern**: Adapters implement port interfaces from `core/ports/`
-4. **No Circular Dependencies**: Build order is core → adapters → apps/server
+### Principles in the current server
 
-### Import Strategy
+1. **One store, two transports**: stdio and HTTP serve the same `PromptStore`, so they behave alike
+2. **Views, not copies**: a profile or selection is a filtered view of the store; a prompt added through one view is stored once
+3. **The library is read-only**: changes go to memory or the state directory, never to `data/prompts`
+4. **Options have one source of truth**: `server-options.ts` resolves flags, environment, config file and URL the same way for both entry points
 
-- Internal dependencies use `workspace:*` in package.json
-- Import from built outputs: `@mcp-prompts/core/dist/`
-- Use NodeNext module resolution
-- Adapters can depend on `@mcp-prompts/core`
-- Core NEVER imports from adapter packages
+## The Two Servers
 
-## Dual-Mode Server
+### MCP over stdio (`mcp-prompts`)
+- Entry point: `src/mcp-server-standalone.ts`; what MCP clients start
+- `mcp-prompts start` is accepted for configurations written for 3.x
+- Commands: `mcp-prompts profiles`, `mcp-prompts catalog`, `mcp-prompts config` (each takes the options below)
 
-This server runs in two distinct modes controlled by the `MODE` environment variable:
-
-### MCP Mode (`MODE=mcp`)
-- Stdio transport (standard input/output)
-- Used by MCP clients like Claude Desktop
-- Implements MCP 1.18 protocol specification
-- Entry point: `src/mcp-server-standalone.ts`
-- Tools exposed via `server.tool()` registration
-
-### HTTP Mode (`MODE=http`)
+### HTTP (`mcp-prompts-http`)
 - JSON API on `node:http` (no web framework), sharing `src/prompt-store.ts` with the stdio server
-- Entry point: `src/index.ts` → `src/http-server.ts`; `pnpm start:http` or `mcp-prompts start --mode http`
-- Endpoints: `GET /health`, `/ready`, `/version`; `GET|POST /v1/prompts`;
-  `GET|PUT|DELETE /v1/prompts/:id`; `POST /v1/prompts/:id/apply`; `GET /v1/stats`;
+- Entry point: `src/index.ts` → `src/http-server.ts`; `pnpm start:http`
+- Endpoints: `GET /health`, `/ready` (also reports `readOnly`, `auth`, `storage`), `/version`;
+  `GET|POST /v1/prompts`; `GET|PUT|DELETE /v1/prompts/:id`; `POST /v1/prompts/:id/apply`; `GET /v1/stats`;
   `GET /mcp/tools` and `POST /mcp/tools/:name` (body `{ "arguments": {...} }`);
   `POST /mcp` is MCP Streamable HTTP (stateless), its query string narrowing the selection
-- Errors: 400 invalid input, 404 unknown prompt or path, 405 wrong method, 413 body over 1 MB
+- Errors: 400 invalid input, 401 missing or wrong token, 403 Host or Origin not allowed, 404 unknown
+  prompt or path, 405 wrong method, 409 id taken, 413 body over 1 MB, 415 body not JSON
 
-### Install options (both modes)
+### Install options (both servers)
 - `src/server-options.ts` reads one set of options from flags, env (`MCP_PROMPTS_*`, `PROMPTS_DIR`),
-  a `--config` JSON file and, for `/mcp`, the URL query: `prompts` / `templates` (separate lists of
-  groups = library directories, ids or `tag:<tag>`; `all`/`none`), `exclude`, `expose`
-  (`tools,prompts,resources`), `readOnly`, `promptsDir`, `dirs`. Flags > env > config file.
-- `PromptStore.select()` returns a filtered view; only library prompts are filtered, `dirs` and
-  runtime-added prompts are always served. `src/mcp-prompts-server.ts` builds the MCP server for a view.
-- `mcp-prompts catalog` lists groups and what a selection serves; `mcp-prompts config` prints the
-  matching install command, client config, URL and config file.
+  a `--config` JSON file and, for `/mcp`, the URL query: `profile` (names from the library's
+  `profiles.json`), `prompts` / `templates` (separate lists of groups = library directories, ids or
+  `tag:<tag>`; `all`/`none`), `exclude`, `expose` (`tools,prompts,resources`), `readOnly`,
+  `promptsDir`, `dirs`, `stateDir`. Flags > env > config file.
+- `PromptStore.selectProfiles()` and `select()` return filtered views; only library prompts are
+  filtered, `dirs` and runtime-added prompts are always served. `src/mcp-prompts-server.ts` builds
+  the MCP server for a view.
+- `mcp-prompts profiles` lists the profiles; `mcp-prompts catalog` lists groups and what a
+  selection serves; `mcp-prompts config` prints the matching install command, client config, URL
+  and config file.
 
 ## MCP Tools Implementation
 
-MCP tools are registered using the `@modelcontextprotocol/sdk` and provide comprehensive prompt management capabilities:
-
-```typescript
-server.tool(
-  "tool_name",
-  "Description",
-  zodSchema,
-  async (args) => { /* implementation */ }
-);
-```
+Tools are registered in `src/mcp-prompts-server.ts` with `server.registerTool`: each has a title,
+a strict Zod input schema, an output schema (results carry `structuredContent` beside the text)
+and annotations. A failure is returned as a tool error that says what to do next.
 
 ### Available MCP Tools
 
-**Core Prompt Management:**
-- **`list_prompts`** - Discover available prompts with filtering
-  - Parameters: `cursor`, `tags[]`, `category`, `search`
-  - Returns: Array of prompt metadata with tags and descriptions
+These seven are all the tools. Examples further down this file that call `create_prompt`, or pass
+template values to `get_prompt`, predate them: use `add_prompt` and `apply_template`.
 
-- **`get_prompt`** - Retrieve and hydrate prompt templates
-  - Parameters: `name` (required), `arguments` (optional for templates)
-  - Returns: Fully rendered prompt content with variable substitution
+- **`list_prompts`** - Summaries of the prompts this install serves
+  - Parameters: `tags[]` (any match), `category`, `isTemplate`, `search` (name, description, content), `limit` (1-100, default 50), `offset`
+  - Returns: `total`, `has_more`, `next_offset` and the page of summaries
 
-- **`create_prompt`** - Capture successful patterns and methodologies
-  - Parameters: `name`, `description`, `content`, `tags[]`
-  - Creates new reusable knowledge artifacts
+- **`get_prompt`** - One prompt as JSON, including a template's `variables`
+  - Parameters: `id`
 
-- **`update_prompt`** - Refine existing knowledge based on experience
-  - Parameters: `name`, `prompt` (object with updated fields)
-  - Enables continuous improvement of methodologies
+- **`apply_template`** - Fill a template's `{{variables}}`
+  - Parameters: `id`, `variables` (object)
+  - Returns: `text`, plus `missing` (placeholders left unfilled) and `unused` (values not used)
 
-- **`delete_prompt`** - Remove obsolete or incorrect knowledge
-  - Parameters: `name`
-  - Maintains knowledge base quality
+- **`get_stats`** - Counts, tags, categories, and `storage` (`file` or `memory`)
 
-**Advanced Operations:**
-- **`apply_template`** - Direct variable substitution without storage
-  - Parameters: Template content and variables object
-  - Pure template processing for one-off operations
+- **`add_prompt`** - Add a prompt or template
+  - Parameters: `name`, `content`, optional `id`, `description`, `isTemplate`, `variables`, `tags`, `category`, `metadata`
 
-- **`get_stats`** - Analytics about the knowledge ecosystem
-  - Returns: Total prompts, category distributions, usage patterns
-  - Enables monitoring of system intelligence growth
+- **`update_prompt`** - Change fields of a prompt; the version goes up
+  - Parameters: `id`, `updates` (the fields to change)
+
+- **`delete_prompt`** - Delete a prompt
+  - Parameters: `id`
+
+The last three are absent from a read-only install. With `--expose prompts` each prompt is also an
+MCP prompt named by its id; with `--expose resources` each is readable as `prompts://<id>`.
 
 ### Cognitive Tool Integration
 
@@ -241,15 +176,19 @@ The system enables automatic knowledge transfer across different development dom
 - Debugging methodologies shared between different technology stacks
 - Optimization strategies generalized across hardware platforms
 
-## Storage Backends
+## Storage
 
-Controlled by `STORAGE_TYPE` environment variable:
+One store (`src/prompt-store.ts`) serves both servers.
 
-- **memory** (default): In-memory, for development
-- **file**: Persistent local filesystem
-- **aws**: DynamoDB + S3 + SQS
-
-All storage adapters implement the same port interfaces from `core/ports/`.
+- **Library**: JSON files under `data/prompts/` (or `PROMPTS_DIR`), one prompt per file, loaded
+  recursively at start in name order. Files that fail validation are skipped with a warning.
+  `profiles.json` and `index.json` are not prompts. The library is never written to.
+- **Changes** (`add_prompt`, `update_prompt`, `delete_prompt`): in memory by default, lost at
+  restart. With `--state-dir` / `MCP_PROMPTS_STATE_DIR` each change is saved as a JSON file there
+  (atomic writes; deleted library ids are remembered in `.deleted.json`) and loaded at the next
+  start. Several servers may share one state directory: each re-reads it when it changes.
+- There is no database backend. The file and memory repositories in `src/adapters` belong to the
+  older hexagonal server and are not used by the binaries.
 
 ## Cognitive Development Platform
 
@@ -492,33 +431,34 @@ cursor-agent --workspace /home/sparrow/projects/ai-mcp-monorepo/packages/mcp-pro
 
 ## Configuration & Environment
 
-### Required Variables
+Every setting is optional. Flags override environment variables, which override a `--config` file;
+`.env.example` lists them all. `STORAGE_TYPE`, `MODE` and the AWS, Postgres and Stripe variables of
+earlier versions are not read by current code.
+
+### What an install serves (both servers)
 ```bash
-MODE=mcp|http               # Server mode
-STORAGE_TYPE=memory|file|aws # Storage backend
+MCP_PROMPTS_PROFILE=software-dev        # profiles of the library, comma-separated
+MCP_PROMPTS_PROMPTS=all                 # all, none, or groups / ids / tag:<tag>
+MCP_PROMPTS_TEMPLATES=all
+MCP_PROMPTS_EXCLUDE=
+MCP_PROMPTS_EXPOSE=tools                # tools, prompts, resources
+MCP_PROMPTS_READ_ONLY=true
+PROMPTS_DIR=/path/to/library            # instead of the bundled data/prompts
+MCP_PROMPTS_DIRS=/own/prompts           # served in full beside the library
+MCP_PROMPTS_STATE_DIR=~/.local/share/mcp-prompts   # save add/update/delete here
+MCP_PROMPTS_CONFIG=/path/to/config.json
+LOG_LEVEL=info                          # logs go to stderr
 ```
 
-### AWS Variables (when STORAGE_TYPE=aws)
+### HTTP server only
 ```bash
-AWS_REGION=us-east-1
-PROMPTS_TABLE=mcp-prompts
-PROMPTS_BUCKET=mcp-prompts-catalog
-PROCESSING_QUEUE=mcp-prompts-processing
-USERS_TABLE=mcp-prompts-users
-```
-
-### HTTP Mode Variables
-```bash
-PORT=3000
-HOST=0.0.0.0
-NODE_ENV=production
-LOG_LEVEL=info
-```
-
-### Optional Features
-```bash
-STRIPE_SECRET_KEY=sk_...    # Payment processing
-STRIPE_WEBHOOK_SECRET=whsec_...
+HOST=127.0.0.1
+PORT=3003
+MCP_PROMPTS_AUTH_TOKEN=...              # or MCP_PROMPTS_AUTH_TOKEN_FILE
+MCP_PROMPTS_ALLOWED_HOSTS=prompts.example.com
+MCP_PROMPTS_ALLOWED_ORIGINS=https://app.example.com
+CORS_ORIGIN=https://app.example.com
+MCP_PROMPTS_ALLOW_INSECURE=false
 ```
 
 ## Code Style Requirements
@@ -533,20 +473,25 @@ STRIPE_WEBHOOK_SECRET=whsec_...
 ## Deployment Targets
 
 ### npm Package
-- Main entry: `dist/index.js` (HTTP server)
-- MCP entry: `dist/mcp-server-standalone.js`
-- CLI entry: `dist/cli.js`
-- Binaries: `mcp-prompts`, `mcp-prompts-server`, `mcp-prompts-http`
+- Main entry and `mcp-prompts` binary: `dist/mcp-server-standalone.js` (MCP over stdio, plus the
+  `profiles`, `catalog` and `config` commands); `mcp-prompts-server` is the same binary
+- `mcp-prompts-http`: `dist/index.js` (HTTP server)
+- Ships `dist`, `data/prompts` (with `profiles.json`), `deploy`, `examples`, `scripts`
 
 ### Docker Images
-Multiple Dockerfiles for different use cases:
-- `Dockerfile` - Default HTTP server
-- `Dockerfile.mcp` - MCP stdio server
-- `Dockerfile.aws` - AWS-integrated
-- `Dockerfile.file` / `.memory` / `.postgres` - Storage variants
+Three Dockerfiles, published by `.github/workflows/docker-publish.yml`; arguments after the image
+name go to the server:
+- `Dockerfile` (tag `latest`) - HTTP server on port 3003, read-only by default
+- `Dockerfile.mcp` (tag `mcp`) - MCP stdio server, changes kept in memory
+- `Dockerfile.file` (tag `file`) - MCP stdio server that saves changes to `/data`
 
-### AWS Lambda
-Lambda handlers in `src/lambda/` for serverless deployment with API Gateway
+`docker-compose.yml` runs the HTTP image from this checkout. Earlier AWS, Postgres and memory
+variants are in `archive/`.
+
+### Profiles
+`deploy/README.md` describes the five profiles (`software-dev`, `embedded-iot`, `mia-vehicle`,
+`voice-home`, `learning-loop`) and how to install one; `deploy/smoke-test.mjs` checks an install
+through a real MCP client.
 
 ## Template System
 
@@ -557,18 +502,21 @@ Templates use `{{variableName}}` syntax for variable substitution:
 
 ## Security Considerations
 
-- HTTP mode accepts JSON bodies up to 1 MB; CORS headers are sent only when `CORS_ORIGIN` is set
-- Input validation with Zod
-- IAM roles for AWS (no hardcoded credentials in production)
-- Non-root user in Docker containers
+- HTTP mode listens on `127.0.0.1` by default. Beyond loopback it refuses to start with writes
+  enabled and no token (`MCP_PROMPTS_AUTH_TOKEN`), unless read-only or `MCP_PROMPTS_ALLOW_INSECURE=true`
+- With a token, every route except `/health`, `/ready` and `/version` needs `Authorization: Bearer <token>`
+- Host and Origin are checked (`src/http-security.ts`); bodies must be `application/json`, at most 1 MB
+- CORS headers are sent only when `CORS_ORIGIN` is set
+- Input validation with Zod; tool input schemas are strict (an unknown argument is an error)
+- Prompt ids for new prompts are limited to a safe alphabet; state files never leave the state directory
+- Docker images run as a non-root user; the HTTP image is read-only by default
 
 ## Build Configuration
 
-- **TypeScript**: Target ES2020, module ES2020
-- **SWC**: For fast compilation (`swc src -d dist`)
-- **Output**: `dist/` directory
-- Generates: `.js`, `.d.ts`, `.map` files
-- Declaration maps enabled for debugging
+- `pnpm run build` = `tsc -p tsconfig.build.json` (type check, declarations only) then `swc src -d dist` (JavaScript)
+- **TypeScript**: target ES2020, module CommonJS; `tsconfig.build.json` leaves out tests and `src/testing`
+- **Output**: `dist/` with `.js`, `.d.ts` and maps
+- `pnpm run type-check` (`tsc --noEmit`) covers tests as well
 
 ## System Status & Capabilities
 

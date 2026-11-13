@@ -31,3 +31,20 @@ legacy*
 backup*
 temp*
 test-*
+# Not needed to build or run the server
+*.tsbuildinfo
+archive
+packages
+apps
+cdk
+web
+public
+AGENTS
+flatbuffers
+layers
+imports
+examples
+deploy
+scripts
+.cursor
+.devcontainer

@@ -1,4 +1,4 @@
-import type { Catalog, Selector } from './prompt-store.js';
+import type { Catalog, ProfileSummary, Selector } from './prompt-store.js';
 import { DEFAULT_OPTIONS, type ServerOptions } from './server-options.js';
 
 // The text behind `mcp-prompts catalog` (what can be chosen) and `mcp-prompts config` (the same
@@ -39,6 +39,41 @@ export function formatCatalog(catalog: Catalog): string {
   return lines.join('\n');
 }
 
+/** The table behind `mcp-prompts profiles`: each profile, how much it serves, and what none serves. */
+export function formatProfiles(listing: ProfileListing): string {
+  const lines: string[] = [];
+  lines.push(`Library: ${listing.library ?? 'bundled sample prompts'}`);
+  if (listing.profiles.length === 0) {
+    lines.push('This library defines no profiles. A profiles.json at its root adds them; see the README.');
+    return lines.join('\n');
+  }
+  lines.push('A profile serves the prompts one kind of work needs and nothing else, so listings stay short.');
+  lines.push('');
+  const width = Math.max(14, ...listing.profiles.map(profile => profile.name.length + 2));
+  lines.push(`${pad('profile', width)}prompts  templates  for`);
+  for (const profile of listing.profiles) {
+    lines.push(`${pad(profile.name, width)}${pad(String(profile.prompts), 9)}${pad(String(profile.templates), 11)}${profile.description}`);
+  }
+  lines.push(`${pad('(no profile)', width)}${pad(String(listing.total.prompts), 9)}${pad(String(listing.total.templates), 11)}The whole library.`);
+  if (listing.unprofiled.length > 0) {
+    lines.push('', `In no profile (${listing.unprofiled.length}), served only without one: ${listing.unprofiled.join(', ')}`);
+  }
+  lines.push(
+    '',
+    'Use one with --profile <name> (several: a,b), MCP_PROMPTS_PROFILE, "profile" in a config file,',
+    'or ?profile=<name> in an HTTP URL. "mcp-prompts catalog --profile <name>" lists what it serves,',
+    '"mcp-prompts config --profile <name>" prints the install command.',
+  );
+  return lines.join('\n');
+}
+
+export interface ProfileListing {
+  library?: string;
+  total: { prompts: number; templates: number };
+  profiles: ProfileSummary[];
+  unprofiled: string[];
+}
+
 function selectorValue(selector: Selector): string {
   return selector === 'all' ? 'all' : selector.length === 0 ? 'none' : selector.join(',');
 }
@@ -47,6 +82,7 @@ function selectorValue(selector: Selector): string {
 export function optionArgs(options: ServerOptions): string[] {
   const args: string[] = [];
   const { selection } = options;
+  if (options.profiles.length > 0) args.push('--profile', options.profiles.join(','));
   if (selection.prompts !== 'all') args.push('--prompts', selectorValue(selection.prompts));
   if (selection.templates !== 'all') args.push('--templates', selectorValue(selection.templates));
   if (selection.exclude.length > 0) args.push('--exclude', selection.exclude.join(','));
@@ -54,6 +90,7 @@ export function optionArgs(options: ServerOptions): string[] {
   if (options.readOnly) args.push('--read-only');
   if (options.promptsDir) args.push('--prompts-dir', options.promptsDir);
   for (const dir of options.dirs) args.push('--dir', dir);
+  if (options.stateDir) args.push('--state-dir', options.stateDir);
   return args;
 }
 
@@ -61,6 +98,7 @@ export function optionArgs(options: ServerOptions): string[] {
 export function optionConfigFile(options: ServerOptions): Record<string, unknown> {
   const config: Record<string, unknown> = {};
   const { selection } = options;
+  if (options.profiles.length > 0) config.profile = options.profiles;
   if (selection.prompts !== 'all') config.prompts = selection.prompts.length === 0 ? 'none' : selection.prompts;
   if (selection.templates !== 'all') config.templates = selection.templates.length === 0 ? 'none' : selection.templates;
   if (selection.exclude.length > 0) config.exclude = selection.exclude;
@@ -68,6 +106,7 @@ export function optionConfigFile(options: ServerOptions): Record<string, unknown
   if (options.readOnly) config.readOnly = true;
   if (options.promptsDir) config.promptsDir = options.promptsDir;
   if (options.dirs.length > 0) config.dirs = options.dirs;
+  if (options.stateDir) config.stateDir = options.stateDir;
   return config;
 }
 
@@ -80,6 +119,7 @@ function queryValue(value: string): string {
 export function optionUrl(options: ServerOptions, base: string): string {
   const params: string[] = [];
   const { selection } = options;
+  if (options.profiles.length > 0) params.push(`profile=${queryValue(options.profiles.join(','))}`);
   if (selection.prompts !== 'all') params.push(`prompts=${queryValue(selectorValue(selection.prompts))}`);
   if (selection.templates !== 'all') params.push(`templates=${queryValue(selectorValue(selection.templates))}`);
   if (selection.exclude.length > 0) params.push(`exclude=${queryValue(selection.exclude.join(','))}`);
@@ -105,6 +145,7 @@ export function formatInstallSnippets(options: ServerOptions, name = 'mcp-prompt
   const serverArgs = [
     ...(options.promptsDir ? ['--prompts-dir', options.promptsDir] : []),
     ...options.dirs.flatMap(dir => ['--dir', dir]),
+    ...(options.stateDir ? ['--state-dir', options.stateDir] : []),
   ].map(shellQuote).join(' ');
 
   return [

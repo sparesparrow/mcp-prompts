@@ -133,7 +133,11 @@ describe('mcp-server-standalone with install options on the command line', () =>
     });
     const filled = await client.getPrompt({ name: 'a-greet', arguments: { who: 'you' } });
     expect(textOf(filled.messages[0])).toBe('Hello you from {{place}}');
-    await expect(client.getPrompt({ name: 'a-plain' })).rejects.toThrow(/not found/);
+    // Invalid params, said once: the message used to arrive as "MCP error -32602: MCP error -32602: ...".
+    await expect(client.getPrompt({ name: 'a-plain' })).rejects.toMatchObject({
+      code: -32602,
+      message: 'MCP error -32602: Prompt with ID a-plain not found',
+    });
   });
 
   it('serves the chosen templates as prompts:// resources', async () => {
@@ -143,7 +147,14 @@ describe('mcp-server-standalone with install options on the command line', () =>
     expect(read.contents[0]).toMatchObject({ mimeType: 'text/plain', text: 'Hello {{who}} from {{place}}' });
     const { resourceTemplates } = await client.listResourceTemplates();
     expect(resourceTemplates[0].uriTemplate).toBe('prompts://{id}');
-    await expect(client.readResource({ uri: 'prompts://b-tmpl' })).rejects.toThrow(/not found/);
+    // The specification's code for a resource that does not exist.
+    await expect(client.readResource({ uri: 'prompts://b-tmpl' })).rejects.toMatchObject({
+      code: -32002,
+      message: 'MCP error -32002: Prompt with ID b-tmpl not found',
+    });
+    // Broken percent-encoding is the caller's mistake, not an internal error.
+    await expect(client.readResource({ uri: 'prompts://%E0%A4%A' })).rejects.toMatchObject({ code: -32602 });
+    await expect(client.readResource({ uri: 'file:///etc/passwd' })).rejects.toMatchObject({ code: -32602 });
   });
 
   it('tells the model what this install exposes and serves', () => {
@@ -257,14 +268,125 @@ describe('mcp-prompts commands', () => {
     expect(bad.stderr).toContain('mcp-prompts --help');
     expect(bad.stdout).toBe('');
     expect(run(['catalogue']).stderr).toContain('unknown command "catalogue"');
-    expect(run(['--json']).stderr).toContain('--json goes with the catalog command');
+    expect(run(['--json']).stderr).toContain('--json goes with the catalog and profiles commands');
+  }, 30_000);
+
+  it('profiles lists the library\'s profiles, what each serves and what none serves', () => {
+    const { status, stdout } = run(['profiles', '--prompts-dir', fixture.library]);
+    expect(status).toBe(0);
+    expect(stdout).toMatch(/greetings\s+0\s+2\s+Greeting templates/);
+    expect(stdout).toMatch(/notes\s+2\s+0\s+Plain notes/);
+    expect(stdout).toMatch(/\(no profile\)\s+3\s+3/);
+    expect(stdout).toContain('In no profile (2), served only without one: a-plain, b-tmpl');
+
+    const listing = JSON.parse(run(['profiles', '--json', '--prompts-dir', fixture.library]).stdout);
+    expect(listing.profiles.map((profile: { name: string }) => profile.name)).toEqual(['greetings', 'notes']);
+    expect(listing.total).toEqual({ prompts: 3, templates: 3 });
+  }, 30_000);
+
+  it('serves only a profile\'s prompts and says so in the instructions', async () => {
+    const client = await connect(['--prompts-dir', fixture.library, '--profile', 'greetings']);
+    const listed = await client.callTool({ name: 'list_prompts', arguments: {} });
+    expect((listed.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['a-greet', 'a-deep']);
+    expect(client.getInstructions()).toContain('2 of the 6 library prompts (profile greetings)');
+    const outside = await client.callTool({ name: 'get_prompt', arguments: { id: 'root-note' } });
+    expect(outside.isError).toBe(true);
+    await client.close();
+
+    // The environment variable does the same, and --exclude narrows the profile.
+    const narrowed = await connect(['--prompts-dir', fixture.library, '--exclude', 'a-greet'], { MCP_PROMPTS_PROFILE: 'greetings,notes' });
+    const all = await narrowed.callTool({ name: 'list_prompts', arguments: {} });
+    expect((all.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['a-deep', 'b-plain', 'root-note']);
+    await narrowed.close();
+  }, 30_000);
+
+  it('refuses a profile the library does not have, naming the ones it has', () => {
+    const { status, stderr, stdout } = run(['--prompts-dir', fixture.library, '--profile', 'greeting']);
+    expect(status).toBe(2);
+    expect(stderr).toContain('unknown profile "greeting": this library has greetings, notes');
+    expect(stdout).toBe('');
+  }, 30_000);
+
+  it('config carries the profile into the command, the client config, the URL and the config file', () => {
+    const { stdout } = run(['config', '--prompts-dir', fixture.library, '--profile', 'greetings', '--read-only']);
+    expect(stdout).toContain('--profile greetings --read-only');
+    expect(stdout).toContain('/mcp?profile=greetings&readOnly=true');
+    expect(stdout).toContain('"profile": [');
+  }, 30_000);
+
+  it('still serves when started the 3.x way, as "mcp-prompts start"', async () => {
+    // Client configs written for 3.x say `npx -y @sparesparrow/mcp-prompts start`.
+    const client = await connect(['start', '--mode', 'mcp', '--prompts-dir', fixture.library]);
+    expect((await client.listTools()).tools).toHaveLength(7);
+    await client.close();
+    const http = run(['start', '--mode', 'http']);
+    expect(http.status).toBe(2);
+    expect(http.stderr).toContain('mcp-prompts-http');
   }, 30_000);
 
   it('--help lists the options', () => {
     const { status, stdout } = run(['--help']);
     expect(status).toBe(0);
-    for (const flag of ['--prompts', '--templates', '--exclude', '--expose', '--read-only', '--dir', '--config', 'MCP_PROMPTS_TEMPLATES']) {
+    for (const flag of ['--prompts', '--templates', '--exclude', '--expose', '--read-only', '--dir', '--state-dir', '--config', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_AUTH_TOKEN']) {
       expect(stdout).toContain(flag);
     }
+  }, 30_000);
+
+  it('config carries the state directory into the command and the config file', () => {
+    const { stdout } = run(['config', '--state-dir', '/var/lib/mcp-prompts']);
+    expect(stdout).toContain('-- mcp-prompts --state-dir /var/lib/mcp-prompts');
+    expect(stdout).toContain('"stateDir": "/var/lib/mcp-prompts"');
+  }, 30_000);
+
+  it('the commands print without creating the state directory, or needing to be able to', () => {
+    const absent = path.join(fixture.root, 'state-not-created');
+    for (const command of ['config', 'catalog', 'profiles']) {
+      const { status, stdout } = run([command, '--prompts-dir', fixture.library, '--state-dir', absent]);
+      expect(status, command).toBe(0);
+      expect(stdout.length, command).toBeGreaterThan(0);
+    }
+    expect(fs.existsSync(absent)).toBe(false);
+    // A directory that could never be made (its parent is a file) is no obstacle to printing.
+    const blocked = path.join(fixture.root, 'a-file-for-config');
+    fs.writeFileSync(blocked, '');
+    expect(run(['config', '--state-dir', path.join(blocked, 'state')]).status).toBe(0);
+  }, 30_000);
+
+  it('catalog lists what a state directory holds', () => {
+    const state = path.join(fixture.root, 'state-for-catalog');
+    fs.mkdirSync(state);
+    fs.writeFileSync(path.join(state, 'saved.json'), JSON.stringify({ id: 'saved', name: 'Saved', content: 's' }));
+    const catalog = JSON.parse(run(['catalog', '--json', '--prompts-dir', fixture.library, '--state-dir', state]).stdout);
+    expect(catalog.served.find((p: { id: string }) => p.id === 'saved')).toMatchObject({ source: 'runtime' });
+    expect(fs.readdirSync(state)).toEqual(['saved.json']);
+  }, 30_000);
+
+  it('exits with one line, not a stack trace, when the state directory cannot be written', () => {
+    const blocked = path.join(fixture.root, 'a-file');
+    fs.writeFileSync(blocked, '');
+    const { status, stderr, stdout } = run(['--state-dir', path.join(blocked, 'state')]);
+    expect(status).toBe(1);
+    expect(stderr).toMatch(/^mcp-prompts: State directory .* is not writable/);
+    expect(stderr).not.toContain('    at ');
+    expect(stdout).toBe('');
+  }, 30_000);
+});
+
+describe('mcp-server-standalone with a state directory', () => {
+  let fixture: FixtureLibrary;
+  beforeAll(() => { fixture = makeFixtureLibrary(); });
+  afterAll(() => fixture.cleanup());
+
+  it('keeps what one run of the binary added for the next run', async () => {
+    const args = ['--prompts-dir', fixture.library, '--state-dir', path.join(fixture.root, 'state')];
+    const first = await connect(args);
+    const added = await first.callTool({ name: 'add_prompt', arguments: { id: 'across-runs', name: 'Across runs', content: 'kept' } });
+    expect(added.structuredContent).toMatchObject({ id: 'across-runs', persisted: true });
+    await first.close();
+
+    const second = await connect(args);
+    const fetched = await second.callTool({ name: 'get_prompt', arguments: { id: 'across-runs' } });
+    expect(fetched.structuredContent).toMatchObject({ name: 'Across runs', content: 'kept' });
+    await second.close();
   }, 30_000);
 });

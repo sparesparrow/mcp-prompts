@@ -3,7 +3,7 @@ import * as os from 'os';
 import * as path from 'path';
 import { parseArgs } from 'util';
 import { z } from 'zod';
-import { PromptStore, SELECT_ALL, type Selection, type Selector } from './prompt-store.js';
+import { PromptStore, SELECT_ALL, UnknownProfileError, type Selection, type Selector } from './prompt-store.js';
 
 // What an install serves: which library prompts and templates, which MCP capabilities, and whether
 // prompts can be changed. The same options come from command-line flags, environment variables, a
@@ -13,6 +13,11 @@ export const CAPABILITIES = ['tools', 'prompts', 'resources'] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 
 export interface ServerOptions {
+  /**
+   * Profiles of the library to serve (see profiles.json there): the prompts of any of them.
+   * The selection below then narrows that further. Empty serves the whole library.
+   */
+  profiles: string[];
   selection: Selection;
   expose: Capability[];
   readOnly: boolean;
@@ -20,10 +25,13 @@ export interface ServerOptions {
   promptsDir?: string;
   /** The user's own directories, always served in full. */
   dirs: string[];
+  /** Where add, update and delete are saved. Left out, they are kept in memory only. */
+  stateDir?: string;
 }
 
 /** One source's options; keys it leaves out keep the value from an earlier source. */
 export interface OptionLayer {
+  profiles?: string[];
   prompts?: Selector;
   templates?: Selector;
   exclude?: string[];
@@ -31,9 +39,11 @@ export interface OptionLayer {
   readOnly?: boolean;
   promptsDir?: string;
   dirs?: string[];
+  stateDir?: string;
 }
 
 export const DEFAULT_OPTIONS: ServerOptions = {
+  profiles: [],
   selection: SELECT_ALL,
   expose: ['tools'],
   readOnly: false,
@@ -49,14 +59,19 @@ export class OptionsError extends Error {
 
 export const HELP_TEXT = `Usage:
   mcp-prompts [options]                 serve MCP over stdio (what MCP clients start)
+  mcp-prompts profiles [--json]         list the library's profiles: ready-made selections for
+                                        one kind of work, each a fraction of the library
   mcp-prompts catalog [options] [--json]
                                         list the library's groups and what the options select
   mcp-prompts config [options] [--name <server>] [--url <base url>]
                                         print the install command, client config, URL and config
                                         file that serve what the options select
   mcp-prompts-http [options]            serve the HTTP API, with MCP at /mcp
+  (start and serve are accepted before the options, as in "mcp-prompts start", and change nothing)
 
 Choose what the install serves:
+  --profile <names>     serve only the prompts of these profiles (comma-separated; several
+                        serve the prompts of any of them). The options below narrow it further.
   --prompts <list>      plain prompts to serve (default: all)
   --templates <list>    templates to serve (default: all)
   --exclude <list>      entries to leave out of both lists
@@ -69,18 +84,28 @@ Choose what the install serves:
   --read-only           leave out add_prompt, update_prompt and delete_prompt
   --prompts-dir <dir>   library to choose from instead of the bundled prompts
   --dir <dir>           also serve every prompt in this directory, unfiltered (repeatable)
-  --config <file>       read options from a JSON file (keys: prompts, templates, exclude,
-                        expose, readOnly, promptsDir, dirs)
+  --state-dir <dir>     save add_prompt, update_prompt and delete_prompt to this directory and
+                        load them again at the next start (default: memory only)
+  --config <file>       read options from a JSON file (keys: profile, prompts, templates,
+                        exclude, expose, readOnly, promptsDir, dirs, stateDir)
   -h, --help            show this help
   -v, --version         show the version
 
-Environment variables: MCP_PROMPTS_PROMPTS, MCP_PROMPTS_TEMPLATES, MCP_PROMPTS_EXCLUDE,
-MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS (separated by
-"${path.delimiter}"), MCP_PROMPTS_CONFIG. Flags override environment variables, which override
-the config file.
+Environment variables: MCP_PROMPTS_PROFILE, MCP_PROMPTS_PROMPTS, MCP_PROMPTS_TEMPLATES,
+MCP_PROMPTS_EXCLUDE, MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS (separated by
+"${path.delimiter}"), MCP_PROMPTS_STATE_DIR, MCP_PROMPTS_CONFIG. Flags override environment
+variables, which override the config file.
 
-HTTP: the URL http://<host>:<port>/mcp takes prompts, templates, exclude, expose and readOnly as
-query parameters, and can only narrow what the server itself serves.
+HTTP: the URL http://<host>:<port>/mcp takes profile, prompts, templates, exclude, expose and
+readOnly as query parameters, and can only narrow what the server itself serves.
+mcp-prompts-http also reads HOST (default 127.0.0.1), PORT (default 3003), CORS_ORIGIN and:
+  MCP_PROMPTS_AUTH_TOKEN        bearer token every request except /health, /ready and /version
+                                must carry (or MCP_PROMPTS_AUTH_TOKEN_FILE, a file holding it)
+  MCP_PROMPTS_ALLOWED_HOSTS     Host header names to accept (default: loopback names when HOST
+                                is loopback, otherwise unchecked)
+  MCP_PROMPTS_ALLOWED_ORIGINS   browser origins to accept besides CORS_ORIGIN
+A server that listens beyond loopback and accepts writes must have a token; without one it
+refuses to start unless it is read-only or MCP_PROMPTS_ALLOW_INSECURE=true.
 `;
 
 function splitEntries(values: string | readonly string[]): string[] {
@@ -103,6 +128,15 @@ export function parseSelector(name: string, values: string | readonly string[]):
   if (emptyTag) throw new OptionsError(`${name}: tag: needs a tag name, as in tag:voice`);
   if (entries[0] === 'all') return 'all';
   if (entries[0] === 'none') return [];
+  return Array.from(new Set(entries));
+}
+
+/** Parses a list of profile names. Whether the library defines them is checked once it is loaded. */
+export function parseProfiles(name: string, values: string | readonly string[]): string[] {
+  const entries = splitEntries(values);
+  if (entries.length === 0) throw new OptionsError(`${name} needs a profile name (run "mcp-prompts profiles" to see them)`);
+  const bad = entries.find(entry => !/^[a-z0-9][a-z0-9-]*$/.test(entry));
+  if (bad !== undefined) throw new OptionsError(`${name}: "${bad}" is not a profile name (lower-case letters, digits and "-")`);
   return Array.from(new Set(entries));
 }
 
@@ -141,6 +175,8 @@ export function resolvePath(value: string, base: string): string {
 export interface CommandLine {
   /** The subcommand (catalog, config), or undefined to serve. */
   command?: string;
+  /** --mode as given (3.x chose the transport with it); each entry point serves only its own. */
+  mode?: string;
   layer: OptionLayer;
   configPath?: string;
   help: boolean;
@@ -151,6 +187,7 @@ export interface CommandLine {
 }
 
 const ARG_OPTIONS = {
+  profile: { type: 'string', multiple: true },
   prompts: { type: 'string', multiple: true },
   templates: { type: 'string', multiple: true },
   exclude: { type: 'string', multiple: true },
@@ -158,13 +195,20 @@ const ARG_OPTIONS = {
   'read-only': { type: 'boolean' },
   'prompts-dir': { type: 'string' },
   dir: { type: 'string', multiple: true },
+  'state-dir': { type: 'string' },
   config: { type: 'string' },
   help: { type: 'boolean', short: 'h' },
   version: { type: 'boolean', short: 'v' },
   json: { type: 'boolean' },
   name: { type: 'string' },
   url: { type: 'string' },
+  mode: { type: 'string', short: 'm' },
 } as const;
+
+// 3.x was started as `mcp-prompts start [--mode mcp]`, and client configs written for it still
+// say so (often through an unpinned `npx -y @sparesparrow/mcp-prompts start`). Serving is what
+// the binaries do without a command, so these words are accepted and mean nothing more.
+const SERVE_COMMANDS = ['start', 'serve'];
 
 /** Parses command-line arguments (without the node and script paths). Paths resolve against cwd. */
 export function parseCommandLine(argv: readonly string[], cwd: string = process.cwd()): CommandLine {
@@ -180,6 +224,7 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
   if (positionals.length > 1) throw new OptionsError(`unexpected argument "${positionals[1]}"`);
 
   const layer: OptionLayer = {};
+  if (values.profile) layer.profiles = parseProfiles('--profile', values.profile);
   if (values.prompts) layer.prompts = parseSelector('prompts', values.prompts);
   if (values.templates) layer.templates = parseSelector('templates', values.templates);
   if (values.exclude) layer.exclude = parseExclude(values.exclude);
@@ -187,9 +232,11 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
   if (values['read-only']) layer.readOnly = true;
   if (values['prompts-dir']) layer.promptsDir = resolvePath(values['prompts-dir'], cwd);
   if (values.dir) layer.dirs = values.dir.map(dir => resolvePath(dir, cwd));
+  if (values['state-dir']) layer.stateDir = resolvePath(values['state-dir'], cwd);
 
   return {
-    command: positionals[0],
+    command: SERVE_COMMANDS.includes(positionals[0]) ? undefined : positionals[0],
+    mode: values.mode,
     layer,
     configPath: values.config ? resolvePath(values.config, cwd) : undefined,
     help: Boolean(values.help),
@@ -201,9 +248,15 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
 }
 
 const ENV_KEYS = [
-  'MCP_PROMPTS_PROMPTS', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_EXCLUDE', 'MCP_PROMPTS_EXPOSE',
-  'MCP_PROMPTS_READ_ONLY', 'MCP_PROMPTS_DIRS', 'MCP_PROMPTS_CONFIG',
+  'MCP_PROMPTS_PROFILE', 'MCP_PROMPTS_PROMPTS', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_EXCLUDE', 'MCP_PROMPTS_EXPOSE',
+  'MCP_PROMPTS_READ_ONLY', 'MCP_PROMPTS_DIRS', 'MCP_PROMPTS_STATE_DIR', 'MCP_PROMPTS_CONFIG',
+  // Read by the HTTP entry point (config.ts); listed here so they are not reported as unknown.
+  'MCP_PROMPTS_AUTH_TOKEN', 'MCP_PROMPTS_AUTH_TOKEN_FILE', 'MCP_PROMPTS_ALLOWED_HOSTS',
+  'MCP_PROMPTS_ALLOWED_ORIGINS', 'MCP_PROMPTS_ALLOW_INSECURE',
 ];
+
+// Earlier releases and the old Docker and compose files set these; no storage backend reads them.
+const LEGACY_STORAGE_TYPES = ['file', 'memory'];
 
 /** Reads the options from environment variables; an empty variable counts as unset. */
 export function optionsFromEnv(
@@ -212,6 +265,8 @@ export function optionsFromEnv(
 ): { layer: OptionLayer; configPath?: string; warnings: string[] } {
   const get = (key: string) => (env[key]?.trim() ? env[key]!.trim() : undefined);
   const layer: OptionLayer = {};
+  const profile = get('MCP_PROMPTS_PROFILE');
+  if (profile) layer.profiles = parseProfiles('MCP_PROMPTS_PROFILE', profile);
   const prompts = get('MCP_PROMPTS_PROMPTS');
   if (prompts) layer.prompts = parseSelector('MCP_PROMPTS_PROMPTS', prompts);
   const templates = get('MCP_PROMPTS_TEMPLATES');
@@ -226,12 +281,23 @@ export function optionsFromEnv(
   if (promptsDir) layer.promptsDir = resolvePath(promptsDir, cwd);
   const dirs = get('MCP_PROMPTS_DIRS');
   if (dirs) layer.dirs = dirs.split(path.delimiter).filter(Boolean).map(dir => resolvePath(dir, cwd));
+  const stateDir = get('MCP_PROMPTS_STATE_DIR');
+  if (stateDir) layer.stateDir = resolvePath(stateDir, cwd);
   const config = get('MCP_PROMPTS_CONFIG');
 
   // A misspelt variable would otherwise be ignored without a word.
   const warnings = Object.keys(env)
     .filter(key => key.startsWith('MCP_PROMPTS_') && !ENV_KEYS.includes(key))
     .map(key => `ignoring unknown environment variable ${key}`);
+
+  // STORAGE_TYPE used to promise backends (postgres, aws) this server does not have; saying nothing
+  // let a deployment believe its prompts were going to a database.
+  const storageType = get('STORAGE_TYPE');
+  if (storageType && !LEGACY_STORAGE_TYPES.includes(storageType)) {
+    warnings.push(`STORAGE_TYPE=${storageType} is not supported: prompts are read from files, and changes are kept in memory unless MCP_PROMPTS_STATE_DIR is set`);
+  } else if (storageType === 'file' && !layer.stateDir) {
+    warnings.push('STORAGE_TYPE=file no longer selects anything: set MCP_PROMPTS_STATE_DIR to save changes to disk');
+  }
 
   return { layer, configPath: config ? resolvePath(config, cwd) : undefined, warnings };
 }
@@ -240,6 +306,7 @@ const StringOrList = z.union([z.string(), z.array(z.string())]);
 
 const ConfigFileSchema = z.strictObject({
   $schema: z.string().optional(),
+  profile: StringOrList.optional(),
   prompts: StringOrList.optional(),
   templates: StringOrList.optional(),
   exclude: StringOrList.optional(),
@@ -247,6 +314,7 @@ const ConfigFileSchema = z.strictObject({
   readOnly: z.boolean().optional(),
   promptsDir: z.string().optional(),
   dirs: z.array(z.string()).optional(),
+  stateDir: z.string().optional(),
 });
 
 /** Reads a JSON config file. Relative paths in it resolve against the file's directory. */
@@ -268,6 +336,7 @@ export function optionsFromConfigFile(file: string): OptionLayer {
   const config = parsed.data;
   const base = path.dirname(file);
   const layer: OptionLayer = {};
+  if (config.profile !== undefined) layer.profiles = parseProfiles('profile', config.profile);
   if (config.prompts !== undefined) layer.prompts = parseSelector('prompts', config.prompts);
   if (config.templates !== undefined) layer.templates = parseSelector('templates', config.templates);
   if (config.exclude !== undefined) layer.exclude = parseExclude(config.exclude);
@@ -275,10 +344,11 @@ export function optionsFromConfigFile(file: string): OptionLayer {
   if (config.readOnly !== undefined) layer.readOnly = config.readOnly;
   if (config.promptsDir !== undefined) layer.promptsDir = resolvePath(config.promptsDir, base);
   if (config.dirs !== undefined) layer.dirs = config.dirs.map(dir => resolvePath(dir, base));
+  if (config.stateDir !== undefined) layer.stateDir = resolvePath(config.stateDir, base);
   return layer;
 }
 
-export const QUERY_PARAMS = ['prompts', 'templates', 'exclude', 'expose', 'readOnly'] as const;
+export const QUERY_PARAMS = ['profile', 'prompts', 'templates', 'exclude', 'expose', 'readOnly'] as const;
 
 /**
  * Reads the options a /mcp URL may carry. Paths are not among them: a URL chooses from what the
@@ -290,6 +360,7 @@ export function optionsFromQuery(query: URLSearchParams): OptionLayer {
     throw new OptionsError(`unknown query parameter ${unknown.join(', ')} (accepted: ${QUERY_PARAMS.join(', ')})`);
   }
   const layer: OptionLayer = {};
+  if (query.has('profile')) layer.profiles = parseProfiles('profile', query.getAll('profile'));
   if (query.has('prompts')) layer.prompts = parseSelector('prompts', query.getAll('prompts'));
   if (query.has('templates')) layer.templates = parseSelector('templates', query.getAll('templates'));
   if (query.has('exclude')) layer.exclude = parseExclude(query.getAll('exclude'));
@@ -301,8 +372,11 @@ export function optionsFromQuery(query: URLSearchParams): OptionLayer {
 
 /** Applies layers in order; each overrides the keys it sets. */
 export function mergeOptions(base: ServerOptions, ...layers: OptionLayer[]): ServerOptions {
-  const result: ServerOptions = { ...base, selection: { ...base.selection }, expose: [...base.expose], dirs: [...base.dirs] };
+  const result: ServerOptions = {
+    ...base, profiles: [...base.profiles], selection: { ...base.selection }, expose: [...base.expose], dirs: [...base.dirs],
+  };
   for (const layer of layers) {
+    if (layer.profiles !== undefined) result.profiles = layer.profiles;
     if (layer.prompts !== undefined) result.selection.prompts = layer.prompts;
     if (layer.templates !== undefined) result.selection.templates = layer.templates;
     if (layer.exclude !== undefined) result.selection.exclude = layer.exclude;
@@ -310,6 +384,7 @@ export function mergeOptions(base: ServerOptions, ...layers: OptionLayer[]): Ser
     if (layer.readOnly !== undefined) result.readOnly = layer.readOnly;
     if (layer.promptsDir !== undefined) result.promptsDir = layer.promptsDir;
     if (layer.dirs !== undefined) result.dirs = layer.dirs;
+    if (layer.stateDir !== undefined) result.stateDir = layer.stateDir;
   }
   return result;
 }
@@ -337,9 +412,27 @@ export function resolveOptions(
   };
 }
 
-/** Loads the library and the user's directories, and selects what the options ask for. */
+/**
+ * The part of a store the options ask for: the named profiles, narrowed by the selection.
+ * Throws OptionsError when the library does not define one of the profiles.
+ */
+export function selectFor(store: PromptStore, options: { profiles?: string[]; selection: Selection }): PromptStore {
+  try {
+    return store.selectProfiles(options.profiles ?? []).select(options.selection);
+  } catch (error) {
+    if (error instanceof UnknownProfileError) throw new OptionsError(error.message);
+    throw error;
+  }
+}
+
+/**
+ * Loads the library, the user's directories and what earlier runs saved to the state directory,
+ * and selects what the options ask for. Throws PromptStorageError when the state directory cannot
+ * be written and the options are not read-only, and OptionsError for an unknown profile.
+ */
 export function openStore(options: ServerOptions): { base: PromptStore; store: PromptStore; warnings: string[] } {
   const base = new PromptStore();
   base.load({ promptsDir: options.promptsDir, dirs: options.dirs });
-  return { base, store: base.select(options.selection), warnings: base.selectionWarnings(options.selection) };
+  if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
+  return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection) };
 }

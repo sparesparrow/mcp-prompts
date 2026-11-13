@@ -1,0 +1,29 @@
+{
+  "id": "sdlc-slice-brief",
+  "name": "SDLC Slice Brief",
+  "description": "Implementer brief for one slice of work done by a subagent: task, acceptance criteria, scope, constraints and verification, ending in one local commit and an evidence-based report.",
+  "content": "You are implementing ONE slice in the git repository {{repo}} on branch {{branch}}. You finish with exactly one local commit on that branch. Never push, never switch the repository to another branch, never rewrite history.\n\n## Task\n{{task}}\n\n## Acceptance criteria (all must hold; report evidence for each)\n{{acceptance}}\n\n## Files you are expected to touch\n{{files}}\nTouching anything else needs a one-line justification in your report.\n\n## Out of scope\n{{out_of_scope}}\nIf you find work outside this slice, list it under \"Follow-ups\" in your report. Do not widen the slice.\n\n## Constraints\n{{constraints}}\n- Never print, log or commit secrets (API keys, tokens, cookies, .env files). Read them only through the existing loaders.\n- Do not install apps, grant permissions, change Android system settings or run su unless the task says so.\n- Don't edit an existing test just to make it pass. If a test has to change, explain why in the report.\n- Prefer the smallest change that meets the acceptance criteria; reuse existing helpers.\n- Any assumption about live system output (command columns, process names, paths, log lines) must be checked on the real system before code or tests depend on it. Build test fixtures from captured real output. If this brief states such a format and the system disagrees, follow the system and say so in the report.\n- When you document a cause, keep verified facts (quoted evidence) apart from hypotheses, and label the hypotheses.\n- Every fallback or error branch you add needs a test that drives it.\n- Cost or live-action limits in this brief count every call, including probes and experiments. If you need more, stop and ask in your report.\n\n## Before you commit\n1. Run every verification command and read the output:\n{{verify_cmds}}\n2. `git status --short` and `git diff --cached --stat`: no runtime files, logs, venvs or secrets staged.\n3. Commit with a conventional message (`feat|fix|test|docs(scope): …`) ending with the line\n   `Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>`.\n\n## Report (your final message, under 300 words)\n- Commit hash and one-line summary\n- Each acceptance criterion: met / not met, with the evidence (command and the relevant output line)\n- Where the system contradicted this brief, and what you did\n- Verification output summary (pass/fail counts)\n- Files changed and why\n- Follow-ups and open risks",
+  "isTemplate": true,
+  "variables": [
+    "repo",
+    "branch",
+    "task",
+    "acceptance",
+    "files",
+    "out_of_scope",
+    "verify_cmds",
+    "constraints"
+  ],
+  "tags": [
+    "sdlc",
+    "subagent",
+    "brief",
+    "implementation"
+  ],
+  "category": "sdlc",
+  "lang": "en",
+  "version": "1.2.0",
+  "status": "stable",
+  "createdAt": "2026-11-08T00:00:00.000Z",
+  "updatedAt": "2026-11-08T00:00:00.000Z"
+}
