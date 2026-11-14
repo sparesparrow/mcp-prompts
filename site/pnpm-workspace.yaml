@@ -1,0 +1,11 @@
+# A workspace of its own, so the repository's pnpm workspace (which is only '.') and its CI
+# never install or build the site.
+packages:
+  - '.'
+
+allowBuilds:
+  '@parcel/watcher': true
+  '@swc/core': true
+  esbuild: true
+  lmdb: true
+  msgpackr-extract: true

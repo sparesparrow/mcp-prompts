@@ -1,0 +1,47 @@
+{
+  "name": "mcp-prompts-site",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "The install configurator published at https://sparesparrow.github.io/mcp-prompts/ (see README.md)",
+  "scripts": {
+    "dev": "vite",
+    "typecheck": "tsc -b",
+    "snapshot": "node scripts/snapshot.ts",
+    "verify": "node scripts/verify.ts",
+    "bundle": "rm -rf dist bundle.html && parcel build index.html --dist-dir dist --no-source-maps --no-cache && html-inline dist/index.html > bundle.html",
+    "pages": "node scripts/pages.ts",
+    "build": "pnpm run snapshot && pnpm run typecheck && pnpm run verify && pnpm run bundle && pnpm run pages"
+  },
+  "dependencies": {
+    "@radix-ui/react-checkbox": "^1.4.1",
+    "@radix-ui/react-label": "^2.1.17",
+    "@radix-ui/react-slot": "^1.5.0",
+    "@radix-ui/react-switch": "^1.4.1",
+    "@radix-ui/react-tabs": "^1.2.1",
+    "@radix-ui/react-toggle": "^1.2.1",
+    "@radix-ui/react-toggle-group": "^1.2.1",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.72.0",
+    "react": "^19.3.1",
+    "react-dom": "^19.3.1",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@parcel/config-default": "^2.16.4",
+    "@types/node": "^24.19.2",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@vitejs/plugin-react": "^6.1.2",
+    "autoprefixer": "^10.6.2",
+    "html-inline": "^1.2.0",
+    "parcel": "^2.16.4",
+    "parcel-resolver-tspaths": "^0.0.9",
+    "postcss": "^8.5.32",
+    "tailwindcss": "3.4.1",
+    "tailwindcss-animate": "^1.0.7",
+    "typescript": "~7.0.2",
+    "vite": "^8.3.6"
+  }
+}
