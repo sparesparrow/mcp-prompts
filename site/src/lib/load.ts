@@ -3,11 +3,9 @@
 // files it publishes) lists them, and profiles.json and package.json sit beside them. Anywhere
 // else, or when that fails, it uses the snapshot built with the page.
 
-import { buildPrompts, parseProfiles, type Library } from './library.ts';
+import { buildPrompts, parseProfiles, type Library, type Snapshot } from './library.ts';
 
-export interface Snapshot extends Library {
-  version: string;
-}
+export type { Snapshot };
 
 export interface LoadedLibrary extends Library {
   source: 'live' | 'snapshot';

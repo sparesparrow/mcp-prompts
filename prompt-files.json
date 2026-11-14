@@ -1,0 +1,9 @@
+---
+layout: null
+---
+{%- comment -%}
+  GitHub Pages turns this into a JSON list of every file it publishes under data/prompts, e.g.
+  "/data/prompts/mia-car/mia-car-navigation.json". The install page (index.html, built from
+  site/) reads it to load the live library from main. The trailing null saves a comma check.
+{%- endcomment -%}
+[{%- for file in site.static_files -%}{%- if file.extname == '.json' and file.path contains '/data/prompts/' -%}{{ file.path | jsonify }},{%- endif -%}{%- endfor -%}null]

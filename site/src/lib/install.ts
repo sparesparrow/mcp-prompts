@@ -138,7 +138,7 @@ export function stdioLaunch(options: InstallOptions, runner: Exclude<Runner, 'ht
   // :file image keeps changes in /data, a named volume, when the install saves them.
   const notes: string[] = [];
   const docker = ['run', '-i', '--rm', '--network', 'none'];
-  const inner = { ...options, dirs: [] as string[], stateDir: undefined, promptsDir: undefined };
+  const inner: InstallOptions = { ...options, dirs: [], stateDir: undefined, promptsDir: undefined };
   options.dirs.forEach((dir, index) => {
     docker.push('-v', `${dir}:/own/${index + 1}:ro`);
     inner.dirs.push(`/own/${index + 1}`);

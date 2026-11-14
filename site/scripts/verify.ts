@@ -9,9 +9,8 @@ import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { SELECT_ALL, servedPrompts, type Selection } from '../src/lib/library.ts';
+import { SELECT_ALL, servedPrompts, type Selection, type Snapshot } from '../src/lib/library.ts';
 import { formatInstallSnippets, optionArgs, type InstallOptions } from '../src/lib/install.ts';
-import type { Snapshot } from '../src/lib/load.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');
@@ -35,7 +34,7 @@ const temp = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-site-verify-'));
 const own = path.join(temp, 'own prompts');
 fs.mkdirSync(own);
 
-const option = (partial: Partial<InstallOptions> & { selection?: Partial<Selection> }): InstallOptions => ({
+const option = (partial: Omit<Partial<InstallOptions>, 'selection'> & { selection?: Partial<Selection> }): InstallOptions => ({
   profiles: [],
   expose: ['tools'],
   readOnly: false,

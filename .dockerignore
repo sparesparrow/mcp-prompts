@@ -48,3 +48,8 @@ deploy
 scripts
 .cursor
 .devcontainer
+
+# The install page (site/ and the index.html and prompt-files.json built from it)
+site
+index.html
+prompt-files.json

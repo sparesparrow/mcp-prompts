@@ -34,7 +34,6 @@
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
     "@vitejs/plugin-react": "^6.1.2",
-    "autoprefixer": "^10.6.2",
     "html-inline": "^1.2.0",
     "parcel": "^2.16.4",
     "parcel-resolver-tspaths": "^0.0.9",
@@ -43,5 +42,8 @@
     "tailwindcss-animate": "^1.0.7",
     "typescript": "~7.0.2",
     "vite": "^8.3.6"
+  },
+  "@parcel/resolver-default": {
+    "packageExports": true
   }
 }

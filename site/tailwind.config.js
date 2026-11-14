@@ -41,6 +41,14 @@ module.exports = {
           DEFAULT: "hsl(var(--card))",
           foreground: "hsl(var(--card-foreground))",
         },
+        template: {
+          DEFAULT: "hsl(var(--template))",
+          foreground: "hsl(var(--template-foreground))",
+        },
+      },
+      fontFamily: {
+        sans: ['"IBM Plex Sans"', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        mono: ['"IBM Plex Mono"', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'monospace'],
       },
       borderRadius: {
         lg: "var(--radius)",

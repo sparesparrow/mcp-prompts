@@ -46,6 +46,11 @@ export interface Library {
   skipped: Array<{ path: string; reason: string }>;
 }
 
+/** The library as built into the page, for when the live one cannot be read. */
+export interface Snapshot extends Library {
+  version: string;
+}
+
 const NOT_PROMPTS = ['index.json', 'profiles.json'];
 
 /**

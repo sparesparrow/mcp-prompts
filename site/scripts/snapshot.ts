@@ -5,8 +5,7 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildPrompts, parseProfiles } from '../src/lib/library.ts';
-import type { Snapshot } from '../src/lib/load.ts';
+import { buildPrompts, parseProfiles, type Snapshot } from '../src/lib/library.ts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const repo = path.resolve(here, '..', '..');

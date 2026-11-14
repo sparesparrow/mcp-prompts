@@ -9,6 +9,10 @@ Listed on [Glama](https://glama.ai/mcp/servers/sparesparrow/mcp-prompts),
 [AIBASE](https://mcp.aibase.com/server/1916334459480600578). A Rust reimplementation focused on memory
 efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparesparrow/mcp-prompts-rs).
 
+**[Configure an install in the browser](https://sparesparrow.github.io/mcp-prompts/):** pick a profile
+or your own prompts and templates, choose the MCP capabilities, and copy the matching `claude mcp add`
+command, client config, URL or config file. The page reads the library from this branch.
+
 ## What It Does
 
 - **Stores prompts** as JSON files in `data/prompts/`
@@ -96,7 +100,8 @@ install one over Docker or HTTP, and how to change or add one.
 
 ### Choose what gets installed
 
-Beyond the profiles, you can choose yourself:
+Beyond the profiles, you can choose yourself (the [install page](https://sparesparrow.github.io/mcp-prompts/)
+does it with checkboxes and writes the options below for you):
 
 - which **plain prompts** and which **templates** to serve (two separate lists);
 - which **MCP capabilities** expose them: `tools`, `prompts` (each prompt becomes a slash command, with a template's variables as its arguments) and `resources` (each prompt is readable as `prompts://<id>`, for attaching as context);
@@ -328,6 +333,7 @@ pnpm build         # Build TypeScript
 pnpm dev           # Watch mode
 pnpm test          # Run tests
 pnpm orchestrate   # Test orchestration
+pnpm run site      # Rebuild the install page (index.html) from site/; see site/README.md
 ```
 
 ## Enterprise Deployment
