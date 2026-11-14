@@ -1,0 +1,39 @@
+# Claude Code on GitHub: answers @claude in issues and issue comments by the repo owner only.
+# Added by cliphist-android/assistant/router/setup-github-claude.sh for the phone's Claude Panel.
+# Needs the repo secret CLAUDE_CODE_OAUTH_TOKEN (`claude setup-token`, then
+# `gh secret set CLAUDE_CODE_OAUTH_TOKEN -R <owner/repo>`), or run /install-github-app instead.
+name: Claude Code
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+jobs:
+  claude:
+    if: >-
+      (github.event_name == 'issues' &&
+       contains(github.event.issue.body, '@claude') &&
+       github.event.issue.user.login == 'sparesparrow') ||
+      (github.event_name == 'issue_comment' &&
+       contains(github.event.comment.body, '@claude') &&
+       github.event.comment.user.login == 'sparesparrow')
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      pull-requests: write
+      issues: write
+      id-token: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+      - uses: anthropics/claude-code-action@v1
+        with:
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+          claude_args: >-
+            --allowedTools "Bash(gh pr create:*),Bash(gh pr view:*),Bash(git:*)"
+            --append-system-prompt "When you change code, finish by opening a DRAFT pull request with gh pr create --draft whose body says Closes #<issue number>. Never merge. Never commit secrets."
