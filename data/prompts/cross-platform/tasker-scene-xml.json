@@ -1,0 +1,20 @@
+{
+  "id": "tasker-scene-xml",
+  "name": "Tasker Scene and Task XML (Generated Projects)",
+  "description": "Knowledge: how to generate Tasker project XML (scenes, tasks, profiles) from code and import it on a rooted phone; action codes, element shapes and the gotchas found building the Claude Panel.",
+  "content": "# Generating Tasker XML\n\nTasker 6.x imports .prj.xml / .tsk.xml / .prf.xml (not .scn.xml) through its own importer:\n`am start -a android.intent.action.VIEW -t text/xml -d file:///sdcard/Download/X.prj.xml -n net.dinglisch.android.taskerm/com.joaomgcd.taskerm.datashare.import.ActivityImportTaskerDataFromXml`\nThe user taps YES (and YES to enable). The importer re-reads the file after the first YES, so delete it only after Tasker's files/autobackup.xml mtime changes. The IntentHandler file:// handler only copies the file; it does not import.\n\n## Action codes (args by sr name)\n- 129 JavaScriptlet: arg0 code, arg1 libraries, arg2 auto-exit, arg3 timeout (s)\n- 30 Wait: arg0 ms, arg1 s, arg2 min, arg3 h, arg4 days\n- 135 Goto: ConditionList (op 2 = matches) + Int arg0 0 (action number), arg1 target action #, arg2 label\n- 360 Input Dialog: arg1 title, arg2 text, arg3 default, arg4 timeout; result in %input\n- 378 List Dialog: Bundle arg0, arg1 1 (single choice), arg2 title, arg3 items (comma separated or %array), arg6 OK label, arg7 cancel label, arg9 timeout, arg10-12 0; result in %ld_selected\n- 159 Profile Status: arg0 profile name, arg1 Int (0 off, 1 on)\n- 47 Show Scene, 49 Destroy Scene, 51 Element Text\n- Assistance Request event (long-press power / assist gesture): Event code 201\n\n## Scene elements\n- TextElement: arg2 size, arg4 colour, arg7 alignment, arg8 long-text\n- ButtonElement: clickTask = task id, arg1 label\n\n## Gotchas\n- Only one task instance runs at a time per name, and one long JavaScriptlet loop starves button tasks: poll with JS (one cycle) + Wait + Goto instead of a while loop in JS.\n- A scene shown as a blocking overlay cancels dialogs: hide the scene before Input/List Dialog, show it again after.\n- shell() in a JavaScriptlet drops the CRs of the output: parse HTTP replies with \\r?\\n\\r?\\n.\n- XMLHttpRequest with a custom header (e.g. a token) triggers a CORS preflight against a local server: use shell() + nc with the body in a file instead.\n- KEYCODE_ASSIST presses under ~150 ms are dropped; simulate the gesture with `input keyevent --duration 900 KEYCODE_POWER`.\n- Exported XML has attributes without spaces between them; fix that with a regex before parsing it with a strict XML parser.\n- Tasker project variables are stored in plain text in the backup: never put API keys there.",
+  "isTemplate": false,
+  "variables": [],
+  "tags": [
+    "tasker",
+    "android",
+    "knowledge",
+    "scenes"
+  ],
+  "category": "cross-platform",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "updatedAt": "2026-11-14T00:00:00.000Z"
+}

@@ -1,0 +1,23 @@
+{
+  "id": "panel-coding-task",
+  "name": "Panel: Coding Task for @claude",
+  "description": "Issue body for the GitHub @claude coding agent, filled from a spoken request on the phone's Claude Panel: implement it in the chosen repo, small scope, tests, finish with a draft PR.",
+  "content": "A request dictated on my phone (speech-to-text, so expect small transcription errors; read it for intent):\n\n> {{request}}\n\nRepository: {{repo}}\n\n## Task\nImplement this request in {{repo}}.\n\n1. Read the repo's CLAUDE.md / README first and follow its conventions.\n2. Keep the change as small as the request allows. Do not refactor unrelated code.\n3. Add or update tests that cover the change, and run the repo's existing tests.\n4. If the request is ambiguous, choose the most conservative reading and say so in the PR.\n5. Never commit secrets, tokens, .env files, logs or runtime state.\n\n## Finish\nOpen a **draft** pull request that links this issue (\"Closes #<issue>\"). In the PR description list:\n- what changed and why\n- how it was tested\n- anything you could not verify\n\nDo not merge.",
+  "isTemplate": true,
+  "variables": [
+    "request",
+    "repo"
+  ],
+  "tags": [
+    "panel",
+    "coding",
+    "github-claude",
+    "voice"
+  ],
+  "category": "panel",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "updatedAt": "2026-11-14T00:00:00.000Z"
+}

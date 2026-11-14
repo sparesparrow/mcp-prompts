@@ -1,0 +1,23 @@
+{
+  "id": "panel-repo-question",
+  "name": "Panel: Repo Question for @claude",
+  "description": "Issue body asking the GitHub @claude agent a question about a repo, filled from a spoken question on the phone's Claude Panel: answer from the code, change nothing.",
+  "content": "A question dictated on my phone (speech-to-text, so expect small transcription errors):\n\n> {{request}}\n\nRepository: {{repo}}\n\n## Task\nAnswer the question from the code in {{repo}}.\n\n- Do not change any files, open branches or pull requests.\n- Cite the files and lines your answer rests on.\n- If the code does not answer it, say what is missing instead of guessing.\n\n## Finish\nReply as a comment on this issue. Start with a two-sentence answer that can be read aloud, then the details.",
+  "isTemplate": true,
+  "variables": [
+    "request",
+    "repo"
+  ],
+  "tags": [
+    "panel",
+    "question",
+    "github-claude",
+    "voice"
+  ],
+  "category": "panel",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "createdAt": "2026-11-14T00:00:00.000Z",
+  "updatedAt": "2026-11-14T00:00:00.000Z"
+}
