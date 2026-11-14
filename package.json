@@ -57,7 +57,8 @@
     "lint": "eslint src --ext .ts,.js",
     "lint:fix": "eslint src --ext .ts,.js --fix",
     "type-check": "tsc --noEmit",
-    "prepublishOnly": "pnpm run build"
+    "prepublishOnly": "pnpm run build",
+    "site": "pnpm run build && pnpm --dir site install --frozen-lockfile && pnpm --dir site run build"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.2",
