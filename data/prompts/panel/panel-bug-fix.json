@@ -1,8 +1,8 @@
 {
   "id": "panel-bug-fix",
-  "name": "Panel: Bug Fix for @claude",
-  "description": "Issue body for the GitHub @claude coding agent, filled from a spoken bug report on the phone's Claude Panel: reproduce, fix, regression test, draft PR.",
-  "content": "A bug report dictated on my phone (speech-to-text, so expect small transcription errors):\n\n> {{request}}\n\nRepository: {{repo}}\n\n## Task\nFix this bug in {{repo}}.\n\n1. Find the code involved and reproduce the bug, ideally with a failing test.\n2. Fix the root cause, not the symptom. Keep the diff small.\n3. Add a regression test that fails before the fix and passes after it. Run the existing tests.\n4. If you cannot reproduce it, do not guess a fix: comment on this issue with what you checked and what information is missing.\n5. Never commit secrets, tokens, .env files, logs or runtime state.\n\n## Finish\nOpen a **draft** pull request that links this issue (\"Closes #<issue>\"), describing the cause, the fix, the test, and anything unverified. Do not merge.",
+  "name": "Panel: Bug Fix",
+  "description": "Coding-agent prompt filled from a spoken bug report on the phone's Claude Panel: reproduce, fix, regression test; the runner turns the changes into a draft PR.",
+  "content": "A bug report dictated on my phone (speech-to-text, so expect small transcription errors):\n\n> {{request}}\n\nRepository: {{repo}}\n\n## Task\nFix this bug in {{repo}}.\n\n1. Find the code involved and reproduce the bug, ideally with a failing test.\n2. Fix the root cause, not the symptom. Keep the diff small.\n3. Add a regression test that fails before the fix and passes after it. Run the existing tests.\n4. If you cannot reproduce it, do not guess a fix: change nothing and report what you checked and what information is missing.\n5. Never commit secrets, tokens, .env files, logs or runtime state.\n\n## Finish\nThe result becomes a **draft** pull request (never merged by you). End with its description: the cause, the fix, the test, and anything unverified.",
   "isTemplate": true,
   "variables": [
     "request",
@@ -11,7 +11,7 @@
   "tags": [
     "panel",
     "bugfix",
-    "github-claude",
+    "coding-agent",
     "voice"
   ],
   "category": "panel",
