@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_semantic",
+  "name": "Znalosti a principy",
+  "description": "Úvodní instrukce pro vrstvu semantic.",
+  "content": "Vyvoď z dodaných důkazů obecné principy a podmínky jejich platnosti. Uveď původ, omezení a míru jistoty; jeden příklad není univerzální pravidlo.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "semantic"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/semantic",
+    "language": "cs"
+  }
+}

@@ -250,7 +250,7 @@ program
   .command('start')
   .description('Start the MCP Prompts server')
   .option('-m, --mode <mode>', 'Server mode (mcp|http)', 'mcp')
-  .option('-p, --port <port>', 'Port number', '3000')
+  .option('-p, --port <port>', 'Port number (http mode)', '3003')
   .option('-h, --host <host>', 'Host address', '0.0.0.0')
   .action(async (options) => {
     try {
@@ -258,8 +258,14 @@ program
       process.env.PORT = options.port;
       process.env.HOST = options.host;
       
-      // Import and start the server
-      await import('./mcp-server-standalone');
+      // Each entry point starts its server when imported
+      if (options.mode === 'http') {
+        await import('./index');
+      } else if (options.mode === 'mcp') {
+        await import('./mcp-server-standalone');
+      } else {
+        throw new Error(`Unknown mode "${options.mode}" (expected mcp or http)`);
+      }
     } catch (error) {
       logger.error('Failed to start server:', error);
       process.exit(1);

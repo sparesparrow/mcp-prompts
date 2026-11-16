@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_procedures",
+  "name": "Pracovní postup",
+  "description": "Úvodní instrukce pro vrstvu procedures.",
+  "content": "Navrhni reprodukovatelné kroky, vstupy, očekávané výsledky a postup návratu. Odděl bezpečné kontroly od kroků vyžadujících souhlas. Postup automaticky nespouštěj.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "procedures"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/procedures",
+    "language": "cs"
+  }
+}

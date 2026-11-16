@@ -44,6 +44,6 @@ describe('McpServer content -> template mapping', () => {
 
   it('an explicit template wins over content', async () => {
     await server.executeTool('create_prompt', { name: 'n', template: 'T', content: 'C' });
-    expect(promptService.createPrompt).toHaveBeenCalledWith({ name: 'n', template: 'T', content: 'C' });
+    expect(promptService.createPrompt).toHaveBeenCalledWith({ name: 'n', template: 'T' });
   });
 });

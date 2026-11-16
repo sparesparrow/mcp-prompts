@@ -1,0 +1,7 @@
+packages:
+  - '.'
+
+# pnpm 10+ refuses to run dependency build scripts unless they are approved here.
+allowBuilds:
+  '@swc/core': true
+  esbuild: true

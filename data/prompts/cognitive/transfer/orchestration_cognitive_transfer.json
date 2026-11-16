@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_transfer",
+  "name": "Přenos znalostí",
+  "description": "Úvodní instrukce pro vrstvu transfer.",
+  "content": "Porovnej zdrojovou a cílovou doménu. Uveď shody, rozdíly, předpoklady a test ověřující přenos. Nepřenášej tajemství a netvrď funkčnost bez ověření.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "transfer"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/transfer",
+    "language": "cs"
+  }
+}

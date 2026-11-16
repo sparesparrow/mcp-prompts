@@ -10,9 +10,16 @@
     "consecutive_errors",
     "last_run_status"
   ],
-  "tags": ["openclaw", "cron", "error", "recovery"],
+  "tags": [
+    "cron",
+    "error",
+    "openclaw",
+    "recovery"
+  ],
   "category": "openclaw",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-03-28T00:00:00.000Z",
-  "updatedAt": "2026-03-28T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-03-28T00:00:00.000Z"
 }

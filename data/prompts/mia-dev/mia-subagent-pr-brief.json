@@ -1,0 +1,26 @@
+{
+  "id": "mia-subagent-pr-brief",
+  "name": "MIA subagent PR brief",
+  "description": "Brief for a subagent that implements one approved slice of the MIA repo as a single pull request, never merging it.",
+  "variables": [
+    "task",
+    "requirements",
+    "keep_strings",
+    "out_of_scope"
+  ],
+  "tags": [
+    "mia",
+    "mia-dev",
+    "subagent",
+    "pull-request",
+    "brief"
+  ],
+  "content": "You are implementing ONE slice of the MIA repository (/home/sparrow/mia) and opening ONE pull request for it. Do not merge it.\n\n## Task\n{{task}}\n\n## Requirements this touches\n{{requirements}}\n(REQ-AREA-NNN ids from spec/requirements/*.yaml, and whether the PR adds, changes or promotes their evidence state.)\n\n## Out of scope\n{{out_of_scope}}\nIf you find work outside this slice, open or note a GitHub Issue with a backlog:* and area:* label. Do not add TODO files (ADR-0001) and do not widen the PR.\n\n## Keep these test strings unchanged\n{{keep_strings}}\nExisting tests and fixtures that assert these strings are the contract. If one has to change, stop and report it instead of editing the test to match.\n\n## Rules\n- One approved slice per pull request. Work on a new branch from main; never push to main.\n- New behaviour needs a requirement in spec/requirements/. New tests carry @pytest.mark.req(...) (Python) or // @req (Kotlin/C++).\n- A requirement claims only the evidence that exists (ADR-0010). CI supports up to simulation_tested. Bench, hardware and vehicle states need a record in spec/evidence/<REQ-ID>/, and you cannot create one by running CI.\n- Nothing you write may transmit on a vehicle bus or actuate hardware. Read-only OBD/UDS only.\n- Do not install anything on the phone or the Pi and do not touch settings unless this task says so.\n\n## Before opening the PR\n1. Run the checks for the areas you changed (pytest tests/ -m \"not hardware\", the Android unit tests, etc.) and read the failures. Do not report a check you did not run.\n2. Run: python tools/ci/traceability.py check\n3. Read .github/pull_request_template.md and fill in every section of that file. Do not work from memory or from a copy, because the template is the source of truth.\n\n## PR description must end with these sections, in this order\nClaim / Proof / Not proven / Safety / Next owner.\n- Claim: what now works, and only that.\n- Proof: the exact commands, test names or capture files. Say which tests were green locally and which only run in CI.\n- Not proven: hardware, live service, phone, vehicle. If nothing is listed here, you probably overclaimed.\n- Safety: what cannot transmit or actuate, and how that is enforced. \"n/a\" only if nothing touches hardware.\n- Next owner: who acts next (Evaluator review, bench validation, follow-up issue).\n\n## Report back\nReturn the PR URL, the list of checks you ran with results, anything in Not proven, and any decision you need from the owner. Leave the PR open and unmerged.\n",
+  "isTemplate": true,
+  "version": "1.0.0",
+  "status": "stable",
+  "category": "mia-dev",
+  "lang": "en",
+  "createdAt": "2026-10-31T00:00:00.000Z",
+  "updatedAt": "2026-10-31T00:00:00.000Z"
+}

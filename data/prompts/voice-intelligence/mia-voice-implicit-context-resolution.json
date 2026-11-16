@@ -18,18 +18,20 @@
     "active_scene"
   ],
   "tags": [
-    "innovation",
     "auto-generated",
-    "mia",
-    "voice",
-    "pronoun-resolution",
-    "implicit-reference",
     "context-resolution",
     "conversational",
-    "smart-home"
+    "implicit-reference",
+    "innovation",
+    "mia",
+    "pronoun-resolution",
+    "smart-home",
+    "voice"
   ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2026-06-26T07:00:00.000Z",
-  "updatedAt": "2026-06-26T07:00:00.000Z",
-  "version": 1
+  "updatedAt": "2026-06-26T07:00:00.000Z"
 }

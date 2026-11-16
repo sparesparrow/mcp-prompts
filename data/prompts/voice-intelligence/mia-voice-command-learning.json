@@ -22,9 +22,17 @@
     "device_state",
     "user_preferences"
   ],
-  "tags": ["mia", "voice", "learning", "command-intelligence", "pattern-extraction"],
+  "tags": [
+    "command-intelligence",
+    "learning",
+    "mia",
+    "pattern-extraction",
+    "voice"
+  ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-27T00:00:00.000Z",
-  "updatedAt": "2025-01-27T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-27T00:00:00.000Z"
 }

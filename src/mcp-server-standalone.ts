@@ -1,362 +1,137 @@
 #!/usr/bin/env node
 
-import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { z } from 'zod';
 import { logger } from './utils.js';
-import * as fs from 'fs';
-import * as path from 'path';
-import { createRequire } from 'module';
+import { createMcpServer, packageVersion, type McpServerOptions } from './mcp-prompts-server.js';
+import { formatCatalog, formatInstallSnippets, formatProfiles, type ProfileListing } from './install-commands.js';
+import { HELP_TEXT, OptionsError, openConfiguredStore, openStore, resolveOptions } from './server-options.js';
+import { PromptStorageError } from './prompt-store.js';
 
-// Report the version from package.json (dist/ and src/ are both one level below it)
-const SERVER_VERSION: string = (() => {
-  try {
-    return createRequire(__filename)('../package.json').version as string;
-  } catch {
-    return '0.0.0';
-  }
-})();
+// The `mcp-prompts` binary: serves MCP over stdio, or with `catalog` / `config` shows what an install
+// can serve and how to install exactly that. Options come from flags, environment variables and a
+// config file (see server-options.ts).
 
-// Define the prompt schema
-const PromptSchema = z.object({
-  id: z.string(),
-  name: z.string(),
-  content: z.string(),
-  isTemplate: z.boolean().default(false),
-  tags: z.array(z.string()).default([]),
-  variables: z.array(z.union([
-    z.string(),
-    z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      required: z.boolean().default(true),
-      type: z.enum(['string', 'number', 'boolean']).default('string')
-    })
-  ])).optional(),
-  metadata: z.record(z.any()).optional()
-});
+export { createMcpServer, type McpServerOptions } from './mcp-prompts-server.js';
 
-const CreatePromptParams = PromptSchema.omit({ id: true });
-const UpdatePromptParams = PromptSchema.partial().omit({ id: true });
-
-// In-memory storage for prompts
-const prompts = new Map();
-
-// Recursively load JSON files from a directory
-function loadPromptsFromDirectory(dir: string, prompts: Map<string, any>): number {
-  let count = 0;
-  try {
-    const entries = fs.readdirSync(dir, { withFileTypes: true });
-
-    for (const entry of entries) {
-      const fullPath = path.join(dir, entry.name);
-
-      if (entry.isDirectory()) {
-        // Recursively load from subdirectories
-        count += loadPromptsFromDirectory(fullPath, prompts);
-      } else if (entry.isFile() && entry.name.endsWith('.json') && entry.name !== 'index.json') {
-        try {
-          const promptData = JSON.parse(fs.readFileSync(fullPath, 'utf8'));
-
-          // Store prompt with all its data including content
-          prompts.set(promptData.id, {
-            ...promptData,
-            createdAt: promptData.createdAt || new Date().toISOString(),
-            updatedAt: promptData.updatedAt || new Date().toISOString(),
-            version: promptData.version || 1
-          });
-          count++;
-        } catch (err) {
-          logger.warn(`Failed to load prompt from ${fullPath}:`, err);
-        }
-      }
-    }
-  } catch (err) {
-    logger.warn(`Failed to read directory ${dir}:`, err);
-  }
-
-  return count;
-}
-
-// Load prompts from data/prompts directory structure
-function loadSamplePrompts() {
-  try {
-    // First, try to load from PROMPTS_DIR environment variable, or fallback to relative path
-    const promptsDir = process.env.PROMPTS_DIR || path.join(process.cwd(), 'data', 'prompts');
-
-    if (fs.existsSync(promptsDir)) {
-      const totalLoaded = loadPromptsFromDirectory(promptsDir, prompts);
-      logger.info(`Loaded ${totalLoaded} prompts from directory structure`);
-    } else {
-      // Fallback to sample prompts if prompts directory doesn't exist
-      const sampleDataPath = path.join(process.cwd(), 'data', 'sample-prompts.json');
-      if (fs.existsSync(sampleDataPath)) {
-        const sampleData = JSON.parse(fs.readFileSync(sampleDataPath, 'utf8'));
-        for (const prompt of sampleData.prompts) {
-          prompts.set(prompt.id, {
-            ...prompt,
-            createdAt: new Date().toISOString(),
-            updatedAt: new Date().toISOString(),
-            version: 1
-          });
-        }
-        logger.info(`Loaded ${sampleData.prompts.length} sample prompts`);
-      }
-    }
-  } catch (error) {
-    logger.warn('Could not load prompts:', error);
-  }
-}
-
-export async function createMcpServer() {
-  const server = new McpServer({
-    name: 'mcp-prompts',
-    version: SERVER_VERSION,
-  });
-
-  // Load sample prompts
-  loadSamplePrompts();
-
-  // Tool: Add a new prompt
-  server.registerTool('add_prompt', { description: 'Create a new prompt', inputSchema: CreatePromptParams.shape }, async (params) => {
-    try {
-      const validatedParams = CreatePromptParams.parse(params);
-      const id = `prompt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-      const prompt = {
-        ...validatedParams,
-        id,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        version: 1
-      };
-      prompts.set(id, prompt);
-      logger.info(`Added prompt: ${id}`);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Prompt "${prompt.name}" added successfully with ID: ${id}`
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error adding prompt:', error);
-      throw new Error(`Failed to add prompt: ${error}`);
-    }
-  });
-
-  // Tool: Get a prompt by ID
-  server.registerTool('get_prompt', { description: 'Get a prompt by its ID', inputSchema: { id: z.string() } }, async (params) => {
-    try {
-      const { id } = z.object({ id: z.string() }).parse(params);
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(prompt, null, 2)
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error getting prompt:', error);
-      throw new Error(`Failed to get prompt: ${error}`);
-    }
-  });
-
-  // Tool: List all prompts
-  server.registerTool('list_prompts', { description: 'List prompts, optionally filtered by tags or a search string', inputSchema: { tags: z.array(z.string()).optional(), search: z.string().optional() } }, async (params) => {
-    try {
-      const validatedParams = z.object({
-        tags: z.array(z.string()).optional(),
-        search: z.string().optional()
-      }).optional().parse(params);
-
-      let promptList = Array.from(prompts.values());
-
-      // Filter by tags if provided
-      if (validatedParams?.tags && validatedParams.tags.length > 0) {
-        promptList = promptList.filter(prompt => 
-          validatedParams.tags!.some(tag => prompt.tags.includes(tag))
-        );
-      }
-
-      // Filter by search term if provided
-      if (validatedParams?.search) {
-        const searchLower = validatedParams.search.toLowerCase();
-        promptList = promptList.filter(prompt => 
-          prompt.name.toLowerCase().includes(searchLower) ||
-          prompt.content.toLowerCase().includes(searchLower)
-        );
-      }
-
-      // Return summary format instead of full content to avoid large responses
-      const summaryList = promptList.map(prompt => ({
-        id: prompt.id,
-        name: prompt.name,
-        description: prompt.description || 'No description',
-        tags: prompt.tags,
-        isTemplate: prompt.isTemplate || false,
-        createdAt: prompt.createdAt,
-        version: prompt.version
-      }));
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Found ${summaryList.length} prompts:\n\n${summaryList.map(p =>
-              `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]`
-            ).join('\n')}`
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error listing prompts:', error);
-      throw new Error(`Failed to list prompts: ${error}`);
-    }
-  });
-
-  // Tool: Update a prompt
-  server.registerTool('update_prompt', { description: 'Update fields of an existing prompt', inputSchema: { id: z.string(), updates: UpdatePromptParams } }, async (params) => {
-    try {
-      const { id, updates } = z.object({
-        id: z.string(),
-        updates: UpdatePromptParams
-      }).parse(params);
-
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-
-      const updatedPrompt = {
-        ...prompt,
-        ...updates,
-        updatedAt: new Date().toISOString(),
-        version: prompt.version + 1
-      };
-
-      prompts.set(id, updatedPrompt);
-      logger.info(`Updated prompt: ${id}`);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Prompt "${updatedPrompt.name}" updated successfully`
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error updating prompt:', error);
-      throw new Error(`Failed to update prompt: ${error}`);
-    }
-  });
-
-  // Tool: Delete a prompt
-  server.registerTool('delete_prompt', { description: 'Delete a prompt by its ID', inputSchema: { id: z.string() } }, async (params) => {
-    try {
-      const { id } = z.object({ id: z.string() }).parse(params);
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-      prompts.delete(id);
-      logger.info(`Deleted prompt: ${id}`);
-      return {
-        content: [
-          {
-            type: 'text',
-            text: `Prompt "${prompt.name}" deleted successfully`
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error deleting prompt:', error);
-      throw new Error(`Failed to delete prompt: ${error}`);
-    }
-  });
-
-  // Tool: Apply template variables to a prompt
-  server.registerTool('apply_template', { description: 'Apply variables to a prompt template', inputSchema: { id: z.string(), variables: z.record(z.any()) } }, async (params) => {
-    try {
-      const { id, variables } = z.object({
-        id: z.string(),
-        variables: z.record(z.any())
-      }).parse(params);
-
-      const prompt = prompts.get(id);
-      if (!prompt) {
-        throw new Error(`Prompt with ID ${id} not found`);
-      }
-
-      if (!prompt.isTemplate) {
-        throw new Error(`Prompt "${prompt.name}" is not a template`);
-      }
-
-      let result = prompt.content;
-      // Simple variable substitution
-      for (const [key, value] of Object.entries(variables)) {
-        const placeholder = `{{${key}}}`;
-        result = result.replace(new RegExp(placeholder, 'g'), String(value));
-      }
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: result
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error applying template:', error);
-      throw new Error(`Failed to apply template: ${error}`);
-    }
-  });
-
-  // Tool: Get prompt statistics
-  server.registerTool('get_stats', { description: 'Get prompt statistics' }, async () => {
-    try {
-      const promptList = Array.from(prompts.values());
-      const stats = {
-        total: promptList.length,
-        templates: promptList.filter(p => p.isTemplate).length,
-        regular: promptList.filter(p => !p.isTemplate).length,
-        tags: Array.from(new Set(promptList.flatMap(p => p.tags || []))),
-        categories: Array.from(new Set(promptList.map(p => p.metadata?.category).filter(Boolean)))
-      };
-
-      return {
-        content: [
-          {
-            type: 'text',
-            text: JSON.stringify(stats, null, 2)
-          }
-        ]
-      };
-    } catch (error) {
-      logger.error('Error getting stats:', error);
-      throw new Error(`Failed to get stats: ${error}`);
-    }
-  });
-
-  return server;
-}
-
-export async function startMcpServer() {
-  const server = await createMcpServer();
+export async function startMcpServer(options: McpServerOptions = {}) {
+  const server = await createMcpServer(options);
   const transport = new StdioServerTransport();
   await server.connect(transport);
   logger.info('MCP Prompts server started on stdio transport');
   return server;
 }
 
-// Start the server when this file is executed directly
-startMcpServer().catch((error) => {
-  console.error('Failed to start MCP server:', error);
-  process.exit(1);
-});
+const COMMANDS = ['profiles', 'catalog', 'config'];
+
+/**
+ * Runs the command line. Resolves to an exit code for commands that finish, or undefined once the
+ * stdio server is serving.
+ */
+export async function main(
+  argv: readonly string[] = process.argv.slice(2),
+  env: NodeJS.ProcessEnv = process.env,
+  cwd: string = process.cwd()
+): Promise<number | undefined> {
+  let resolved;
+  try {
+    resolved = resolveOptions(argv, env, cwd);
+    const { command, json, name, url, mode } = resolved.commandLine;
+    if (command !== undefined && !COMMANDS.includes(command)) {
+      throw new OptionsError(`unknown command "${command}" (commands: ${COMMANDS.join(', ')})`);
+    }
+    if (mode !== undefined && mode !== 'mcp') {
+      throw new OptionsError(mode === 'http'
+        ? '--mode http is gone: mcp-prompts serves MCP over stdio; start the HTTP server with mcp-prompts-http'
+        : `unknown --mode "${mode}" (mcp-prompts serves MCP over stdio; mcp-prompts-http serves HTTP)`);
+    }
+    if (json && command !== 'catalog' && command !== 'profiles') throw new OptionsError('--json goes with the catalog and profiles commands');
+    if ((name !== undefined || url !== undefined) && command !== 'config') {
+      throw new OptionsError('--name and --url go with the config command');
+    }
+  } catch (error) {
+    if (!(error instanceof OptionsError)) throw error;
+    process.stderr.write(`mcp-prompts: ${error.message}\nRun mcp-prompts --help to see the options.\n`);
+    return 2;
+  }
+
+  const { options, commandLine } = resolved;
+  if (commandLine.help) {
+    process.stdout.write(HELP_TEXT);
+    return 0;
+  }
+  if (commandLine.version) {
+    process.stdout.write(`${packageVersion()}\n`);
+    return 0;
+  }
+
+  let opened;
+  try {
+    // profiles, catalog and config only print. They read what a state directory holds but must
+    // not create it: "mcp-prompts config --state-dir /var/lib/mcp-prompts" used to make that
+    // directory, or fail without printing anything when it could not.
+    opened = commandLine.command !== undefined
+      ? openStore({ ...options, readOnly: true })
+      : await openConfiguredStore(options);
+  } catch (error) {
+    if (error instanceof OptionsError) {
+      // A profile the library does not have.
+      process.stderr.write(`mcp-prompts: ${error.message}\nRun mcp-prompts profiles to see the profiles.\n`);
+      return 2;
+    }
+    // The state directory cannot be written: say so in one line instead of a stack trace.
+    if (!(error instanceof PromptStorageError)) throw error;
+    process.stderr.write(`mcp-prompts: ${error.message}\n`);
+    return 1;
+  }
+  const { base, store, warnings } = opened;
+  const allWarnings = [...resolved.warnings, ...warnings];
+
+  if (commandLine.command !== undefined) {
+    for (const warning of allWarnings) process.stderr.write(`warning: ${warning}\n`);
+    if (commandLine.command === 'profiles') {
+      // The library's own profiles, whatever this command line selects.
+      const { library, totals } = base.catalog();
+      const listing: ProfileListing = {
+        library,
+        total: { prompts: totals.prompts, templates: totals.templates },
+        profiles: base.profiles(),
+        unprofiled: base.unprofiled(),
+      };
+      for (const profile of listing.profiles) {
+        for (const warning of profile.warnings) process.stderr.write(`warning: profile ${profile.name}: ${warning}\n`);
+      }
+      process.stdout.write(`${commandLine.json ? JSON.stringify(listing, null, 2) : formatProfiles(listing)}\n`);
+    } else if (commandLine.command === 'catalog') {
+      process.stdout.write(`${commandLine.json ? JSON.stringify(store.catalog(), null, 2) : formatCatalog(store.catalog())}\n`);
+    } else {
+      process.stdout.write(`${formatInstallSnippets(options, commandLine.name, commandLine.url)}\n`);
+    }
+    return 0;
+  }
+
+  // stdout carries JSON-RPC from here on; warnings go to the log on stderr.
+  for (const warning of allWarnings) logger.warn(warning);
+  const server = await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly, profiles: options.profiles });
+  // As PID 1 in a container node ignores SIGTERM unless something handles it, and `docker stop`
+  // would wait out its timeout and kill the process.
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => {
+      server.close().then(() => process.exit(0), () => process.exit(1));
+    });
+  }
+  return undefined;
+}
+
+// Start only when run as a program (the npm binary, node dist/..., Docker), not when imported.
+if (require.main === module) {
+  main().then(
+    code => {
+      // exitCode rather than exit(), so output piped to another program is flushed first.
+      if (code !== undefined) process.exitCode = code;
+    },
+    error => {
+      console.error('Failed to start MCP server:', error);
+      process.exit(1);
+    }
+  );
+}

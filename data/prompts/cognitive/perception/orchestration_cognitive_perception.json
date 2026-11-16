@@ -1,0 +1,16 @@
+{
+  "id": "orchestration_cognitive_perception",
+  "name": "Vnímání kontextu",
+  "description": "Úvodní instrukce pro vrstvu perception.",
+  "content": "Zmapuj cíl uživatele, repozitář, dostupné nástroje a omezení. Odděl pozorované údaje od předpokladů. Nic neprováděj ani nesbírej data mimo schválený rozsah.",
+  "isTemplate": false,
+  "tags": [
+    "cognitive",
+    "perception"
+  ],
+  "version": 1,
+  "metadata": {
+    "category": "cognitive/perception",
+    "language": "cs"
+  }
+}

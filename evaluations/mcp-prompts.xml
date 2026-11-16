@@ -1,0 +1,49 @@
+<!--
+  Evaluation questions for the mcp-prompts MCP server: can a model with nothing but this server's
+  tools answer them? All are read-only (list_prompts, get_prompt, apply_template, get_stats) and
+  independent of each other. Run them against the whole bundled library (no profile, no
+  selection). The answers hold for the library as of the commit that last changed this file;
+  each was checked through a real MCP client (see evaluations/README.md).
+-->
+<evaluation>
+  <qa_pair>
+    <question>The library has a template that decides which OpenClaw agent should handle a request. According to its routing decision tree, which agent handles BPM detection and audio analysis? Answer with the agent id only.</question>
+    <answer>music-ai</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>MIA keeps its Zigbee lights in step with the phases of the voice pipeline. Which mood name does the template for this publish while the AI model is computing a response? Answer with the mood name only.</question>
+    <answer>thinking</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Among the templates in the category mia-car, which one declares the most variables? Answer with the prompt id only.</question>
+    <answer>mia-car-maintenance-recommendations</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Among the templates tagged voice, which one declares the most variables? Answer with the prompt id only.</question>
+    <answer>mia-voice-context-analyzer</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The category voice-intelligence holds several templates and exactly one prompt that is not a template. What is that prompt's id?</question>
+    <answer>mia-system-identity</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many prompts in the category main-agents are plain prompts rather than templates? Answer with a number only.</question>
+    <answer>9</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Exactly one prompt in the library has the version 2.0.0. What is its id?</question>
+    <answer>gamepad-dynamic-remapper</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The template that configures GPIO pins for MIA's car hardware asks for its answer as JSON with a "pins" object. How many keys does that "pins" object have? Answer with a number only.</question>
+    <answer>4</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Fill the template that configures GPIO pins for MIA's car hardware, giving a value only for the Raspberry Pi model (use "Pi 5") and nothing else. How many placeholders does the server report as not filled? Answer with a number only.</question>
+    <answer>4</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>In the category mia-car, the navigation template and the emergency response template have exactly one variable name in common. Which one? Answer with the variable name only.</question>
+    <answer>current_location</answer>
+  </qa_pair>
+</evaluation>

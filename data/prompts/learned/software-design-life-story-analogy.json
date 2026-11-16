@@ -1,14 +1,18 @@
 {
-  "id": "could-you-interpret-the-assumed-applicat",
-  "name": "Could you interpret the assumed applicat...",
+  "id": "software-design-life-story-analogy",
+  "name": "Software Design Life-Story Analogy",
   "description": "Could you interpret the assumed application of this software design as a life-story analogy?",
   "content": "Could you interpret the assumed application of this software design as a life-story analogy?",
   "isTemplate": false,
+  "variables": [],
   "tags": [
     "ai",
     "productivity"
   ],
+  "category": "learned",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "draft",
   "createdAt": "2025-03-05T03:37:30.297Z",
-  "updatedAt": "2025-03-05T03:41:11.299Z",
-  "version": 1
+  "updatedAt": "2025-03-05T03:41:11.299Z"
 }

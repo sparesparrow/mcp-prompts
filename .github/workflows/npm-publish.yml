@@ -18,7 +18,8 @@ on:
 
 env:
   NODE_VERSION: '20'
-  PNPM_VERSION: '8'
+  # pnpm-lock.yaml is lockfile v9, which pnpm 8 cannot read.
+  PNPM_VERSION: '9'
 
 jobs:
   build-and-test:
@@ -52,7 +53,7 @@ jobs:
             ${{ runner.os }}-pnpm-store-
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile
 
       - name: Type check
         run: pnpm run type-check
@@ -100,8 +101,9 @@ jobs:
           name: dist
           path: dist/
 
+      # Full install: `pnpm publish` runs prepublishOnly (`pnpm run build`), which needs the dev dependencies.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prod
+        run: pnpm install --frozen-lockfile
 
       - name: Get version from package.json
         id: package-version
@@ -130,34 +132,7 @@ jobs:
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: Create GitHub Release
-        if: steps.check-version.outputs.exists == 'false' && startsWith(github.ref, 'refs/tags/')
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }}
-          release_name: Release ${{ github.ref_name }}
-          body: |
-            ## Changes in version ${{ steps.package-version.outputs.version }}
-
-            ### Features
-            - MCP Prompts Server with full protocol support
-            - Multiple storage backends (Memory, File, AWS)
-            - Template system with variable substitution
-            - REST API and CLI tools
-
-            ### Installation
-            ```bash
-            npm install @sparesparrow/mcp-prompts@${{ steps.package-version.outputs.version }}
-            ```
-
-            ### Docker
-            ```bash
-            docker pull ghcr.io/sparesparrow/mcp-prompts:${{ steps.package-version.outputs.version }}
-            ```
-          draft: false
-          prerelease: false
+      # The GitHub Release is created by hand (gh release create), which also creates the tag.
 
       - name: Version already published
         if: steps.check-version.outputs.exists == 'true'
@@ -193,11 +168,20 @@ jobs:
           name: dist
           path: dist/
 
+      # Full install: `pnpm publish` runs prepublishOnly (`pnpm run build`), which needs the dev dependencies.
       - name: Install dependencies
-        run: pnpm install --frozen-lockfile --prod
+        run: pnpm install --frozen-lockfile
 
       - name: Publish to GitHub Packages
-        run: pnpm publish --registry https://npm.pkg.github.com --no-git-checks || echo "Already published or error"
+        # Skip only when this exact version is already there (a published version cannot be
+        # overwritten); any other publish error fails the job.
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          if npm view "@sparesparrow/mcp-prompts@$VERSION" version --registry https://npm.pkg.github.com >/dev/null 2>&1; then
+            echo "::warning::@sparesparrow/mcp-prompts@$VERSION is already on GitHub Packages. Skipping publish."
+          else
+            pnpm publish --registry https://npm.pkg.github.com --no-git-checks
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

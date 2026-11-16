@@ -1,0 +1,24 @@
+{
+  "id": "mia-pr-merge-gate",
+  "name": "MIA PR merge gate",
+  "description": "Checklist to run before merging a MIA pull request: every check completed and green, none pending, mergeable, and the diff actually read.",
+  "variables": [
+    "pr_number"
+  ],
+  "tags": [
+    "mia",
+    "mia-dev",
+    "pull-request",
+    "review",
+    "checklist",
+    "merge"
+  ],
+  "content": "Merge gate for MIA pull request #{{pr_number}} in sparesparrow/mia. Run every step. Merge only if all pass. If anything fails, is pending, or cannot be checked, do NOT merge: report which step and why.\n\n## 1. Every check finished and passed\ngh pr view {{pr_number}} --repo sparesparrow/mia --json statusCheckRollup --jq '.statusCheckRollup[] | [.name, .status, (.conclusion // \"none\")] | @tsv'\n- Every row must be COMPLETED with SUCCESS (or an explicitly accepted NEUTRAL/SKIPPED).\n- Any FAILURE, CANCELLED, TIMED_OUT, ACTION_REQUIRED, or a status other than COMPLETED (QUEUED, IN_PROGRESS, PENDING) is a stop.\n- An empty list is a stop, not a pass: it means checks have not started.\n- Name each check that failed. A failed \"Python Tests\" is a stop even when the other checks are green.\n\n## 2. The branch can merge\ngh pr view {{pr_number}} --repo sparesparrow/mia --json mergeStateStatus,mergeable,isDraft,reviewDecision\n- mergeStateStatus must be CLEAN. BLOCKED, BEHIND, DIRTY, UNSTABLE, HAS_HOOKS and UNKNOWN are stops.\n- isDraft must be false. reviewDecision must not be CHANGES_REQUESTED.\n\n## 3. The diff was read\ngh pr diff {{pr_number}} --repo sparesparrow/mia\nRead it, not just the file list. Confirm:\n- The change matches the PR's Claim, and nothing outside the stated slice is included.\n- Tests were not weakened, skipped or deleted to get green, and the strings other tests depend on are untouched.\n- Each requirement keeps only the evidence that exists (ADR-0010). No bench, hardware or vehicle state is promoted without a record in spec/evidence/<REQ-ID>/.\n- Nothing can transmit on a vehicle bus or actuate hardware unless the Safety section says how that is enforced.\n\n## 4. The PR description is complete\nClaim / Proof / Not proven / Safety / Next owner are all present, and Not proven is honest.\n\n## 5. Re-check right before merging\nRe-run step 1 immediately before the merge command. A push after your first check restarts CI.\n\n## Report\nOne line per step: PASS or STOP with the reason. Then either \"safe to merge\" with the exact command, or \"do not merge\" with what has to change. Never merge on a partial result.\n",
+  "isTemplate": true,
+  "version": "1.0.0",
+  "status": "stable",
+  "category": "mia-dev",
+  "lang": "en",
+  "createdAt": "2026-10-31T00:00:00.000Z",
+  "updatedAt": "2026-10-31T00:00:00.000Z"
+}

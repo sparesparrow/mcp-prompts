@@ -1,0 +1,16 @@
+{
+  // The build: tsc checks the types and writes the declarations, swc writes the JavaScript.
+  // Not incremental: the build-info file of the base config lands outside dist, so after
+  // `pnpm run clean` tsc believed everything was already emitted and wrote no declarations.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "incremental": false,
+    "emitDeclarationOnly": true
+  },
+  "exclude": [
+    "node_modules", "dist", "archive", "tests",
+    "src/cli.ts", "src/core/services/payment.service.ts", "src/monitoring/cloudwatch-metrics.ts",
+    "src/**/*.test.ts", "src/**/*.spec.ts", "src/testing"
+  ]
+}

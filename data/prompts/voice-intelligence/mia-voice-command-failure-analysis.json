@@ -25,9 +25,17 @@
     "time_of_day",
     "user_preferences"
   ],
-  "tags": ["mia", "voice", "failure-analysis", "learning", "improvement"],
+  "tags": [
+    "failure-analysis",
+    "improvement",
+    "learning",
+    "mia",
+    "voice"
+  ],
   "category": "voice-intelligence",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
   "createdAt": "2025-01-27T00:00:00.000Z",
-  "updatedAt": "2025-01-27T00:00:00.000Z",
-  "version": 1
+  "updatedAt": "2025-01-27T00:00:00.000Z"
 }

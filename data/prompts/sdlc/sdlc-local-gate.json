@@ -1,0 +1,25 @@
+{
+  "id": "sdlc-local-gate",
+  "name": "SDLC Local Merge Gate",
+  "description": "Local merge-gate checklist for a slice when no CI or GitHub access is available: verification green, diff in scope, tests not weakened, findings resolved, no secrets or runtime files, docs updated.",
+  "content": "Local merge gate for {{base}}..{{head}} in {{repo}}. Run every step. The slice passes only if every step passes. If anything fails or cannot be checked, the slice is NOT done: report which step and why.\n\n1. Verification is green. Run, and read the output of:\n{{verify_cmds}}\n   Any failure, error, skipped-without-reason or \"0 tests collected\" is a stop.\n2. The diff was read: `git -C {{repo}} diff {{base}}..{{head}}`. It matches the slice brief and nothing outside the slice is included.\n3. Tests were not weakened, skipped or deleted to get green. The test count did not drop.\n4. Every reviewer finding of severity blocker or major is fixed (cite the fixing commit) or explicitly accepted by the user. Minor findings are fixed or listed as follow-ups.\n5. No secrets or runtime files:\n   - added lines only: `git -C {{repo}} diff {{base}}..{{head}} | grep -nE '^\\+.*({{secret_patterns}})'` (report matches as file:line only, never the value)\n   - file names: `git -C {{repo}} diff --name-only {{base}}..{{head}} | grep -E '(cookie|token|\\.env|/state/|/logs/|\\.venv|__pycache__)'` shows nothing\n   - `git -C {{repo}} status --short` is clean\n6. Docs updated where behaviour changed (README, skill references).\n\nOutput: PASS or FAIL, then one line per step with its evidence.",
+  "isTemplate": true,
+  "variables": [
+    "repo",
+    "base",
+    "head",
+    "verify_cmds",
+    "secret_patterns"
+  ],
+  "tags": [
+    "sdlc",
+    "gate",
+    "checklist"
+  ],
+  "category": "sdlc",
+  "lang": "en",
+  "version": "1.1.0",
+  "status": "stable",
+  "createdAt": "2026-11-08T00:00:00.000Z",
+  "updatedAt": "2026-11-08T00:00:00.000Z"
+}
