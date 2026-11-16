@@ -185,13 +185,26 @@ function categoryOf(prompt: StoredPrompt): string | undefined {
   return typeof fromMetadata === 'string' && fromMetadata ? fromMetadata : undefined;
 }
 
+/** The longest description a list shows; get_prompt returns the whole one. */
+export const MAX_SUMMARY_DESCRIPTION = 110;
+
+/** The text cut to at most `max` characters, ending in an ellipsis when something was left out. */
+function shorten(value: string, max: number): string {
+  if (value.length <= max) return value;
+  let end = max - 1;
+  // Do not leave half of a character that takes two code units.
+  const last = value.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end--;
+  return `${value.slice(0, end)}…`;
+}
+
 function summarize(prompt: StoredPrompt): PromptSummary {
   const category = categoryOf(prompt);
   const language = (prompt.metadata as Record<string, unknown> | undefined)?.language;
   return {
     id: prompt.id,
     name: prompt.name,
-    description: prompt.description || 'No description',
+    description: shorten(prompt.description || 'No description', MAX_SUMMARY_DESCRIPTION),
     tags: prompt.tags ?? [],
     isTemplate: prompt.isTemplate || false,
     ...(category ? { category } : {}),

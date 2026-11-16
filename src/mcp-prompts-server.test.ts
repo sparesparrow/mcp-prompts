@@ -237,6 +237,33 @@ describe('context budget', () => {
     expect(page.structuredContent).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
   });
 
+  it('keeps a page of 50 prompts small however long their descriptions are', async () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 50; i++) {
+      await store.add({ id: `huge-${i}`, name: `Huge ${i}`, description: `${'D'.repeat(100_000)}`, content: 'c', isTemplate: false, tags: ['huge'], category: 'big' });
+    }
+    const client = await connect({ store });
+    const page = await call(client, 'list_prompts', { limit: 50 });
+    const rows = (page.structuredContent as { prompts: Array<{ description: string }> }).prompts;
+    expect(rows).toHaveLength(50);
+    for (const row of rows) {
+      expect(row.description.length).toBeLessThanOrEqual(110);
+      expect(row.description.endsWith('\u2026')).toBe(true);
+    }
+    const bytes = Buffer.byteLength(JSON.stringify(page));
+    expect(bytes).toBeLessThan(30_000);
+    // The whole description is one get_prompt away.
+    const whole = await call(client, 'get_prompt', { id: 'huge-0' });
+    expect((whole.structuredContent as { description: string }).description).toHaveLength(100_000);
+  });
+
+  it('leaves a short description as it is', async () => {
+    const store = new PromptStore();
+    await store.add({ id: 'short', name: 'Short', description: 'x'.repeat(110), content: 'c', isTemplate: false, tags: [] });
+    const page = await call(await connect({ store }), 'list_prompts');
+    expect((page.structuredContent as { prompts: Array<{ description: string }> }).prompts[0].description).toBe('x'.repeat(110));
+  });
+
   it('refuses a page over 50 prompts', async () => {
     const client = await connect({ store: await library() });
     expect((await call(client, 'list_prompts', { limit: 51 })).isError).toBe(true);

@@ -280,8 +280,6 @@ interface ToolConfig {
   annotations: ToolAnnotations;
 }
 
-const MAX_LISTED_DESCRIPTION = 200;
-
 function text(value: string): CallToolResult['content'][number] {
   return { type: 'text', text: value };
 }
@@ -354,14 +352,11 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
       ? (page.total > 0 ? `, none at offset ${page.offset}` : '')
       : page.count < page.total ? `, showing ${page.offset + 1}-${page.offset + page.count}` : '';
     const lines = page.prompts.map(p => {
-      const description = p.description.length > MAX_LISTED_DESCRIPTION
-        ? `${p.description.slice(0, MAX_LISTED_DESCRIPTION - 1)}…`
-        : p.description;
       const details = [
         ...(p.isTemplate ? ['(template)'] : []),
         ...(p.language ? [`(language ${p.language})`] : []),
       ];
-      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
+      return `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
     });
     const more = page.has_more ? `\n\nMore: call list_prompts again with offset=${page.next_offset}.` : '';
     return result([text(`Found ${page.total} prompts${range}:\n\n${lines.join('\n')}${more}`)], page);
