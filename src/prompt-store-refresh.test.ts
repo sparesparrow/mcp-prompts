@@ -31,6 +31,8 @@ class AsyncBackend implements StateBackend {
   /** When set, load() takes its snapshot at once and returns it only when this settles. */
   loadGate: Promise<void> | undefined;
   failPut: Error | undefined;
+  /** revision() never answers. */
+  hang = false;
 
   constructor(readonly db: Database = new Database()) {}
 
@@ -44,6 +46,7 @@ class AsyncBackend implements StateBackend {
 
   async revision(): Promise<string> {
     this.revisionCalls++;
+    if (this.hang) return new Promise<string>(() => undefined);
     if (this.failing) throw this.failing;
     return String(this.db.rev);
   }
@@ -84,7 +87,7 @@ describe('a store over a backend that answers with promises', () => {
   });
   afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
 
-  const open = async (backend: StateBackend, options?: { refreshIntervalMs?: number }) => {
+  const open = async (backend: StateBackend, options?: { refreshIntervalMs?: number; checkTimeoutMs?: number }) => {
     const store = new PromptStore();
     store.load({ promptsDir: library });
     await store.useBackend(backend, options);
@@ -250,6 +253,44 @@ describe('a store over a backend that answers with promises', () => {
       await syncing;
       expect(store.get('mine').name).toBe('Mine');
       expect(store.get('theirs').name).toBe('theirs');
+    });
+  });
+
+  describe('a backend that stops answering', () => {
+    it('ends a check that takes too long, so that the next one can run and recovery is seen', async () => {
+      const backend = new AsyncBackend();
+      const store = await open(backend, { refreshIntervalMs: 5, checkTimeoutMs: 60 });
+      await backend.put(stored('late'), 'create');
+      backend.hang = true;
+      const warn = vi.spyOn(logger, 'warn').mockImplementation((() => undefined) as never);
+      try {
+        const started = Date.now();
+        await store.sync();
+        expect(Date.now() - started).toBeLessThan(1_000);
+        // Reads keep starting checks; each ends by itself, and the failure is reported once.
+        for (let i = 0; i < 4; i++) {
+          store.list();
+          await wait(80);
+        }
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(() => store.get('late')).toThrow(PromptNotFoundError);
+        backend.hang = false;
+        await vi.waitFor(() => {
+          store.list();
+          expect(store.get('late').name).toBe('late');
+        });
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    it('fails checkStorage within the bound instead of waiting', async () => {
+      const backend = new AsyncBackend();
+      const store = await open(backend, { checkTimeoutMs: 60 });
+      backend.hang = true;
+      const started = Date.now();
+      await expect(store.checkStorage()).rejects.toThrow(PromptStorageError);
+      expect(Date.now() - started).toBeLessThan(1_000);
     });
   });
 

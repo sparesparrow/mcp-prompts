@@ -126,6 +126,13 @@ saved, so the same call, repeated, goes through. That check compares version lab
 update only moves a version that is a number or `x.y.z`: a prompt whose version is any other
 text keeps it through every update, so for it a stale update is not detected.
 
+The server applies migrations only when some are missing: once they are applied, a database role
+with just SELECT, INSERT, UPDATE and DELETE on the tables is enough. With `--read-only` it never
+changes the schema (apply the migrations with a writable start first) and refuses changes; its
+`storage` shows as `memory`, as for a read-only state directory. Every statement is stopped after
+10 seconds, so a stuck connection or a lock held by someone else makes a call fail (and `/ready`
+answer 503) instead of waiting for ever; the store keeps serving what it has and checks again.
+
 The library stays read-only and shared; saved prompts are laid over it as they are over a state
 directory. To copy a directory of prompts into the database once (ids the owner already has are
 skipped, nothing is overwritten, only counts are printed), after `pnpm run build`:

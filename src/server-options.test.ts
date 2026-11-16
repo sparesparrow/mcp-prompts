@@ -297,3 +297,29 @@ describe('openConfiguredStore with Postgres', () => {
     });
   });
 });
+
+describe.skipIf(!process.env.TEST_DATABASE_URL)('openConfiguredStore with Postgres, read-only', () => {
+  const run = Math.random().toString(36).slice(2, 8);
+  const schema = `ro_${run}`;
+  const urlFor = () => {
+    const url = new URL(process.env.TEST_DATABASE_URL!);
+    url.searchParams.set('options', `-c search_path=${schema}`);
+    return url.toString();
+  };
+  const readOnly = (): ServerOptions =>
+    mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixtureLibrary() }, { storage: 'postgres', owner: 'ro-owner', readOnly: true } as never);
+
+  it('never changes the database: with no migrations applied it fails, and creates nothing', async () => {
+    const admin = createPostgresPool(process.env.TEST_DATABASE_URL!);
+    try {
+      await admin.query(`CREATE SCHEMA ${schema}`);
+      const error = await openConfiguredStore(readOnly(), { DATABASE_URL: urlFor() }).catch(err => err);
+      expect(error).toBeInstanceOf(PromptStorageError);
+      const tables = await admin.query('SELECT table_name FROM information_schema.tables WHERE table_schema = $1', [schema]);
+      expect(tables.rows).toEqual([]);
+    } finally {
+      await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await admin.end();
+    }
+  });
+});

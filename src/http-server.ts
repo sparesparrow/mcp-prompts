@@ -78,10 +78,15 @@ export interface HttpServerOptions {
   allowInsecure?: boolean;
   /** Where DATABASE_URL is read from, for a postgres install. Defaults to process.env. */
   env?: NodeJS.ProcessEnv;
+  /** How long /ready waits for the database before it says it is unavailable. */
+  readyTimeoutMs?: number;
 }
 
 /** How long a request waits for the database to say whether other servers changed anything. */
 const SYNC_WAIT_MS = 1_000;
+
+/** How long /ready waits for the database; a health check gives up sooner than this on its own. */
+const READY_WAIT_MS = 5_000;
 
 /** Resolves when the work does, or after ms, whichever is first; the work carries on either way. */
 function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
@@ -120,7 +125,7 @@ const ToolCallBody = z.object({ arguments: z.record(z.string(), z.any()).default
 
 const WRITE_TOOLS = ['add_prompt', 'update_prompt', 'delete_prompt'];
 
-function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: AccessPolicy): Route[] {
+function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: AccessPolicy, readyTimeoutMs: number): Route[] {
   const version = packageVersion();
   const { readOnly } = serverOptions;
 
@@ -190,9 +195,13 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       // requires a token and saves to disk. An image too old to know those settings fails the check.
       handler: async (_req, res) => {
         const stateDir = store.stateDir;
-        if (store.storage === 'postgres') {
+        // A read-only install reports its storage as memory, but its database must answer all the same.
+        if (store.backendKind === 'postgres') {
           try {
-            await store.checkStorage();
+            await Promise.race([
+              store.checkStorage(),
+              new Promise<never>((_resolve, reject) => { setTimeout(reject, readyTimeoutMs).unref(); }),
+            ]);
           } catch {
             // The cause is in the log; a health check needs no more than this.
             res.status(503).json({ status: 'unavailable', service: 'mcp-prompts', reason: 'the database cannot be reached' });
@@ -425,7 +434,7 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
     allowedOrigins: options.allowedOrigins,
     corsOrigin: options.corsOrigin,
   });
-  const routes = buildRoutes(served, serverOptions, access);
+  const routes = buildRoutes(served, serverOptions, access, options.readyTimeoutMs ?? READY_WAIT_MS);
 
   const server = http.createServer(async (req, res) => {
     if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);
@@ -493,7 +502,7 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : undefined;
       // Other servers may have saved changes since the last request: ask the database before answering.
       // A database that hangs must not hold up reads that memory can answer: wait a moment, no longer.
-      if (!isProbe && served.storage === 'postgres') await waitAtMost(served.sync(), SYNC_WAIT_MS);
+      if (!isProbe && served.backendKind === 'postgres') await waitAtMost(served.sync(), SYNC_WAIT_MS);
       let statusCode = 200;
       const routeRes: RouteResponse = {
         status: code => { statusCode = code; return routeRes; },

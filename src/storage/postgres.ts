@@ -17,10 +17,31 @@ const MIGRATION_LOCK = 726_201_001;
 
 const UNIQUE_VIOLATION = '23505';
 
+/** The driver gave up waiting for an answer: the connection may still be busy with the query. */
+function timedOutOnClient(error: unknown): boolean {
+  return error instanceof Error && error.message === 'Query read timeout';
+}
+
 /** The code of a failure, if it looks like one; the message of an error is never used. */
 function errorCode(error: unknown): string | undefined {
+  if (timedOutOnClient(error)) return 'QUERY_TIMEOUT';
   const code = (error as { code?: unknown } | null)?.code;
   return typeof code === 'string' && /^[A-Za-z0-9_]{1,32}$/.test(code) ? code : undefined;
+}
+
+/**
+ * Rolls a transaction back. Returns false when the connection cannot be trusted afterwards: the
+ * rollback failed, or the query before it timed out on the client, in which case the connection
+ * is busy and a rollback would only wait behind it.
+ */
+async function rollback(client: PoolClient, cause: unknown): Promise<boolean> {
+  if (timedOutOnClient(cause)) return false;
+  try {
+    await client.query('ROLLBACK');
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -34,13 +55,37 @@ function fail(what: string, error: unknown, consequence: string, report = true):
   throw new PromptStorageError(`Could not ${what}${code ? ` (${code})` : ''}${consequence}`);
 }
 
+/** How long a statement may run before the server stops it, unless the pool is made with another limit. */
+export const QUERY_TIMEOUT_MS = 10_000;
+
+export interface PostgresPoolOptions {
+  /**
+   * The longest a statement may run. The server stops it after this long (a lock held by someone
+   * else counts), and the driver gives up a second later on a connection that stopped answering,
+   * so no call waits for ever. Defaults to QUERY_TIMEOUT_MS.
+   */
+  queryTimeoutMs?: number;
+}
+
 /** A pool for the given connection string. An idle connection that drops is logged by code only. */
-export function createPostgresPool(connectionString: string): Pool {
-  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10_000 });
+export function createPostgresPool(connectionString: string, options: PostgresPoolOptions = {}): Pool {
+  const limit = options.queryTimeoutMs ?? QUERY_TIMEOUT_MS;
+  const pool = new Pool({
+    connectionString, max: 5, connectionTimeoutMillis: 10_000,
+    statement_timeout: limit, query_timeout: limit + 1_000,
+  });
   pool.on('error', error => {
     logger.warn({ code: errorCode(error) }, 'Postgres state backend: an idle connection failed');
   });
   return pool;
+}
+
+/** Whether schema_migrations exists and lists every file. Only reads. */
+async function allApplied(pool: Pool, files: string[]): Promise<boolean> {
+  const exists = await pool.query("SELECT to_regclass('schema_migrations') AS name");
+  if (!exists.rows[0]?.name) return false;
+  const done = new Set((await pool.query('SELECT name FROM schema_migrations')).rows.map(row => row.name as string));
+  return files.every(name => done.has(name));
 }
 
 /**
@@ -53,6 +98,10 @@ export async function runMigrations(pool: Pool, dir: string = MIGRATIONS_DIR): P
   let failed = false;
   try {
     const files = fs.readdirSync(dir).filter(name => name.endsWith('.sql')).sort();
+    // Every statement below that creates something needs the right to create in the schema, even
+    // CREATE ... IF NOT EXISTS on a table that exists. A role that may only read and write rows
+    // must still start, so when everything is applied nothing is run that could need it.
+    if (await allApplied(pool, files)) return [];
     client = await pool.connect();
     await client.query('BEGIN');
     try {
@@ -69,7 +118,7 @@ export async function runMigrations(pool: Pool, dir: string = MIGRATIONS_DIR): P
       await client.query('COMMIT');
       return applied;
     } catch (error) {
-      await client.query('ROLLBACK').catch(() => undefined);
+      if (!(await rollback(client, error))) failed = true;
       throw error;
     }
   } catch (error) {
@@ -85,6 +134,8 @@ export interface PostgresStateBackendOptions {
   pool: Pool;
   /** Whose prompts these are. Every statement is limited to this owner; it never comes from a request. */
   ownerSub: string;
+  /** Only read: changes are refused before anything is sent to the database. */
+  readOnly?: boolean;
 }
 
 const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
@@ -122,7 +173,7 @@ function isPrompt(body: unknown, id: string): body is StoredPrompt {
  */
 export class PostgresStateBackend implements StateBackend {
   readonly kind = 'postgres' as const;
-  readonly writable = true;
+  readonly writable: boolean;
   private readonly pool: Pool;
   private readonly ownerSub: string;
   /** The last revision check failed, and said so. */
@@ -131,6 +182,7 @@ export class PostgresStateBackend implements StateBackend {
   constructor(options: PostgresStateBackendOptions) {
     this.pool = options.pool;
     this.ownerSub = options.ownerSub;
+    this.writable = !options.readOnly;
   }
 
   async load(): Promise<StateSnapshot> {
@@ -140,6 +192,7 @@ export class PostgresStateBackend implements StateBackend {
       client = await this.pool.connect();
       // One snapshot for both reads, so a write between them cannot show half of itself.
       await client.query('BEGIN ISOLATION LEVEL REPEATABLE READ READ ONLY');
+      let snapshot: StateSnapshot;
       try {
         const rows = await client.query('SELECT id, body FROM prompts WHERE owner_sub = $1 ORDER BY id', [this.ownerSub]);
         const tombstones = await client.query('SELECT id FROM tombstones WHERE owner_sub = $1 ORDER BY id', [this.ownerSub]);
@@ -148,10 +201,14 @@ export class PostgresStateBackend implements StateBackend {
           if (isPrompt(row.body, row.id)) prompts.push(row.body);
           else logger.warn(`Skipped saved prompt ${row.id}: it is not a usable prompt`);
         }
-        return { prompts, tombstones: tombstones.rows.map(row => row.id as string) };
-      } finally {
-        await client.query('ROLLBACK').catch(() => undefined);
+        snapshot = { prompts, tombstones: tombstones.rows.map(row => row.id as string) };
+      } catch (error) {
+        if (!(await rollback(client, error))) failed = true;
+        throw error;
       }
+      // End the read-only transaction; a connection that cannot is not put back.
+      if (!(await rollback(client, undefined))) failed = true;
+      return snapshot;
     } catch (error) {
       failed = true;
       return fail('read the saved prompts from the database', error, '');
@@ -229,6 +286,7 @@ export class PostgresStateBackend implements StateBackend {
    * PromptStorageError without the driver's words.
    */
   private async write(what: string, change: (client: PoolClient) => Promise<void>): Promise<void> {
+    if (!this.writable) throw new PromptStorageError(`Could not ${what}: the database is opened read-only; nothing was changed`);
     let client: PoolClient | undefined;
     let failed = false;
     try {
@@ -243,7 +301,7 @@ export class PostgresStateBackend implements StateBackend {
         await client.query('COMMIT');
       } catch (error) {
         // A connection that cannot even roll back may still hold the transaction: do not reuse it.
-        await client.query('ROLLBACK').catch(() => { failed = true; });
+        if (!(await rollback(client, error))) failed = true;
         throw error;
       }
     } catch (error) {

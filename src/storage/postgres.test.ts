@@ -3,7 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
-import { Pool } from 'pg';
+import { Pool, type PoolClient } from 'pg';
 import { PromptConflictError, PromptNotFoundError, PromptStaleError, PromptStorageError, PromptStore, PromptUsageError, type StoredPrompt } from '../prompt-store';
 import { logger } from '../utils';
 import { PostgresStateBackend, createPostgresPool, runMigrations } from './postgres';
@@ -111,6 +111,42 @@ describe('PostgresStateBackend when a rollback fails', () => {
     const { pool, released } = brokenClient(/INSERT INTO prompts/, new Error('boom'), true);
     const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
     await expect(backend.put(stored('x'), 'create')).rejects.toThrow(PromptStorageError);
+    expect(released).toEqual([true]);
+  });
+});
+
+describe('createPostgresPool', () => {
+  it('limits every query, on the server and on the client, by default and by option', () => {
+    const url = 'postgresql://u:p@127.0.0.1:1/d';
+    const standard = createPostgresPool(url);
+    const quick = createPostgresPool(url, { queryTimeoutMs: 2_500 });
+    const options = (pool: Pool) => pool.options as { statement_timeout?: number; query_timeout?: number };
+    expect(options(standard)).toMatchObject({ statement_timeout: 10_000 });
+    expect(options(standard).query_timeout).toBeGreaterThan(10_000);
+    expect(options(quick)).toMatchObject({ statement_timeout: 2_500 });
+    expect(options(quick).query_timeout).toBeGreaterThan(2_500);
+    void standard.end();
+    void quick.end();
+  });
+});
+
+describe('PostgresStateBackend when a query times out on the client', () => {
+  it('does not wait for a rollback on a connection that stopped answering, and throws it away', async () => {
+    const released: unknown[] = [];
+    const client = {
+      query: (sql: string) => {
+        if (sql === 'ROLLBACK') return new Promise(() => undefined);
+        if (/INSERT INTO prompts/.test(sql)) return Promise.reject(new Error('Query read timeout'));
+        return Promise.resolve({ rows: [], rowCount: 1 });
+      },
+      release: (arg?: unknown) => { released.push(arg); },
+    };
+    const pool = { connect: async () => client, query: async () => ({ rows: [] }) } as unknown as Pool;
+    const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
+    const error = await backend.put(stored('x'), 'create').catch(err => err);
+    expect(error).toBeInstanceOf(PromptStorageError);
+    expect(error.message).toMatch(/nothing was changed/);
+    expect(error.message).not.toContain('read timeout');
     expect(released).toEqual([true]);
   });
 });
@@ -501,6 +537,170 @@ describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
       } finally {
         await scoped.end();
       }
+    });
+  });
+
+  /** The test database's URL with a role and a schema of its own, for a pool that must see that schema only. */
+  const urlFor = (schema: string, credentials?: { user: string; password: string }) => {
+    const url = new URL(DATABASE_URL!);
+    if (credentials) {
+      url.username = credentials.user;
+      url.password = credentials.password;
+    }
+    url.searchParams.set('options', `-c search_path=${schema}`);
+    return url.toString();
+  };
+
+  describe('a database that stops answering', () => {
+    const schema = `hang_${run}`;
+    let setup: Pool;
+    let fast: Pool;
+    let holder: PoolClient | undefined;
+
+    beforeAll(async () => {
+      await pool.query(`CREATE SCHEMA ${schema}`);
+      setup = new Pool({ connectionString: urlFor(schema), max: 2 });
+      await runMigrations(setup);
+      fast = createPostgresPool(urlFor(schema), { queryTimeoutMs: 300 });
+      await setup.query('SELECT 1');
+    });
+    afterAll(async () => {
+      await release();
+      await fast.end();
+      await setup.end();
+      await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+    });
+
+    /** Holds the table that every revision check and write touches, as a stuck transaction would. */
+    const hold = async () => {
+      holder = await pool.connect();
+      await holder.query('BEGIN');
+      await holder.query(`LOCK TABLE ${schema}.revisions IN ACCESS EXCLUSIVE MODE`);
+    };
+    const release = async () => {
+      if (!holder) return;
+      await holder.query('ROLLBACK').catch(() => undefined);
+      holder.release();
+      holder = undefined;
+    };
+    const timed = async <T>(work: Promise<T>): Promise<{ result: T | Error; ms: number }> => {
+      const started = Date.now();
+      const result = await work.catch(err => err as Error);
+      return { result, ms: Date.now() - started };
+    };
+
+    it('fails a revision check, a health check and a write within the bound, and queues nothing behind them', async () => {
+      const owner = newOwner('hang-bound');
+      const store = await storeFor(backendFor(owner, fast), 60_000);
+      await hold();
+      try {
+        const revision = await timed(backendFor(owner, fast).revision());
+        expect(revision.result).toBeInstanceOf(PromptStorageError);
+        expect(revision.ms).toBeLessThan(3_000);
+        const health = await timed(store.checkStorage());
+        expect(health.result).toBeInstanceOf(PromptStorageError);
+        expect(health.ms).toBeLessThan(3_000);
+        // Two writes to one prompt id: the second must not wait for a first that never ends.
+        const first = await timed(store.add({ id: 'stuck', name: 'S', content: 'c', isTemplate: false, tags: [] }));
+        const second = await timed(store.add({ id: 'stuck', name: 'S', content: 'c', isTemplate: false, tags: [] }));
+        for (const write of [first, second]) {
+          expect(write.result).toBeInstanceOf(PromptStorageError);
+          expect((write.result as Error).message).toMatch(/nothing was changed/);
+          expect(write.ms).toBeLessThan(3_000);
+        }
+        expect(() => store.get('stuck')).toThrow(PromptNotFoundError);
+      } finally {
+        await release();
+      }
+      // The pool is whole again: the same store writes once the database answers.
+      await store.add({ id: 'after', name: 'After', content: 'c', isTemplate: false, tags: [] });
+      expect(store.get('after').name).toBe('After');
+    });
+
+    it('lets the background check recover when the database answers again', async () => {
+      const owner = newOwner('hang-recover');
+      const store = await storeFor(backendFor(owner, fast), 20);
+      // Another server of the same owner, over the same schema but without the short limits.
+      const other = await storeFor(backendFor(owner, setup), 60_000);
+      await hold();
+      try {
+        // Reads start checks that fail against the held table.
+        for (let i = 0; i < 6; i++) {
+          store.list();
+          await new Promise(resolve => setTimeout(resolve, 100));
+        }
+      } finally {
+        await release();
+      }
+      await add(other, 'while-away');
+      await vi.waitFor(() => expect(store.get('while-away').name).toBe('while-away'), { timeout: 5_000 });
+    }, 15_000);
+  });
+
+  describe('a role that may not create anything', () => {
+    const schema = `role_${run}`;
+    const credentials = { user: `limited_${run}`, password: crypto.randomBytes(12).toString('hex') };
+    let setup: Pool;
+
+    beforeAll(async () => {
+      await pool.query(`CREATE SCHEMA ${schema}`);
+      setup = new Pool({ connectionString: urlFor(schema), max: 2 });
+      await runMigrations(setup);
+      // Hex only, so nothing here can be anything but a name and a password.
+      await pool.query(`CREATE ROLE ${credentials.user} LOGIN PASSWORD '${credentials.password}'`);
+      await pool.query(`GRANT USAGE ON SCHEMA ${schema} TO ${credentials.user}`);
+      await pool.query(`GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA ${schema} TO ${credentials.user}`);
+    });
+    afterAll(async () => {
+      await setup.end();
+      await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await pool.query(`DROP OWNED BY ${credentials.user}`);
+      await pool.query(`DROP ROLE IF EXISTS ${credentials.user}`);
+    });
+
+    it('starts once the migrations are applied, and reads and writes its own rows', async () => {
+      const limited = createPostgresPool(urlFor(schema, credentials));
+      try {
+        // The role really cannot create (so that this test means something).
+        await expect(limited.query('CREATE TABLE should_not_exist (id int)')).rejects.toBeTruthy();
+        expect(await runMigrations(limited)).toEqual([]);
+        const owner = newOwner('limited');
+        const store = await storeFor(backendFor(owner, limited));
+        await add(store, 'by-limited');
+        await store.update('by-limited', { name: 'Edited' });
+        await store.delete('by-limited');
+        expect(await backendFor(owner, limited).revision()).toBe('3');
+      } finally {
+        await limited.end();
+      }
+    });
+  });
+
+  describe('opened read-only', () => {
+    it('serves what is saved and what others save, refuses changes, and reports memory like a read-only state directory', async () => {
+      const owner = newOwner('readonly');
+      const writer = await storeFor(backendFor(owner), 60_000);
+      await add(writer, 'saved-before');
+      const store = new PromptStore();
+      store.load({ promptsDir: library });
+      await store.useBackend(new PostgresStateBackend({ pool, ownerSub: owner, readOnly: true }), { refreshIntervalMs: 60_000 });
+      expect(store.get('saved-before').name).toBe('saved-before');
+      expect(store.storage).toBe('memory');
+      expect(store.stats().storage).toBe('memory');
+      await expect(add(store, 'nope')).rejects.toThrow(PromptUsageError);
+      await expect(store.delete('lib-a')).rejects.toThrow(PromptUsageError);
+      await add(writer, 'saved-after');
+      await store.sync();
+      expect(store.get('saved-after').name).toBe('saved-after');
+    });
+
+    it('is refused at the backend as well, with nothing written', async () => {
+      const owner = newOwner('readonly-backend');
+      const backend = new PostgresStateBackend({ pool, ownerSub: owner, readOnly: true });
+      expect(backend.writable).toBe(false);
+      await expect(backend.put(stored('x'), 'create')).rejects.toThrow(PromptStorageError);
+      await expect(backend.remove('x', true)).rejects.toThrow(/read-only/);
+      expect(await backend.revision()).toBe('0');
     });
   });
 

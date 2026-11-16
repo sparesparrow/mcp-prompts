@@ -22,7 +22,7 @@ class Database {
 
 class FakePostgres implements StateBackend {
   readonly kind = 'postgres' as const;
-  readonly writable = true;
+  writable = true;
   unreachable = false;
   constructor(readonly db: Database = new Database()) {}
   async load(): Promise<StateSnapshot> {
@@ -179,6 +179,30 @@ describe('HTTP over a Postgres store', () => {
     });
     expect(put.status).toBe(200);
     expect(await json(put)).toMatchObject({ name: 'Theirs', content: 'Mine', version: 4 });
+  });
+
+  it('is not ready when the database does not answer in time', async () => {
+    const backend = new FakePostgres();
+    const store = await open(backend);
+    app = await startHttpServer(0, '127.0.0.1', { store, readyTimeoutMs: 200 });
+    closers.push(() => app.close());
+    const base = `http://127.0.0.1:${app.address()!.port}`;
+    backend.revision = () => new Promise<string>(() => undefined);
+    const started = Date.now();
+    const res = await fetch(`${base}/ready`, { signal: AbortSignal.timeout(4_000) });
+    expect(res.status).toBe(503);
+    expect(Date.now() - started).toBeLessThan(2_000);
+    expect(JSON.stringify(await json(res))).not.toContain('timed out');
+  });
+
+  it('checks the database of a read-only install too, and reports its storage as memory like a read-only state directory does', async () => {
+    const backend = new FakePostgres();
+    backend.writable = false;
+    const base = await serve(await open(backend));
+    expect(await json(await fetch(`${base}/ready`))).toMatchObject({ status: 'ready', storage: 'memory' });
+    expect(await json(await fetch(`${base}/v1/stats`))).toMatchObject({ storage: 'memory' });
+    backend.unreachable = true;
+    expect((await fetch(`${base}/ready`)).status).toBe(503);
   });
 
   it('does not make reads wait for a database that hangs', async () => {

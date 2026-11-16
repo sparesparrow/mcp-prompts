@@ -419,6 +419,22 @@ interface SharedState {
   writes: number;
   /** The last check failed and was reported; the next failure is not reported again until one succeeds. */
   checkFailed: boolean;
+  /** How long one question to an asynchronous backend may take before it counts as failed. */
+  checkTimeoutMs: number;
+}
+
+/** A backend that has not answered in this long is treated as down; its own limits normally come first. */
+export const CHECK_TIMEOUT_MS = 15_000;
+
+/** Settles with the work, or rejects with a PromptStorageError (which says nothing about the cause) after ms. */
+function withTimeout<T>(work: Promise<T> | T, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new PromptStorageError('The database did not answer in time')), ms);
+    Promise.resolve(work).then(
+      value => { clearTimeout(timer); resolve(value); },
+      error => { clearTimeout(timer); reject(error); }
+    );
+  });
 }
 
 /** How long to leave between checks of a backend that can only be asked asynchronously. */
@@ -427,7 +443,7 @@ export const REFRESH_INTERVAL_MS = 2_000;
 function newSharedState(): SharedState {
   return {
     prompts: new Map(), origins: new Map(), profiles: new Map(), queued: new Map(),
-    refreshMs: REFRESH_INTERVAL_MS, lastCheck: 0, writes: 0, checkFailed: false,
+    refreshMs: REFRESH_INTERVAL_MS, lastCheck: 0, writes: 0, checkFailed: false, checkTimeoutMs: CHECK_TIMEOUT_MS,
   };
 }
 
@@ -817,7 +833,7 @@ export class PromptStore {
    * by sync(). Returns how many saved prompts were loaded. Throws PromptStorageError when the
    * backend cannot be read, and PromptUsageError when this store already has a backend.
    */
-  async useBackend(backend: StateBackend, options: { refreshIntervalMs?: number } = {}): Promise<number> {
+  async useBackend(backend: StateBackend, options: { refreshIntervalMs?: number; checkTimeoutMs?: number } = {}): Promise<number> {
     this.assertNoBackend();
     let asyncBackend: boolean;
     let revision: string;
@@ -836,6 +852,7 @@ export class PromptStore {
     this.assertNoBackend();
     this.shared.asyncBackend = asyncBackend;
     this.shared.refreshMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
+    this.shared.checkTimeoutMs = options.checkTimeoutMs ?? CHECK_TIMEOUT_MS;
     this.shared.lastCheck = Date.now();
     return this.attach(backend, snapshot, revision);
   }
@@ -850,7 +867,7 @@ export class PromptStore {
    * store) must be loaded before; the prompts it holds are shared, not copied, while what the
    * backend saved is private to the new store. This store must not have a backend itself.
    */
-  async overlay(backend: StateBackend, options: { refreshIntervalMs?: number } = {}): Promise<PromptStore> {
+  async overlay(backend: StateBackend, options: { refreshIntervalMs?: number; checkTimeoutMs?: number } = {}): Promise<PromptStore> {
     this.assertNoBackend();
     const pristine = (this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) });
     const store = new PromptStore();
@@ -883,9 +900,15 @@ export class PromptStore {
     await this.runCheck();
   }
 
-  /** Throws when the backend cannot be reached. A store without a backend is always fine. */
+  /** Throws when the backend cannot be reached in time. A store without a backend is always fine. */
   async checkStorage(): Promise<void> {
-    await this.shared.backend?.revision();
+    const { backend, checkTimeoutMs } = this.shared;
+    if (backend) await withTimeout(backend.revision(), checkTimeoutMs);
+  }
+
+  /** The kind of backend behind this store, whether or not it can be written; undefined for memory only. */
+  get backendKind(): 'file' | 'postgres' | undefined {
+    return this.shared.backend?.kind;
   }
 
   private attach(backend: StateBackend, snapshot: StateSnapshot, revision: string): number {
@@ -973,9 +996,10 @@ export class PromptStore {
       const { backend, saved, writes } = shared;
       if (!backend || !saved) return;
       try {
-        const revision = await backend.revision();
+        // Bounded, so that a backend that never answers fails this check and the next one can start.
+        const revision = await withTimeout(backend.revision(), shared.checkTimeoutMs);
         if (revision !== saved.revision) {
-          const snapshot = await backend.load();
+          const snapshot = await withTimeout(backend.load(), shared.checkTimeoutMs);
           if (shared.writes !== writes) continue;
           shared.saved = { snapshot, revision };
           this.applySaved();
@@ -997,7 +1021,9 @@ export class PromptStore {
 
   private assertWritable(): void {
     if (this.shared.backend && !this.shared.backend.writable) {
-      throw new PromptUsageError('This server reads its state directory read-only, so prompts cannot be changed here');
+      throw new PromptUsageError(this.shared.backend.kind === 'file'
+        ? 'This server reads its state directory read-only, so prompts cannot be changed here'
+        : 'This server reads its database read-only, so prompts cannot be changed here');
     }
   }
 

@@ -515,8 +515,9 @@ export async function openConfiguredStore(options: ServerOptions, env: NodeJS.Pr
       await pool.end().catch(() => undefined);
     };
     try {
-      await runMigrations(pool);
-      await base.useBackend(new PostgresStateBackend({ pool, ownerSub: options.owner }));
+      // A read-only install changes nothing, the schema included: the migrations must already be applied.
+      if (!options.readOnly) await runMigrations(pool);
+      await base.useBackend(new PostgresStateBackend({ pool, ownerSub: options.owner, readOnly: options.readOnly }));
     } catch (error) {
       await close();
       throw error;
