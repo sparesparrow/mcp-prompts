@@ -4,7 +4,7 @@ import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js'
 import { logger } from './utils.js';
 import { createMcpServer, packageVersion, type McpServerOptions } from './mcp-prompts-server.js';
 import { formatCatalog, formatInstallSnippets, formatProfiles, type ProfileListing } from './install-commands.js';
-import { HELP_TEXT, OptionsError, openStore, resolveOptions } from './server-options.js';
+import { HELP_TEXT, OptionsError, openConfiguredStore, openStore, resolveOptions } from './server-options.js';
 import { PromptStorageError } from './prompt-store.js';
 
 // The `mcp-prompts` binary: serves MCP over stdio, or with `catalog` / `config` shows what an install
@@ -69,7 +69,9 @@ export async function main(
     // profiles, catalog and config only print. They read what a state directory holds but must
     // not create it: "mcp-prompts config --state-dir /var/lib/mcp-prompts" used to make that
     // directory, or fail without printing anything when it could not.
-    opened = openStore(commandLine.command !== undefined ? { ...options, readOnly: true } : options);
+    opened = commandLine.command !== undefined
+      ? openStore({ ...options, readOnly: true })
+      : await openConfiguredStore(options);
   } catch (error) {
     if (error instanceof OptionsError) {
       // A profile the library does not have.

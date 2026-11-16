@@ -23,7 +23,7 @@ import {
   StoredPrompt,
   UpdatePromptParams,
 } from './prompt-store.js';
-import type { Capability } from './server-options.js';
+import { openConfiguredStore, resolveOptions, type Capability } from './server-options.js';
 
 // Builds the MCP server for one install: the prompts it serves (a store, possibly a selection of
 // the library) and the capabilities it exposes. No side effects, so both the stdio entry point and
@@ -147,8 +147,7 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
   const readOnly = options.readOnly ?? false;
   let store = options.store;
   if (!store) {
-    store = new PromptStore();
-    store.loadDefault();
+    store = (await openConfiguredStore(resolveOptions([], process.env).options)).store;
   }
   const prompts: PromptStore = store;
 
@@ -184,6 +183,7 @@ const SummarySchema = z.object({
   category: z.string().optional(),
   createdAt: z.string(),
   version: VersionSchema,
+  language: z.string().optional(),
 });
 const PageSchema = z.object({
   total: z.number().int().describe('Prompts matching the filter'),
@@ -227,6 +227,12 @@ const StatsSchema = z.object({
   tags: z.array(z.string()),
   categories: z.array(z.string()),
   storage: z.enum(['memory', 'file']),
+  sources: z.object({
+    bundled: z.number().int(),
+    catalog: z.number().int(),
+    user: z.number().int(),
+    session: z.number().int(),
+  }),
 });
 
 const ListPromptsInput = z.strictObject({
@@ -316,7 +322,7 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
   tool('list_prompts', {
     title: 'List prompts',
     description:
-      'List the prompts this server serves, as summaries (id, name, description, tags, isTemplate, category, version). ' +
+      'List the prompts this server serves, as summaries (id, name, description, tags, isTemplate, category, version, language). ' +
       'Filter with tags (any match), category, isTemplate and search (name, description and content). ' +
       'Returns up to `limit` prompts starting at `offset`; when has_more is true, call again with offset = next_offset. ' +
       'Use get_prompt for the content of one prompt.',
@@ -332,7 +338,11 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
       const description = p.description.length > MAX_LISTED_DESCRIPTION
         ? `${p.description.slice(0, MAX_LISTED_DESCRIPTION - 1)}…`
         : p.description;
-      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${p.isTemplate ? ' (template)' : ''}`;
+      const details = [
+        ...(p.isTemplate ? ['(template)'] : []),
+        ...(p.language ? [`(language ${p.language})`] : []),
+      ];
+      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
     });
     const more = page.has_more ? `\n\nMore: call list_prompts again with offset=${page.next_offset}.` : '';
     return result([text(`Found ${page.total} prompts${range}:\n\n${lines.join('\n')}${more}`)], page);

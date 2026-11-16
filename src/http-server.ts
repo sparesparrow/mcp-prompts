@@ -14,7 +14,7 @@ import {
   UpdatePromptParams,
 } from './prompt-store.js';
 import { createMcpServer, packageVersion } from './mcp-prompts-server.js';
-import { DEFAULT_OPTIONS, OptionsError, openStore, optionsFromQuery, selectFor, type OptionLayer, type ServerOptions } from './server-options.js';
+import { OptionsError, openConfiguredStore, optionsFromQuery, resolveOptions, selectFor, type OptionLayer, type ServerOptions } from './server-options.js';
 import { buildAccessPolicy, checkSource, checkToken, startupRefusal, type AccessPolicy } from './http-security.js';
 
 // HTTP mode: the same prompts and operations as the MCP stdio server, as a small JSON API, plus a
@@ -373,17 +373,8 @@ function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 }
 
 export async function createServer(options: HttpServerOptions = {}): Promise<HttpServerApp> {
-  const serverOptions = options.serverOptions ?? DEFAULT_OPTIONS;
-  let base = options.store;
-  if (!base) {
-    if (options.serverOptions) {
-      // The library, the user's directories and what earlier runs saved to the state directory.
-      base = openStore(serverOptions).base;
-    } else {
-      base = new PromptStore();
-      base.loadDefault();
-    }
-  }
+  const serverOptions = options.serverOptions ?? resolveOptions([], process.env).options;
+  const base = options.store ?? (await openConfiguredStore(serverOptions)).base;
   for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
   // Throws OptionsError for a profile the library does not define.
   const served = selectFor(base, serverOptions);
@@ -517,7 +508,8 @@ export async function startHttpServer(
   host: string = '127.0.0.1',
   options: HttpServerOptions = {}
 ): Promise<HttpServerApp> {
-  const readOnly = (options.serverOptions ?? DEFAULT_OPTIONS).readOnly;
+  const serverOptions = options.serverOptions ?? resolveOptions([], process.env).options;
+  const readOnly = serverOptions.readOnly;
   const token = options.access ? options.access.token : options.authToken;
   const refusal = startupRefusal({ host, readOnly, token, allowInsecure: options.allowInsecure });
   if (refusal) throw new Error(refusal);
@@ -528,7 +520,7 @@ export async function startHttpServer(
     allowedOrigins: options.allowedOrigins,
     corsOrigin: options.corsOrigin,
   });
-  const app = await createServer({ ...options, access });
+  const app = await createServer({ ...options, serverOptions, access });
   await new Promise<void>((resolve, reject) => {
     app.onListenError(reject);
     app.listen(port, host, resolve);

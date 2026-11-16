@@ -89,6 +89,8 @@ export interface PromptSummary {
   category?: string;
   createdAt: string;
   version: number | string;
+  /** metadata.language, when present, so callers can choose a language without fetching each prompt. */
+  language?: string;
 }
 
 export interface ListFilter {
@@ -119,6 +121,7 @@ export interface PromptStats {
   categories: string[];
   /** 'file' when changes are saved to a state directory, 'memory' when they end with the process. */
   storage: 'memory' | 'file';
+  sources: { bundled: number; catalog: number; user: number; session: number };
 }
 
 export interface RenderedTemplate {
@@ -187,6 +190,7 @@ function categoryOf(prompt: StoredPrompt): string | undefined {
 
 function summarize(prompt: StoredPrompt): PromptSummary {
   const category = categoryOf(prompt);
+  const language = (prompt.metadata as Record<string, unknown> | undefined)?.language;
   return {
     id: prompt.id,
     name: prompt.name,
@@ -195,7 +199,8 @@ function summarize(prompt: StoredPrompt): PromptSummary {
     isTemplate: prompt.isTemplate || false,
     ...(category ? { category } : {}),
     createdAt: prompt.createdAt,
-    version: prompt.version
+    version: prompt.version,
+    ...(typeof language === 'string' ? { language } : {})
   };
 }
 
@@ -289,6 +294,42 @@ const COARSE_MTIME_MS = 2_000;
 
 /** JSON files in a library that are not prompts: a generated index, and the profiles. */
 const NOT_PROMPTS = ['index.json', 'profiles.json'];
+const CATALOG_TIMEOUT_MS = 5_000;
+const CATALOG_MAX_BYTES = 1024 * 1024;
+const LOCAL_HTTP_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]']);
+
+function isLocalHttp(url: URL): boolean {
+  return url.protocol === 'http:' && LOCAL_HTTP_HOSTS.has(url.hostname);
+}
+
+function catalogOrigin(location: string): string {
+  try {
+    return new URL(location).origin;
+  } catch {
+    return '[invalid catalog URL]';
+  }
+}
+
+async function fetchCatalog(url: URL, allowLocalHttp: boolean, timeoutMs: number): Promise<Response> {
+  let current = url;
+  const signal = AbortSignal.timeout(timeoutMs);
+  const redirectStatuses = new Set([301, 302, 303, 307, 308]);
+  for (let redirects = 0; redirects <= 5; redirects++) {
+    const response = await fetch(current, { signal, redirect: 'manual' });
+    if (!redirectStatuses.has(response.status)) return response;
+    const location = response.headers.get('location');
+    if (!location || redirects === 5) {
+      await response.body?.cancel();
+      throw new Error('catalog redirect is missing a location or exceeded the redirect limit');
+    }
+    const next = new URL(location, current);
+    const allowed = allowLocalHttp ? isLocalHttp(next) : next.protocol === 'https:';
+    await response.body?.cancel();
+    if (!allowed) throw new Error(`catalog redirect to ${next.origin} was refused`);
+    current = next;
+  }
+  throw new Error('catalog exceeded the redirect limit');
+}
 
 function byName(a: fs.Dirent, b: fs.Dirent): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
@@ -355,6 +396,7 @@ const ProfilesFileSchema = z.looseObject({
 export type PromptOrigin =
   | { kind: 'library'; group: string }
   | { kind: 'user'; dir: string }
+  | { kind: 'catalog'; url: string }
   | { kind: 'runtime' };
 
 export interface CatalogGroup {
@@ -551,6 +593,61 @@ export class PromptStore {
     return count;
   }
 
+  /**
+   * Loads a remote prompt catalog after the bundled library and before user directories. Only
+   * HTTPS is accepted, except for HTTP catalogs on loopback. A failed catalog leaves the store
+   * unchanged; invalid entries are skipped individually.
+   */
+  async loadCatalog(location: string, options: { timeoutMs?: number; maxBytes?: number } = {}): Promise<number> {
+    const timeoutMs = options.timeoutMs ?? CATALOG_TIMEOUT_MS;
+    const maxBytes = options.maxBytes ?? CATALOG_MAX_BYTES;
+    try {
+      const url = new URL(location);
+      const localHttp = isLocalHttp(url);
+      if ((url.protocol !== 'https:' && !localHttp) || url.username !== '' || url.password !== '') {
+        logger.warn(`PROMPTS_CATALOG_URL must be https (or http to localhost): ${url.origin} refused`);
+        return 0;
+      }
+
+      const response = await fetchCatalog(url, localHttp, timeoutMs);
+      if (!response.ok) {
+        logger.warn(`Catalog ${url.origin} answered ${response.status}: skipped`);
+        return 0;
+      }
+
+      const body = await readLimited(response, maxBytes);
+      const data: unknown = JSON.parse(body);
+      const entries = Array.isArray(data)
+        ? data
+        : data && typeof data === 'object' && Array.isArray((data as { prompts?: unknown }).prompts)
+          ? (data as { prompts: unknown[] }).prompts
+          : undefined;
+      if (!entries) {
+        logger.warn(`Catalog ${url.origin} is neither an array nor { "prompts": [...] }: skipped`);
+        return 0;
+      }
+
+      let count = 0;
+      for (const entry of entries) {
+        const valid = PromptSchema.safeParse(entry);
+        if (!valid.success) {
+          logger.warn(`Catalog entry skipped: ${valid.error.issues[0]?.message ?? 'invalid'}`);
+          continue;
+        }
+        const prompt = this.checkPromptData(entry, `catalog ${url.origin}`);
+        if (!prompt) continue;
+        this.put(prompt, { kind: 'catalog', url: url.origin });
+        count++;
+      }
+      logger.info(`Loaded ${count} prompts from catalog ${url.origin}`);
+      return count;
+    } catch (error) {
+      const reason = error instanceof Error ? error.name : 'error';
+      logger.warn(`Catalog ${catalogOrigin(location)} not loaded (${reason})`);
+      return 0;
+    }
+  }
+
   /** Records a prompt read from the library, the samples or one of the user's directories. */
   private put(prompt: StoredPrompt, origin: PromptOrigin): void {
     this.shared.prompts.set(prompt.id, prompt);
@@ -590,6 +687,21 @@ export class PromptStore {
     const count = this.loadTree(dir, dir, kind, new Map(), visited);
     // Saved edits and deletions apply to what was just loaded as well.
     if (this.shared.watch) this.applyState();
+    return count;
+  }
+
+  /** Loads user directories after the library and any remote catalog, so the user's ids win. */
+  loadUserDirectories(dirs: string[]): number {
+    let count = 0;
+    for (const dir of dirs) {
+      if (!fs.existsSync(dir)) {
+        logger.warn(`Prompts directory ${dir} does not exist`);
+        continue;
+      }
+      const loaded = this.loadDirectory(dir, 'user');
+      logger.info(`Loaded ${loaded} prompts from ${dir}`);
+      count += loaded;
+    }
     return count;
   }
 
@@ -982,13 +1094,22 @@ export class PromptStore {
 
   stats(): PromptStats {
     const promptList = this.all();
+    const sources = { bundled: 0, catalog: 0, user: 0, session: 0 };
+    for (const prompt of promptList) {
+      const kind = this.originOf(prompt.id).kind;
+      if (kind === 'library') sources.bundled++;
+      else if (kind === 'catalog') sources.catalog++;
+      else if (kind === 'user') sources.user++;
+      else sources.session++;
+    }
     return {
       total: promptList.length,
       templates: promptList.filter(p => p.isTemplate).length,
       regular: promptList.filter(p => !p.isTemplate).length,
       tags: Array.from(new Set(promptList.flatMap(p => p.tags || []))).sort(),
       categories: Array.from(new Set(promptList.map(categoryOf).filter((c): c is string => Boolean(c)))).sort(),
-      storage: this.shared.stateDir ? 'file' : 'memory'
+      storage: this.shared.stateDir ? 'file' : 'memory',
+      sources
     };
   }
 
@@ -1075,4 +1196,27 @@ export class PromptStore {
     }
     return warnings;
   }
+}
+
+/** Reads at most maxBytes so a large or endless response cannot exhaust memory. */
+async function readLimited(response: Response, maxBytes: number): Promise<string> {
+  const declared = Number(response.headers.get('content-length'));
+  if (Number.isFinite(declared) && declared > maxBytes) {
+    throw new Error(`catalog is ${declared} bytes, over the ${maxBytes}-byte limit`);
+  }
+  if (!response.body) return '';
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > maxBytes) {
+      await reader.cancel();
+      throw new Error(`catalog is over the ${maxBytes}-byte limit`);
+    }
+    chunks.push(value);
+  }
+  return Buffer.concat(chunks).toString('utf8');
 }

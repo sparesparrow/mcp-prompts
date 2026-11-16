@@ -25,6 +25,8 @@ export interface ServerOptions {
   promptsDir?: string;
   /** The user's own directories, always served in full. */
   dirs: string[];
+  /** Optional JSON catalog fetched once at startup and layered between the library and user directories. */
+  catalogUrl?: string;
   /** Where add, update and delete are saved. Left out, they are kept in memory only. */
   stateDir?: string;
 }
@@ -39,6 +41,7 @@ export interface OptionLayer {
   readOnly?: boolean;
   promptsDir?: string;
   dirs?: string[];
+  catalogUrl?: string;
   stateDir?: string;
 }
 
@@ -87,14 +90,14 @@ Choose what the install serves:
   --state-dir <dir>     save add_prompt, update_prompt and delete_prompt to this directory and
                         load them again at the next start (default: memory only)
   --config <file>       read options from a JSON file (keys: profile, prompts, templates,
-                        exclude, expose, readOnly, promptsDir, dirs, stateDir)
+                        exclude, expose, readOnly, promptsDir, dirs, catalogUrl, stateDir)
   -h, --help            show this help
   -v, --version         show the version
 
 Environment variables: MCP_PROMPTS_PROFILE, MCP_PROMPTS_PROMPTS, MCP_PROMPTS_TEMPLATES,
-MCP_PROMPTS_EXCLUDE, MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS (separated by
-"${path.delimiter}"), MCP_PROMPTS_STATE_DIR, MCP_PROMPTS_CONFIG. Flags override environment
-variables, which override the config file.
+MCP_PROMPTS_EXCLUDE, MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS or
+PROMPTS_EXTRA_DIRS (separated by "${path.delimiter}"), PROMPTS_CATALOG_URL, MCP_PROMPTS_STATE_DIR,
+MCP_PROMPTS_CONFIG. Flags override environment variables, which override the config file.
 
 HTTP: the URL http://<host>:<port>/mcp takes profile, prompts, templates, exclude, expose and
 readOnly as query parameters, and can only narrow what the server itself serves.
@@ -279,8 +282,12 @@ export function optionsFromEnv(
   if (readOnly) layer.readOnly = parseBoolean('MCP_PROMPTS_READ_ONLY', readOnly);
   const promptsDir = get('PROMPTS_DIR');
   if (promptsDir) layer.promptsDir = resolvePath(promptsDir, cwd);
-  const dirs = get('MCP_PROMPTS_DIRS');
-  if (dirs) layer.dirs = dirs.split(path.delimiter).filter(Boolean).map(dir => resolvePath(dir, cwd));
+  const dirs = [get('MCP_PROMPTS_DIRS'), get('PROMPTS_EXTRA_DIRS')].filter((value): value is string => Boolean(value));
+  if (dirs.length > 0) {
+    layer.dirs = dirs.flatMap(value => value.split(path.delimiter).filter(Boolean).map(dir => resolvePath(dir, cwd)));
+  }
+  const catalogUrl = get('PROMPTS_CATALOG_URL');
+  if (catalogUrl) layer.catalogUrl = catalogUrl;
   const stateDir = get('MCP_PROMPTS_STATE_DIR');
   if (stateDir) layer.stateDir = resolvePath(stateDir, cwd);
   const config = get('MCP_PROMPTS_CONFIG');
@@ -314,6 +321,7 @@ const ConfigFileSchema = z.strictObject({
   readOnly: z.boolean().optional(),
   promptsDir: z.string().optional(),
   dirs: z.array(z.string()).optional(),
+  catalogUrl: z.string().url().optional(),
   stateDir: z.string().optional(),
 });
 
@@ -344,6 +352,7 @@ export function optionsFromConfigFile(file: string): OptionLayer {
   if (config.readOnly !== undefined) layer.readOnly = config.readOnly;
   if (config.promptsDir !== undefined) layer.promptsDir = resolvePath(config.promptsDir, base);
   if (config.dirs !== undefined) layer.dirs = config.dirs.map(dir => resolvePath(dir, base));
+  if (config.catalogUrl !== undefined) layer.catalogUrl = config.catalogUrl;
   if (config.stateDir !== undefined) layer.stateDir = resolvePath(config.stateDir, base);
   return layer;
 }
@@ -384,6 +393,7 @@ export function mergeOptions(base: ServerOptions, ...layers: OptionLayer[]): Ser
     if (layer.readOnly !== undefined) result.readOnly = layer.readOnly;
     if (layer.promptsDir !== undefined) result.promptsDir = layer.promptsDir;
     if (layer.dirs !== undefined) result.dirs = layer.dirs;
+    if (layer.catalogUrl !== undefined) result.catalogUrl = layer.catalogUrl;
     if (layer.stateDir !== undefined) result.stateDir = layer.stateDir;
   }
   return result;
@@ -433,6 +443,16 @@ export function selectFor(store: PromptStore, options: { profiles?: string[]; se
 export function openStore(options: ServerOptions): { base: PromptStore; store: PromptStore; warnings: string[] } {
   const base = new PromptStore();
   base.load({ promptsDir: options.promptsDir, dirs: options.dirs });
+  if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
+  return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection) };
+}
+
+/** Opens a store with library < catalog < user-directory precedence. */
+export async function openConfiguredStore(options: ServerOptions): Promise<{ base: PromptStore; store: PromptStore; warnings: string[] }> {
+  const base = new PromptStore();
+  base.load({ promptsDir: options.promptsDir });
+  if (options.catalogUrl) await base.loadCatalog(options.catalogUrl);
+  base.loadUserDirectories(options.dirs);
   if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
   return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection) };
 }
