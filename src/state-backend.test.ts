@@ -21,7 +21,9 @@ class FakeBackend implements StateBackend {
   readonly log: string[] = [];
   failWith: Error | undefined;
   beforeWrite: (() => void) | undefined;
-  private rev = 0;
+  /** Makes every write wait this long, so concurrent changes overlap. */
+  delayMs = 0;
+  protected rev = 0;
 
   load(): StateSnapshot {
     return { prompts: Array.from(this.prompts.values()), tombstones: Array.from(this.tombstones) };
@@ -31,11 +33,24 @@ class FakeBackend implements StateBackend {
     return String(this.rev);
   }
 
-  async put(prompt: StoredPrompt, mode: 'create' | 'replace'): Promise<void> {
-    this.log.push(`put ${mode} ${prompt.id}`);
+  /**
+   * Like the Postgres backend: a replace with an expected version needs a saved prompt of that
+   * version, and one with null (the first save of a library prompt) needs no saved prompt and no
+   * tombstone.
+   */
+  async put(prompt: StoredPrompt, mode: 'create' | 'replace', expectedVersion?: string | null): Promise<void> {
+    this.log.push(mode === 'replace' ? `put replace ${prompt.id} expected=${expectedVersion}` : `put create ${prompt.id}`);
     this.beforeWrite?.();
+    if (this.delayMs) await new Promise(resolve => setTimeout(resolve, this.delayMs));
     if (this.failWith) throw this.failWith;
     if (mode === 'create' && this.prompts.has(prompt.id)) throw new PromptConflictError(prompt.id);
+    if (mode === 'replace' && expectedVersion !== undefined) {
+      const current = this.prompts.get(prompt.id);
+      const matches = expectedVersion === null
+        ? !current && !this.tombstones.has(prompt.id)
+        : current !== undefined && String(current.version) === expectedVersion;
+      if (!matches) throw new PromptConflictError(prompt.id);
+    }
     this.prompts.set(prompt.id, prompt);
     if (mode === 'create') this.tombstones.delete(prompt.id);
     this.rev++;
@@ -43,6 +58,7 @@ class FakeBackend implements StateBackend {
 
   async remove(id: string, tombstone: boolean): Promise<void> {
     this.log.push(`remove ${id} tombstone=${tombstone}`);
+    if (this.delayMs) await new Promise(resolve => setTimeout(resolve, this.delayMs));
     if (this.failWith) throw this.failWith;
     this.prompts.delete(id);
     if (tombstone) this.tombstones.add(id);
@@ -151,7 +167,7 @@ describe('PromptStore with a StateBackend', () => {
     const store = await open(backend);
     const updated = await store.update('lib-a', { name: 'Library A, edited' });
     expect(updated.version).toBe(2);
-    expect(backend.log).toEqual(['put replace lib-a']);
+    expect(backend.log).toEqual(['put replace lib-a expected=null']);
     expect(backend.prompts.get('lib-a')!.name).toBe('Library A, edited');
   });
 
@@ -172,6 +188,119 @@ describe('PromptStore with a StateBackend', () => {
     await expect(store.add({ name: 'Nope', content: 'c', isTemplate: false, tags: [] })).rejects.toThrow(PromptUsageError);
     await expect(store.delete('lib-a')).rejects.toThrow(PromptUsageError);
     expect(backend.log).toEqual([]);
+  });
+});
+
+describe('PromptStore changes that overlap', () => {
+  let root: string;
+  let library: string;
+  beforeAll(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-overlap-'));
+    library = path.join(root, 'library');
+    fs.mkdirSync(library, { recursive: true });
+    fs.writeFileSync(path.join(library, 'lib-a.json'), JSON.stringify({ id: 'lib-a', name: 'Library A', content: 'a' }));
+  });
+  afterAll(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  const open = async (backend: StateBackend) => {
+    const store = new PromptStore();
+    store.load({ promptsDir: library });
+    await store.useBackend(backend);
+    return store;
+  };
+
+  it('asks for no expected version on the first edit of a library prompt, then for the saved one', async () => {
+    const backend = new FakeBackend();
+    const store = await open(backend);
+    await store.update('lib-a', { name: 'One' });
+    await store.update('lib-a', { name: 'Two' });
+    expect(backend.log).toEqual(['put replace lib-a expected=null', 'put replace lib-a expected=2']);
+    expect(store.get('lib-a').version).toBe(3);
+  });
+
+  it('applies two updates of one prompt one after the other, so neither is lost', async () => {
+    const backend = new FakeBackend();
+    backend.delayMs = 10;
+    const store = await open(backend);
+    await store.add({ id: 'mine', name: 'Mine', content: 'c', isTemplate: false, tags: [] });
+    const [first, second] = await Promise.all([
+      store.update('mine', { name: 'First' }),
+      store.update('mine', { content: 'second content' })
+    ]);
+    expect([first.version, second.version]).toEqual([2, 3]);
+    expect(store.get('mine')).toMatchObject({ name: 'First', content: 'second content', version: 3 });
+    expect(backend.prompts.get('mine')).toMatchObject({ name: 'First', content: 'second content', version: 3 });
+  });
+
+  it('reports a conflict when another server changed the prompt after this store read it', async () => {
+    const backend = new FakeBackend();
+    backend.prompts.set('shared', stored('shared'));
+    const store = await open(backend);
+    backend.prompts.set('shared', { ...stored('shared', 'Theirs'), version: 2 });
+    await expect(store.update('shared', { name: 'Mine' })).rejects.toThrow(PromptConflictError);
+    expect(backend.prompts.get('shared')!.name).toBe('Theirs');
+    expect(store.get('shared').name).toBe('shared');
+  });
+
+  it('does not bring a prompt back when an update was queued behind its deletion', async () => {
+    const backend = new FakeBackend();
+    backend.delayMs = 10;
+    const store = await open(backend);
+    await store.add({ id: 'doomed', name: 'Doomed', content: 'c', isTemplate: false, tags: [] });
+    const deleting = store.delete('doomed');
+    const updating = store.update('doomed', { name: 'Too late' });
+    await expect(deleting).resolves.toMatchObject({ id: 'doomed' });
+    await expect(updating).rejects.toThrow(PromptNotFoundError);
+    expect(backend.prompts.has('doomed')).toBe(false);
+    expect(() => store.get('doomed')).toThrow(PromptNotFoundError);
+  });
+
+  it('does not bring a prompt back when another server deleted it first', async () => {
+    const backend = new FakeBackend();
+    backend.prompts.set('doomed', stored('doomed'));
+    const store = await open(backend);
+    backend.prompts.delete('doomed');
+    await expect(store.update('doomed', { name: 'Too late' })).rejects.toThrow(PromptConflictError);
+    expect(backend.prompts.has('doomed')).toBe(false);
+  });
+
+  it('keeps going after a change failed', async () => {
+    const backend = new FakeBackend();
+    backend.prompts.set('kept', stored('kept'));
+    const store = await open(backend);
+    backend.failWith = new Error('down');
+    // The backend recovers by the time the second change reaches it.
+    backend.beforeWrite = () => {
+      if (backend.log.length === 2) backend.failWith = undefined;
+    };
+    const failing = store.update('kept', { name: 'A' });
+    const next = store.update('kept', { name: 'B' });
+    await expect(failing).rejects.toThrow(PromptStorageError);
+    await expect(next).resolves.toMatchObject({ name: 'B', version: 2 });
+  });
+
+  it('works with a backend whose load and revision answer with promises', async () => {
+    class AsyncBackend extends FakeBackend {
+      // @ts-expect-error narrowing the return type to the asynchronous half of the contract
+      async load(): Promise<StateSnapshot> {
+        return super.load();
+      }
+      // @ts-expect-error narrowing the return type to the asynchronous half of the contract
+      async revision(): Promise<string> {
+        return super.revision();
+      }
+    }
+    const backend = new AsyncBackend();
+    backend.prompts.set('saved', stored('saved'));
+    backend.tombstones.add('lib-a');
+    const store = await open(backend);
+    expect(store.get('saved').name).toBe('saved');
+    expect(() => store.get('lib-a')).toThrow(PromptNotFoundError);
+    // Reads stay synchronous and do not wait for, or trip over, the pending revision check.
+    expect(store.list()).toHaveLength(1);
+    await store.add({ id: 'new-one', name: 'New', content: 'c', isTemplate: false, tags: [] });
+    expect(store.get('new-one').name).toBe('New');
+    expect(store.stats().total).toBe(2);
   });
 });
 

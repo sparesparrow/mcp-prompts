@@ -8,11 +8,16 @@ import { logger } from './utils.js';
 // served prompts in memory and reads them synchronously; a backend only persists the changes and
 // hands back what earlier runs (or other servers) saved.
 
-/** A prompt with this id already exists. */
+/** A prompt with this id already exists, or was changed by someone else since it was read. */
 export class PromptConflictError extends Error {
-  constructor(id: string) {
-    super(`A prompt with ID ${id} already exists`);
+  constructor(id: string, message = `A prompt with ID ${id} already exists`) {
+    super(message);
   }
+}
+
+/** The conflict of a change made to a prompt that someone else changed or deleted in the meantime. */
+export function staleChangeError(id: string): PromptConflictError {
+  return new PromptConflictError(id, `Prompt ${id} was changed or deleted by someone else since it was read; read it again and retry`);
 }
 
 /** A change could not be saved; the prompt was left as it was. */
@@ -39,9 +44,14 @@ export interface StateBackend {
   /**
    * Saves a prompt. 'create' must fail with PromptConflictError when the id is taken (decided by
    * the backend itself, so two servers cannot both win), and also clears a tombstone for the id;
-   * 'replace' overwrites. Any other failure is a PromptStorageError, and nothing is saved.
+   * 'replace' overwrites. With an expectedVersion, 'replace' only succeeds when the saved prompt
+   * still has that version, so an update made from a stale read, or of a prompt another server
+   * deleted, fails with PromptConflictError instead of overwriting or bringing it back. null means
+   * the prompt was not saved yet (a library prompt edited for the first time): it must still not
+   * be saved, nor its id recorded as deleted. Left out, 'replace' is unconditional. Any other
+   * failure is a PromptStorageError, and nothing is saved.
    */
-  put(prompt: StoredPrompt, mode: 'create' | 'replace'): Promise<void>;
+  put(prompt: StoredPrompt, mode: 'create' | 'replace', expectedVersion?: string | null): Promise<void>;
   /** Removes a prompt; with tombstone, also remembers the id as deleted (it exists in the library). */
   remove(id: string, tombstone: boolean): Promise<void>;
 }
@@ -176,6 +186,9 @@ export class FileStateBackend implements StateBackend {
     return this.lastRevision;
   }
 
+  // The expected version is not checked: a directory has no way to compare and replace in one
+  // step. The store applies the changes it makes one after the other, and reads the directory
+  // again whenever it changed, so a stale replace is rare here.
   async put(prompt: StoredPrompt, mode: 'create' | 'replace'): Promise<void> {
     this.saving(`prompt ${prompt.id}`, () => {
       const data = `${JSON.stringify(prompt, null, 2)}\n`;

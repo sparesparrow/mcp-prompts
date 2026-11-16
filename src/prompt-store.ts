@@ -405,12 +405,14 @@ interface SharedState {
   pristine?: { prompts: Map<string, StoredPrompt>; origins: Map<string, PromptOrigin> };
   /** What the backend held when it was last read, and its revision from just before that read. */
   saved?: { snapshot: StateSnapshot; revision: string };
+  /** The change last queued for each prompt id, so changes to one prompt are applied one by one. */
+  queued: Map<string, Promise<unknown>>;
 }
 
 export class PromptStore {
   // Views made by select() share this state and add filters, so a prompt added through any view
   // is stored once.
-  private shared: SharedState = { prompts: new Map(), origins: new Map(), profiles: new Map() };
+  private shared: SharedState = { prompts: new Map(), origins: new Map(), profiles: new Map(), queued: new Map() };
   private filters: Visibility[] = [];
 
   /** Number of prompts this store serves. */
@@ -939,56 +941,83 @@ export class PromptStore {
     return prompt;
   }
 
+  /**
+   * Runs a change to one prompt after the changes queued for the same id, so two updates of a
+   * prompt cannot both start from the same version and an update cannot run after the deletion
+   * it was queued behind. A failed change does not stop the ones behind it. Without a backend a
+   * change is decided and applied in one step, so there is nothing to queue.
+   */
+  private serialised<T>(id: string, change: () => Promise<T>): Promise<T> {
+    if (!this.shared.backend) return change();
+    const { queued } = this.shared;
+    const run = (queued.get(id) ?? Promise.resolve()).then(change, change);
+    const settled = run.then(() => undefined, () => undefined);
+    queued.set(id, settled);
+    void settled.then(() => {
+      if (queued.get(id) === settled) queued.delete(id);
+    });
+    return run;
+  }
+
   async add(input: CreatePromptInput): Promise<StoredPrompt> {
-    this.assertWritable();
-    this.refresh();
     const { id: requestedId, ...fields } = input;
-    // An id taken by a prompt outside this view's selection is taken all the same.
-    if (requestedId !== undefined && this.shared.prompts.has(requestedId)) throw new PromptConflictError(requestedId);
     const id = requestedId ?? `prompt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    const now = new Date().toISOString();
-    const prompt: StoredPrompt = { ...fields, id, createdAt: now, updatedAt: now, version: 1 };
-    // Saved first: the backend decides a conflict (another server may have saved this id a moment ago).
-    if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(prompt, 'create'));
-    this.shared.prompts.set(id, prompt);
-    // An id the library also has (deleted earlier, now added again) keeps its place in the
-    // library, as it will after a restart; anything else was added at runtime.
-    this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
-    logger.info(`Added prompt: ${id}`);
-    return prompt;
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      this.refresh();
+      // An id taken by a prompt outside this view's selection is taken all the same.
+      if (requestedId !== undefined && this.shared.prompts.has(requestedId)) throw new PromptConflictError(requestedId);
+      const now = new Date().toISOString();
+      const prompt: StoredPrompt = { ...fields, id, createdAt: now, updatedAt: now, version: 1 };
+      // Saved first: the backend decides a conflict (another server may have saved this id a moment ago).
+      if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(prompt, 'create'));
+      this.shared.prompts.set(id, prompt);
+      // An id the library also has (deleted earlier, now added again) keeps its place in the
+      // library, as it will after a restart; anything else was added at runtime.
+      this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
+      logger.info(`Added prompt: ${id}`);
+      return prompt;
+    });
   }
 
   async update(id: string, updates: UpdatePromptInput): Promise<StoredPrompt> {
-    this.assertWritable();
-    const prompt = this.get(id);
-    const changes = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
-    if (Object.keys(changes).length === 0) {
-      throw new PromptUsageError('Nothing to update: give at least one field to change (name, description, content, isTemplate, tags, category, variables or metadata)');
-    }
-    const updated: StoredPrompt = {
-      ...prompt,
-      ...changes,
-      id,
-      updatedAt: new Date().toISOString(),
-      version: nextVersion(prompt.version)
-    };
-    if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(updated, 'replace'));
-    this.shared.prompts.set(id, updated);
-    logger.info(`Updated prompt: ${id}`);
-    return updated;
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      const prompt = this.get(id);
+      const changes = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
+      if (Object.keys(changes).length === 0) {
+        throw new PromptUsageError('Nothing to update: give at least one field to change (name, description, content, isTemplate, tags, category, variables or metadata)');
+      }
+      const updated: StoredPrompt = {
+        ...prompt,
+        ...changes,
+        id,
+        updatedAt: new Date().toISOString(),
+        version: nextVersion(prompt.version)
+      };
+      // The backend only replaces the version this change started from; a library prompt that was
+      // never saved has none, which is the null.
+      const expectedVersion = prompt === this.shared.pristine?.prompts.get(id) ? null : String(prompt.version);
+      if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(updated, 'replace', expectedVersion));
+      this.shared.prompts.set(id, updated);
+      logger.info(`Updated prompt: ${id}`);
+      return updated;
+    });
   }
 
   async delete(id: string): Promise<StoredPrompt> {
-    this.assertWritable();
-    const prompt = this.get(id);
-    // A prompt that also exists in the library or a user directory would come back the next time
-    // the backend is read, so its id is recorded as deleted.
-    const tombstone = this.shared.pristine?.prompts.has(id) ?? false;
-    if (this.shared.backend) await this.persist(`the deletion of prompt ${id}`, backend => backend.remove(id, tombstone));
-    this.shared.prompts.delete(id);
-    this.shared.origins.delete(id);
-    logger.info(`Deleted prompt: ${id}`);
-    return prompt;
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      const prompt = this.get(id);
+      // A prompt that also exists in the library or a user directory would come back the next time
+      // the backend is read, so its id is recorded as deleted.
+      const tombstone = this.shared.pristine?.prompts.has(id) ?? false;
+      if (this.shared.backend) await this.persist(`the deletion of prompt ${id}`, backend => backend.remove(id, tombstone));
+      this.shared.prompts.delete(id);
+      this.shared.origins.delete(id);
+      logger.info(`Deleted prompt: ${id}`);
+      return prompt;
+    });
   }
 
   /** Fills a template prompt's placeholders and reports which were left unfilled. */
