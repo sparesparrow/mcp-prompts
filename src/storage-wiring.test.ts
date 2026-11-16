@@ -43,9 +43,6 @@ class FakePostgres implements StateBackend {
   }
 }
 
-const stored = (id: string, name = id): StoredPrompt =>
-  ({ id, name, content: `${name} content`, isTemplate: false, tags: [], createdAt: 't', updatedAt: 't', version: 1 });
-
 let root: string;
 let library: string;
 beforeAll(() => {
@@ -183,6 +180,16 @@ describe('HTTP over a Postgres store', () => {
     expect(put.status).toBe(200);
     expect(await json(put)).toMatchObject({ name: 'Theirs', content: 'Mine', version: 4 });
   });
+
+  it('does not make reads wait for a database that hangs', async () => {
+    const backend = new FakePostgres();
+    const base = await serve(await open(backend));
+    backend.revision = () => new Promise<string>(() => undefined);
+    const started = Date.now();
+    const res = await fetch(`${base}/v1/prompts/lib-a`, { signal: AbortSignal.timeout(4_000) });
+    expect(res.status).toBe(200);
+    expect(Date.now() - started).toBeLessThan(3_000);
+  }, 10_000);
 
   it('answers 409 when a change is stale all the same', async () => {
     const backend = new FakePostgres();

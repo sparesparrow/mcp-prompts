@@ -23,10 +23,14 @@ function errorCode(error: unknown): string | undefined {
   return typeof code === 'string' && /^[A-Za-z0-9_]{1,32}$/.test(code) ? code : undefined;
 }
 
-/** Logs a failure by its code and throws the error callers get, which has no driver text. */
-function fail(what: string, error: unknown, consequence: string): never {
+/**
+ * Logs a failure by its code and throws the error callers get, which has no driver text. With
+ * report false the log line is left to debug level: for a check that is repeated while the
+ * database is down, which says so once.
+ */
+function fail(what: string, error: unknown, consequence: string, report = true): never {
   const code = errorCode(error);
-  logger.error({ code }, `Postgres state backend: could not ${what}`);
+  logger[report ? 'error' : 'debug']({ code }, `Postgres state backend: could not ${what}`);
   throw new PromptStorageError(`Could not ${what}${code ? ` (${code})` : ''}${consequence}`);
 }
 
@@ -121,6 +125,8 @@ export class PostgresStateBackend implements StateBackend {
   readonly writable = true;
   private readonly pool: Pool;
   private readonly ownerSub: string;
+  /** The last revision check failed, and said so. */
+  private checkFailing = false;
 
   constructor(options: PostgresStateBackendOptions) {
     this.pool = options.pool;
@@ -157,9 +163,13 @@ export class PostgresStateBackend implements StateBackend {
   async revision(): Promise<string> {
     try {
       const result = await this.pool.query('SELECT rev FROM revisions WHERE owner_sub = $1', [this.ownerSub]);
+      this.checkFailing = false;
       return result.rows[0] ? String(result.rows[0].rev) : '0';
     } catch (error) {
-      return fail('check the database for changes', error, '');
+      // Asked every couple of seconds, and by every health check: an outage is reported once.
+      const first = !this.checkFailing;
+      this.checkFailing = true;
+      return fail('check the database for changes', error, '', first);
     }
   }
 

@@ -548,6 +548,43 @@ describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
       expect(rows.rows.map(row => row.id)).toEqual(['kept']);
     });
 
+    it('reports an outage once, however often the store and the health check ask', async () => {
+      const { state, source } = flaky();
+      const store = await storeFor(backendFor(newOwner('outage'), source), 1);
+      /** What an operator would see at the default log level: everything above debug. */
+      const reported = async (fn: () => Promise<unknown>): Promise<string[]> => {
+        const lines: string[] = [];
+        const spies = (['info', 'warn', 'error'] as const).map(level =>
+          vi.spyOn(logger, level).mockImplementation(((...args: unknown[]) => { lines.push(`${level} ${JSON.stringify(args)}`); }) as never)
+        );
+        try {
+          await fn();
+        } finally {
+          spies.forEach(spy => spy.mockRestore());
+        }
+        return lines;
+      };
+      state.broken = true;
+      const outage = await reported(async () => {
+        for (let i = 0; i < 5; i++) {
+          await store.sync();
+          await store.checkStorage().catch(() => undefined);
+        }
+      });
+      // One line from the backend and one from the store; the rest of the failed checks say nothing.
+      expect(outage.length).toBeLessThanOrEqual(2);
+      expect(outage.length).toBeGreaterThan(0);
+      state.broken = false;
+      await store.sync();
+      // Once it is back, a new outage is reported again.
+      state.broken = true;
+      const second = await reported(async () => { await store.sync(); await store.sync(); });
+      state.broken = false;
+      expect(second.length).toBeGreaterThan(0);
+      expect(second.length).toBeLessThanOrEqual(2);
+      for (const line of [...outage, ...second]) for (const secret of ['leaky_user', '10.9.8.7', 'password']) expect(line).not.toContain(secret);
+    });
+
     it('refuses to attach to a backend whose first read fails, without details', async () => {
       const { state, source } = flaky();
       state.broken = true;

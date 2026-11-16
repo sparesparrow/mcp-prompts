@@ -80,6 +80,17 @@ export interface HttpServerOptions {
   env?: NodeJS.ProcessEnv;
 }
 
+/** How long a request waits for the database to say whether other servers changed anything. */
+const SYNC_WAIT_MS = 1_000;
+
+/** Resolves when the work does, or after ms, whichever is first; the work carries on either way. */
+function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, ms);
+    work.then(() => { clearTimeout(timer); resolve(); }, () => { clearTimeout(timer); resolve(); });
+  });
+}
+
 class HttpError extends Error {
   constructor(public readonly statusCode: number, message: string) {
     super(message);
@@ -481,7 +492,8 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
 
       const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : undefined;
       // Other servers may have saved changes since the last request: ask the database before answering.
-      if (!isProbe && served.storage === 'postgres') await served.sync();
+      // A database that hangs must not hold up reads that memory can answer: wait a moment, no longer.
+      if (!isProbe && served.storage === 'postgres') await waitAtMost(served.sync(), SYNC_WAIT_MS);
       let statusCode = 200;
       const routeRes: RouteResponse = {
         status: code => { statusCode = code; return routeRes; },
