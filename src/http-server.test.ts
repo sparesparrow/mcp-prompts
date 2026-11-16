@@ -1,6 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import * as fs from 'fs';
+import * as http from 'http';
+import * as os from 'os';
+import * as path from 'path';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { createServer, startHttpServer, type HttpServerApp, type Route } from './http-server';
 import { PromptStore } from './prompt-store';
+import { mergeOptions, DEFAULT_OPTIONS } from './server-options';
+import { makeFixtureLibrary, type FixtureLibrary } from './testing/fixture-library';
 
 // Route handlers are called directly for the health endpoints, then the whole server is
 // exercised over real HTTP on an ephemeral port.
@@ -30,7 +38,7 @@ describe('http-server routes', () => {
       'GET /health', 'GET /ready', 'GET /version',
       'GET /v1/prompts', 'POST /v1/prompts', 'GET /v1/prompts/:id', 'PUT /v1/prompts/:id',
       'DELETE /v1/prompts/:id', 'POST /v1/prompts/:id/apply', 'GET /v1/stats',
-      'GET /mcp/tools', 'POST /mcp/tools/:name',
+      'GET /mcp/tools', 'POST /mcp/tools/:name', 'POST /mcp',
     ]));
   });
 
@@ -42,9 +50,35 @@ describe('http-server routes', () => {
     expect(new Date(payload.timestamp).toString()).not.toBe('Invalid Date');
   });
 
-  it('/ready returns status=ready, service=mcp-prompts', async () => {
+  it('/ready returns status=ready and the mode the server runs in', async () => {
     const app = await createServer({ store: new PromptStore() });
-    expect(callHandler(findRoute(app, 'GET', '/ready'))).toEqual({ status: 'ready', service: 'mcp-prompts' });
+    expect(callHandler(findRoute(app, 'GET', '/ready'))).toEqual({
+      status: 'ready', service: 'mcp-prompts', readOnly: false, auth: 'none', storage: 'memory',
+    });
+    const catalog = await createServer({
+      store: new PromptStore(),
+      serverOptions: mergeOptions(DEFAULT_OPTIONS, { readOnly: true }),
+      authToken: 'correct-horse-battery-staple',
+    });
+    expect(callHandler(findRoute(catalog, 'GET', '/ready'))).toMatchObject({ readOnly: true, auth: 'token' });
+  });
+
+  it('/ready answers 503 once the state directory can no longer be written', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ready-state-'));
+    const store = new PromptStore();
+    store.openStateDir(dir);
+    const app = await startHttpServer(0, '127.0.0.1', { store });
+    const ready = () => fetch(`http://127.0.0.1:${app.address()!.port}/ready`);
+    try {
+      expect(await (await ready()).json()).toMatchObject({ status: 'ready', storage: 'file' });
+      // The volume goes away (unmounted, deleted): a load balancer should stop sending writes here.
+      fs.rmSync(dir, { recursive: true, force: true });
+      const gone = await ready();
+      expect(gone.status).toBe(503);
+      expect(await gone.json()).toMatchObject({ status: 'unavailable' });
+    } finally {
+      await app.close();
+    }
   });
 
   it('/version returns the package version and service name', async () => {
@@ -107,7 +141,10 @@ describe('http-server over HTTP', () => {
     expect(updated.json).toMatchObject({ name: 'Greeting v2', version: 2 });
 
     const applied = await request('POST', `/v1/prompts/${id}/apply`, { variables: { who: 'Brno', place: 'MCP' } });
-    expect(applied.json.result).toBe('Hello Brno from MCP');
+    expect(applied.json).toEqual({ id, result: 'Hello Brno from MCP', missing: [], unused: [] });
+    // A value left out or misspelt is reported, as the MCP tool does, instead of only staying in the text.
+    const partial = await request('POST', `/v1/prompts/${id}/apply`, { variables: { who: 'Brno', plcae: 'MCP' } });
+    expect(partial.json).toMatchObject({ result: 'Hello Brno from {{place}}', missing: ['place'], unused: ['plcae'] });
 
     const stats = await request('GET', '/v1/stats');
     expect(stats.json).toMatchObject({ total: 1, templates: 1 });
@@ -150,13 +187,300 @@ describe('http-server over HTTP', () => {
     expect(wrongMethod.headers.get('allow')).toBe('GET');
   });
 
-  it('rejects bodies over 1 MB', async () => {
+  it('answers 413 for bodies over 1 MB instead of resetting the connection', async () => {
     const res = await fetch(`${base}/v1/prompts`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: 'big', content: 'x'.repeat(1024 * 1024 + 10) }),
-    }).catch(() => null);
-    // The server answers 413 and closes the connection; either outcome means it refused the body.
-    if (res) expect(res.status).toBe(413);
+    });
+    expect(res.status).toBe(413);
+    expect(((await res.json()) as { error: string }).error).toMatch(/too large/);
+  });
+
+  it('answers 400, not 500, for a path with broken percent-encoding', async () => {
+    const res = await request('GET', '/v1/prompts/%E0%A4%A');
+    expect(res.status).toBe(400);
+    expect(res.json.error).toMatch(/percent-encoding/);
+  });
+
+  it('answers HEAD like GET, without a body', async () => {
+    const res = await fetch(`${base}/health`, { method: 'HEAD' });
+    expect(res.status).toBe(200);
+    expect(await res.text()).toBe('');
+  });
+
+  it('takes a JSON body only as application/json', async () => {
+    // What a cross-site form post or a no-preflight fetch can send.
+    const res = await fetch(`${base}/v1/prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'text/plain' }, body: JSON.stringify({ name: 'x', content: 'y' }),
+    });
+    expect(res.status).toBe(415);
+  });
+
+  it('keeps description and category, accepts a chosen id and answers 409 when it is taken', async () => {
+    const created = await request('POST', '/v1/prompts', {
+      id: 'http-chosen', name: 'Chosen', content: 'c', description: 'kept', category: 'ops',
+    });
+    expect(created.status).toBe(201);
+    expect(created.json).toMatchObject({ id: 'http-chosen', description: 'kept', category: 'ops' });
+    expect((await request('POST', '/v1/prompts', { id: 'http-chosen', name: 'Again', content: 'c' })).status).toBe(409);
+    expect((await request('POST', '/v1/prompts', { id: '../etc', name: 'Bad', content: 'c' })).status).toBe(400);
+    expect((await request('PUT', '/v1/prompts/http-chosen', {})).status).toBe(400);
+    expect((await request('PUT', '/v1/prompts/http-chosen', { name: '' })).status).toBe(400);
+    await request('DELETE', '/v1/prompts/http-chosen');
+  });
+
+  it('pages GET /v1/prompts on request and reports the total', async () => {
+    for (const n of [1, 2, 3]) await request('POST', '/v1/prompts', { id: `page-${n}`, name: `Page ${n}`, content: 'c', tags: ['paging'] });
+    const all = await request('GET', '/v1/prompts?tags=paging');
+    expect(all.json).toMatchObject({ total: 3, count: 3, has_more: false });
+    const first = await request('GET', '/v1/prompts?tags=paging&limit=2');
+    expect(first.json).toMatchObject({ total: 3, count: 2, has_more: true, next_offset: 2 });
+    const second = await request('GET', '/v1/prompts?tags=paging&limit=2&offset=2');
+    expect(second.json.prompts.map((p: { id: string }) => p.id)).toEqual(['page-3']);
+    expect((await request('GET', '/v1/prompts?limit=0')).status).toBe(400);
+    expect((await request('GET', '/v1/prompts?offset=-1')).status).toBe(400);
+    for (const n of [1, 2, 3]) await request('DELETE', `/v1/prompts/page-${n}`);
+  });
+});
+
+describe('HTTP access control', () => {
+  const token = 'test-token-0123456789abcdef';
+  let guarded: HttpServerApp;
+  let local: HttpServerApp;
+
+  // fetch cannot set Host, so these go through node:http.
+  const raw = (app: HttpServerApp, options: { method?: string; path: string; headers?: Record<string, string>; body?: string }) =>
+    new Promise<{ status: number; headers: http.IncomingHttpHeaders; body: string }>((resolve, reject) => {
+      const req = http.request({
+        host: '127.0.0.1', port: app.address()!.port, method: options.method ?? 'GET', path: options.path, headers: options.headers,
+      }, res => {
+        let body = '';
+        res.on('data', chunk => { body += chunk; });
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, headers: res.headers, body }));
+      });
+      req.on('error', reject);
+      if (options.body) req.write(options.body);
+      req.end();
+    });
+
+  beforeAll(async () => {
+    guarded = await startHttpServer(0, '127.0.0.1', { store: new PromptStore(), authToken: token });
+    local = await startHttpServer(0, '127.0.0.1', { store: new PromptStore() });
+  });
+  afterAll(async () => {
+    await guarded.close();
+    await local.close();
+  });
+
+  it('requires the bearer token for the API and MCP, but not for the health probes', async () => {
+    expect((await raw(guarded, { path: '/health' })).status).toBe(200);
+    expect((await raw(guarded, { path: '/version' })).status).toBe(200);
+
+    const denied = await raw(guarded, { path: '/v1/prompts' });
+    expect(denied.status).toBe(401);
+    expect(denied.headers['www-authenticate']).toMatch(/^Bearer/);
+    expect((await raw(guarded, { path: '/v1/prompts', headers: { Authorization: 'Bearer wrong-token-0123456789' } })).status).toBe(401);
+    expect((await raw(guarded, { path: '/v1/prompts', headers: { Authorization: `Bearer ${token}` } })).status).toBe(200);
+
+    const write = { method: 'POST', path: '/v1/prompts', body: JSON.stringify({ name: 'n', content: 'c' }) };
+    expect((await raw(guarded, { ...write, headers: { 'Content-Type': 'application/json' } })).status).toBe(401);
+    expect((await raw(guarded, { ...write, headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } })).status).toBe(201);
+    expect((await raw(guarded, { method: 'POST', path: '/mcp', headers: { 'Content-Type': 'application/json' }, body: '{}' })).status).toBe(401);
+  });
+
+  it('lets an MCP client in with the token in its headers', async () => {
+    const url = new URL(`http://127.0.0.1:${guarded.address()!.port}/mcp`);
+    const client = new Client({ name: 'auth-test', version: '1.0.0' });
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { Authorization: `Bearer ${token}` } } }));
+    expect((await client.listTools()).tools.length).toBeGreaterThan(0);
+    await client.close();
+
+    const anonymous = new Client({ name: 'auth-test', version: '1.0.0' });
+    await expect(anonymous.connect(new StreamableHTTPClientTransport(url))).rejects.toThrow();
+  });
+
+  it('refuses a request that arrives under another site\'s name (DNS rebinding)', async () => {
+    const rebound = await raw(local, { path: '/v1/prompts', headers: { Host: 'evil.example' } });
+    expect(rebound.status).toBe(403);
+    expect(rebound.body).toMatch(/MCP_PROMPTS_ALLOWED_HOSTS/);
+    expect((await raw(local, { path: '/v1/prompts', headers: { Host: `localhost:${local.address()!.port}` } })).status).toBe(200);
+    // Probes are called by address from load balancers and container runtimes.
+    expect((await raw(local, { path: '/health', headers: { Host: '10.0.0.7:3003' } })).status).toBe(200);
+  });
+
+  it('refuses a write sent by a web page from another origin, and allows a local page', async () => {
+    const write = { method: 'POST', path: '/v1/prompts', body: JSON.stringify({ name: 'planted', content: 'c' }) };
+    const foreign = await raw(local, { ...write, headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' } });
+    expect(foreign.status).toBe(403);
+    const mcp = await raw(local, { method: 'POST', path: '/mcp', headers: { 'Content-Type': 'application/json', Origin: 'https://evil.example' }, body: '{}' });
+    expect(mcp.status).toBe(403);
+    const inspector = await raw(local, { ...write, headers: { 'Content-Type': 'application/json', Origin: 'http://localhost:6274' } });
+    expect(inspector.status).toBe(201);
+    const listed = JSON.parse((await raw(local, { path: '/v1/prompts' })).body) as { prompts: Array<{ name: string }> };
+    expect(listed.prompts.map(p => p.name)).toEqual(['planted']);
+  });
+});
+
+describe('startHttpServer start-up', () => {
+  it('refuses to listen beyond loopback with writes enabled and no token', async () => {
+    await expect(startHttpServer(0, '0.0.0.0', { store: new PromptStore() })).rejects.toThrow(/MCP_PROMPTS_AUTH_TOKEN/);
+  });
+
+  it('listens beyond loopback when read-only, with a token, or when told the risk is handled', async () => {
+    const readOnly = await startHttpServer(0, '0.0.0.0', {
+      store: new PromptStore(), serverOptions: mergeOptions(DEFAULT_OPTIONS, { readOnly: true }),
+    });
+    const withToken = await startHttpServer(0, '0.0.0.0', { store: new PromptStore(), authToken: 'a-long-enough-secret-token' });
+    const insecure = await startHttpServer(0, '0.0.0.0', { store: new PromptStore(), allowInsecure: true });
+    // Beyond loopback the server cannot know its public name, so any Host is accepted unless listed.
+    const res = await fetch(`http://127.0.0.1:${readOnly.address()!.port}/v1/prompts`);
+    expect(res.status).toBe(200);
+    await Promise.all([readOnly.close(), withToken.close(), insecure.close()]);
+  });
+
+  it('rejects instead of crashing when the port is taken', async () => {
+    const first = await startHttpServer(0, '127.0.0.1', { store: new PromptStore() });
+    await expect(startHttpServer(first.address()!.port, '127.0.0.1', { store: new PromptStore() })).rejects.toMatchObject({ code: 'EADDRINUSE' });
+    await first.close();
+  });
+
+  it('saves changes to the state directory of its options and serves them after a restart', async () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-http-state-'));
+    const fixture = makeFixtureLibrary();
+    const serverOptions = mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixture.library, stateDir: path.join(dir, 'state') });
+    const post = (app: HttpServerApp, body: unknown) => fetch(`http://127.0.0.1:${app.address()!.port}/v1/prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+
+    const first = await startHttpServer(0, '127.0.0.1', { serverOptions });
+    expect((await post(first, { id: 'saved-over-http', name: 'Saved', content: 'c' })).status).toBe(201);
+    await first.close();
+
+    const second = await startHttpServer(0, '127.0.0.1', { serverOptions });
+    const got = await fetch(`http://127.0.0.1:${second.address()!.port}/v1/prompts/saved-over-http`);
+    expect(got.status).toBe(200);
+    const stats = await (await fetch(`http://127.0.0.1:${second.address()!.port}/v1/stats`)).json() as { storage: string; total: number };
+    expect(stats).toMatchObject({ storage: 'file', total: 7 });
+    await second.close();
+    fixture.cleanup();
+    fs.rmSync(dir, { recursive: true, force: true });
+  });
+});
+
+describe('MCP over HTTP at /mcp', () => {
+  let fixture: FixtureLibrary;
+  let open: HttpServerApp;
+  let narrowed: HttpServerApp;
+  const clients: Client[] = [];
+
+  const urlOf = (app: HttpServerApp, query = '') => `http://127.0.0.1:${app.address()!.port}/mcp${query}`;
+
+  const connect = async (url: string) => {
+    const client = new Client({ name: 'http-mcp-test', version: '1.0.0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(url)));
+    clients.push(client);
+    return client;
+  };
+
+  beforeAll(async () => {
+    fixture = makeFixtureLibrary();
+    // One server serving its whole library, one started with a selection and read-only.
+    open = await startHttpServer(0, '127.0.0.1', {
+      serverOptions: mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixture.library }),
+    });
+    narrowed = await startHttpServer(0, '127.0.0.1', {
+      serverOptions: mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixture.library, prompts: [], templates: ['alpha'], readOnly: true }),
+    });
+  });
+
+  afterAll(async () => {
+    await Promise.all(clients.map(client => client.close()));
+    await open.close();
+    await narrowed.close();
+    fixture.cleanup();
+  });
+
+  it('serves the whole library with the default tools when the URL chooses nothing', async () => {
+    const client = await connect(urlOf(open));
+    const tools = (await client.listTools()).tools.map(t => t.name);
+    expect(tools).toEqual(expect.arrayContaining(['add_prompt', 'list_prompts', 'apply_template']));
+    expect(client.getServerCapabilities()?.prompts).toBeUndefined();
+    const stats = await client.callTool({ name: 'get_stats', arguments: {} });
+    expect(JSON.parse((stats.content as Array<{ text: string }>)[0].text)).toMatchObject({ total: 6 });
+  });
+
+  it('takes the selection, capabilities and read-only from the query string', async () => {
+    const client = await connect(urlOf(open, '?prompts=none&templates=beta,a-greet&expose=prompts,resources&readOnly=true'));
+    expect(client.getServerCapabilities()?.tools).toBeUndefined();
+    const { prompts } = await client.listPrompts();
+    expect(prompts.map(p => p.name).sort()).toEqual(['a-greet', 'b-tmpl']);
+    const filled = await client.getPrompt({ name: 'a-greet', arguments: { who: 'HTTP', place: 'the URL' } });
+    expect((filled.messages[0].content as { text: string }).text).toBe('Hello HTTP from the URL');
+    const { resources } = await client.listResources();
+    expect(resources.map(r => r.uri).sort()).toEqual(['prompts://a-greet', 'prompts://b-tmpl']);
+    expect(client.getInstructions()).toContain('2 of the 6 library prompts');
+  });
+
+  it('serves a profile named in the URL, and refuses one the library does not have', async () => {
+    const client = await connect(urlOf(open, '?profile=greetings&expose=tools,prompts'));
+    expect((await client.listPrompts()).prompts.map(p => p.name)).toEqual(['a-greet', 'a-deep']);
+    expect(client.getInstructions()).toContain('2 of the 6 library prompts (profile greetings)');
+    // Two clients of one server, each with its own profile.
+    const other = await connect(urlOf(open, '?profile=notes'));
+    const listed = await other.callTool({ name: 'list_prompts', arguments: {} });
+    expect((listed.structuredContent as { prompts: Array<{ id: string }> }).prompts.map(p => p.id)).toEqual(['b-plain', 'root-note']);
+
+    const body = JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' });
+    const headers = { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' };
+    const unknown = await fetch(urlOf(open, '?profile=greeting'), { method: 'POST', headers, body });
+    expect(unknown.status).toBe(400);
+    expect(((await unknown.json()) as { error: string }).error).toContain('unknown profile "greeting": this library has greetings, notes');
+  });
+
+  it('can only narrow what the server itself serves', async () => {
+    // The server serves alpha templates and is read-only; the URL asks for beta and writes.
+    const client = await connect(urlOf(narrowed, '?templates=alpha/deep,beta&readOnly=false'));
+    const tools = (await client.listTools()).tools.map(t => t.name);
+    expect(tools).not.toContain('add_prompt');
+    const listed = await client.callTool({ name: 'list_prompts', arguments: {} });
+    const text = (listed.content as Array<{ text: string }>)[0].text;
+    expect(text).toContain('Found 1 prompts');
+    expect(text).toContain('(a-deep)');
+  });
+
+  it('keeps prompts added through one session for the next, as the stdio server does', async () => {
+    const first = await connect(urlOf(open, '?expose=tools,prompts'));
+    const added = await first.callTool({ name: 'add_prompt', arguments: { name: 'Added over HTTP', content: 'hi' } });
+    const id = /ID: (\S+)/.exec((added.content as Array<{ text: string }>)[0].text)?.[1];
+    const second = await connect(urlOf(open, '?expose=prompts&prompts=none&templates=none'));
+    expect((await second.listPrompts()).prompts.map(p => p.name)).toEqual([id]);
+  });
+
+  it('answers 400 for unknown or invalid query parameters, and 405 for GET', async () => {
+    const post = (query: string) => fetch(urlOf(open, query), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json, text/event-stream' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'ping' }),
+    });
+    const unknown = await post('?promptsDir=/etc');
+    expect(unknown.status).toBe(400);
+    expect(((await unknown.json()) as { error: string }).error).toMatch(/unknown query parameter promptsDir/);
+    expect((await post('?expose=sampling')).status).toBe(400);
+    const get = await fetch(urlOf(open), { method: 'GET' });
+    expect(get.status).toBe(405);
+    expect(get.headers.get('allow')).toBe('POST');
+  });
+
+  it('leaves the write routes out of a read-only server', async () => {
+    const base = `http://127.0.0.1:${narrowed.address()!.port}`;
+    const create = await fetch(`${base}/v1/prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'x', content: 'y' }),
+    });
+    expect(create.status).toBe(405);
+    const tools = await (await fetch(`${base}/mcp/tools`)).json() as { tools: Array<{ name: string }> };
+    expect(tools.tools.map((t: { name: string }) => t.name)).not.toContain('add_prompt');
+    const listed = await (await fetch(`${base}/v1/prompts`)).json() as { prompts: Array<{ id: string }> };
+    expect(listed.prompts.map((p: { id: string }) => p.id).sort()).toEqual(['a-deep', 'a-greet']);
   });
 });
