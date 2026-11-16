@@ -1,5 +1,6 @@
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
@@ -253,5 +254,75 @@ describe.skipIf(!process.env.TEST_DATABASE_URL)('the HTTP server with MCP_PROMPT
     expect(await (await fetch(`${urlOf(second)}/ready`)).json()).toMatchObject({ status: 'ready', storage: 'postgres' });
     await second.close();
     await first.close();
+  });
+});
+
+describe('MCP reads over a Postgres store after a quiet time', () => {
+  const add = (store: PromptStore, id: string, name = id) =>
+    store.add({ id, name, content: `${name} content`, isTemplate: false, tags: [] });
+
+  it('show the first read what another server saved, whatever the refresh interval', async () => {
+    const db = new Database();
+    const mine = await open(new FakePostgres(db), 60_000);
+    const theirs = await open(new FakePostgres(db), 60_000);
+    const client = await connect(mine);
+    // Mine has not looked at the database for a minute (the interval is longer than the test).
+    await add(theirs, 'from-b', 'From B');
+    const got = await call(client, 'get_prompt', { id: 'from-b' });
+    expect(got.isError).toBeFalsy();
+    expect(got.structuredContent).toMatchObject({ name: 'From B' });
+
+    await theirs.update('from-b', { name: 'Renamed on B' });
+    expect((await call(client, 'get_prompt', { id: 'from-b' })).structuredContent).toMatchObject({ name: 'Renamed on B' });
+
+    await add(theirs, 'second', 'Second');
+    const listed = await call(client, 'list_prompts', { search: 'second' });
+    expect(listed.structuredContent).toMatchObject({ total: 1 });
+    await theirs.delete('from-b');
+    expect((await call(client, 'get_prompt', { id: 'from-b' })).isError).toBe(true);
+  });
+
+  it('also covers prompts/get and resources/read, and the lists', async () => {
+    const db = new Database();
+    const mine = await open(new FakePostgres(db), 60_000);
+    const theirs = await open(new FakePostgres(db), 60_000);
+    const server = await createMcpServer({ store: mine, expose: ['tools', 'prompts', 'resources'] });
+    const [clientSide, serverSide] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'wiring-test', version: '1.0.0' });
+    await Promise.all([server.connect(serverSide), client.connect(clientSide)]);
+    closers.push(async () => { await client.close(); await server.close(); });
+    await add(theirs, 'later', 'Later');
+    expect((await client.listPrompts()).prompts.map(p => p.name)).toContain('later');
+    await add(theirs, 'later-2', 'Later 2');
+    expect((await client.listResources()).resources.map(r => r.name)).toContain('later-2');
+    await add(theirs, 'later-3', 'Later 3');
+    expect((await client.getPrompt({ name: 'later-3' })).messages[0].content).toMatchObject({ text: 'Later 3 content' });
+    await add(theirs, 'later-4', 'Later 4');
+    expect((await client.readResource({ uri: 'prompts://later-4' })).contents[0]).toMatchObject({ text: 'Later 4 content' });
+  });
+
+  it('also holds for an MCP client of the HTTP server', async () => {
+    const db = new Database();
+    const mine = await open(new FakePostgres(db), 60_000);
+    const theirs = await open(new FakePostgres(db), 60_000);
+    const app = await startHttpServer(0, '127.0.0.1', { store: mine });
+    closers.push(() => app.close());
+    const client = new Client({ name: 'wiring-http', version: '1.0.0' });
+    await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${app.address()!.port}/mcp`)));
+    closers.push(() => client.close());
+    await add(theirs, 'over-http', 'Over HTTP');
+    const got = (await client.callTool({ name: 'get_prompt', arguments: { id: 'over-http' } })) as ToolResult;
+    expect(got.isError).toBeFalsy();
+    expect(got.structuredContent).toMatchObject({ name: 'Over HTTP' });
+  });
+
+  it('does not make a tool wait for a database that hangs', async () => {
+    const backend = new FakePostgres();
+    const client = await connect(await open(backend, 60_000));
+    backend.revision = () => new Promise<string>(() => undefined);
+    const started = Date.now();
+    const got = await call(client, 'get_prompt', { id: 'lib-a' });
+    expect(got.isError).toBeFalsy();
+    expect(Date.now() - started).toBeLessThan(3_000);
   });
 });

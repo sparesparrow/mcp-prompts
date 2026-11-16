@@ -18,3 +18,14 @@ export function generateId(): string {
 export function sanitizeString(str: string): string {
   return str.replace(/[^a-zA-Z0-9-_]/g, '_');
 }
+
+/** How long a read waits for the database to say whether other servers changed anything. */
+export const SYNC_WAIT_MS = 1_000;
+
+/** Resolves when the work does, or after ms, whichever is first; the work carries on either way. */
+export function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
+  return new Promise(resolve => {
+    const timer = setTimeout(resolve, ms);
+    work.then(() => { clearTimeout(timer); resolve(); }, () => { clearTimeout(timer); resolve(); });
+  });
+}

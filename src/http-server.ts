@@ -3,7 +3,7 @@ import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { z, ZodError } from 'zod';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { logger } from './utils.js';
+import { logger, SYNC_WAIT_MS, waitAtMost } from './utils.js';
 import {
   CreatePromptParams,
   PromptConflictError,
@@ -82,19 +82,8 @@ export interface HttpServerOptions {
   readyTimeoutMs?: number;
 }
 
-/** How long a request waits for the database to say whether other servers changed anything. */
-const SYNC_WAIT_MS = 1_000;
-
 /** How long /ready waits for the database; a health check gives up sooner than this on its own. */
 const READY_WAIT_MS = 5_000;
-
-/** Resolves when the work does, or after ms, whichever is first; the work carries on either way. */
-function waitAtMost(work: Promise<void>, ms: number): Promise<void> {
-  return new Promise(resolve => {
-    const timer = setTimeout(resolve, ms);
-    work.then(() => { clearTimeout(timer); resolve(); }, () => { clearTimeout(timer); resolve(); });
-  });
-}
 
 class HttpError extends Error {
   constructor(public readonly statusCode: number, message: string) {
@@ -341,6 +330,8 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           // A URL can make the session read-only, never the reverse.
           readOnly: readOnly || fromUrl.readOnly === true,
           profiles: fromUrl.profiles ?? serverOptions.profiles,
+          // This request has already asked the database (above): do not ask again for each call.
+          syncBeforeRead: false,
         });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
         req.raw.res.on('close', () => {

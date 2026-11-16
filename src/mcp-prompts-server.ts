@@ -12,7 +12,7 @@ import {
 import { z, ZodError } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './utils.js';
+import { logger, SYNC_WAIT_MS, waitAtMost } from './utils.js';
 import {
   CreatePromptParams,
   PromptConflictError,
@@ -41,6 +41,12 @@ export interface McpServerOptions {
   readOnly?: boolean;
   /** The profiles the store was narrowed to, named in the usage instructions. */
   profiles?: string[];
+  /**
+   * Ask a database-backed store, for at most a second, whether other servers changed anything
+   * before each request is answered. Default true; the HTTP server turns it off because it asks
+   * once per request itself.
+   */
+  syncBeforeRead?: boolean;
 }
 
 export const RESOURCE_SCHEME = 'prompts://';
@@ -176,9 +182,16 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
     if (expose.includes('resources')) server.server.sendResourceListChanged().catch(() => undefined);
   };
 
-  if (expose.includes('tools')) registerTools(server, prompts, readOnly, notifyListChanged);
-  if (expose.includes('prompts')) registerPrompts(server, prompts);
-  if (expose.includes('resources')) registerResources(server, prompts);
+  // Reads are served from memory, and a database-backed store only checks for other servers'
+  // changes in the background: the first read after a quiet time would show old content.
+  const syncFirst = options.syncBeforeRead ?? true;
+  const fresh = async () => {
+    if (syncFirst && prompts.backendKind === 'postgres') await waitAtMost(prompts.sync(), SYNC_WAIT_MS);
+  };
+
+  if (expose.includes('tools')) registerTools(server, prompts, readOnly, notifyListChanged, fresh);
+  if (expose.includes('prompts')) registerPrompts(server, prompts, fresh);
+  if (expose.includes('resources')) registerResources(server, prompts, fresh);
 
   return server;
 }
@@ -305,7 +318,7 @@ function describeFailure(action: string, error: unknown): string {
   return `Internal error while ${action}; the server log has the details.`;
 }
 
-function registerTools(server: McpServer, store: PromptStore, readOnly: boolean, changed: () => void): void {
+function registerTools(server: McpServer, store: PromptStore, readOnly: boolean, changed: () => void, fresh: () => Promise<void>): void {
   // The SDK's generic registerTool overloads make tsc give up on these schemas (TS2589, type
   // instantiation too deep). The SDK still validates arguments against inputSchema before a
   // handler runs and results against outputSchema after, so the handlers take the parsed type.
@@ -323,6 +336,9 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
   ) => {
     register(name, config, (async (args: z.output<Schema>) => {
       try {
+        // Reads see what other servers saved; a change decides against the store's own view, so a
+        // stale one is reported as such.
+        if (config.annotations.readOnlyHint) await fresh();
         return await run(args);
       } catch (error) {
         return { isError: true, content: [text(describeFailure(action, error))] };
@@ -506,10 +522,11 @@ function listPage(store: PromptStore, cursor: string | undefined): { items: Stor
 const listedDescription = (prompt: StoredPrompt) =>
   prompt.description ? { description: shorten(prompt.description, MAX_SUMMARY_DESCRIPTION) } : {};
 
-function registerPrompts(server: McpServer, store: PromptStore): void {
+function registerPrompts(server: McpServer, store: PromptStore, fresh: () => Promise<void>): void {
   server.server.registerCapabilities({ prompts: { listChanged: true } });
 
-  server.server.setRequestHandler(ListPromptsRequestSchema, request => {
+  server.server.setRequestHandler(ListPromptsRequestSchema, async request => {
+    await fresh();
     const { items, nextCursor } = listPage(store, request.params?.cursor);
     return {
       prompts: items.map(prompt => ({
@@ -524,7 +541,8 @@ function registerPrompts(server: McpServer, store: PromptStore): void {
     };
   });
 
-  server.server.setRequestHandler(GetPromptRequestSchema, request => {
+  server.server.setRequestHandler(GetPromptRequestSchema, async request => {
+    await fresh();
     const prompt = getOrRpcError(store, request.params.name, ErrorCode.InvalidParams);
     const text = prompt.isTemplate ? store.applyTemplate(prompt.id, request.params.arguments ?? {}) : prompt.content;
     return {
@@ -534,12 +552,13 @@ function registerPrompts(server: McpServer, store: PromptStore): void {
   });
 }
 
-function registerResources(server: McpServer, store: PromptStore): void {
+function registerResources(server: McpServer, store: PromptStore, fresh: () => Promise<void>): void {
   server.server.registerCapabilities({ resources: { listChanged: true } });
 
   const uriOf = (id: string) => `${RESOURCE_SCHEME}${encodeURIComponent(id)}`;
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, request => {
+  server.server.setRequestHandler(ListResourcesRequestSchema, async request => {
+    await fresh();
     const { items, nextCursor } = listPage(store, request.params?.cursor);
     return {
       resources: items.map(prompt => ({
@@ -563,7 +582,8 @@ function registerResources(server: McpServer, store: PromptStore): void {
     }],
   }));
 
-  server.server.setRequestHandler(ReadResourceRequestSchema, request => {
+  server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
+    await fresh();
     const { uri } = request.params;
     if (!uri.startsWith(RESOURCE_SCHEME)) {
       throw rpcError(ErrorCode.InvalidParams, `Unknown resource ${uri}: expected ${RESOURCE_SCHEME}<id>`);
