@@ -185,10 +185,15 @@ describe('http-server over HTTP', () => {
   });
 
   it('lists categories with counts over HTTP', async () => {
+    const add = (id: string, category: string, isTemplate = false) =>
+      request('POST', '/v1/prompts', { id, name: id, content: 'x', category, isTemplate });
+    await add('own-cat-1', 'own-cat-a');
+    await add('own-cat-2', 'own-cat-a', true);
+    await add('own-cat-3', 'own-cat-b');
     const res = await request('POST', '/mcp/tools/list_categories', { arguments: {} });
     expect(res.json.result).toEqual(expect.arrayContaining([
-      { category: 'cat-a', count: 30, templates: 0 },
-      { category: 'cat-b', count: 30, templates: 0 },
+      { category: 'own-cat-a', count: 2, templates: 1 },
+      { category: 'own-cat-b', count: 1, templates: 0 },
     ]));
   });
 
