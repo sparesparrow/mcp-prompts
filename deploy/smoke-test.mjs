@@ -25,7 +25,8 @@ Options:
   --token <token>        bearer token for an HTTP deployment (or the MCP_PROMPTS_AUTH_TOKEN variable)
   --token-file <file>    file holding the token
   --expect-read-only     fail if the server offers add_prompt, update_prompt or delete_prompt
-  --expect-persistent    fail unless changes are saved to a state directory (get_stats storage "file")
+  --expect-persistent    fail unless changes are saved to a state directory or Postgres (get_stats storage
+                         "file" or "postgres")
   --write                add, update and delete one prompt (smoke-test-<random>)
   --allow-empty          do not fail when the server serves no prompts
   --timeout <seconds>    give up after this long (default 30)
@@ -175,7 +176,8 @@ async function run() {
     check(writeTools.length === 0, 'is read-only: no add_prompt, update_prompt or delete_prompt', `offers ${writeTools.join(', ')}`);
   }
 
-  const page = await call(client, 'list_prompts', { limit: 100 });
+  // 50 is the most a page holds; the total says how many the install serves.
+  const page = await call(client, 'list_prompts', { limit: 50 });
   if (page) {
     check(page.total > 0 || values['allow-empty'], `list_prompts finds ${page.total} prompts`, 'the library is empty (wrong PROMPTS_DIR or selection?)');
     if (maxPrompts !== undefined) {
@@ -188,7 +190,8 @@ async function run() {
       const prompt = await call(client, 'get_prompt', { id: first.id });
       check(prompt?.id === first.id && typeof prompt?.content === 'string', `get_prompt returns "${first.id}"`);
     }
-    const template = page.prompts?.find(prompt => prompt.isTemplate);
+    // Not necessarily on the first page of a large library: ask for one template.
+    const template = (await call(client, 'list_prompts', { isTemplate: true, limit: 1 }))?.prompts?.[0];
     if (template) {
       const full = await call(client, 'get_prompt', { id: template.id });
       const names = (full?.variables ?? []).map(variable => (typeof variable === 'string' ? variable : variable.name));
@@ -201,7 +204,7 @@ async function run() {
   if (stats) {
     pass(`get_stats: ${stats.total} prompts, ${stats.templates} templates, storage "${stats.storage}"`);
     if (values['expect-persistent']) {
-      check(stats.storage === 'file', 'changes are saved to a state directory', `storage is "${stats.storage}": set MCP_PROMPTS_STATE_DIR (--state-dir) and leave read-only off`);
+      check(stats.storage === 'file' || stats.storage === 'postgres', `changes are saved (storage "${stats.storage}")`, `storage is "${stats.storage}": set MCP_PROMPTS_STATE_DIR (--state-dir) or MCP_PROMPTS_STORAGE=postgres, and leave read-only off`);
     }
   }
 
