@@ -338,8 +338,11 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
       const description = p.description.length > MAX_LISTED_DESCRIPTION
         ? `${p.description.slice(0, MAX_LISTED_DESCRIPTION - 1)}…`
         : p.description;
-      const details = [p.id, ...(p.isTemplate ? ['template'] : []), ...(p.language ? [`language ${p.language}`] : [])];
-      return `- **${p.name}** (${details.join(', ')}): ${description} [${p.tags.join(', ')}]`;
+      const details = [
+        ...(p.isTemplate ? ['(template)'] : []),
+        ...(p.language ? [`(language ${p.language})`] : []),
+      ];
+      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
     });
     const more = page.has_more ? `\n\nMore: call list_prompts again with offset=${page.next_offset}.` : '';
     return result([text(`Found ${page.total} prompts${range}:\n\n${lines.join('\n')}${more}`)], page);
