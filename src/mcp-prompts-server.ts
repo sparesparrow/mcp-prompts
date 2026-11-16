@@ -17,6 +17,7 @@ import {
   CreatePromptParams,
   PromptConflictError,
   PromptNotFoundError,
+  PromptStaleError,
   PromptStorageError,
   PromptStore,
   PromptUsageError,
@@ -73,8 +74,8 @@ export function buildInstructions(options: {
   expose: Capability[];
   readOnly: boolean;
   selectionNote?: string;
-  /** Changes are saved to a state directory and survive a restart. */
-  persistent?: boolean;
+  /** Where changes are saved: 'file' (a state directory) and 'postgres' survive a restart. */
+  storage?: 'memory' | 'file' | 'postgres';
 }): string {
   const tools = options.expose.includes('tools');
   const prompts = options.expose.includes('prompts');
@@ -108,8 +109,9 @@ export function buildInstructions(options: {
   if (options.readOnly) {
     lines.push('', 'Read-only: this install has no add_prompt, update_prompt or delete_prompt.');
   } else if (tools) {
-    lines.push('', options.persistent
-      ? 'Persistence: add_prompt, update_prompt and delete_prompt are saved to this server\'s state directory and survive a restart. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id.'
+    const saved = options.storage === 'postgres' ? 'database' : options.storage === 'file' ? 'state directory' : undefined;
+    lines.push('', saved
+      ? `Persistence: add_prompt, update_prompt and delete_prompt are saved to this server's ${saved} and survive a restart. Give add_prompt an \`id\` to choose a stable one; otherwise it assigns a random id.`
       : 'Persistence: add_prompt, update_prompt and delete_prompt change memory only and are lost when the server restarts. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id. A prompt that must last is a JSON file under data/prompts/ with a stable id, added by pull request.');
   }
   return lines.join('\n');
@@ -146,15 +148,24 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
   const expose = options.expose ?? ['tools'];
   const readOnly = options.readOnly ?? false;
   let store = options.store;
+  let closeStore: (() => Promise<void>) | undefined;
   if (!store) {
-    store = (await openConfiguredStore(resolveOptions([], process.env).options)).store;
+    const opened = await openConfiguredStore(resolveOptions([], process.env).options);
+    store = opened.store;
+    closeStore = opened.close;
   }
   const prompts: PromptStore = store;
 
   const server = new McpServer(
     { name: 'mcp-prompts', version: packageVersion() },
-    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts, options.profiles), persistent: Boolean(prompts.stateDir) }) }
+    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts, options.profiles), storage: prompts.storage }) }
   );
+
+  // A store opened here (and its database connections) ends with the server.
+  if (closeStore) {
+    const close = closeStore;
+    server.server.onclose = () => { void close(); };
+  }
 
   // Clients that list prompts or resources hear about changes made through the tools.
   const notifyListChanged = () => {
@@ -212,7 +223,7 @@ const ChangeSchema = z.object({
   id: z.string(),
   name: z.string(),
   version: VersionSchema,
-  persisted: z.boolean().describe('True when the change was saved to the state directory, false when it is in memory only'),
+  persisted: z.boolean().describe('True when the change was saved (to the state directory or the database), false when it is in memory only'),
 });
 const RenderSchema = z.object({
   id: z.string(),
@@ -230,7 +241,7 @@ const StatsSchema = z.object({
   regular: z.number().int(),
   tags: z.array(z.string()),
   categories: z.array(z.string()),
-  storage: z.enum(['memory', 'file']),
+  storage: z.enum(['memory', 'file', 'postgres']),
   sources: z.object({
     bundled: z.number().int(),
     catalog: z.number().int(),
@@ -283,6 +294,8 @@ function result(content: CallToolResult['content'], structured: object): CallToo
 /** What went wrong, said so the caller can fix it; internals stay in the log. */
 function describeFailure(action: string, error: unknown): string {
   if (error instanceof PromptNotFoundError) return `${error.message}. Call list_prompts to see the ids this server serves.`;
+  // Someone else changed the prompt; the store has read their version, so asking again works.
+  if (error instanceof PromptStaleError) return error.message;
   if (error instanceof PromptConflictError) return `${error.message}. Choose another id, or change the existing prompt with update_prompt.`;
   if (error instanceof PromptUsageError || error instanceof PromptStorageError) return error.message;
   if (error instanceof ZodError) {
@@ -317,10 +330,12 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     }) as (args: never) => Promise<CallToolResult>);
   };
 
-  const persisted = () => Boolean(store.stateDir);
-  const storageNote = () => persisted()
-    ? 'Saved to the state directory; it survives a restart.'
-    : 'Kept in memory only; it is lost when the server restarts.';
+  const persisted = () => store.storage !== 'memory';
+  const storageNote = () => store.storage === 'postgres'
+    ? 'Saved to the database; it survives a restart.'
+    : persisted()
+      ? 'Saved to the state directory; it survives a restart.'
+      : 'Kept in memory only; it is lost when the server restarts.';
   const change = (prompt: StoredPrompt) => ({ id: prompt.id, name: prompt.name, version: prompt.version, persisted: persisted() });
 
   tool('list_prompts', {
@@ -408,7 +423,7 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
 
   tool('get_stats', {
     title: 'Library statistics',
-    description: 'Counts of prompts and templates, the tags and categories in use, and whether changes are saved to disk (`storage`).',
+    description: 'Counts of prompts and templates, the tags and categories in use, and where changes are saved (`storage`: memory, file or postgres).',
     inputSchema: NoInput,
     outputSchema: StatsSchema,
     annotations: READ_ONLY,

@@ -12,7 +12,7 @@ importers:
         specifier: ^1.32.2
         version: 1.32.2(zod@4.6.7)
       pg:
-        specifier: 8.23.1
+        specifier: ^8.23.1
         version: 8.23.1
       pino:
         specifier: ^8.21.0
@@ -34,7 +34,7 @@ importers:
         specifier: ^20.19.17
         version: 20.19.43
       '@types/pg':
-        specifier: 8.23.1
+        specifier: ^8.23.1
         version: 8.23.1
       '@typescript-eslint/eslint-plugin':
         specifier: ^8.72.0

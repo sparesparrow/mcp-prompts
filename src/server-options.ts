@@ -29,6 +29,15 @@ export interface ServerOptions {
   catalogUrl?: string;
   /** Where add, update and delete are saved. Left out, they are kept in memory only. */
   stateDir?: string;
+  /**
+   * 'file' (the default) keeps changes in memory or in stateDir; 'postgres' saves them to the
+   * database named by the environment variable DATABASE_URL, for the owner below. The URL is read
+   * from the environment when the store is opened and is not an option, so that nothing that
+   * prints the options can print it.
+   */
+  storage: 'file' | 'postgres';
+  /** Whose prompts a postgres install saves and serves (MCP_PROMPTS_OWNER). */
+  owner?: string;
 }
 
 /** One source's options; keys it leaves out keep the value from an earlier source. */
@@ -43,6 +52,8 @@ export interface OptionLayer {
   dirs?: string[];
   catalogUrl?: string;
   stateDir?: string;
+  storage?: 'file' | 'postgres';
+  owner?: string;
 }
 
 export const DEFAULT_OPTIONS: ServerOptions = {
@@ -51,6 +62,7 @@ export const DEFAULT_OPTIONS: ServerOptions = {
   expose: ['tools'],
   readOnly: false,
   dirs: [],
+  storage: 'file',
 };
 
 /** An option value or name is invalid; the message says which and why. */
@@ -98,6 +110,10 @@ Environment variables: MCP_PROMPTS_PROFILE, MCP_PROMPTS_PROMPTS, MCP_PROMPTS_TEM
 MCP_PROMPTS_EXCLUDE, MCP_PROMPTS_EXPOSE, MCP_PROMPTS_READ_ONLY, PROMPTS_DIR, MCP_PROMPTS_DIRS or
 PROMPTS_EXTRA_DIRS (separated by "${path.delimiter}"), PROMPTS_CATALOG_URL, MCP_PROMPTS_STATE_DIR,
 MCP_PROMPTS_CONFIG. Flags override environment variables, which override the config file.
+
+Postgres (environment only): MCP_PROMPTS_STORAGE=postgres saves add_prompt, update_prompt and
+delete_prompt to the database in DATABASE_URL instead of memory or a state directory, for the
+owner MCP_PROMPTS_OWNER. MCP_PROMPTS_STORAGE=file is the default.
 
 HTTP: the URL http://<host>:<port>/mcp takes profile, prompts, templates, exclude, expose and
 readOnly as query parameters, and can only narrow what the server itself serves.
@@ -253,6 +269,7 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
 const ENV_KEYS = [
   'MCP_PROMPTS_PROFILE', 'MCP_PROMPTS_PROMPTS', 'MCP_PROMPTS_TEMPLATES', 'MCP_PROMPTS_EXCLUDE', 'MCP_PROMPTS_EXPOSE',
   'MCP_PROMPTS_READ_ONLY', 'MCP_PROMPTS_DIRS', 'MCP_PROMPTS_STATE_DIR', 'MCP_PROMPTS_CONFIG',
+  'MCP_PROMPTS_STORAGE', 'MCP_PROMPTS_OWNER',
   // Read by the HTTP entry point (config.ts); listed here so they are not reported as unknown.
   'MCP_PROMPTS_AUTH_TOKEN', 'MCP_PROMPTS_AUTH_TOKEN_FILE', 'MCP_PROMPTS_ALLOWED_HOSTS',
   'MCP_PROMPTS_ALLOWED_ORIGINS', 'MCP_PROMPTS_ALLOW_INSECURE',
@@ -290,6 +307,13 @@ export function optionsFromEnv(
   if (catalogUrl) layer.catalogUrl = catalogUrl;
   const stateDir = get('MCP_PROMPTS_STATE_DIR');
   if (stateDir) layer.stateDir = resolvePath(stateDir, cwd);
+  const storage = get('MCP_PROMPTS_STORAGE');
+  if (storage !== undefined) {
+    if (storage !== 'file' && storage !== 'postgres') throw new OptionsError(`MCP_PROMPTS_STORAGE must be file or postgres, not "${storage}"`);
+    layer.storage = storage;
+  }
+  const owner = get('MCP_PROMPTS_OWNER');
+  if (owner) layer.owner = owner;
   const config = get('MCP_PROMPTS_CONFIG');
 
   // A misspelt variable would otherwise be ignored without a word.
@@ -301,7 +325,10 @@ export function optionsFromEnv(
   // let a deployment believe its prompts were going to a database.
   const storageType = get('STORAGE_TYPE');
   if (storageType && !LEGACY_STORAGE_TYPES.includes(storageType)) {
-    warnings.push(`STORAGE_TYPE=${storageType} is not supported: prompts are read from files, and changes are kept in memory unless MCP_PROMPTS_STATE_DIR is set`);
+    warnings.push(
+      `STORAGE_TYPE=${storageType} is not supported: prompts are read from files, and changes are kept in memory unless MCP_PROMPTS_STATE_DIR is set` +
+      (storageType === 'postgres' ? ' (to save to Postgres, set MCP_PROMPTS_STORAGE=postgres, DATABASE_URL and MCP_PROMPTS_OWNER)' : '')
+    );
   } else if (storageType === 'file' && !layer.stateDir) {
     warnings.push('STORAGE_TYPE=file no longer selects anything: set MCP_PROMPTS_STATE_DIR to save changes to disk');
   }
@@ -395,6 +422,8 @@ export function mergeOptions(base: ServerOptions, ...layers: OptionLayer[]): Ser
     if (layer.dirs !== undefined) result.dirs = layer.dirs;
     if (layer.catalogUrl !== undefined) result.catalogUrl = layer.catalogUrl;
     if (layer.stateDir !== undefined) result.stateDir = layer.stateDir;
+    if (layer.storage !== undefined) result.storage = layer.storage;
+    if (layer.owner !== undefined) result.owner = layer.owner;
   }
   return result;
 }
@@ -439,20 +468,61 @@ export function selectFor(store: PromptStore, options: { profiles?: string[]; se
  * Loads the library, the user's directories and what earlier runs saved to the state directory,
  * and selects what the options ask for. Throws PromptStorageError when the state directory cannot
  * be written and the options are not read-only, and OptionsError for an unknown profile.
+ * Reads only: a postgres install is listed by its library alone (this never connects).
  */
-export function openStore(options: ServerOptions): { base: PromptStore; store: PromptStore; warnings: string[] } {
+export function openStore(options: ServerOptions): OpenedStore {
   const base = new PromptStore();
   base.load({ promptsDir: options.promptsDir, dirs: options.dirs });
-  if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
-  return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection) };
+  const warnings: string[] = [];
+  if (options.storage === 'postgres') {
+    warnings.push('MCP_PROMPTS_STORAGE=postgres: this command shows the library only, not the prompts saved in the database');
+  } else if (options.stateDir) {
+    base.openStateDir(options.stateDir, { readOnly: options.readOnly });
+  }
+  return { base, store: selectFor(base, options), warnings: [...warnings, ...base.selectionWarnings(options.selection)], close: async () => {} };
 }
 
-/** Opens a store with library < catalog < user-directory precedence. */
-export async function openConfiguredStore(options: ServerOptions): Promise<{ base: PromptStore; store: PromptStore; warnings: string[] }> {
+export interface OpenedStore {
+  base: PromptStore;
+  store: PromptStore;
+  warnings: string[];
+  /** Releases what the store holds open (the database connections). Safe to call more than once. */
+  close: () => Promise<void>;
+}
+
+/**
+ * Opens a store with library < catalog < user-directory precedence. With postgres storage it
+ * connects to env.DATABASE_URL, applies the migrations and saves for options.owner; the URL is
+ * never put in a message. Throws OptionsError when a setting is missing or contradicts another,
+ * and PromptStorageError (without connection details) when the database cannot be used.
+ */
+export async function openConfiguredStore(options: ServerOptions, env: NodeJS.ProcessEnv = process.env): Promise<OpenedStore> {
   const base = new PromptStore();
   base.load({ promptsDir: options.promptsDir });
   if (options.catalogUrl) await base.loadCatalog(options.catalogUrl);
   base.loadUserDirectories(options.dirs);
-  if (options.stateDir) base.openStateDir(options.stateDir, { readOnly: options.readOnly });
-  return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection) };
+  let close = async () => {};
+  if (options.storage === 'postgres') {
+    const url = env.DATABASE_URL?.trim();
+    if (!url) throw new OptionsError('MCP_PROMPTS_STORAGE=postgres needs the database in the environment variable DATABASE_URL');
+    if (!options.owner) throw new OptionsError('MCP_PROMPTS_STORAGE=postgres needs MCP_PROMPTS_OWNER, the owner whose prompts this server saves and serves');
+    if (options.stateDir) throw new OptionsError('MCP_PROMPTS_STORAGE=postgres and MCP_PROMPTS_STATE_DIR both say where to save changes; set only one');
+    // Loaded only now: an install that keeps its prompts in files never needs the driver.
+    const { PostgresStateBackend, createPostgresPool, runMigrations } = await import('./storage/postgres.js');
+    const pool = createPostgresPool(url);
+    close = async () => {
+      close = async () => {};
+      await pool.end().catch(() => undefined);
+    };
+    try {
+      await runMigrations(pool);
+      await base.useBackend(new PostgresStateBackend({ pool, ownerSub: options.owner }));
+    } catch (error) {
+      await close();
+      throw error;
+    }
+  } else if (options.stateDir) {
+    base.openStateDir(options.stateDir, { readOnly: options.readOnly });
+  }
+  return { base, store: selectFor(base, options), warnings: base.selectionWarnings(options.selection), close: () => close() };
 }

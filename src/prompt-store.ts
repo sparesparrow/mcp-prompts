@@ -3,9 +3,9 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils.js';
-import { FileStateBackend, PromptConflictError, PromptStorageError, type StateBackend, type StateSnapshot } from './state-backend.js';
+import { FileStateBackend, PromptConflictError, PromptStaleError, PromptStorageError, type StateBackend, type StateSnapshot } from './state-backend.js';
 
-export { PromptConflictError, PromptStorageError } from './state-backend.js';
+export { PromptConflictError, PromptStaleError, PromptStorageError } from './state-backend.js';
 export type { StateBackend, StateSnapshot } from './state-backend.js';
 
 // Shared by the MCP stdio server and the HTTP server, so both serve the same prompts the same way.
@@ -130,8 +130,8 @@ export interface PromptStats {
   regular: number;
   tags: string[];
   categories: string[];
-  /** 'file' when changes are saved to a state directory, 'memory' when they end with the process. */
-  storage: 'memory' | 'file';
+  /** Where changes are saved: 'file' (a state directory), 'postgres', or 'memory' when they end with the process. */
+  storage: 'memory' | 'file' | 'postgres';
   sources: { bundled: number; catalog: number; user: number; session: number };
 }
 
@@ -407,17 +407,45 @@ interface SharedState {
   saved?: { snapshot: StateSnapshot; revision: string };
   /** The change last queued for each prompt id, so changes to one prompt are applied one by one. */
   queued: Map<string, Promise<unknown>>;
+  /** The backend answers with promises, so it is checked in the background (see refresh). */
+  asyncBackend?: boolean;
+  /** How long to leave between checks of an asynchronous backend. */
+  refreshMs: number;
+  /** When an asynchronous backend was last asked, from Date.now(). */
+  lastCheck: number;
+  /** The check of the backend that is running, so concurrent callers share one. */
+  checking?: Promise<void>;
+  /** Changes made through this store so far; a read of the backend that overlapped one is repeated. */
+  writes: number;
+  /** The last check failed and was reported; the next failure is not reported again until one succeeds. */
+  checkFailed: boolean;
+}
+
+/** How long to leave between checks of a backend that can only be asked asynchronously. */
+export const REFRESH_INTERVAL_MS = 2_000;
+
+function newSharedState(): SharedState {
+  return {
+    prompts: new Map(), origins: new Map(), profiles: new Map(), queued: new Map(),
+    refreshMs: REFRESH_INTERVAL_MS, lastCheck: 0, writes: 0, checkFailed: false,
+  };
 }
 
 export class PromptStore {
   // Views made by select() share this state and add filters, so a prompt added through any view
   // is stored once.
-  private shared: SharedState = { prompts: new Map(), origins: new Map(), profiles: new Map(), queued: new Map() };
+  private shared: SharedState = newSharedState();
   private filters: Visibility[] = [];
 
   /** Number of prompts this store serves. */
   get size(): number {
     return this.all().length;
+  }
+
+  /** Where changes are saved: the backend's kind while it can be written, otherwise memory. */
+  get storage(): 'memory' | 'file' | 'postgres' {
+    const { backend } = this.shared;
+    return backend?.writable ? backend.kind : 'memory';
   }
 
   /** The directory changes are saved to, or undefined when they are kept in memory only. */
@@ -784,13 +812,80 @@ export class PromptStore {
 
   /**
    * Saves add, update and delete to the backend from now on, after loading what it holds. Like
-   * openStateDir, but for a backend that may answer asynchronously. Returns how many saved
-   * prompts were loaded.
+   * openStateDir, but for a backend that may answer asynchronously: such a backend is asked about
+   * changes in the background, at most once per refreshIntervalMs (two seconds by default), and
+   * by sync(). Returns how many saved prompts were loaded. Throws PromptStorageError when the
+   * backend cannot be read, and PromptUsageError when this store already has a backend.
    */
-  async useBackend(backend: StateBackend): Promise<number> {
-    const revision = await backend.revision();
-    const snapshot = await backend.load();
+  async useBackend(backend: StateBackend, options: { refreshIntervalMs?: number } = {}): Promise<number> {
+    this.assertNoBackend();
+    let asyncBackend: boolean;
+    let revision: string;
+    let snapshot: StateSnapshot;
+    try {
+      const first = backend.revision();
+      asyncBackend = typeof first !== 'string';
+      revision = await first;
+      snapshot = await backend.load();
+    } catch (error) {
+      if (error instanceof PromptStorageError) throw error;
+      logger.error({ err: error }, 'Could not read the saved prompts');
+      throw new PromptStorageError('Could not read the saved prompts; the backend was not used');
+    }
+    // Another call may have attached a backend while this one was reading.
+    this.assertNoBackend();
+    this.shared.asyncBackend = asyncBackend;
+    this.shared.refreshMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
+    this.shared.lastCheck = Date.now();
     return this.attach(backend, snapshot, revision);
+  }
+
+  private assertNoBackend(): void {
+    if (this.shared.backend) throw new PromptUsageError('This store already saves to a backend; it can have only one');
+  }
+
+  /**
+   * A store over the same library whose saved prompts come from its own backend: one owner's view
+   * of a shared library. The library (and the catalog and user directories loaded into this
+   * store) must be loaded before; the prompts it holds are shared, not copied, while what the
+   * backend saved is private to the new store. This store must not have a backend itself.
+   */
+  async overlay(backend: StateBackend, options: { refreshIntervalMs?: number } = {}): Promise<PromptStore> {
+    this.assertNoBackend();
+    const pristine = (this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) });
+    const store = new PromptStore();
+    store.shared = {
+      ...newSharedState(),
+      prompts: new Map(pristine.prompts),
+      origins: new Map(pristine.origins),
+      library: this.shared.library,
+      profiles: this.shared.profiles,
+      pristine,
+    };
+    await store.useBackend(backend, options);
+    return store;
+  }
+
+  /**
+   * Asks the backend now, whatever the interval, and reads it again if something changed. Meant
+   * for a request that must see what another server saved. A backend that fails is not an error
+   * here: the store keeps serving what it has (and says so once in the log).
+   */
+  async sync(): Promise<void> {
+    const { backend, saved } = this.shared;
+    if (!backend || !saved) return;
+    if (!this.shared.asyncBackend) {
+      this.refresh();
+      return;
+    }
+    // A check that started before this call may have missed what this call must see.
+    if (this.shared.checking) await this.shared.checking;
+    await this.runCheck();
+  }
+
+  /** Throws when the backend cannot be reached. A store without a backend is always fine. */
+  async checkStorage(): Promise<void> {
+    await this.shared.backend?.revision();
   }
 
   private attach(backend: StateBackend, snapshot: StateSnapshot, revision: string): number {
@@ -825,11 +920,17 @@ export class PromptStore {
 
   /**
    * Reads the backend again if it changed since it was last read. Reads of the store are
-   * synchronous, so a backend that can only answer asynchronously is not polled here.
+   * synchronous, so a backend that can only answer asynchronously is asked in the background:
+   * this starts a check when the interval has passed and returns at once, and what the check
+   * finds is served from the next read on.
    */
   private refresh(): void {
     const { backend, saved } = this.shared;
     if (!backend || !saved) return;
+    if (this.shared.asyncBackend) {
+      if (!this.shared.checking && Date.now() - this.shared.lastCheck >= this.shared.refreshMs) void this.runCheck();
+      return;
+    }
     const revision = backend.revision();
     if (typeof revision !== 'string') {
       Promise.resolve(revision).catch(() => undefined);
@@ -851,6 +952,49 @@ export class PromptStore {
     this.applySaved();
   }
 
+  /** Runs one check of an asynchronous backend, or joins the one that is running. */
+  private runCheck(): Promise<void> {
+    const shared = this.shared;
+    if (!shared.checking) {
+      shared.lastCheck = Date.now();
+      shared.checking = this.checkBackend().finally(() => {
+        shared.checking = undefined;
+      });
+    }
+    return shared.checking;
+  }
+
+  /** Compares the backend's revision with the one last read, and reads it again if it moved. Never throws. */
+  private async checkBackend(): Promise<void> {
+    const shared = this.shared;
+    // A change made through this store while the backend was being read is not in what was read,
+    // and applying that would take it out of memory: read again instead.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { backend, saved, writes } = shared;
+      if (!backend || !saved) return;
+      try {
+        const revision = await backend.revision();
+        if (revision !== saved.revision) {
+          const snapshot = await backend.load();
+          if (shared.writes !== writes) continue;
+          shared.saved = { snapshot, revision };
+          this.applySaved();
+        }
+        if (shared.checkFailed) logger.info('The saved prompts can be read again');
+        shared.checkFailed = false;
+        return;
+      } catch (error) {
+        // PromptStorageError messages carry no connection details; anything else is named by its type only.
+        if (!shared.checkFailed) {
+          const reason = error instanceof PromptStorageError ? error.message : error instanceof Error ? error.name : 'error';
+          logger.warn(`Could not check the saved prompts for changes (${reason}); serving what was read before`);
+        }
+        shared.checkFailed = true;
+        return;
+      }
+    }
+  }
+
   private assertWritable(): void {
     if (this.shared.backend && !this.shared.backend.writable) {
       throw new PromptUsageError('This server reads its state directory read-only, so prompts cannot be changed here');
@@ -868,7 +1012,9 @@ export class PromptStore {
     try {
       await save(backend);
     } catch (error) {
-      if (error instanceof PromptConflictError || error instanceof PromptStorageError) throw error;
+      // Someone else changed the prompt: read what they saved, so that trying again starts from it.
+      if (error instanceof PromptStaleError && this.shared.asyncBackend) await this.sync();
+      if (error instanceof PromptConflictError || error instanceof PromptStorageError || error instanceof PromptUsageError) throw error;
       logger.error({ err: error }, `Could not save ${what}`);
       throw new PromptStorageError(`Could not save ${what}; nothing was changed`);
     }
@@ -972,6 +1118,7 @@ export class PromptStore {
       // Saved first: the backend decides a conflict (another server may have saved this id a moment ago).
       if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(prompt, 'create'));
       this.shared.prompts.set(id, prompt);
+      this.shared.writes++;
       // An id the library also has (deleted earlier, now added again) keeps its place in the
       // library, as it will after a restart; anything else was added at runtime.
       this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
@@ -1000,6 +1147,7 @@ export class PromptStore {
       const expectedVersion = prompt === this.shared.pristine?.prompts.get(id) ? null : String(prompt.version);
       if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(updated, 'replace', expectedVersion));
       this.shared.prompts.set(id, updated);
+      this.shared.writes++;
       logger.info(`Updated prompt: ${id}`);
       return updated;
     });
@@ -1015,6 +1163,7 @@ export class PromptStore {
       if (this.shared.backend) await this.persist(`the deletion of prompt ${id}`, backend => backend.remove(id, tombstone));
       this.shared.prompts.delete(id);
       this.shared.origins.delete(id);
+      this.shared.writes++;
       logger.info(`Deleted prompt: ${id}`);
       return prompt;
     });
@@ -1050,7 +1199,7 @@ export class PromptStore {
       regular: promptList.filter(p => !p.isTemplate).length,
       tags: Array.from(new Set(promptList.flatMap(p => p.tags || []))).sort(),
       categories: Array.from(new Set(promptList.map(categoryOf).filter((c): c is string => Boolean(c)))).sort(),
-      storage: this.stateDir ? 'file' : 'memory',
+      storage: this.storage,
       sources
     };
   }

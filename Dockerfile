@@ -24,6 +24,8 @@ COPY --from=builder --chown=mcp-prompts:nodejs /app/node_modules ./node_modules
 COPY --from=builder --chown=mcp-prompts:nodejs /app/dist ./dist
 COPY --from=builder --chown=mcp-prompts:nodejs /app/data/prompts ./data/prompts
 COPY --from=builder --chown=mcp-prompts:nodejs /app/data/sample-prompts.json ./data/sample-prompts.json
+# The SQL files of the Postgres backend (MCP_PROMPTS_STORAGE=postgres), applied at start.
+COPY --from=builder --chown=mcp-prompts:nodejs /app/migrations ./migrations
 
 # Where a read-write deployment saves changes (MCP_PROMPTS_STATE_DIR=/data); unused otherwise.
 RUN mkdir -p /data && chown mcp-prompts:nodejs /data

@@ -15,9 +15,19 @@ export class PromptConflictError extends Error {
   }
 }
 
-/** The conflict of a change made to a prompt that someone else changed or deleted in the meantime. */
-export function staleChangeError(id: string): PromptConflictError {
-  return new PromptConflictError(id, `Prompt ${id} was changed or deleted by someone else since it was read; read it again and retry`);
+/**
+ * A change made to a prompt that someone else changed or deleted in the meantime. Unlike a taken
+ * id, it is worth retrying: the store reads the backend again when it sees one, so the retry
+ * starts from what the other server saved.
+ */
+export class PromptStaleError extends PromptConflictError {
+  constructor(id: string) {
+    super(id, `Prompt ${id} was changed or deleted by someone else since it was read; read it again and retry`);
+  }
+}
+
+export function staleChangeError(id: string): PromptStaleError {
+  return new PromptStaleError(id);
 }
 
 /** A change could not be saved; the prompt was left as it was. */
@@ -48,8 +58,13 @@ export interface StateBackend {
    * still has that version, so an update made from a stale read, or of a prompt another server
    * deleted, fails with PromptConflictError instead of overwriting or bringing it back. null means
    * the prompt was not saved yet (a library prompt edited for the first time): it must still not
-   * be saved, nor its id recorded as deleted. Left out, 'replace' is unconditional. Any other
-   * failure is a PromptStorageError, and nothing is saved.
+   * be saved, nor its id recorded as deleted. Left out, 'replace' is unconditional. A version that
+   * no longer matches is a PromptStaleError. Any other failure is a PromptStorageError, and
+   * nothing is saved.
+   *
+   * The check compares version labels, and an update only moves a label that is a number or
+   * x.y.z (see nextVersion). A prompt whose version is any other text keeps that text through
+   * every update, so for it the check always matches and a stale update is not detected.
    */
   put(prompt: StoredPrompt, mode: 'create' | 'replace', expectedVersion?: string | null): Promise<void>;
   /** Removes a prompt; with tombstone, also remembers the id as deleted (it exists in the library). */
@@ -189,7 +204,7 @@ export class FileStateBackend implements StateBackend {
   // The expected version is not checked: a directory has no way to compare and replace in one
   // step. The store applies the changes it makes one after the other, and reads the directory
   // again whenever it changed, so a stale replace is rare here.
-  async put(prompt: StoredPrompt, mode: 'create' | 'replace'): Promise<void> {
+  async put(prompt: StoredPrompt, mode: 'create' | 'replace', _expected?: string | null): Promise<void> {
     this.saving(`prompt ${prompt.id}`, () => {
       const data = `${JSON.stringify(prompt, null, 2)}\n`;
       if (mode === 'replace') {

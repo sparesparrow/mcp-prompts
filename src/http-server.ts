@@ -76,6 +76,8 @@ export interface HttpServerOptions {
   allowedOrigins?: string[];
   /** Listen beyond loopback with writes enabled and no token. */
   allowInsecure?: boolean;
+  /** Where DATABASE_URL is read from, for a postgres install. Defaults to process.env. */
+  env?: NodeJS.ProcessEnv;
 }
 
 class HttpError extends Error {
@@ -175,8 +177,17 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       // Readiness, and the mode the server runs in, so that a health check can insist on it:
       // deploy/http-catalog is healthy only while read-only, deploy/http-workspace only while it
       // requires a token and saves to disk. An image too old to know those settings fails the check.
-      handler: (_req, res) => {
+      handler: async (_req, res) => {
         const stateDir = store.stateDir;
+        if (store.storage === 'postgres') {
+          try {
+            await store.checkStorage();
+          } catch {
+            // The cause is in the log; a health check needs no more than this.
+            res.status(503).json({ status: 'unavailable', service: 'mcp-prompts', reason: 'the database cannot be reached' });
+            return;
+          }
+        }
         if (stateDir) {
           try {
             fs.accessSync(stateDir, fs.constants.R_OK | fs.constants.W_OK);
@@ -190,7 +201,7 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           service: 'mcp-prompts',
           readOnly,
           auth: access.token ? 'token' : 'none',
-          storage: stateDir ? 'file' : 'memory',
+          storage: store.storage,
         });
       },
     },
@@ -386,10 +397,17 @@ function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 
 export async function createServer(options: HttpServerOptions = {}): Promise<HttpServerApp> {
   const serverOptions = options.serverOptions ?? resolveOptions([], process.env).options;
-  const base = options.store ?? (await openConfiguredStore(serverOptions)).base;
+  const opened = options.store ? undefined : await openConfiguredStore(serverOptions, options.env);
+  const base = options.store ?? opened!.base;
   for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
   // Throws OptionsError for a profile the library does not define.
-  const served = selectFor(base, serverOptions);
+  let served: PromptStore;
+  try {
+    served = selectFor(base, serverOptions);
+  } catch (error) {
+    await opened?.close();
+    throw error;
+  }
   const access = options.access ?? buildAccessPolicy('127.0.0.1', {
     token: options.authToken,
     allowedHosts: options.allowedHosts,
@@ -462,6 +480,8 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       }
 
       const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : undefined;
+      // Other servers may have saved changes since the last request: ask the database before answering.
+      if (!isProbe && served.storage === 'postgres') await served.sync();
       let statusCode = 200;
       const routeRes: RouteResponse = {
         status: code => { statusCode = code; return routeRes; },
@@ -492,13 +512,19 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       server.listen(Number(port), hostname, () => cb?.());
       return app;
     },
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        if (!server.listening) return resolve();
-        server.close(err => (err ? reject(err) : resolve()));
-        // Idle keep-alive connections would otherwise hold the shutdown until they time out.
-        server.closeIdleConnections();
-      }),
+    close: async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          if (!server.listening) return resolve();
+          server.close(err => (err ? reject(err) : resolve()));
+          // Idle keep-alive connections would otherwise hold the shutdown until they time out.
+          server.closeIdleConnections();
+        });
+      } finally {
+        // The database connections this server opened itself, if any.
+        await opened?.close();
+      }
+    },
     address: () => {
       const addr = server.address();
       return addr && typeof addr === 'object' ? addr : null;
@@ -533,10 +559,15 @@ export async function startHttpServer(
     corsOrigin: options.corsOrigin,
   });
   const app = await createServer({ ...options, serverOptions, access });
-  await new Promise<void>((resolve, reject) => {
-    app.onListenError(reject);
-    app.listen(port, host, resolve);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      app.onListenError(reject);
+      app.listen(port, host, resolve);
+    });
+  } catch (error) {
+    await app.close().catch(() => undefined);
+    throw error;
+  }
   const addr = app.address();
   logger.info(
     `MCP Prompts HTTP server listening on ${host}:${addr?.port ?? port} ` +

@@ -107,6 +107,33 @@ Only the library is filtered. Prompts in your own `--dir` directories, and promp
 `add_prompt`, are served by every install whatever its profile. With a shared `--state-dir` that
 means a prompt one agent saves appears in every profile.
 
+## Save changes to Postgres (optional)
+
+Instead of memory or a `--state-dir`, `add_prompt`, `update_prompt` and `delete_prompt` can be
+saved to a Postgres database, so that several servers share them. Environment variables, names
+only (put the values in your secret store, not in a file you commit):
+
+- `MCP_PROMPTS_STORAGE=postgres` (the default is `file`)
+- `DATABASE_URL`, the database
+- `MCP_PROMPTS_OWNER`, whose prompts this server saves and serves; every row carries its owner
+  and one owner never sees another's. It cannot be combined with `MCP_PROMPTS_STATE_DIR`.
+
+The server applies the SQL files in `migrations/` when it starts (the Docker images carry them).
+Servers that share an owner see each other's changes within about two seconds, and an HTTP
+request asks the database before it answers. An update made from an older version of a prompt
+is refused with a 409 saying to read it again; the store has by then read what the other server
+saved, so the same call, repeated, goes through. That check compares version labels, and an
+update only moves a version that is a number or `x.y.z`: a prompt whose version is any other
+text keeps it through every update, so for it a stale update is not detected.
+
+The library stays read-only and shared; saved prompts are laid over it as they are over a state
+directory. To copy a directory of prompts into the database once (ids the owner already has are
+skipped, nothing is overwritten, only counts are printed), after `pnpm run build`:
+
+```bash
+DATABASE_URL=... node scripts/seed-postgres.mjs ./my-prompts --owner <owner>
+```
+
 ## Other ways to keep calls small
 
 - Leave `--expose` at `tools` unless you want slash commands: with `prompts`, a client loads the

@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { Pool, type PoolClient } from 'pg';
 import { PromptConflictError, PromptStorageError, staleChangeError, type StateBackend, type StateSnapshot } from '../state-backend.js';
-import type { StoredPrompt } from '../prompt-store.js';
+import { PromptUsageError, type StoredPrompt } from '../prompt-store.js';
 import { logger } from '../utils.js';
 
 // Saved prompts in Postgres, for one owner. Nothing here puts the connection string, host, user or
@@ -83,6 +83,25 @@ export interface PostgresStateBackendOptions {
   ownerSub: string;
 }
 
+const LONE_SURROGATE = /[\ud800-\udbff](?![\udc00-\udfff])|(?<![\ud800-\udbff])[\udc00-\udfff]/;
+
+/**
+ * Postgres refuses the NUL character, and a lone surrogate, in jsonb text (22P05). Say so before
+ * anything is written, as a problem with the input (a 400) and not as a storage failure, without
+ * repeating any of the text.
+ */
+function assertStorable(prompt: StoredPrompt): void {
+  const bad = (text: string) => text.includes('\u0000') || LONE_SURROGATE.test(text);
+  JSON.stringify(prompt, (key, value) => {
+    if (bad(key) || (typeof value === 'string' && bad(value))) {
+      throw new PromptUsageError(
+        `Prompt ${prompt.id} contains a NUL character (U+0000) or an unpaired surrogate, which the database cannot store; remove it and try again`
+      );
+    }
+    return value;
+  });
+}
+
 /** Whether a stored row is a prompt the store can serve. */
 function isPrompt(body: unknown, id: string): body is StoredPrompt {
   const prompt = body as Partial<StoredPrompt> | null;
@@ -145,6 +164,7 @@ export class PostgresStateBackend implements StateBackend {
   }
 
   async put(prompt: StoredPrompt, mode: 'create' | 'replace', expectedVersion?: string | null): Promise<void> {
+    assertStorable(prompt);
     await this.write(`save prompt ${prompt.id}`, async client => {
       const values = [this.ownerSub, prompt.id, JSON.stringify(prompt), String(prompt.version)];
       if (mode === 'create') {
@@ -212,7 +232,8 @@ export class PostgresStateBackend implements StateBackend {
         await change(client);
         await client.query('COMMIT');
       } catch (error) {
-        await client.query('ROLLBACK').catch(() => undefined);
+        // A connection that cannot even roll back may still hold the transaction: do not reuse it.
+        await client.query('ROLLBACK').catch(() => { failed = true; });
         throw error;
       }
     } catch (error) {

@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { Pool } from 'pg';
-import { PromptConflictError, PromptNotFoundError, PromptStorageError, PromptStore, type StoredPrompt } from '../prompt-store';
+import { PromptConflictError, PromptNotFoundError, PromptStaleError, PromptStorageError, PromptStore, PromptUsageError, type StoredPrompt } from '../prompt-store';
 import { logger } from '../utils';
 import { PostgresStateBackend, createPostgresPool, runMigrations } from './postgres';
 
@@ -75,6 +75,46 @@ describe('PostgresStateBackend without a reachable database', () => {
   });
 });
 
+describe('PostgresStateBackend when a rollback fails', () => {
+  /** A connection that fails on the statement matching `failOn`, and on every ROLLBACK when rollbackFails. */
+  const brokenClient = (failOn: RegExp, error: unknown, rollbackFails: boolean) => {
+    const released: unknown[] = [];
+    const client = {
+      query: async (sql: string) => {
+        if (sql === 'ROLLBACK' && rollbackFails) throw Object.assign(new Error('connection lost'), { code: '57P01' });
+        if (failOn.test(sql)) throw error;
+        return { rows: [], rowCount: 1 };
+      },
+      release: (arg?: unknown) => { released.push(arg); },
+    };
+    const pool = { connect: async () => client, query: async () => ({ rows: [] }) } as unknown as Pool;
+    return { pool, released };
+  };
+  const duplicate = Object.assign(new Error('duplicate key value'), { code: '23505' });
+
+  it('throws the connection away instead of returning it to the pool', async () => {
+    const { pool, released } = brokenClient(/INSERT INTO prompts/, duplicate, true);
+    const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
+    // The caller still gets the conflict, but the connection may be in an unknown state.
+    await expect(backend.put(stored('x'), 'create')).rejects.toThrow(PromptConflictError);
+    expect(released).toEqual([true]);
+  });
+
+  it('puts a connection whose rollback worked back', async () => {
+    const { pool, released } = brokenClient(/INSERT INTO prompts/, duplicate, false);
+    const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
+    await expect(backend.put(stored('x'), 'create')).rejects.toThrow(PromptConflictError);
+    expect(released).toEqual([false]);
+  });
+
+  it('does the same for a failure that is not a conflict', async () => {
+    const { pool, released } = brokenClient(/INSERT INTO prompts/, new Error('boom'), true);
+    const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
+    await expect(backend.put(stored('x'), 'create')).rejects.toThrow(PromptStorageError);
+    expect(released).toEqual([true]);
+  });
+});
+
 describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
   let pool: Pool;
   let root: string;
@@ -108,10 +148,10 @@ describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
   const backendFor = (ownerSub: string, source: Pick<Pool, 'query' | 'connect'> = pool) =>
     new PostgresStateBackend({ pool: source as Pool, ownerSub });
 
-  const storeFor = async (backend: PostgresStateBackend) => {
+  const storeFor = async (backend: PostgresStateBackend, refreshIntervalMs?: number) => {
     const store = new PromptStore();
     store.load({ promptsDir: library });
-    await store.useBackend(backend);
+    await store.useBackend(backend, { refreshIntervalMs });
     return store;
   };
 
@@ -328,6 +368,139 @@ describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
         expect((await backend.load()).prompts.map(prompt => prompt.id)).toEqual(['a', 'b']);
       });
       expect(output).toContain('broken');
+    });
+  });
+
+  describe('several servers for one owner', () => {
+    it('see each other\'s changes after the refresh interval, without being asked', async () => {
+      const owner = newOwner('shared');
+      const a = await storeFor(backendFor(owner), 50);
+      const b = await storeFor(backendFor(owner), 50);
+      await add(a, 'from-a');
+      await b.add({ id: 'from-b', name: 'From B', content: 'c', isTemplate: false, tags: [] });
+      // Reads trigger the checks; the changes arrive within a moment.
+      await vi.waitFor(() => expect(b.get('from-a').name).toBe('from-a'));
+      await vi.waitFor(() => expect(a.get('from-b').name).toBe('From B'));
+      await a.delete('lib-a');
+      await vi.waitFor(() => expect(() => b.get('lib-a')).toThrow(PromptNotFoundError));
+    });
+
+    it('never see another owner\'s changes', async () => {
+      const one = await storeFor(backendFor(newOwner('owner-one')), 20);
+      const two = await storeFor(backendFor(newOwner('owner-two')), 20);
+      await add(one, 'private-to-one');
+      await one.update('lib-b', { name: 'Edited by one' });
+      await one.delete('lib-a');
+      await new Promise(resolve => setTimeout(resolve, 60));
+      await two.sync();
+      expect(() => two.get('private-to-one')).toThrow(PromptNotFoundError);
+      expect(two.get('lib-b').name).toBe('Library B');
+      expect(two.get('lib-a').name).toBe('Library A');
+      expect(two.size).toBe(2);
+    });
+
+    it('recover from a conflict: after another server changed a prompt, a retry goes through', async () => {
+      const owner = newOwner('heal');
+      const a = await storeFor(backendFor(owner), 60_000);
+      const b = await storeFor(backendFor(owner), 60_000);
+      await add(a, 'doc');
+      await b.sync();
+      await b.update('doc', { name: 'By B' });
+      await expect(a.update('doc', { content: 'By A' })).rejects.toThrow(PromptStaleError);
+      expect(a.get('doc').name).toBe('By B');
+      const retried = await a.update('doc', { content: 'By A' });
+      expect(retried).toMatchObject({ name: 'By B', content: 'By A', version: 3 });
+      await b.sync();
+      expect(b.get('doc')).toMatchObject({ name: 'By B', content: 'By A', version: 3 });
+    });
+  });
+
+  describe('text Postgres cannot keep', () => {
+    it('rejects a NUL character with a usage error (a 400), and saves nothing', async () => {
+      const owner = newOwner('nul');
+      const backend = backendFor(owner);
+      const store = await storeFor(backend);
+      await add(store, 'fine');
+      const revision = await backend.revision();
+      const fields = [
+        { name: 'N', content: 'before\u0000after' },
+        { name: 'N\u0000', content: 'c' },
+        { name: 'N', content: 'c', tags: ['t\u0000'] },
+        { name: 'N', content: 'c', metadata: { 'k\u0000': 'v' } },
+      ];
+      for (const input of fields) {
+        const error = await store.add({ id: 'nul', isTemplate: false, tags: [], ...input }).catch(err => err);
+        expect(error).toBeInstanceOf(PromptUsageError);
+        expect(error.message).toMatch(/NUL/);
+        expect(error.message).not.toContain('before');
+      }
+      await expect(store.update('fine', { content: 'x\u0000y' })).rejects.toThrow(PromptUsageError);
+      expect(store.get('fine').version).toBe(1);
+      expect(() => store.get('nul')).toThrow(PromptNotFoundError);
+      expect(await backend.revision()).toBe(revision);
+    });
+
+    it('rejects a lone surrogate the same way', async () => {
+      const store = await storeFor(backendFor(newOwner('surrogate')));
+      await expect(add(store, 'lone').then(() => store.update('lone', { content: 'broken \ud800 text' }))).rejects.toThrow(PromptUsageError);
+    });
+
+    it('keeps text that merely looks like an escape', async () => {
+      const store = await storeFor(backendFor(newOwner('escape')));
+      await store.add({ id: 'text', name: 'Text', content: 'a literal \\u0000 and a pair \ud83d\ude00', isTemplate: false, tags: [] });
+      expect(store.get('text').content).toContain('\\u0000');
+    });
+  });
+
+  describe('migrations in a database of their own', () => {
+    const schemas: string[] = [];
+    const tmpDirs: string[] = [];
+    /** A pool whose connections see an empty schema only. */
+    const emptyDatabase = async () => {
+      const schema = `mig_${run}_${schemas.length}`;
+      schemas.push(schema);
+      await pool.query(`CREATE SCHEMA ${schema}`);
+      const scoped = new Pool({ connectionString: DATABASE_URL, options: `-c search_path=${schema}`, max: 5 });
+      const tables = async () => (await pool.query('SELECT table_name FROM information_schema.tables WHERE table_schema = $1 ORDER BY table_name', [schema])).rows.map(row => row.table_name as string);
+      return { scoped, tables };
+    };
+    afterAll(async () => {
+      for (const schema of schemas) await pool.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      for (const dir of tmpDirs) fs.rmSync(dir, { recursive: true, force: true });
+    });
+
+    it('applied by two runners starting together on an empty database, are applied once', async () => {
+      const { scoped, tables } = await emptyDatabase();
+      try {
+        const results = await Promise.all([runMigrations(scoped), runMigrations(scoped), runMigrations(scoped)]);
+        expect(results.filter(applied => applied.length > 0)).toEqual([['001_prompts.sql']]);
+        expect((await scoped.query('SELECT name FROM schema_migrations')).rows).toEqual([{ name: '001_prompts.sql' }]);
+        expect(await tables()).toEqual(['prompts', 'revisions', 'schema_migrations', 'tombstones']);
+      } finally {
+        await scoped.end();
+      }
+    });
+
+    it('roll back everything when one file fails, and leave the connection usable', async () => {
+      const { scoped, tables } = await emptyDatabase();
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'migrations-bad-'));
+      tmpDirs.push(dir);
+      fs.writeFileSync(path.join(dir, '001_ok.sql'), 'CREATE TABLE first_table (id int);');
+      fs.writeFileSync(path.join(dir, '002_bad.sql'), 'CREATE TABLE second_table (id int); SELECT * FROM table_that_does_not_exist;');
+      try {
+        const error = await runMigrations(scoped, dir).catch(err => err);
+        expect(error).toBeInstanceOf(PromptStorageError);
+        expect(error.message).toMatch(/migrations/);
+        expect(error.message).not.toContain('table_that_does_not_exist');
+        // Not even the first file or the record of it: the whole run was one transaction.
+        expect(await tables()).toEqual([]);
+        // Fixed, the same directory applies in full.
+        fs.writeFileSync(path.join(dir, '002_bad.sql'), 'CREATE TABLE second_table (id int);');
+        expect(await runMigrations(scoped, dir)).toEqual(['001_ok.sql', '002_bad.sql']);
+        expect(await tables()).toEqual(['first_table', 'schema_migrations', 'second_table']);
+      } finally {
+        await scoped.end();
+      }
     });
   });
 
