@@ -19,35 +19,35 @@ import {
 import { makeFixtureLibrary, type FixtureLibrary } from './testing/fixture-library';
 
 describe('PromptStore', () => {
-  it('keeps isTemplate and tags when an update leaves them out', () => {
+  it('keeps isTemplate and tags when an update leaves them out', async () => {
     const store = new PromptStore();
-    const p = store.add({ name: 'T', content: 'Hi {{x}}', isTemplate: true, tags: ['a'] });
-    const updated = store.update(p.id, UpdatePromptParams.parse({ name: 'T2' }));
+    const p = await store.add({ name: 'T', content: 'Hi {{x}}', isTemplate: true, tags: ['a'] });
+    const updated = await store.update(p.id, UpdatePromptParams.parse({ name: 'T2' }));
     expect(updated).toMatchObject({ name: 'T2', isTemplate: true, tags: ['a'], version: 2 });
   });
 
-  it('fills placeholders literally, including names with regex characters', () => {
+  it('fills placeholders literally, including names with regex characters', async () => {
     const store = new PromptStore();
-    const p = store.add({ name: 'T', content: '{{a.b}} and {{a.b}} and {{c}}', isTemplate: true, tags: [] });
+    const p = await store.add({ name: 'T', content: '{{a.b}} and {{a.b}} and {{c}}', isTemplate: true, tags: [] });
     expect(store.applyTemplate(p.id, { 'a.b': 'X', c: 1 })).toBe('X and X and 1');
   });
 
-  it('refuses to apply a prompt that is not a template', () => {
+  it('refuses to apply a prompt that is not a template', async () => {
     const store = new PromptStore();
-    const p = store.add({ name: 'Plain', content: 'x', isTemplate: false, tags: [] });
+    const p = await store.add({ name: 'Plain', content: 'x', isTemplate: false, tags: [] });
     expect(() => store.applyTemplate(p.id, {})).toThrow(PromptUsageError);
   });
 
-  it('reports missing prompts with PromptNotFoundError', () => {
+  it('reports missing prompts with PromptNotFoundError', async () => {
     const store = new PromptStore();
     expect(() => store.get('nope')).toThrow(PromptNotFoundError);
-    expect(() => store.delete('nope')).toThrow(PromptNotFoundError);
+    await expect(store.delete('nope')).rejects.toThrow(PromptNotFoundError);
   });
 
-  it('filters by any matching tag and by search text', () => {
+  it('filters by any matching tag and by search text', async () => {
     const store = new PromptStore();
-    store.add({ name: 'Alpha', content: 'first', isTemplate: false, tags: ['x'] });
-    store.add({ name: 'Beta', content: 'second', isTemplate: false, tags: ['y'] });
+    await store.add({ name: 'Alpha', content: 'first', isTemplate: false, tags: ['x'] });
+    await store.add({ name: 'Beta', content: 'second', isTemplate: false, tags: ['y'] });
     expect(store.list({ tags: ['y', 'z'] }).map(p => p.name)).toEqual(['Beta']);
     expect(store.list({ search: 'FIRST' }).map(p => p.name)).toEqual(['Alpha']);
     expect(store.stats()).toMatchObject({ total: 2, templates: 0, regular: 2 });
@@ -106,21 +106,21 @@ describe('PromptStore selections', () => {
     expect(none.get('b-plain').name).toBe('My b-plain');
   });
 
-  it('hides unselected prompts from every operation', () => {
+  it('hides unselected prompts from every operation', async () => {
     const view = select({ prompts: [], templates: ['a-greet'] });
     expect(() => view.get('a-plain')).toThrow(PromptNotFoundError);
-    expect(() => view.update('a-plain', {})).toThrow(PromptNotFoundError);
-    expect(() => view.delete('a-plain')).toThrow(PromptNotFoundError);
+    await expect(view.update('a-plain', {})).rejects.toThrow(PromptNotFoundError);
+    await expect(view.delete('a-plain')).rejects.toThrow(PromptNotFoundError);
     expect(view.applyTemplate('a-greet', { who: 'you', place: 'here' })).toBe('Hello you from here');
     expect(view.stats()).toMatchObject({ total: 3, templates: 2, regular: 1 });
     expect(view.size).toBe(3);
   });
 
-  it('serves prompts added at runtime through any view, to every view', () => {
+  it('serves prompts added at runtime through any view, to every view', async () => {
     const store = new PromptStore();
     store.load({ promptsDir: fixture.library });
     const narrow = store.select({ ...SELECT_ALL, prompts: [], templates: [] });
-    const added = narrow.add({ name: 'New', content: 'n', isTemplate: false, tags: [] });
+    const added = await narrow.add({ name: 'New', content: 'n', isTemplate: false, tags: [] });
     expect(narrow.get(added.id).name).toBe('New');
     expect(store.select({ ...SELECT_ALL, prompts: ['beta'] }).get(added.id).name).toBe('New');
   });
@@ -162,12 +162,12 @@ describe('PromptStore selections', () => {
 });
 
 describe('PromptStore fields and versions', () => {
-  it('keeps description and category through create and update', () => {
+  it('keeps description and category through create and update', async () => {
     const store = new PromptStore();
-    const added = store.add(CreatePromptParams.parse({ name: 'N', content: 'c', description: 'what it is for', category: 'ops' }));
+    const added = await store.add(CreatePromptParams.parse({ name: 'N', content: 'c', description: 'what it is for', category: 'ops' }));
     expect(added).toMatchObject({ description: 'what it is for', category: 'ops' });
     expect(store.list()[0]).toMatchObject({ description: 'what it is for', category: 'ops' });
-    const updated = store.update(added.id, UpdatePromptParams.parse({ description: 'new words' }));
+    const updated = await store.update(added.id, UpdatePromptParams.parse({ description: 'new words' }));
     expect(updated).toMatchObject({ description: 'new words', category: 'ops', name: 'N' });
   });
 
@@ -177,10 +177,10 @@ describe('PromptStore fields and versions', () => {
     expect(UpdatePromptParams.safeParse({ content: '' }).success).toBe(false);
   });
 
-  it('refuses an update that changes nothing', () => {
+  it('refuses an update that changes nothing', async () => {
     const store = new PromptStore();
-    const p = store.add({ name: 'N', content: 'c', isTemplate: false, tags: [] });
-    expect(() => store.update(p.id, {})).toThrow(/Nothing to update/);
+    const p = await store.add({ name: 'N', content: 'c', isTemplate: false, tags: [] });
+    await expect(store.update(p.id, {})).rejects.toThrow(/Nothing to update/);
     expect(store.get(p.id).version).toBe(1);
   });
 
@@ -192,49 +192,49 @@ describe('PromptStore fields and versions', () => {
     expect(nextVersion('draft')).toBe('draft');
   });
 
-  it('bumps the patch number of a library prompt whose version is a semver string', () => {
+  it('bumps the patch number of a library prompt whose version is a semver string', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-'));
     fs.writeFileSync(path.join(dir, 'a.json'), JSON.stringify({ id: 'a', name: 'A', content: 'a', version: '1.0.0' }));
     const store = new PromptStore();
     store.loadDirectory(dir);
-    expect(store.update('a', { name: 'A2' }).version).toBe('1.0.1');
+    expect((await store.update('a', { name: 'A2' })).version).toBe('1.0.1');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('accepts a caller-chosen id and refuses one that is taken or unsafe', () => {
+  it('accepts a caller-chosen id and refuses one that is taken or unsafe', async () => {
     const store = new PromptStore();
-    expect(store.add(CreatePromptParams.parse({ id: 'release-notes', name: 'N', content: 'c' })).id).toBe('release-notes');
-    expect(() => store.add(CreatePromptParams.parse({ id: 'release-notes', name: 'M', content: 'd' }))).toThrow(PromptConflictError);
+    expect((await store.add(CreatePromptParams.parse({ id: 'release-notes', name: 'N', content: 'c' }))).id).toBe('release-notes');
+    await expect(store.add(CreatePromptParams.parse({ id: 'release-notes', name: 'M', content: 'd' }))).rejects.toThrow(PromptConflictError);
     for (const id of ['../escape', 'a/b', '.hidden', '', 'x'.repeat(129), 'sp ace']) {
       expect(CreatePromptParams.safeParse({ id, name: 'N', content: 'c' }).success, id).toBe(false);
     }
   });
 
-  it('treats an id hidden by a selection as taken', () => {
+  it('treats an id hidden by a selection as taken', async () => {
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-'));
     fs.writeFileSync(path.join(dir, 'hidden.json'), JSON.stringify({ id: 'hidden', name: 'Hidden', content: 'h' }));
     const store = new PromptStore();
     store.load({ promptsDir: dir });
     const view = store.select({ ...SELECT_ALL, prompts: [], templates: [] });
     expect(() => view.get('hidden')).toThrow(PromptNotFoundError);
-    expect(() => view.add({ id: 'hidden', name: 'Clash', content: 'c', isTemplate: false, tags: [] })).toThrow(PromptConflictError);
+    await expect(view.add({ id: 'hidden', name: 'Clash', content: 'c', isTemplate: false, tags: [] })).rejects.toThrow(PromptConflictError);
     expect(store.get('hidden').name).toBe('Hidden');
     fs.rmSync(dir, { recursive: true, force: true });
   });
 
-  it('counts categories from the top-level field as well as metadata, and searches descriptions', () => {
+  it('counts categories from the top-level field as well as metadata, and searches descriptions', async () => {
     const store = new PromptStore();
-    store.add({ name: 'One', content: 'x', description: 'about turbines', category: 'embedded', isTemplate: false, tags: ['b', 'a'] });
-    store.add({ name: 'Two', content: 'y', metadata: { category: 'cognitive/meta' }, isTemplate: true, tags: ['a'] });
+    await store.add({ name: 'One', content: 'x', description: 'about turbines', category: 'embedded', isTemplate: false, tags: ['b', 'a'] });
+    await store.add({ name: 'Two', content: 'y', metadata: { category: 'cognitive/meta' }, isTemplate: true, tags: ['a'] });
     expect(store.stats()).toMatchObject({ categories: ['cognitive/meta', 'embedded'], tags: ['a', 'b'], storage: 'memory' });
     expect(store.list({ search: 'TURBINES' }).map(p => p.name)).toEqual(['One']);
     expect(store.list({ category: 'cognitive/meta' }).map(p => p.name)).toEqual(['Two']);
     expect(store.list({ isTemplate: false }).map(p => p.name)).toEqual(['One']);
   });
 
-  it('pages a listing and says where the next page starts', () => {
+  it('pages a listing and says where the next page starts', async () => {
     const store = new PromptStore();
-    for (const n of [1, 2, 3, 4, 5]) store.add({ name: `P${n}`, content: 'c', isTemplate: false, tags: [] });
+    for (const n of [1, 2, 3, 4, 5]) await store.add({ name: `P${n}`, content: 'c', isTemplate: false, tags: [] });
     expect(store.page({}, { limit: 2 })).toMatchObject({ total: 5, count: 2, offset: 0, limit: 2, has_more: true, next_offset: 2 });
     const last = store.page({}, { limit: 2, offset: 4 });
     expect(last).toMatchObject({ total: 5, count: 1, has_more: false });
@@ -427,12 +427,12 @@ describe('PromptStore state directory', () => {
     return store;
   };
 
-  it('saves added, updated and deleted prompts and loads them at the next start', () => {
+  it('saves added, updated and deleted prompts and loads them at the next start', async () => {
     const first = open();
     expect(first.stats().storage).toBe('file');
-    const added = first.add(CreatePromptParams.parse({ id: 'mine', name: 'Mine', content: 'm', description: 'd' }));
-    first.update('lib-a', { name: 'Library A, edited' });
-    first.delete('lib-b');
+    const added = await first.add(CreatePromptParams.parse({ id: 'mine', name: 'Mine', content: 'm', description: 'd' }));
+    await first.update('lib-a', { name: 'Library A, edited' });
+    await first.delete('lib-b');
 
     const second = open();
     expect(second.get('mine')).toMatchObject({ name: 'Mine', description: 'd', createdAt: added.createdAt });
@@ -450,23 +450,23 @@ describe('PromptStore state directory', () => {
     expect(store.catalog().served.find(p => p.id === 'lib-a')).toMatchObject({ source: 'library', group: 'ops' });
   });
 
-  it('lets a deleted id be added again and forgets a deleted runtime prompt', () => {
+  it('lets a deleted id be added again and forgets a deleted runtime prompt', async () => {
     const store = open();
-    store.add(CreatePromptParams.parse({ id: 'lib-b', name: 'B again', content: 'b2' }));
-    store.delete('mine');
+    await store.add(CreatePromptParams.parse({ id: 'lib-b', name: 'B again', content: 'b2' }));
+    await store.delete('mine');
     const next = open();
     expect(next.get('lib-b').name).toBe('B again');
     expect(() => next.get('mine')).toThrow(PromptNotFoundError);
     expect(fs.existsSync(path.join(state, 'mine.json'))).toBe(false);
   });
 
-  it('gives ids that are not plain lower-case names a hashed file, never a path', () => {
+  it('gives ids that are not plain lower-case names a hashed file, never a path', async () => {
     const store = open();
-    store.add({ id: 'MixedCase', name: 'Mixed', content: 'c', isTemplate: false, tags: [] });
+    await store.add({ id: 'MixedCase', name: 'Mixed', content: 'c', isTemplate: false, tags: [] });
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'prompts-odd-'));
     fs.writeFileSync(path.join(dir, 'odd.json'), JSON.stringify({ id: '../../outside', name: 'Odd id', content: 'c' }));
     store.loadDirectory(dir, 'user');
-    store.update('../../outside', { name: 'Odd id, edited' });
+    await store.update('../../outside', { name: 'Odd id, edited' });
     const names = fs.readdirSync(state);
     expect(names.filter(name => name.startsWith('x-')).length).toBe(2);
     expect(names).not.toContain('MixedCase.json');
@@ -489,17 +489,17 @@ describe('PromptStore state directory', () => {
     expect(() => store.openStateDir(path.join(file, 'state'))).toThrow(PromptStorageError);
   });
 
-  it('leaves the prompt as it was when a save fails', () => {
+  it('leaves the prompt as it was when a save fails', async () => {
     const dir = path.join(root, 'vanishing');
     const store = new PromptStore();
     store.openStateDir(dir);
-    const kept = store.add({ id: 'kept', name: 'Kept', content: 'c', isTemplate: false, tags: [] });
+    const kept = await store.add({ id: 'kept', name: 'Kept', content: 'c', isTemplate: false, tags: [] });
     // The directory is replaced by a file, so every later write fails.
     fs.rmSync(dir, { recursive: true, force: true });
     fs.writeFileSync(dir, '');
-    expect(() => store.add({ name: 'Lost', content: 'c', isTemplate: false, tags: [] })).toThrow(PromptStorageError);
-    expect(() => store.update('kept', { name: 'Changed' })).toThrow(/nothing was changed/);
-    expect(() => store.delete('kept')).toThrow(PromptStorageError);
+    await expect(store.add({ name: 'Lost', content: 'c', isTemplate: false, tags: [] })).rejects.toThrow(PromptStorageError);
+    await expect(store.update('kept', { name: 'Changed' })).rejects.toThrow(/nothing was changed/);
+    await expect(store.delete('kept')).rejects.toThrow(PromptStorageError);
     expect(store.get('kept')).toEqual(kept);
     expect(store.size).toBe(1);
     fs.rmSync(dir, { force: true });
@@ -529,66 +529,66 @@ describe('PromptStore state directory shared by several servers', () => {
   };
   const note = (id: string, name: string) => CreatePromptParams.parse({ id, name, content: `${name} content` });
 
-  it('shows one server what another added, changed and deleted, without a restart', () => {
+  it('shows one server what another added, changed and deleted, without a restart', async () => {
     const first = open();
     const second = open();
-    first.add(note('shared-note', 'From the first'));
+    await first.add(note('shared-note', 'From the first'));
     expect(second.get('shared-note').name).toBe('From the first');
     expect(second.list().map(p => p.id)).toContain('shared-note');
 
-    second.update('shared-note', { name: 'Edited by the second' });
-    second.update('lib-a', { name: 'Library A, edited' });
+    await second.update('shared-note', { name: 'Edited by the second' });
+    await second.update('lib-a', { name: 'Library A, edited' });
     expect(first.get('shared-note')).toMatchObject({ name: 'Edited by the second', version: 2 });
     expect(first.get('lib-a').name).toBe('Library A, edited');
 
-    first.delete('shared-note');
-    first.delete('lib-b');
+    await first.delete('shared-note');
+    await first.delete('lib-b');
     expect(() => second.get('shared-note')).toThrow(PromptNotFoundError);
     expect(() => second.get('lib-b')).toThrow(PromptNotFoundError);
     expect(second.size).toBe(1);
   });
 
-  it('refuses an id another server has taken instead of overwriting its prompt', () => {
+  it('refuses an id another server has taken instead of overwriting its prompt', async () => {
     const first = open();
     const second = open();
-    first.add(note('claimed', 'First come'));
-    expect(() => second.add(note('claimed', 'Second come'))).toThrow(PromptConflictError);
+    await first.add(note('claimed', 'First come'));
+    await expect(second.add(note('claimed', 'Second come'))).rejects.toThrow(PromptConflictError);
     expect(JSON.parse(fs.readFileSync(path.join(state, 'claimed.json'), 'utf8')).name).toBe('First come');
     // A file this server has not read yet is protected too (here: one it cannot serve).
     fs.writeFileSync(path.join(state, 'unreadable.json'), '{ not json');
-    expect(() => second.add(note('unreadable', 'Mine'))).toThrow(PromptConflictError);
+    await expect(second.add(note('unreadable', 'Mine'))).rejects.toThrow(PromptConflictError);
     expect(fs.readFileSync(path.join(state, 'unreadable.json'), 'utf8')).toBe('{ not json');
     expect(fs.readdirSync(state).filter(name => name.endsWith('.tmp'))).toEqual([]);
     fs.rmSync(path.join(state, 'unreadable.json'));
   });
 
-  it('keeps a library prompt deleted after it was added again and deleted again', () => {
+  it('keeps a library prompt deleted after it was added again and deleted again', async () => {
     const store = open();
     // lib-b was deleted by the first test.
-    store.add(note('lib-b', 'B, written anew'));
+    await store.add(note('lib-b', 'B, written anew'));
     expect(store.catalog().served.find(p => p.id === 'lib-b')).toMatchObject({ source: 'library', group: 'ops' });
-    store.delete('lib-b');
+    await store.delete('lib-b');
     expect(() => open().get('lib-b')).toThrow(PromptNotFoundError);
   });
 
-  it('lets a read-only server follow the changes and refuses changes through it', () => {
+  it('lets a read-only server follow the changes and refuses changes through it', async () => {
     const writer = open();
     const reader = open({ readOnly: true });
-    writer.add(note('late', 'Added after the reader started'));
+    await writer.add(note('late', 'Added after the reader started'));
     expect(reader.get('late').name).toBe('Added after the reader started');
-    expect(() => reader.add(note('nope', 'Nope'))).toThrow(PromptUsageError);
-    expect(() => reader.update('late', { name: 'Changed' })).toThrow(/read-only/);
-    expect(() => reader.delete('late')).toThrow(PromptUsageError);
+    await expect(reader.add(note('nope', 'Nope'))).rejects.toThrow(PromptUsageError);
+    await expect(reader.update('late', { name: 'Changed' })).rejects.toThrow(/read-only/);
+    await expect(reader.delete('late')).rejects.toThrow(PromptUsageError);
     expect(writer.get('late').name).toBe('Added after the reader started');
   });
 
-  it('applies saved changes to a directory loaded after the state directory was opened', () => {
+  it('applies saved changes to a directory loaded after the state directory was opened', async () => {
     const own = path.join(root, 'own');
     fs.mkdirSync(own);
     fs.writeFileSync(path.join(own, 'mine.json'), JSON.stringify({ id: 'mine', name: 'Mine', content: 'm' }));
     const first = open();
     first.loadDirectory(own, 'user');
-    first.update('mine', { name: 'Mine, edited' });
+    await first.update('mine', { name: 'Mine, edited' });
     const second = open();
     second.loadDirectory(own, 'user');
     expect(second.get('mine').name).toBe('Mine, edited');
@@ -647,10 +647,10 @@ describe('PromptStore profiles', () => {
     expect(ids(greetings.select({ ...SELECT_ALL, templates: ['beta'] }))).toEqual([]);
   });
 
-  it('leaves the user\'s own directories and prompts added at runtime alone', () => {
+  it('leaves the user\'s own directories and prompts added at runtime alone', async () => {
     const store = open([fixture.own]);
     const view = store.selectProfiles(['greetings']);
-    view.add({ id: 'added', name: 'Added', content: 'x', isTemplate: false, tags: [] });
+    await view.add({ id: 'added', name: 'Added', content: 'x', isTemplate: false, tags: [] });
     expect(ids(view)).toEqual(['a-greet', 'a-deep', 'b-plain', 'o-tmpl', 'added']);
     expect(view.get('b-plain').name).toBe('My b-plain');
   });
@@ -723,17 +723,17 @@ describe('bundled profiles', () => {
 });
 
 describe('PromptStore categories', () => {
-  const make = () => {
+  const make = async () => {
     const store = new PromptStore();
-    store.add({ id: 'e1', name: 'E1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'embedded' });
-    store.add({ id: 'e2', name: 'E2', description: 'd', content: 'Hi {{x}}', isTemplate: true, tags: [], category: 'embedded' });
-    store.add({ id: 'w1', name: 'W1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'workflow' });
-    store.add({ id: 'n1', name: 'N1', description: 'd', content: 'c', isTemplate: false, tags: [] });
+    await store.add({ id: 'e1', name: 'E1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'embedded' });
+    await store.add({ id: 'e2', name: 'E2', description: 'd', content: 'Hi {{x}}', isTemplate: true, tags: [], category: 'embedded' });
+    await store.add({ id: 'w1', name: 'W1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'workflow' });
+    await store.add({ id: 'n1', name: 'N1', description: 'd', content: 'c', isTemplate: false, tags: [] });
     return store;
   };
 
-  it('counts prompts and templates per category, largest name order, skipping prompts with no category', () => {
-    expect(make().categories()).toEqual([
+  it('counts prompts and templates per category, largest name order, skipping prompts with no category', async () => {
+    expect((await make()).categories()).toEqual([
       { category: 'embedded', count: 2, templates: 1 },
       { category: 'workflow', count: 1, templates: 0 },
     ]);

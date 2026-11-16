@@ -208,10 +208,10 @@ describe('tools over the bundled library', () => {
 });
 
 describe('context budget', () => {
-  const library = () => {
+  const library = async () => {
     const store = new PromptStore();
     for (let i = 0; i < 60; i++) {
-      store.add({
+      await store.add({
         id: `p${i}`, name: `P${i}`, description: 'd', content: 'c', isTemplate: i % 2 === 0, tags: [],
         category: i < 40 ? 'embedded' : 'workflow',
       });
@@ -220,7 +220,7 @@ describe('context budget', () => {
   };
 
   it('lists categories with counts, without prompt content', async () => {
-    const client = await connect({ store: library() });
+    const client = await connect({ store: await library() });
     const result = await call(client, 'list_categories');
     expect(result.structuredContent).toEqual({
       categories: [
@@ -232,13 +232,13 @@ describe('context budget', () => {
   });
 
   it('returns at most 20 prompts by default', async () => {
-    const client = await connect({ store: library() });
+    const client = await connect({ store: await library() });
     const page = await call(client, 'list_prompts');
     expect(page.structuredContent).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
   });
 
   it('refuses a page over 50 prompts', async () => {
-    const client = await connect({ store: library() });
+    const client = await connect({ store: await library() });
     expect((await call(client, 'list_prompts', { limit: 51 })).isError).toBe(true);
     expect((await call(client, 'list_prompts', { limit: 50 })).isError).toBeFalsy();
   });

@@ -222,8 +222,8 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       method: 'POST',
       path: '/v1/prompts',
       write: true,
-      handler: (req, res) => {
-        res.status(201).json(store.add(CreatePromptParams.parse(req.body)));
+      handler: async (req, res) => {
+        res.status(201).json(await store.add(CreatePromptParams.parse(req.body)));
       },
     },
     {
@@ -237,16 +237,16 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       method: 'PUT',
       path: '/v1/prompts/:id',
       write: true,
-      handler: (req, res) => {
-        res.json(store.update(req.params.id, UpdatePromptParams.parse(req.body)));
+      handler: async (req, res) => {
+        res.json(await store.update(req.params.id, UpdatePromptParams.parse(req.body)));
       },
     },
     {
       method: 'DELETE',
       path: '/v1/prompts/:id',
       write: true,
-      handler: (req, res) => {
-        store.delete(req.params.id);
+      handler: async (req, res) => {
+        await store.delete(req.params.id);
         res.status(204).end();
       },
     },
@@ -277,11 +277,11 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
     {
       method: 'POST',
       path: '/mcp/tools/:name',
-      handler: (req, res) => {
+      handler: async (req, res) => {
         const tool = tools[req.params.name];
         if (!tool) throw new HttpError(404, `Unknown tool: ${req.params.name}`);
         const { arguments: args } = ToolCallBody.parse(req.body ?? {});
-        res.json({ result: tool.run(args) });
+        res.json({ result: await tool.run(args) });
       },
     },
     {

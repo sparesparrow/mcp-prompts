@@ -299,22 +299,22 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
   const register = server.registerTool.bind(server) as unknown as (
     name: string,
     config: ToolConfig,
-    handler: (args: never) => CallToolResult
+    handler: (args: never) => CallToolResult | Promise<CallToolResult>
   ) => unknown;
 
   const tool = <Schema extends z.ZodType>(
     name: string,
     config: Omit<ToolConfig, 'inputSchema'> & { inputSchema: Schema },
     action: string,
-    run: (args: z.output<Schema>) => CallToolResult
+    run: (args: z.output<Schema>) => CallToolResult | Promise<CallToolResult>
   ) => {
-    register(name, config, ((args: z.output<Schema>) => {
+    register(name, config, (async (args: z.output<Schema>) => {
       try {
-        return run(args);
+        return await run(args);
       } catch (error) {
         return { isError: true, content: [text(describeFailure(action, error))] };
       }
-    }) as (args: never) => CallToolResult);
+    }) as (args: never) => Promise<CallToolResult>);
   };
 
   const persisted = () => Boolean(store.stateDir);
@@ -428,8 +428,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: AddPromptInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  }, 'adding the prompt', params => {
-    const prompt = store.add(params);
+  }, 'adding the prompt', async params => {
+    const prompt = await store.add(params);
     changed();
     return result([text(`Prompt "${prompt.name}" added successfully with ID: ${prompt.id}\n${storageNote()}`)], change(prompt));
   });
@@ -442,8 +442,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: UpdatePromptInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  }, 'updating the prompt', ({ id, updates }) => {
-    const prompt = store.update(id, updates);
+  }, 'updating the prompt', async ({ id, updates }) => {
+    const prompt = await store.update(id, updates);
     changed();
     return result([text(`Prompt "${prompt.name}" updated successfully (version ${prompt.version})\n${storageNote()}`)], change(prompt));
   });
@@ -454,8 +454,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: IdInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-  }, 'deleting the prompt', ({ id }) => {
-    const prompt = store.delete(id);
+  }, 'deleting the prompt', async ({ id }) => {
+    const prompt = await store.delete(id);
     changed();
     const note = persisted()
       ? 'The deletion is saved; it stays deleted after a restart.'
