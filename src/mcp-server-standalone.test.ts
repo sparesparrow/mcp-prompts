@@ -120,7 +120,7 @@ describe('mcp-server-standalone with install options on the command line', () =>
 
   it('leaves out the tools that change prompts', async () => {
     const names = (await client.listTools()).tools.map(t => t.name).sort();
-    expect(names).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_prompts']);
+    expect(names).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_categories', 'list_prompts']);
   });
 
   it('serves the chosen templates as MCP prompts, with their variables as arguments', async () => {
@@ -317,7 +317,7 @@ describe('mcp-prompts commands', () => {
   it('still serves when started the 3.x way, as "mcp-prompts start"', async () => {
     // Client configs written for 3.x say `npx -y @sparesparrow/mcp-prompts start`.
     const client = await connect(['start', '--mode', 'mcp', '--prompts-dir', fixture.library]);
-    expect((await client.listTools()).tools).toHaveLength(7);
+    expect((await client.listTools()).tools).toHaveLength(8);
     await client.close();
     const http = run(['start', '--mode', 'http']);
     expect(http.status).toBe(2);

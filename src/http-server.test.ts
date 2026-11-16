@@ -154,6 +154,26 @@ describe('http-server over HTTP', () => {
     expect((await request('GET', `/v1/prompts/${id}`)).status).toBe(404);
   });
 
+  it('never returns more than 50 prompts in a list, and 20 unless asked for more', async () => {
+    for (let i = 0; i < 60; i++) {
+      await request('POST', '/v1/prompts', { id: `budget-${i}`, name: `Budget ${i}`, content: 'x', tags: ['budget'], category: i < 30 ? 'cat-a' : 'cat-b' });
+    }
+    const byDefault = await request('GET', '/v1/prompts?tags=budget');
+    expect(byDefault.json).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
+    expect((await request('GET', '/v1/prompts?tags=budget&limit=50')).json.count).toBe(50);
+    expect((await request('GET', '/v1/prompts?tags=budget&limit=51')).status).toBe(400);
+    const viaTool = await request('POST', '/mcp/tools/list_prompts', { arguments: { tags: ['budget'] } });
+    expect(viaTool.json.result).toMatchObject({ total: 60, count: 20, has_more: true });
+  });
+
+  it('lists categories with counts over HTTP', async () => {
+    const res = await request('POST', '/mcp/tools/list_categories', { arguments: {} });
+    expect(res.json.result).toEqual(expect.arrayContaining([
+      { category: 'cat-a', count: 30, templates: 0 },
+      { category: 'cat-b', count: 30, templates: 0 },
+    ]));
+  });
+
   it('exposes the MCP tools over HTTP', async () => {
     const tools = await request('GET', '/mcp/tools');
     expect(tools.json.tools.map((t: { name: string }) => t.name)).toEqual(expect.arrayContaining([

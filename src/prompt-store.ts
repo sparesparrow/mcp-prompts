@@ -113,6 +113,13 @@ export interface PromptPage {
   prompts: PromptSummary[];
 }
 
+/** One category of the served prompts: how many prompts it holds, and how many of those are templates. */
+export interface CategorySummary {
+  category: string;
+  count: number;
+  templates: number;
+}
+
 export interface PromptStats {
   total: number;
   templates: number;
@@ -1111,6 +1118,20 @@ export class PromptStore {
       storage: this.shared.stateDir ? 'file' : 'memory',
       sources
     };
+  }
+
+  /** The categories this store serves with their sizes, sorted by name; prompts without a category are left out. */
+  categories(): CategorySummary[] {
+    const rows = new Map<string, CategorySummary>();
+    for (const prompt of this.all()) {
+      const category = categoryOf(prompt);
+      if (!category) continue;
+      const row = rows.get(category) ?? { category, count: 0, templates: 0 };
+      row.count++;
+      if (prompt.isTemplate) row.templates++;
+      rows.set(category, row);
+    }
+    return Array.from(rows.values()).sort((a, b) => a.category.localeCompare(b.category));
   }
 
   private libraryPrompts(): Array<{ prompt: StoredPrompt; group: string }> {

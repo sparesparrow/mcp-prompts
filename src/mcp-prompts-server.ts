@@ -99,7 +99,7 @@ export function buildInstructions(options: {
     lines.push(
       '',
       'Using a template:',
-      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts. It returns up to `limit` prompts (default 50); when has_more is true, call it again with offset set to next_offset.',
+      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts. It returns up to `limit` prompts (default 20, at most 50); when has_more is true, call it again with offset set to next_offset.',
       '2. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
       '3. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
       '4. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
@@ -220,6 +220,10 @@ const RenderSchema = z.object({
   missing: z.array(z.string()).describe('Placeholders left in the text because no value was given'),
   unused: z.array(z.string()).describe('Values given that the template does not use'),
 });
+const CategoriesSchema = z.object({
+  categories: z.array(z.object({ category: z.string(), count: z.number(), templates: z.number() })),
+});
+
 const StatsSchema = z.object({
   total: z.number().int(),
   templates: z.number().int(),
@@ -238,9 +242,9 @@ const StatsSchema = z.object({
 const ListPromptsInput = z.strictObject({
   tags: z.array(z.string()).optional().describe('Return prompts carrying any of these tags'),
   search: z.string().optional().describe('Text to look for in the name, description or content (case-insensitive)'),
-  category: z.string().optional().describe('Return prompts of this category, e.g. "embedded" (get_stats lists the categories)'),
+  category: z.string().optional().describe('Return prompts of this category, e.g. "embedded" (list_categories shows them with sizes)'),
   isTemplate: z.boolean().optional().describe('true for templates only, false for plain prompts only'),
-  limit: z.number().int().min(1).max(100).default(50).describe('Most prompts to return (1-100, default 50)'),
+  limit: z.number().int().min(1).max(50).default(20).describe('Most prompts to return (1-50, default 20)'),
   offset: z.number().int().min(0).default(0).describe('Prompts to skip; use next_offset from the previous page'),
 });
 const IdInput = z.strictObject({ id: z.string().min(1).describe('Prompt ID, as returned by list_prompts') });
@@ -386,6 +390,20 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
       [text(rendered.text), ...(notes.length > 0 ? [text(`[mcp-prompts] ${notes.join(' ')}`)] : [])],
       { id, ...rendered }
     );
+  });
+
+  tool('list_categories', {
+    title: 'List categories',
+    description:
+      'List the prompt categories this server serves with the number of prompts and templates in each. ' +
+      'Start here, then call list_prompts with a category to see only that part of the library.',
+    inputSchema: NoInput,
+    outputSchema: CategoriesSchema,
+    annotations: READ_ONLY,
+  }, 'listing categories', () => {
+    const categories = store.categories();
+    const lines = categories.map(c => `- ${c.category}: ${c.count} (${c.templates} templates)`);
+    return result([text(lines.length ? lines.join('\n') : 'No categories.')], { categories });
   });
 
   tool('get_stats', {

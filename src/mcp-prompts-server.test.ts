@@ -42,7 +42,7 @@ describe('tool definitions', () => {
     const client = await connect({ store: new PromptStore() });
     const { tools } = await client.listTools();
     expect(tools.map(t => t.name).sort()).toEqual([
-      'add_prompt', 'apply_template', 'delete_prompt', 'get_prompt', 'get_stats', 'list_prompts', 'update_prompt',
+      'add_prompt', 'apply_template', 'delete_prompt', 'get_prompt', 'get_stats', 'list_categories', 'list_prompts', 'update_prompt',
     ]);
     for (const tool of tools) {
       expect(tool.title, tool.name).toBeTruthy();
@@ -52,7 +52,7 @@ describe('tool definitions', () => {
       expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
     }
     const hints = Object.fromEntries(tools.map(t => [t.name, t.annotations]));
-    for (const name of ['list_prompts', 'get_prompt', 'apply_template', 'get_stats']) {
+    for (const name of ['list_prompts', 'list_categories', 'get_prompt', 'apply_template', 'get_stats']) {
       expect(hints[name]).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     }
     expect(hints.add_prompt).toMatchObject({ readOnlyHint: false, destructiveHint: false });
@@ -64,7 +64,7 @@ describe('tool definitions', () => {
     const client = await connect({ store: new PromptStore(), readOnly: true });
     const { tools } = await client.listTools();
     expect(tools.every(t => t.annotations?.readOnlyHint === true)).toBe(true);
-    expect(tools.map(t => t.name).sort()).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_prompts']);
+    expect(tools.map(t => t.name).sort()).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_categories', 'list_prompts']);
   });
 });
 
@@ -204,5 +204,42 @@ describe('tools over the bundled library', () => {
     expect(result.structuredContent).toMatchObject({ missing: [], unused: [] });
     expect(result.content[0].text).toContain('assembleDebug');
     expect(result.content[0].text).not.toContain('{{');
+  });
+});
+
+describe('context budget', () => {
+  const library = () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 60; i++) {
+      store.add({
+        id: `p${i}`, name: `P${i}`, description: 'd', content: 'c', isTemplate: i % 2 === 0, tags: [],
+        category: i < 40 ? 'embedded' : 'workflow',
+      });
+    }
+    return store;
+  };
+
+  it('lists categories with counts, without prompt content', async () => {
+    const client = await connect({ store: library() });
+    const result = await call(client, 'list_categories');
+    expect(result.structuredContent).toEqual({
+      categories: [
+        { category: 'embedded', count: 40, templates: 20 },
+        { category: 'workflow', count: 20, templates: 10 },
+      ],
+    });
+    expect(result.content[0].text.length).toBeLessThan(500);
+  });
+
+  it('returns at most 20 prompts by default', async () => {
+    const client = await connect({ store: library() });
+    const page = await call(client, 'list_prompts');
+    expect(page.structuredContent).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
+  });
+
+  it('refuses a page over 50 prompts', async () => {
+    const client = await connect({ store: library() });
+    expect((await call(client, 'list_prompts', { limit: 51 })).isError).toBe(true);
+    expect((await call(client, 'list_prompts', { limit: 50 })).isError).toBeFalsy();
   });
 });

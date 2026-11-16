@@ -85,17 +85,22 @@ class HttpError extends Error {
 }
 
 const ApplyTemplateBody = z.object({ variables: z.record(z.string(), z.any()).default({}) });
+// A list never carries more than a page: the whole library must not land in an agent's context.
+const DEFAULT_PAGE = 20;
+const MAX_PAGE = 50;
 const ListFilterArgs = z.object({
   tags: z.array(z.string()).optional(),
   search: z.string().optional(),
   category: z.string().optional(),
   isTemplate: z.boolean().optional(),
+  limit: z.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
+  offset: z.number().int().min(0).default(0),
 });
 const ListQuery = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
   isTemplate: z.enum(['true', 'false']).transform(value => value === 'true').optional(),
-  limit: z.coerce.number().int().min(1).max(1000).optional(),
+  limit: z.coerce.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
   offset: z.coerce.number().int().min(0).optional(),
 });
 const ToolCallBody = z.object({ arguments: z.record(z.string(), z.any()).default({}) });
@@ -110,7 +115,10 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
   const allTools: Record<string, { description: string; run: (args: Record<string, unknown>) => unknown }> = {
     list_prompts: {
       description: 'List prompts, optionally filtered by tags (any match) or a search term.',
-      run: args => store.list(ListFilterArgs.parse(args)),
+      run: args => {
+        const { limit, offset, ...filter } = ListFilterArgs.parse(args);
+        return store.page(filter, { limit, offset });
+      },
     },
     get_prompt: {
       description: 'Get a prompt by its ID.',
@@ -137,6 +145,10 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
         const { id, variables } = z.object({ id: z.string(), variables: z.record(z.string(), z.any()) }).parse(args);
         return store.applyTemplate(id, variables);
       },
+    },
+    list_categories: {
+      description: 'List the categories with the number of prompts and templates in each.',
+      run: () => store.categories(),
     },
     get_stats: {
       description: 'Counts of prompts and templates, with the tags and categories in use.',
@@ -202,7 +214,7 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           limit: req.query.get('limit') ?? undefined,
           offset: req.query.get('offset') ?? undefined,
         });
-        // Every match unless the caller asks for a page; total and has_more say what was left out.
+        // One page at most; total and has_more say what was left out.
         res.json(store.page({ tags, ...filter }, { limit, offset }));
       },
     },

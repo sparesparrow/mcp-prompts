@@ -721,3 +721,39 @@ describe('bundled profiles', () => {
     expect(car.filter(id => id.startsWith('orchestration_'))).toEqual([]);
   });
 });
+
+describe('PromptStore categories', () => {
+  const make = () => {
+    const store = new PromptStore();
+    store.add({ id: 'e1', name: 'E1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'embedded' });
+    store.add({ id: 'e2', name: 'E2', description: 'd', content: 'Hi {{x}}', isTemplate: true, tags: [], category: 'embedded' });
+    store.add({ id: 'w1', name: 'W1', description: 'd', content: 'c', isTemplate: false, tags: [], category: 'workflow' });
+    store.add({ id: 'n1', name: 'N1', description: 'd', content: 'c', isTemplate: false, tags: [] });
+    return store;
+  };
+
+  it('counts prompts and templates per category, largest name order, skipping prompts with no category', () => {
+    expect(make().categories()).toEqual([
+      { category: 'embedded', count: 2, templates: 1 },
+      { category: 'workflow', count: 1, templates: 0 },
+    ]);
+  });
+
+  it('counts only the library prompts a selection serves', () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-categories-'));
+    try {
+      for (const [group, id, category] of [['g1', 'p1', 'embedded'], ['g2', 'p2', 'workflow']]) {
+        fs.mkdirSync(path.join(dir, group));
+        fs.writeFileSync(path.join(dir, group, `${id}.json`), JSON.stringify({
+          id, name: id, description: 'd', content: 'c', isTemplate: false, tags: [], category,
+        }));
+      }
+      const store = new PromptStore();
+      store.load({ promptsDir: dir });
+      const view = store.select({ ...SELECT_ALL, prompts: ['g2'], templates: [] });
+      expect(view.categories()).toEqual([{ category: 'workflow', count: 1, templates: 0 }]);
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
+});
