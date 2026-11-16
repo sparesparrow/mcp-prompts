@@ -434,7 +434,7 @@ export class McpServer {
             throw new Error('name and content are required');
           }
           // Map content to template for the service
-          const createData = { ...args, template: args.content };
+          const createData = this.withTemplate(args);
           const newPrompt = await this.promptService.createPrompt(createData);
           result = newPrompt.toJSON();
           break;
@@ -444,7 +444,7 @@ export class McpServer {
           if (!args?.id) {
             throw new Error('id is required');
           }
-          const updatedPrompt = await this.promptService.updatePrompt(args.id, args);
+          const updatedPrompt = await this.promptService.updatePrompt(args.id, this.withTemplate(args));
           result = updatedPrompt.toJSON();
           break;
         }
@@ -567,6 +567,14 @@ export class McpServer {
     ];
   }
 
+  /** The public tool schema calls the prompt body `content`; the service stores it as `template`. */
+  private withTemplate(args: any): any {
+    if (!args || typeof args !== 'object') return args;
+    const { content, ...rest } = args;
+    if (content === undefined) return args;
+    return { ...rest, template: rest.template ?? content };
+  }
+
   public async executeTool(toolName: string, args: any): Promise<any> {
     // Legacy tool execution for HTTP compatibility
     try {
@@ -598,12 +606,12 @@ export class McpServer {
         }
         
         case 'create_prompt': {
-          const newPrompt = await this.promptService.createPrompt(args);
+          const newPrompt = await this.promptService.createPrompt(this.withTemplate(args));
           return { result: newPrompt.toJSON() };
         }
 
         case 'update_prompt': {
-          const updatedPrompt = await this.promptService.updatePrompt(args.id, args);
+          const updatedPrompt = await this.promptService.updatePrompt(args.id, this.withTemplate(args));
           return { result: updatedPrompt.toJSON() };
         }
 

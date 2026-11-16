@@ -1,5 +1,6 @@
 name: 'Run TODO to Issue'
-on: ['push']
+# Manual only: running on every push opened ~58 duplicate issues from // TODO comments.
+on: ['workflow_dispatch']
 jobs:
   build:
     runs-on: 'ubuntu-latest'
