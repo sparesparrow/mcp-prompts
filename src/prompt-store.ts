@@ -189,7 +189,7 @@ function categoryOf(prompt: StoredPrompt): string | undefined {
 export const MAX_SUMMARY_DESCRIPTION = 110;
 
 /** The text cut to at most `max` characters, ending in an ellipsis when something was left out. */
-function shorten(value: string, max: number): string {
+export function shorten(value: string, max: number): string {
   if (value.length <= max) return value;
   let end = max - 1;
   // Do not leave half of a character that takes two code units.

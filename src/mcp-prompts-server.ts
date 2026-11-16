@@ -21,6 +21,8 @@ import {
   PromptStorageError,
   PromptStore,
   PromptUsageError,
+  MAX_SUMMARY_DESCRIPTION,
+  shorten,
   StoredPrompt,
   UpdatePromptParams,
 } from './prompt-store.js';
@@ -477,19 +479,50 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
 // Prompts and resources are served by handlers that read the store on every request, so prompts
 // added or removed through the tools show up without re-registering anything.
 
+/** Most entries prompts/list and resources/list return at once; the cursor leads to the rest. */
+const LIST_PAGE_SIZE = 50;
+
+const encodeCursor = (offset: number) => Buffer.from(JSON.stringify({ offset })).toString('base64url');
+
+function decodeCursor(cursor: string | undefined): number {
+  if (cursor === undefined) return 0;
+  try {
+    const { offset } = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { offset?: unknown };
+    if (typeof offset === 'number' && Number.isInteger(offset) && offset >= 0) return offset;
+  } catch {
+    // fall through to the error below
+  }
+  throw rpcError(ErrorCode.InvalidParams, 'Invalid cursor: use the nextCursor of a previous list result');
+}
+
+/** One page of the store's prompts for a list request, and the cursor of the next page if there is one. */
+function listPage(store: PromptStore, cursor: string | undefined): { items: StoredPrompt[]; nextCursor?: string } {
+  const offset = decodeCursor(cursor);
+  const all = store.all();
+  const items = all.slice(offset, offset + LIST_PAGE_SIZE);
+  return offset + items.length < all.length ? { items, nextCursor: encodeCursor(offset + items.length) } : { items };
+}
+
+const listedDescription = (prompt: StoredPrompt) =>
+  prompt.description ? { description: shorten(prompt.description, MAX_SUMMARY_DESCRIPTION) } : {};
+
 function registerPrompts(server: McpServer, store: PromptStore): void {
   server.server.registerCapabilities({ prompts: { listChanged: true } });
 
-  server.server.setRequestHandler(ListPromptsRequestSchema, () => ({
-    prompts: store.all().map(prompt => ({
-      name: prompt.id,
-      title: prompt.name,
-      ...(prompt.description ? { description: prompt.description } : {}),
-      ...(prompt.isTemplate
-        ? { arguments: variableNames(prompt).map(variable => ({ ...variable, required: false })) }
-        : {}),
-    })),
-  }));
+  server.server.setRequestHandler(ListPromptsRequestSchema, request => {
+    const { items, nextCursor } = listPage(store, request.params?.cursor);
+    return {
+      prompts: items.map(prompt => ({
+        name: prompt.id,
+        title: prompt.name,
+        ...listedDescription(prompt),
+        ...(prompt.isTemplate
+          ? { arguments: variableNames(prompt).map(variable => ({ ...variable, required: false })) }
+          : {}),
+      })),
+      ...(nextCursor ? { nextCursor } : {}),
+    };
+  });
 
   server.server.setRequestHandler(GetPromptRequestSchema, request => {
     const prompt = getOrRpcError(store, request.params.name, ErrorCode.InvalidParams);
@@ -506,15 +539,19 @@ function registerResources(server: McpServer, store: PromptStore): void {
 
   const uriOf = (id: string) => `${RESOURCE_SCHEME}${encodeURIComponent(id)}`;
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, () => ({
-    resources: store.all().map(prompt => ({
-      uri: uriOf(prompt.id),
-      name: prompt.id,
-      title: prompt.name,
-      ...(prompt.description ? { description: prompt.description } : {}),
-      mimeType: 'text/plain',
-    })),
-  }));
+  server.server.setRequestHandler(ListResourcesRequestSchema, request => {
+    const { items, nextCursor } = listPage(store, request.params?.cursor);
+    return {
+      resources: items.map(prompt => ({
+        uri: uriOf(prompt.id),
+        name: prompt.id,
+        title: prompt.name,
+        ...listedDescription(prompt),
+        mimeType: 'text/plain',
+      })),
+      ...(nextCursor ? { nextCursor } : {}),
+    };
+  });
 
   server.server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({
     resourceTemplates: [{

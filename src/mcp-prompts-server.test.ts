@@ -270,3 +270,54 @@ describe('context budget', () => {
     expect((await call(client, 'list_prompts', { limit: 50 })).isError).toBeFalsy();
   });
 });
+
+describe('listing prompts and resources over MCP', () => {
+  const bigStore = async (count: number) => {
+    const store = new PromptStore();
+    for (let i = 0; i < count; i++) {
+      await store.add({ id: `bulk-${i}`, name: `Bulk ${i}`, description: i === 0 ? 'D'.repeat(50_000) : 'd', content: 'c', isTemplate: false, tags: [] });
+    }
+    return store;
+  };
+
+  it('pages prompts/list and resources/list at 50 and reaches every prompt by following nextCursor', async () => {
+    const client = await connect({ store: await bigStore(5_000), expose: ['tools', 'prompts', 'resources'] });
+    const seenPrompts: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await client.listPrompts(cursor ? { cursor } : undefined);
+      expect(page.prompts.length).toBeLessThanOrEqual(50);
+      for (const prompt of page.prompts) {
+        expect((prompt.description ?? '').length).toBeLessThanOrEqual(110);
+        seenPrompts.push(prompt.name);
+      }
+      cursor = page.nextCursor;
+      pages++;
+    } while (cursor);
+    expect(pages).toBe(100);
+    expect(new Set(seenPrompts).size).toBe(5_000);
+
+    const seenResources = new Set<string>();
+    cursor = undefined;
+    do {
+      const page = await client.listResources(cursor ? { cursor } : undefined);
+      expect(page.resources.length).toBeLessThanOrEqual(50);
+      for (const resource of page.resources) {
+        expect((resource.description ?? '').length).toBeLessThanOrEqual(110);
+        seenResources.add(resource.uri);
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seenResources.size).toBe(5_000);
+  }, 60_000);
+
+  it('gives no cursor when everything fits one page, and refuses a cursor it did not give', async () => {
+    const client = await connect({ store: await bigStore(3), expose: ['tools', 'prompts', 'resources'] });
+    const page = await client.listPrompts();
+    expect(page.prompts).toHaveLength(3);
+    expect(page.nextCursor).toBeUndefined();
+    await expect(client.listPrompts({ cursor: 'not-a-cursor' })).rejects.toThrow(/cursor/i);
+    await expect(client.listResources({ cursor: 'not-a-cursor' })).rejects.toThrow(/cursor/i);
+  });
+});

@@ -448,6 +448,27 @@ describe('MCP over HTTP at /mcp', () => {
     expect(JSON.parse((stats.content as Array<{ text: string }>)[0].text)).toMatchObject({ total: 6 });
   });
 
+  it('does not hand a whole library to a client that asks for prompts and resources in the URL', async () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 120; i++) await store.add({ id: `many-${i}`, name: `Many ${i}`, content: 'c', isTemplate: false, tags: [] });
+    const app = await startHttpServer(0, '127.0.0.1', { store });
+    try {
+      const client = await connect(urlOf(app, '?expose=prompts,resources'));
+      const first = await client.listPrompts();
+      expect(first.prompts).toHaveLength(50);
+      expect(first.nextCursor).toBeTruthy();
+      const second = await client.listPrompts({ cursor: first.nextCursor });
+      const third = await client.listPrompts({ cursor: second.nextCursor });
+      expect(third.prompts).toHaveLength(20);
+      expect(third.nextCursor).toBeUndefined();
+      const resources = await client.listResources();
+      expect(resources.resources).toHaveLength(50);
+      expect(resources.nextCursor).toBeTruthy();
+    } finally {
+      await app.close();
+    }
+  });
+
   it('takes the selection, capabilities and read-only from the query string', async () => {
     const client = await connect(urlOf(open, '?prompts=none&templates=beta,a-greet&expose=prompts,resources&readOnly=true'));
     expect(client.getServerCapabilities()?.tools).toBeUndefined();
