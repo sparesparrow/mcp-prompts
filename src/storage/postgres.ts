@@ -61,8 +61,9 @@ export const QUERY_TIMEOUT_MS = 10_000;
 export interface PostgresPoolOptions {
   /**
    * The longest a statement may run. The server stops it after this long (a lock held by someone
-   * else counts), and the driver gives up a second later on a connection that stopped answering,
-   * so no call waits for ever. Defaults to QUERY_TIMEOUT_MS.
+   * else counts; set with SET on each new connection, not as a startup parameter, which a pooler
+   * in transaction mode such as Neon's -pooler endpoint refuses), and the driver gives up a second
+   * later on a connection that stopped answering, so no call waits for ever. Defaults to QUERY_TIMEOUT_MS.
    */
   queryTimeoutMs?: number;
 }
@@ -70,9 +71,14 @@ export interface PostgresPoolOptions {
 /** A pool for the given connection string. An idle connection that drops is logged by code only. */
 export function createPostgresPool(connectionString: string, options: PostgresPoolOptions = {}): Pool {
   const limit = options.queryTimeoutMs ?? QUERY_TIMEOUT_MS;
-  const pool = new Pool({
-    connectionString, max: 5, connectionTimeoutMillis: 10_000,
-    statement_timeout: limit, query_timeout: limit + 1_000,
+  const pool = new Pool({ connectionString, max: 5, connectionTimeoutMillis: 10_000, query_timeout: limit + 1_000 });
+  // Queued on the connection before anything the caller sends. If it is refused the driver's
+  // query_timeout still bounds every call; only the code is logged.
+  const statementTimeout = `SET statement_timeout = ${Math.max(1, Math.trunc(limit))}`;
+  pool.on('connect', client => {
+    Promise.resolve(client.query(statementTimeout)).catch(error => {
+      logger.warn({ code: errorCode(error) }, 'Postgres state backend: could not set the statement timeout on a connection');
+    });
   });
   pool.on('error', error => {
     logger.warn({ code: errorCode(error) }, 'Postgres state backend: an idle connection failed');
@@ -289,6 +295,8 @@ export class PostgresStateBackend implements StateBackend {
     if (!this.writable) throw new PromptStorageError(`Could not ${what}: the database is opened read-only; nothing was changed`);
     let client: PoolClient | undefined;
     let failed = false;
+    // Once COMMIT has been sent, a failure no longer says whether the database applied the change.
+    let committing = false;
     try {
       client = await this.pool.connect();
       await client.query('BEGIN');
@@ -298,6 +306,7 @@ export class PostgresStateBackend implements StateBackend {
           [this.ownerSub]
         );
         await change(client);
+        committing = true;
         await client.query('COMMIT');
       } catch (error) {
         // A connection that cannot even roll back may still hold the transaction: do not reuse it.
@@ -307,7 +316,7 @@ export class PostgresStateBackend implements StateBackend {
     } catch (error) {
       if (error instanceof PromptConflictError) throw error;
       failed = true;
-      fail(what, error, '; nothing was changed');
+      fail(what, error, committing ? '; the change may not have been saved: read the prompt again before repeating it' : '; nothing was changed');
     } finally {
       client?.release(failed);
     }

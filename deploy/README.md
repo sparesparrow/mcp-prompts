@@ -118,9 +118,14 @@ only (put the values in your secret store, not in a file you commit):
 - `MCP_PROMPTS_OWNER`, whose prompts this server saves and serves; every row carries its owner
   and one owner never sees another's. It cannot be combined with `MCP_PROMPTS_STATE_DIR`.
 
+A pooled connection string (a PgBouncer in transaction mode, such as the `-pooler` host Neon
+gives) is supported: the server sends no startup parameters a pooler refuses and sets its
+10-second statement limit with `SET` once a connection is open.
+
 The server applies the SQL files in `migrations/` when it starts (the Docker images carry them).
-Servers that share an owner see each other's changes within about two seconds, and an HTTP
-request asks the database before it answers. An update made from an older version of a prompt
+Servers that share an owner check the database every two seconds, and an HTTP request or an MCP
+read (tool, prompt or resource) asks it first, waiting at most a second, so the first read after
+a quiet time shows what another server saved. An update made from an older version of a prompt
 is refused with a 409 saying to read it again; the store has by then read what the other server
 saved, so the same call, repeated, goes through. That check compares version labels, and an
 update only moves a version that is a number or `x.y.z`: a prompt whose version is any other

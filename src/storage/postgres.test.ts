@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import * as crypto from 'crypto';
 import * as fs from 'fs';
+import * as net from 'net';
 import * as os from 'os';
 import * as path from 'path';
 import { Pool, type PoolClient } from 'pg';
@@ -116,17 +117,58 @@ describe('PostgresStateBackend when a rollback fails', () => {
 });
 
 describe('createPostgresPool', () => {
-  it('limits every query, on the server and on the client, by default and by option', () => {
+  const options = (pool: Pool) => pool.options as { statement_timeout?: number; query_timeout?: number };
+
+  it('limits every query on the client by default and by option', () => {
     const url = 'postgresql://u:p@127.0.0.1:1/d';
     const standard = createPostgresPool(url);
     const quick = createPostgresPool(url, { queryTimeoutMs: 2_500 });
-    const options = (pool: Pool) => pool.options as { statement_timeout?: number; query_timeout?: number };
-    expect(options(standard)).toMatchObject({ statement_timeout: 10_000 });
     expect(options(standard).query_timeout).toBeGreaterThan(10_000);
-    expect(options(quick)).toMatchObject({ statement_timeout: 2_500 });
     expect(options(quick).query_timeout).toBeGreaterThan(2_500);
     void standard.end();
     void quick.end();
+  });
+
+  it('does not send statement_timeout as a startup parameter, which a pooler in transaction mode refuses', async () => {
+    const pool = createPostgresPool('postgresql://u:p@127.0.0.1:1/d');
+    expect(options(pool).statement_timeout).toBeUndefined();
+    void pool.end();
+
+    // What a server actually receives when a connection opens.
+    const received: string[] = [];
+    const server = net.createServer(socket => {
+      socket.once('data', data => { received.push(data.toString('latin1')); socket.destroy(); });
+    });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const port = (server.address() as net.AddressInfo).port;
+    const real = createPostgresPool(`postgresql://u:p@127.0.0.1:${port}/d`, { queryTimeoutMs: 2_500 });
+    await real.query('SELECT 1').catch(() => undefined);
+    await real.end();
+    await new Promise(resolve => server.close(resolve));
+    expect(received.length).toBeGreaterThan(0);
+    expect(received.join('')).toContain('database');
+    expect(received.join('')).not.toContain('statement_timeout');
+  });
+
+  it('sets the server-side limit on each new connection instead', () => {
+    const pool = createPostgresPool('postgresql://u:p@127.0.0.1:1/d', { queryTimeoutMs: 2_500 });
+    const sent: string[] = [];
+    pool.emit('connect', { query: (sql: string) => { sent.push(sql); return Promise.resolve({ rows: [] }); } } as unknown as PoolClient);
+    expect(sent).toEqual(['SET statement_timeout = 2500']);
+    void pool.end();
+  });
+
+  it('logs a refused SET by its code only and carries on', async () => {
+    const pool = createPostgresPool('postgresql://u:p@127.0.0.1:1/d');
+    const refusal = Object.assign(new Error('permission denied for leaky_user at 10.9.8.7'), { code: '42501' });
+    const output = await logged(async () => {
+      pool.emit('connect', { query: () => Promise.reject(refusal) } as unknown as PoolClient);
+      await new Promise(resolve => setTimeout(resolve, 20));
+    });
+    void pool.end();
+    expect(output).toContain('42501');
+    expect(output).not.toContain('leaky_user');
+    expect(output).not.toContain('10.9.8.7');
   });
 });
 
@@ -148,6 +190,34 @@ describe('PostgresStateBackend when a query times out on the client', () => {
     expect(error.message).toMatch(/nothing was changed/);
     expect(error.message).not.toContain('read timeout');
     expect(released).toEqual([true]);
+  });
+});
+
+describe('PostgresStateBackend when the answer to COMMIT never comes', () => {
+  const clientWhere = (failing: (sql: string) => boolean) => {
+    const released: unknown[] = [];
+    const client = {
+      query: (sql: string) => (failing(sql) ? Promise.reject(new Error('Query read timeout')) : Promise.resolve({ rows: [], rowCount: 1 })),
+      release: (arg?: unknown) => { released.push(arg); },
+    };
+    return { pool: { connect: async () => client, query: async () => ({ rows: [] }) } as unknown as Pool, released };
+  };
+
+  it('says the change may have been saved, because the database may have committed it', async () => {
+    const { pool, released } = clientWhere(sql => sql === 'COMMIT');
+    const backend = new PostgresStateBackend({ pool, ownerSub: 'u' });
+    const error = await backend.put(stored('x'), 'create').catch(err => err);
+    expect(error).toBeInstanceOf(PromptStorageError);
+    expect(error.message).toMatch(/may not have been saved/);
+    expect(error.message).not.toMatch(/nothing was changed/);
+    expect(error.message).not.toContain('read timeout');
+    expect(released).toEqual([true]);
+  });
+
+  it('still says nothing was changed when the failure came before COMMIT', async () => {
+    const { pool } = clientWhere(sql => /INSERT INTO prompts/.test(sql));
+    const error = await new PostgresStateBackend({ pool, ownerSub: 'u' }).put(stored('x'), 'create').catch(err => err);
+    expect(error.message).toMatch(/nothing was changed/);
   });
 });
 
@@ -588,6 +658,18 @@ describe.skipIf(!DATABASE_URL)('PostgresStateBackend', () => {
       const result = await work.catch(err => err as Error);
       return { result, ms: Date.now() - started };
     };
+
+    it('has the server-side limit on every connection of the pool, from the first query on', async () => {
+      const limited = createPostgresPool(urlFor(schema), { queryTimeoutMs: 2_500 });
+      try {
+        // Two connections at once, so the second one is opened by the pool too.
+        const [first, second] = await Promise.all([limited.query('SHOW statement_timeout'), limited.query('SHOW statement_timeout')]);
+        expect(first.rows[0].statement_timeout).toBe('2500ms');
+        expect(second.rows[0].statement_timeout).toBe('2500ms');
+      } finally {
+        await limited.end();
+      }
+    });
 
     it('fails a revision check, a health check and a write within the bound, and queues nothing behind them', async () => {
       const owner = newOwner('hang-bound');
