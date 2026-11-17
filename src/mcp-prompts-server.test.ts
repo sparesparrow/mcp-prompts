@@ -264,6 +264,24 @@ describe('context budget', () => {
     expect((page.structuredContent as { prompts: Array<{ description: string }> }).prompts[0].description).toBe('x'.repeat(110));
   });
 
+  it('tells the model to go by category first and that lists are capped', async () => {
+    const instructions = (await connect({ store: await library() })).getInstructions() ?? '';
+    const at = (needle: string) => {
+      const index = instructions.indexOf(needle);
+      expect(index, needle).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    expect(at('list_categories')).toBeLessThan(at('list_prompts'));
+    expect(at('list_prompts')).toBeLessThan(at('get_prompt'));
+    expect(at('get_prompt')).toBeLessThan(at('apply_template'));
+    expect(instructions).toMatch(/category/);
+    expect(instructions).toMatch(/capped|at most 50/);
+    expect(instructions).toContain('default 20');
+    expect(instructions).toContain('next_offset');
+    // The usage notes stay short: they are in the model's context all the time.
+    expect(instructions.length).toBeLessThan(2_000);
+  });
+
   it('refuses a page over 50 prompts', async () => {
     const client = await connect({ store: await library() });
     expect((await call(client, 'list_prompts', { limit: 51 })).isError).toBe(true);

@@ -107,11 +107,12 @@ export function buildInstructions(options: {
   if (tools) {
     lines.push(
       '',
-      'Using a template:',
-      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts. It returns up to `limit` prompts (default 20, at most 50); when has_more is true, call it again with offset set to next_offset.',
-      '2. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
-      '3. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
-      '4. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
+      'Finding and using a prompt. Lists are capped (default 20 summaries a page, at most 50), so work from categories down:',
+      '1. list_categories shows the categories this server serves and how many prompts each holds.',
+      '2. list_prompts with `category` (add `tags`, `search` or `isTemplate` to narrow it). Tags match any of the ones given, so a broad tag also returns unrelated prompts. When has_more is true, call it again with offset set to next_offset.',
+      '3. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
+      '4. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
+      '5. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
     );
   }
   if (options.readOnly) {
