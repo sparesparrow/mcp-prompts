@@ -43,21 +43,25 @@ jobs:
         run: |
           set -euo pipefail
           ready=false
+          expected="$(node -p "require('./package.json').version")"
           for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error "$BASE_URL/ready" -o ready.json 2>/dev/null; then
-              if node -e '
+            if curl --fail --silent --show-error "$BASE_URL/ready" -o ready.json 2>/dev/null &&
+               curl --fail --silent --show-error "$BASE_URL/version" -o version.json 2>/dev/null; then
+              if EXPECTED_VERSION="$expected" node -e '
                 const r = require("./ready.json");
-                process.exit(r.status === "ready" && r.readOnly === true && r.auth === "none" && r.storage === "memory" ? 0 : 1);
+                const v = require("./version.json");
+                const safeMode = r.status === "ready" && r.readOnly === true && r.auth === "none" && r.storage === "memory";
+                process.exit(safeMode && v.version === process.env.EXPECTED_VERSION ? 0 : 1);
               '; then
                 ready=true
                 break
               fi
             fi
-            echo "Deployment not ready yet (attempt $attempt/60)"
+            echo "Waiting for the expected commit and safe runtime mode (attempt $attempt/60)"
             sleep 10
           done
           test "$ready" = true || {
-            echo "::error::Vercel did not become ready in 10 minutes, or its runtime mode is unsafe."
+            echo "::error::Vercel did not deploy the expected version in 10 minutes, or its runtime mode is unsafe."
             cat ready.json 2>/dev/null || true
             exit 1
           }
@@ -68,13 +72,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error "$BASE_URL/health"
-          curl --fail --silent --show-error "$BASE_URL/version" -o version.json
-          expected="$(node -p "require('./package.json').version")"
           actual="$(node -p "require('./version.json').version")"
-          test "$actual" = "$expected" || {
-            echo "::error::Deployed version $actual does not match repository version $expected"
-            exit 1
-          }
           echo "Verified deployed version $actual"
 
       - name: Exercise every published MCP profile
