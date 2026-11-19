@@ -1,0 +1,96 @@
+name: Vercel deployment smoke test
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: vercel-deployment-smoke
+  cancel-in-progress: true
+
+jobs:
+  smoke-test:
+    name: Verify production MCP endpoint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install smoke-test dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Wait for the Vercel deployment to become ready
+        env:
+          BASE_URL: https://mcp-prompts.vercel.app
+        run: |
+          set -euo pipefail
+          ready=false
+          expected="$(node -p "require('./package.json').version")"
+          for attempt in $(seq 1 60); do
+            if curl --fail --silent --show-error "$BASE_URL/ready" -o ready.json 2>/dev/null &&
+               curl --fail --silent --show-error "$BASE_URL/version" -o version.json 2>/dev/null; then
+              if EXPECTED_VERSION="$expected" node -e '
+                const r = require("./ready.json");
+                const v = require("./version.json");
+                const safeMode = r.status === "ready" && r.readOnly === true && r.auth === "none" && r.storage === "memory";
+                process.exit(safeMode && v.version === process.env.EXPECTED_VERSION ? 0 : 1);
+              '; then
+                ready=true
+                break
+              fi
+            fi
+            echo "Waiting for the expected commit and safe runtime mode (attempt $attempt/60)"
+            sleep 10
+          done
+          test "$ready" = true || {
+            echo "::error::Vercel did not deploy the expected version in 10 minutes, or its runtime mode is unsafe."
+            cat ready.json 2>/dev/null || true
+            exit 1
+          }
+
+      - name: Verify health and deployed version
+        env:
+          BASE_URL: https://mcp-prompts.vercel.app
+        run: |
+          set -euo pipefail
+          curl --fail --silent --show-error "$BASE_URL/health"
+          actual="$(node -p "require('./version.json').version")"
+          echo "Verified deployed version $actual"
+
+      - name: Exercise every published MCP profile
+        env:
+          BASE_URL: https://mcp-prompts.vercel.app
+        run: |
+          set -euo pipefail
+          while read -r profile max_prompts; do
+            echo "::group::MCP profile: $profile"
+            pnpm exec node deploy/smoke-test.mjs \
+              --expect-read-only \
+              --max-prompts "$max_prompts" \
+              --url "$BASE_URL/mcp?profile=$profile"
+            echo "::endgroup::"
+          done <<'PROFILES'
+          software-dev 15
+          embedded-iot 15
+          mia-vehicle 15
+          voice-home 15
+          learning-loop 15
+          PROFILES
