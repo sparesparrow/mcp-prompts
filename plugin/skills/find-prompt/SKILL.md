@@ -14,8 +14,11 @@ The tools below belong to the plugin's `prompts` server.
 
 1. **Choose tags.** Use the tags or topic the user names. If they name none, use the default tags above,
    comma-separated; if that is empty too, search by text only.
-2. **Search.** Call `list_prompts` with `tags` (a prompt matches if it has any of them) and, if the user gave words,
-   `search` (matched against the name and content). If tags find nothing, try again with `search` alone.
+2. **Search.** If the user's topic names no tag, call `list_categories` first and pick the category that fits. Then call
+   `list_prompts` with `category` and/or `tags` (a prompt matches if it has any of them) and, if the user gave words,
+   `search` (matched against the name, description and content). If tags find nothing, try again with `search` alone.
+   A page holds 20 summaries (descriptions are cut short); when `has_more` is true and you need more, call again with
+   `offset` set to `next_offset`. `get_prompt` returns the whole description and content.
 3. **Prefer the language.** If the preferred language is not `any` and the results hold the same prompt in more than
    one language (same topic, different `language` field), keep the one in the preferred language. Prompts without a
    `language` always stay.

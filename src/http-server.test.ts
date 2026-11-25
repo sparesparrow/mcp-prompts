@@ -154,6 +154,49 @@ describe('http-server over HTTP', () => {
     expect((await request('GET', `/v1/prompts/${id}`)).status).toBe(404);
   });
 
+  it('never returns more than 50 prompts in a list, and 20 unless asked for more', async () => {
+    for (let i = 0; i < 60; i++) {
+      await request('POST', '/v1/prompts', { id: `budget-${i}`, name: `Budget ${i}`, content: 'x', tags: ['budget'], category: i < 30 ? 'cat-a' : 'cat-b' });
+    }
+    const byDefault = await request('GET', '/v1/prompts?tags=budget');
+    expect(byDefault.json).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
+    expect((await request('GET', '/v1/prompts?tags=budget&limit=50')).json.count).toBe(50);
+    expect((await request('GET', '/v1/prompts?tags=budget&limit=51')).status).toBe(400);
+    const viaTool = await request('POST', '/mcp/tools/list_prompts', { arguments: { tags: ['budget'] } });
+    expect(viaTool.json.result).toMatchObject({ total: 60, count: 20, has_more: true });
+  });
+
+  it('keeps a page of 50 prompts small however long their descriptions are', async () => {
+    for (let i = 0; i < 50; i++) {
+      await request('POST', '/v1/prompts', { id: `huge-${i}`, name: `Huge ${i}`, description: 'D'.repeat(100_000), content: 'c', tags: ['huge-desc'] });
+    }
+    const viaApi = await fetch(`${base}/v1/prompts?tags=huge-desc&limit=50`);
+    const apiText = await viaApi.text();
+    expect(JSON.parse(apiText).prompts).toHaveLength(50);
+    expect(Buffer.byteLength(apiText)).toBeLessThan(30_000);
+    const viaTool = await fetch(`${base}/mcp/tools/list_prompts`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ arguments: { tags: ['huge-desc'], limit: 50 } }),
+    });
+    const toolText = await viaTool.text();
+    expect(Buffer.byteLength(toolText)).toBeLessThan(30_000);
+    for (const row of JSON.parse(toolText).result.prompts) expect(row.description.length).toBeLessThanOrEqual(110);
+    const whole = await request('GET', '/v1/prompts/huge-0');
+    expect(whole.json.description).toHaveLength(100_000);
+  });
+
+  it('lists categories with counts over HTTP', async () => {
+    const add = (id: string, category: string, isTemplate = false) =>
+      request('POST', '/v1/prompts', { id, name: id, content: 'x', category, isTemplate });
+    await add('own-cat-1', 'own-cat-a');
+    await add('own-cat-2', 'own-cat-a', true);
+    await add('own-cat-3', 'own-cat-b');
+    const res = await request('POST', '/mcp/tools/list_categories', { arguments: {} });
+    expect(res.json.result).toEqual(expect.arrayContaining([
+      { category: 'own-cat-a', count: 2, templates: 1 },
+      { category: 'own-cat-b', count: 1, templates: 0 },
+    ]));
+  });
+
   it('exposes the MCP tools over HTTP', async () => {
     const tools = await request('GET', '/mcp/tools');
     expect(tools.json.tools.map((t: { name: string }) => t.name)).toEqual(expect.arrayContaining([
@@ -408,6 +451,27 @@ describe('MCP over HTTP at /mcp', () => {
     expect(client.getServerCapabilities()?.prompts).toBeUndefined();
     const stats = await client.callTool({ name: 'get_stats', arguments: {} });
     expect(JSON.parse((stats.content as Array<{ text: string }>)[0].text)).toMatchObject({ total: 6 });
+  });
+
+  it('does not hand a whole library to a client that asks for prompts and resources in the URL', async () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 120; i++) await store.add({ id: `many-${i}`, name: `Many ${i}`, content: 'c', isTemplate: false, tags: [] });
+    const app = await startHttpServer(0, '127.0.0.1', { store });
+    try {
+      const client = await connect(urlOf(app, '?expose=prompts,resources'));
+      const first = await client.listPrompts();
+      expect(first.prompts).toHaveLength(50);
+      expect(first.nextCursor).toBeTruthy();
+      const second = await client.listPrompts({ cursor: first.nextCursor });
+      const third = await client.listPrompts({ cursor: second.nextCursor });
+      expect(third.prompts).toHaveLength(20);
+      expect(third.nextCursor).toBeUndefined();
+      const resources = await client.listResources();
+      expect(resources.resources).toHaveLength(50);
+      expect(resources.nextCursor).toBeTruthy();
+    } finally {
+      await app.close();
+    }
   });
 
   it('takes the selection, capabilities and read-only from the query string', async () => {

@@ -12,14 +12,17 @@ import {
 import { z, ZodError } from 'zod';
 import * as fs from 'fs';
 import * as path from 'path';
-import { logger } from './utils.js';
+import { logger, SYNC_WAIT_MS, waitAtMost } from './utils.js';
 import {
   CreatePromptParams,
   PromptConflictError,
   PromptNotFoundError,
+  PromptStaleError,
   PromptStorageError,
   PromptStore,
   PromptUsageError,
+  MAX_SUMMARY_DESCRIPTION,
+  shorten,
   StoredPrompt,
   UpdatePromptParams,
 } from './prompt-store.js';
@@ -38,6 +41,12 @@ export interface McpServerOptions {
   readOnly?: boolean;
   /** The profiles the store was narrowed to, named in the usage instructions. */
   profiles?: string[];
+  /**
+   * Ask a database-backed store, for at most a second, whether other servers changed anything
+   * before each request is answered. Default true; the HTTP server turns it off because it asks
+   * once per request itself.
+   */
+  syncBeforeRead?: boolean;
 }
 
 export const RESOURCE_SCHEME = 'prompts://';
@@ -73,8 +82,8 @@ export function buildInstructions(options: {
   expose: Capability[];
   readOnly: boolean;
   selectionNote?: string;
-  /** Changes are saved to a state directory and survive a restart. */
-  persistent?: boolean;
+  /** Where changes are saved: 'file' (a state directory) and 'postgres' survive a restart. */
+  storage?: 'memory' | 'file' | 'postgres';
 }): string {
   const tools = options.expose.includes('tools');
   const prompts = options.expose.includes('prompts');
@@ -98,18 +107,20 @@ export function buildInstructions(options: {
   if (tools) {
     lines.push(
       '',
-      'Using a template:',
-      '1. list_prompts with the most specific tag you know. Tags match any of the ones given, so a broad tag also returns unrelated prompts. It returns up to `limit` prompts (default 50); when has_more is true, call it again with offset set to next_offset.',
-      '2. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
-      '3. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
-      '4. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
+      'Finding and using a prompt. Lists are capped (default 20 summaries a page, at most 50), so work from categories down:',
+      '1. list_categories shows the categories this server serves and how many prompts each holds.',
+      '2. list_prompts with `category` (add `tags`, `search` or `isTemplate` to narrow it). Tags match any of the ones given, so a broad tag also returns unrelated prompts. When has_more is true, call it again with offset set to next_offset.',
+      '3. get_prompt with the id. The result is JSON; its `variables` array names every value the template needs.',
+      '4. apply_template with the id and a value for every variable. Plain {{name}} replacement: a variable you leave out stays as a literal {{name}}.',
+      '5. apply_template names the variables it could not fill (`missing`); use the text only when that list is empty.',
     );
   }
   if (options.readOnly) {
     lines.push('', 'Read-only: this install has no add_prompt, update_prompt or delete_prompt.');
   } else if (tools) {
-    lines.push('', options.persistent
-      ? 'Persistence: add_prompt, update_prompt and delete_prompt are saved to this server\'s state directory and survive a restart. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id.'
+    const saved = options.storage === 'postgres' ? 'database' : options.storage === 'file' ? 'state directory' : undefined;
+    lines.push('', saved
+      ? `Persistence: add_prompt, update_prompt and delete_prompt are saved to this server's ${saved} and survive a restart. Give add_prompt an \`id\` to choose a stable one; otherwise it assigns a random id.`
       : 'Persistence: add_prompt, update_prompt and delete_prompt change memory only and are lost when the server restarts. Give add_prompt an `id` to choose a stable one; otherwise it assigns a random id. A prompt that must last is a JSON file under data/prompts/ with a stable id, added by pull request.');
   }
   return lines.join('\n');
@@ -146,15 +157,24 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
   const expose = options.expose ?? ['tools'];
   const readOnly = options.readOnly ?? false;
   let store = options.store;
+  let closeStore: (() => Promise<void>) | undefined;
   if (!store) {
-    store = (await openConfiguredStore(resolveOptions([], process.env).options)).store;
+    const opened = await openConfiguredStore(resolveOptions([], process.env).options);
+    store = opened.store;
+    closeStore = opened.close;
   }
   const prompts: PromptStore = store;
 
   const server = new McpServer(
     { name: 'mcp-prompts', version: packageVersion() },
-    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts, options.profiles), persistent: Boolean(prompts.stateDir) }) }
+    { instructions: buildInstructions({ expose, readOnly, selectionNote: selectionNote(prompts, options.profiles), storage: prompts.storage }) }
   );
+
+  // A store opened here (and its database connections) ends with the server.
+  if (closeStore) {
+    const close = closeStore;
+    server.server.onclose = () => { void close(); };
+  }
 
   // Clients that list prompts or resources hear about changes made through the tools.
   const notifyListChanged = () => {
@@ -163,9 +183,16 @@ export async function createMcpServer(options: McpServerOptions = {}): Promise<M
     if (expose.includes('resources')) server.server.sendResourceListChanged().catch(() => undefined);
   };
 
-  if (expose.includes('tools')) registerTools(server, prompts, readOnly, notifyListChanged);
-  if (expose.includes('prompts')) registerPrompts(server, prompts);
-  if (expose.includes('resources')) registerResources(server, prompts);
+  // Reads are served from memory, and a database-backed store only checks for other servers'
+  // changes in the background: the first read after a quiet time would show old content.
+  const syncFirst = options.syncBeforeRead ?? true;
+  const fresh = async () => {
+    if (syncFirst && prompts.backendKind === 'postgres') await waitAtMost(prompts.sync(), SYNC_WAIT_MS);
+  };
+
+  if (expose.includes('tools')) registerTools(server, prompts, readOnly, notifyListChanged, fresh);
+  if (expose.includes('prompts')) registerPrompts(server, prompts, fresh);
+  if (expose.includes('resources')) registerResources(server, prompts, fresh);
 
   return server;
 }
@@ -212,7 +239,7 @@ const ChangeSchema = z.object({
   id: z.string(),
   name: z.string(),
   version: VersionSchema,
-  persisted: z.boolean().describe('True when the change was saved to the state directory, false when it is in memory only'),
+  persisted: z.boolean().describe('True when the change was saved (to the state directory or the database), false when it is in memory only'),
 });
 const RenderSchema = z.object({
   id: z.string(),
@@ -220,13 +247,17 @@ const RenderSchema = z.object({
   missing: z.array(z.string()).describe('Placeholders left in the text because no value was given'),
   unused: z.array(z.string()).describe('Values given that the template does not use'),
 });
+const CategoriesSchema = z.object({
+  categories: z.array(z.object({ category: z.string(), count: z.number(), templates: z.number() })),
+});
+
 const StatsSchema = z.object({
   total: z.number().int(),
   templates: z.number().int(),
   regular: z.number().int(),
   tags: z.array(z.string()),
   categories: z.array(z.string()),
-  storage: z.enum(['memory', 'file']),
+  storage: z.enum(['memory', 'file', 'postgres']),
   sources: z.object({
     bundled: z.number().int(),
     catalog: z.number().int(),
@@ -238,9 +269,9 @@ const StatsSchema = z.object({
 const ListPromptsInput = z.strictObject({
   tags: z.array(z.string()).optional().describe('Return prompts carrying any of these tags'),
   search: z.string().optional().describe('Text to look for in the name, description or content (case-insensitive)'),
-  category: z.string().optional().describe('Return prompts of this category, e.g. "embedded" (get_stats lists the categories)'),
+  category: z.string().optional().describe('Return prompts of this category, e.g. "embedded" (list_categories shows them with sizes)'),
   isTemplate: z.boolean().optional().describe('true for templates only, false for plain prompts only'),
-  limit: z.number().int().min(1).max(100).default(50).describe('Most prompts to return (1-100, default 50)'),
+  limit: z.number().int().min(1).max(50).default(20).describe('Most prompts to return (1-50, default 20)'),
   offset: z.number().int().min(0).default(0).describe('Prompts to skip; use next_offset from the previous page'),
 });
 const IdInput = z.strictObject({ id: z.string().min(1).describe('Prompt ID, as returned by list_prompts') });
@@ -265,8 +296,6 @@ interface ToolConfig {
   annotations: ToolAnnotations;
 }
 
-const MAX_LISTED_DESCRIPTION = 200;
-
 function text(value: string): CallToolResult['content'][number] {
   return { type: 'text', text: value };
 }
@@ -279,6 +308,8 @@ function result(content: CallToolResult['content'], structured: object): CallToo
 /** What went wrong, said so the caller can fix it; internals stay in the log. */
 function describeFailure(action: string, error: unknown): string {
   if (error instanceof PromptNotFoundError) return `${error.message}. Call list_prompts to see the ids this server serves.`;
+  // Someone else changed the prompt; the store has read their version, so asking again works.
+  if (error instanceof PromptStaleError) return error.message;
   if (error instanceof PromptConflictError) return `${error.message}. Choose another id, or change the existing prompt with update_prompt.`;
   if (error instanceof PromptUsageError || error instanceof PromptStorageError) return error.message;
   if (error instanceof ZodError) {
@@ -288,35 +319,40 @@ function describeFailure(action: string, error: unknown): string {
   return `Internal error while ${action}; the server log has the details.`;
 }
 
-function registerTools(server: McpServer, store: PromptStore, readOnly: boolean, changed: () => void): void {
+function registerTools(server: McpServer, store: PromptStore, readOnly: boolean, changed: () => void, fresh: () => Promise<void>): void {
   // The SDK's generic registerTool overloads make tsc give up on these schemas (TS2589, type
   // instantiation too deep). The SDK still validates arguments against inputSchema before a
   // handler runs and results against outputSchema after, so the handlers take the parsed type.
   const register = server.registerTool.bind(server) as unknown as (
     name: string,
     config: ToolConfig,
-    handler: (args: never) => CallToolResult
+    handler: (args: never) => CallToolResult | Promise<CallToolResult>
   ) => unknown;
 
   const tool = <Schema extends z.ZodType>(
     name: string,
     config: Omit<ToolConfig, 'inputSchema'> & { inputSchema: Schema },
     action: string,
-    run: (args: z.output<Schema>) => CallToolResult
+    run: (args: z.output<Schema>) => CallToolResult | Promise<CallToolResult>
   ) => {
-    register(name, config, ((args: z.output<Schema>) => {
+    register(name, config, (async (args: z.output<Schema>) => {
       try {
-        return run(args);
+        // Reads see what other servers saved; a change decides against the store's own view, so a
+        // stale one is reported as such.
+        if (config.annotations.readOnlyHint) await fresh();
+        return await run(args);
       } catch (error) {
         return { isError: true, content: [text(describeFailure(action, error))] };
       }
-    }) as (args: never) => CallToolResult);
+    }) as (args: never) => Promise<CallToolResult>);
   };
 
-  const persisted = () => Boolean(store.stateDir);
-  const storageNote = () => persisted()
-    ? 'Saved to the state directory; it survives a restart.'
-    : 'Kept in memory only; it is lost when the server restarts.';
+  const persisted = () => store.storage !== 'memory';
+  const storageNote = () => store.storage === 'postgres'
+    ? 'Saved to the database; it survives a restart.'
+    : persisted()
+      ? 'Saved to the state directory; it survives a restart.'
+      : 'Kept in memory only; it is lost when the server restarts.';
   const change = (prompt: StoredPrompt) => ({ id: prompt.id, name: prompt.name, version: prompt.version, persisted: persisted() });
 
   tool('list_prompts', {
@@ -335,14 +371,11 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
       ? (page.total > 0 ? `, none at offset ${page.offset}` : '')
       : page.count < page.total ? `, showing ${page.offset + 1}-${page.offset + page.count}` : '';
     const lines = page.prompts.map(p => {
-      const description = p.description.length > MAX_LISTED_DESCRIPTION
-        ? `${p.description.slice(0, MAX_LISTED_DESCRIPTION - 1)}…`
-        : p.description;
       const details = [
         ...(p.isTemplate ? ['(template)'] : []),
         ...(p.language ? [`(language ${p.language})`] : []),
       ];
-      return `- **${p.name}** (${p.id}): ${description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
+      return `- **${p.name}** (${p.id}): ${p.description} [${p.tags.join(', ')}]${details.length ? ` ${details.join(' ')}` : ''}`;
     });
     const more = page.has_more ? `\n\nMore: call list_prompts again with offset=${page.next_offset}.` : '';
     return result([text(`Found ${page.total} prompts${range}:\n\n${lines.join('\n')}${more}`)], page);
@@ -388,9 +421,23 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     );
   });
 
+  tool('list_categories', {
+    title: 'List categories',
+    description:
+      'List the prompt categories this server serves with the number of prompts and templates in each. ' +
+      'Start here, then call list_prompts with a category to see only that part of the library.',
+    inputSchema: NoInput,
+    outputSchema: CategoriesSchema,
+    annotations: READ_ONLY,
+  }, 'listing categories', () => {
+    const categories = store.categories();
+    const lines = categories.map(c => `- ${c.category}: ${c.count} (${c.templates} templates)`);
+    return result([text(lines.length ? lines.join('\n') : 'No categories.')], { categories });
+  });
+
   tool('get_stats', {
     title: 'Library statistics',
-    description: 'Counts of prompts and templates, the tags and categories in use, and whether changes are saved to disk (`storage`).',
+    description: 'Counts of prompts and templates, the tags and categories in use, and where changes are saved (`storage`: memory, file or postgres).',
     inputSchema: NoInput,
     outputSchema: StatsSchema,
     annotations: READ_ONLY,
@@ -410,8 +457,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: AddPromptInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: false, openWorldHint: false },
-  }, 'adding the prompt', params => {
-    const prompt = store.add(params);
+  }, 'adding the prompt', async params => {
+    const prompt = await store.add(params);
     changed();
     return result([text(`Prompt "${prompt.name}" added successfully with ID: ${prompt.id}\n${storageNote()}`)], change(prompt));
   });
@@ -424,8 +471,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: UpdatePromptInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
-  }, 'updating the prompt', ({ id, updates }) => {
-    const prompt = store.update(id, updates);
+  }, 'updating the prompt', async ({ id, updates }) => {
+    const prompt = await store.update(id, updates);
     changed();
     return result([text(`Prompt "${prompt.name}" updated successfully (version ${prompt.version})\n${storageNote()}`)], change(prompt));
   });
@@ -436,8 +483,8 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
     inputSchema: IdInput,
     outputSchema: ChangeSchema,
     annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: false },
-  }, 'deleting the prompt', ({ id }) => {
-    const prompt = store.delete(id);
+  }, 'deleting the prompt', async ({ id }) => {
+    const prompt = await store.delete(id);
     changed();
     const note = persisted()
       ? 'The deletion is saved; it stays deleted after a restart.'
@@ -449,21 +496,54 @@ function registerTools(server: McpServer, store: PromptStore, readOnly: boolean,
 // Prompts and resources are served by handlers that read the store on every request, so prompts
 // added or removed through the tools show up without re-registering anything.
 
-function registerPrompts(server: McpServer, store: PromptStore): void {
+/** Most entries prompts/list and resources/list return at once; the cursor leads to the rest. */
+const LIST_PAGE_SIZE = 50;
+
+const encodeCursor = (offset: number) => Buffer.from(JSON.stringify({ offset })).toString('base64url');
+
+function decodeCursor(cursor: string | undefined): number {
+  if (cursor === undefined) return 0;
+  try {
+    const { offset } = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as { offset?: unknown };
+    if (typeof offset === 'number' && Number.isInteger(offset) && offset >= 0) return offset;
+  } catch {
+    // fall through to the error below
+  }
+  throw rpcError(ErrorCode.InvalidParams, 'Invalid cursor: use the nextCursor of a previous list result');
+}
+
+/** One page of the store's prompts for a list request, and the cursor of the next page if there is one. */
+function listPage(store: PromptStore, cursor: string | undefined): { items: StoredPrompt[]; nextCursor?: string } {
+  const offset = decodeCursor(cursor);
+  const all = store.all();
+  const items = all.slice(offset, offset + LIST_PAGE_SIZE);
+  return offset + items.length < all.length ? { items, nextCursor: encodeCursor(offset + items.length) } : { items };
+}
+
+const listedDescription = (prompt: StoredPrompt) =>
+  prompt.description ? { description: shorten(prompt.description, MAX_SUMMARY_DESCRIPTION) } : {};
+
+function registerPrompts(server: McpServer, store: PromptStore, fresh: () => Promise<void>): void {
   server.server.registerCapabilities({ prompts: { listChanged: true } });
 
-  server.server.setRequestHandler(ListPromptsRequestSchema, () => ({
-    prompts: store.all().map(prompt => ({
-      name: prompt.id,
-      title: prompt.name,
-      ...(prompt.description ? { description: prompt.description } : {}),
-      ...(prompt.isTemplate
-        ? { arguments: variableNames(prompt).map(variable => ({ ...variable, required: false })) }
-        : {}),
-    })),
-  }));
+  server.server.setRequestHandler(ListPromptsRequestSchema, async request => {
+    await fresh();
+    const { items, nextCursor } = listPage(store, request.params?.cursor);
+    return {
+      prompts: items.map(prompt => ({
+        name: prompt.id,
+        title: prompt.name,
+        ...listedDescription(prompt),
+        ...(prompt.isTemplate
+          ? { arguments: variableNames(prompt).map(variable => ({ ...variable, required: false })) }
+          : {}),
+      })),
+      ...(nextCursor ? { nextCursor } : {}),
+    };
+  });
 
-  server.server.setRequestHandler(GetPromptRequestSchema, request => {
+  server.server.setRequestHandler(GetPromptRequestSchema, async request => {
+    await fresh();
     const prompt = getOrRpcError(store, request.params.name, ErrorCode.InvalidParams);
     const text = prompt.isTemplate ? store.applyTemplate(prompt.id, request.params.arguments ?? {}) : prompt.content;
     return {
@@ -473,20 +553,25 @@ function registerPrompts(server: McpServer, store: PromptStore): void {
   });
 }
 
-function registerResources(server: McpServer, store: PromptStore): void {
+function registerResources(server: McpServer, store: PromptStore, fresh: () => Promise<void>): void {
   server.server.registerCapabilities({ resources: { listChanged: true } });
 
   const uriOf = (id: string) => `${RESOURCE_SCHEME}${encodeURIComponent(id)}`;
 
-  server.server.setRequestHandler(ListResourcesRequestSchema, () => ({
-    resources: store.all().map(prompt => ({
-      uri: uriOf(prompt.id),
-      name: prompt.id,
-      title: prompt.name,
-      ...(prompt.description ? { description: prompt.description } : {}),
-      mimeType: 'text/plain',
-    })),
-  }));
+  server.server.setRequestHandler(ListResourcesRequestSchema, async request => {
+    await fresh();
+    const { items, nextCursor } = listPage(store, request.params?.cursor);
+    return {
+      resources: items.map(prompt => ({
+        uri: uriOf(prompt.id),
+        name: prompt.id,
+        title: prompt.name,
+        ...listedDescription(prompt),
+        mimeType: 'text/plain',
+      })),
+      ...(nextCursor ? { nextCursor } : {}),
+    };
+  });
 
   server.server.setRequestHandler(ListResourceTemplatesRequestSchema, () => ({
     resourceTemplates: [{
@@ -498,7 +583,8 @@ function registerResources(server: McpServer, store: PromptStore): void {
     }],
   }));
 
-  server.server.setRequestHandler(ReadResourceRequestSchema, request => {
+  server.server.setRequestHandler(ReadResourceRequestSchema, async request => {
+    await fresh();
     const { uri } = request.params;
     if (!uri.startsWith(RESOURCE_SCHEME)) {
       throw rpcError(ErrorCode.InvalidParams, `Unknown resource ${uri}: expected ${RESOURCE_SCHEME}<id>`);

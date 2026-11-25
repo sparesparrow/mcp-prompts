@@ -1,9 +1,15 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterAll, afterEach, describe, expect, it } from 'vitest';
 import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
+import { PromptStorageError } from './prompt-store';
+import { createPostgresPool } from './storage/postgres';
 import {
+  DEFAULT_OPTIONS,
   OptionsError,
+  mergeOptions,
+  openConfiguredStore,
+  type ServerOptions,
   optionsFromConfigFile,
   optionsFromEnv,
   optionsFromQuery,
@@ -12,6 +18,19 @@ import {
   parseSelector,
   resolveOptions,
 } from './server-options';
+
+let libraryDir: string | undefined;
+/** A small library of one prompt, made once. */
+function fixtureLibrary(): string {
+  if (!libraryDir) {
+    libraryDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mcp-prompts-options-lib-'));
+    fs.writeFileSync(path.join(libraryDir, 'one.json'), JSON.stringify({ id: 'one', name: 'One', content: 'c' }));
+  }
+  return libraryDir;
+}
+afterAll(() => {
+  if (libraryDir) fs.rmSync(libraryDir, { recursive: true, force: true });
+});
 
 describe('parseSelector', () => {
   it('reads comma-separated and repeated entries, without duplicates', () => {
@@ -196,5 +215,111 @@ describe('profiles in the options', () => {
     expect(() => parseCommandLine(['--profile', ''])).toThrow(/needs a profile name/);
     expect(() => parseCommandLine(['--profile', 'Software Dev'])).toThrow(/is not a profile name/);
     expect(() => optionsFromQuery(new URLSearchParams('profile=../etc'))).toThrow(OptionsError);
+  });
+});
+
+describe('storage selection', () => {
+  it('reads MCP_PROMPTS_STORAGE and MCP_PROMPTS_OWNER, and does not report them as unknown', () => {
+    const { layer, warnings } = optionsFromEnv({ MCP_PROMPTS_STORAGE: 'postgres', MCP_PROMPTS_OWNER: ' user-1 ', DATABASE_URL: 'postgresql://u:p@h/db' }, '/work');
+    expect(layer).toEqual({ storage: 'postgres', owner: 'user-1' });
+    expect(warnings).toEqual([]);
+  });
+
+  it('serves from files and memory unless asked otherwise', () => {
+    expect(resolveOptions([], {}, '/work').options.storage).toBe('file');
+    expect(resolveOptions([], { MCP_PROMPTS_STORAGE: 'file' }, '/work').options.storage).toBe('file');
+    expect(resolveOptions([], { MCP_PROMPTS_STORAGE: 'postgres', MCP_PROMPTS_OWNER: 'me' }, '/work').options).toMatchObject({ storage: 'postgres', owner: 'me' });
+  });
+
+  it('rejects any other value, naming the ones that exist', () => {
+    expect(() => optionsFromEnv({ MCP_PROMPTS_STORAGE: 'mysql' })).toThrow(/MCP_PROMPTS_STORAGE.*file or postgres.*"mysql"/);
+  });
+
+  it('keeps the database URL out of the options, which are printed by the config command', () => {
+    const { options } = resolveOptions([], { MCP_PROMPTS_STORAGE: 'postgres', MCP_PROMPTS_OWNER: 'me', DATABASE_URL: 'postgresql://secret_user:secret_pw@db.example/x' }, '/work');
+    expect(JSON.stringify(options)).not.toContain('secret');
+  });
+
+  it('points a STORAGE_TYPE=postgres install at the new variable', () => {
+    expect(optionsFromEnv({ STORAGE_TYPE: 'postgres' }, '/work').warnings[0]).toContain('MCP_PROMPTS_STORAGE=postgres');
+  });
+});
+
+describe('openConfiguredStore with Postgres', () => {
+  const postgres = (extra: Partial<ServerOptions> = {}): ServerOptions =>
+    mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixtureLibrary() }, { storage: 'postgres', owner: 'user-1', ...extra } as never);
+
+  it('needs DATABASE_URL, and says which setting is missing', async () => {
+    await expect(openConfiguredStore(postgres(), {})).rejects.toThrow(OptionsError);
+    await expect(openConfiguredStore(postgres(), {})).rejects.toThrow(/DATABASE_URL/);
+  });
+
+  it('needs an owner for a single-owner install', async () => {
+    await expect(openConfiguredStore(postgres({ owner: undefined }), { DATABASE_URL: 'postgresql://u:p@127.0.0.1:1/d' })).rejects.toThrow(/MCP_PROMPTS_OWNER/);
+  });
+
+  it('does not combine with a state directory', async () => {
+    await expect(openConfiguredStore(postgres({ stateDir: '/tmp/x' }), { DATABASE_URL: 'postgresql://u:p@127.0.0.1:1/d' })).rejects.toThrow(/MCP_PROMPTS_STATE_DIR/);
+  });
+
+  it('fails without connection details when the database cannot be reached', async () => {
+    const error = await openConfiguredStore(postgres(), { DATABASE_URL: 'postgresql://leaky_user:leaky_pw@127.0.0.1:1/leaky_db' }).catch(err => err);
+    expect(error).toBeInstanceOf(PromptStorageError);
+    for (const secret of ['leaky_user', 'leaky_pw', 'leaky_db', '127.0.0.1']) expect(error.message).not.toContain(secret);
+  });
+
+  it('gives a file install a close() that does nothing', async () => {
+    const opened = await openConfiguredStore(mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixtureLibrary() }), {});
+    expect(opened.base.storage).toBe('memory');
+    await expect(opened.close()).resolves.toBeUndefined();
+  });
+
+  describe.skipIf(!process.env.TEST_DATABASE_URL)('against the test database', () => {
+    const owner = `test-options-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+    const env = { DATABASE_URL: process.env.TEST_DATABASE_URL };
+
+    afterAll(async () => {
+      const pool = createPostgresPool(process.env.TEST_DATABASE_URL!);
+      for (const table of ['prompts', 'tombstones', 'revisions']) await pool.query(`DELETE FROM ${table} WHERE owner_sub = $1`, [owner]);
+      await pool.end();
+    });
+
+    it('opens a store that saves to the database, and another open serves what the first saved', async () => {
+      const options = postgres({ owner });
+      const first = await openConfiguredStore(options, env);
+      expect(first.base.storage).toBe('postgres');
+      await first.store.add({ id: 'kept-in-postgres', name: 'Kept', content: 'c', isTemplate: false, tags: [] });
+      await first.close();
+      const second = await openConfiguredStore(options, env);
+      expect(second.store.get('kept-in-postgres').name).toBe('Kept');
+      expect(second.store.stats().storage).toBe('postgres');
+      await second.close();
+    });
+  });
+});
+
+describe.skipIf(!process.env.TEST_DATABASE_URL)('openConfiguredStore with Postgres, read-only', () => {
+  const run = Math.random().toString(36).slice(2, 8);
+  const schema = `ro_${run}`;
+  const urlFor = () => {
+    const url = new URL(process.env.TEST_DATABASE_URL!);
+    url.searchParams.set('options', `-c search_path=${schema}`);
+    return url.toString();
+  };
+  const readOnly = (): ServerOptions =>
+    mergeOptions(DEFAULT_OPTIONS, { promptsDir: fixtureLibrary() }, { storage: 'postgres', owner: 'ro-owner', readOnly: true } as never);
+
+  it('never changes the database: with no migrations applied it fails, and creates nothing', async () => {
+    const admin = createPostgresPool(process.env.TEST_DATABASE_URL!);
+    try {
+      await admin.query(`CREATE SCHEMA ${schema}`);
+      const error = await openConfiguredStore(readOnly(), { DATABASE_URL: urlFor() }).catch(err => err);
+      expect(error).toBeInstanceOf(PromptStorageError);
+      const tables = await admin.query('SELECT table_name FROM information_schema.tables WHERE table_schema = $1', [schema]);
+      expect(tables.rows).toEqual([]);
+    } finally {
+      await admin.query(`DROP SCHEMA IF EXISTS ${schema} CASCADE`);
+      await admin.end();
+    }
   });
 });

@@ -3,6 +3,10 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils.js';
+import { FileStateBackend, PromptConflictError, PromptStaleError, PromptStorageError, type StateBackend, type StateSnapshot } from './state-backend.js';
+
+export { PromptConflictError, PromptStaleError, PromptStorageError } from './state-backend.js';
+export type { StateBackend, StateSnapshot } from './state-backend.js';
 
 // Shared by the MCP stdio server and the HTTP server, so both serve the same prompts the same way.
 
@@ -113,14 +117,21 @@ export interface PromptPage {
   prompts: PromptSummary[];
 }
 
+/** One category of the served prompts: how many prompts it holds, and how many of those are templates. */
+export interface CategorySummary {
+  category: string;
+  count: number;
+  templates: number;
+}
+
 export interface PromptStats {
   total: number;
   templates: number;
   regular: number;
   tags: string[];
   categories: string[];
-  /** 'file' when changes are saved to a state directory, 'memory' when they end with the process. */
-  storage: 'memory' | 'file';
+  /** Where changes are saved: 'file' (a state directory), 'postgres', or 'memory' when they end with the process. */
+  storage: 'memory' | 'file' | 'postgres';
   sources: { bundled: number; catalog: number; user: number; session: number };
 }
 
@@ -146,13 +157,6 @@ export class PromptUsageError extends Error {
   }
 }
 
-/** A prompt with the requested id already exists. */
-export class PromptConflictError extends Error {
-  constructor(id: string) {
-    super(`A prompt with ID ${id} already exists`);
-  }
-}
-
 /** A profile was asked for that the library does not define. */
 export class UnknownProfileError extends Error {
   constructor(public readonly unknown: string[], public readonly available: string[]) {
@@ -160,13 +164,6 @@ export class UnknownProfileError extends Error {
       `unknown profile ${unknown.map(name => `"${name}"`).join(', ')}: ` +
       (available.length > 0 ? `this library has ${available.join(', ')}` : 'this library defines no profiles (it has no profiles.json)')
     );
-  }
-}
-
-/** A change could not be saved to the state directory; the prompt was left as it was. */
-export class PromptStorageError extends Error {
-  constructor(message: string) {
-    super(message);
   }
 }
 
@@ -188,13 +185,26 @@ function categoryOf(prompt: StoredPrompt): string | undefined {
   return typeof fromMetadata === 'string' && fromMetadata ? fromMetadata : undefined;
 }
 
+/** The longest description a list shows; get_prompt returns the whole one. */
+export const MAX_SUMMARY_DESCRIPTION = 110;
+
+/** The text cut to at most `max` characters, ending in an ellipsis when something was left out. */
+export function shorten(value: string, max: number): string {
+  if (value.length <= max) return value;
+  let end = max - 1;
+  // Do not leave half of a character that takes two code units.
+  const last = value.charCodeAt(end - 1);
+  if (last >= 0xd800 && last <= 0xdbff) end--;
+  return `${value.slice(0, end)}…`;
+}
+
 function summarize(prompt: StoredPrompt): PromptSummary {
   const category = categoryOf(prompt);
   const language = (prompt.metadata as Record<string, unknown> | undefined)?.language;
   return {
     id: prompt.id,
     name: prompt.name,
-    description: prompt.description || 'No description',
+    description: shorten(prompt.description || 'No description', MAX_SUMMARY_DESCRIPTION),
     tags: prompt.tags ?? [],
     isTemplate: prompt.isTemplate || false,
     ...(category ? { category } : {}),
@@ -249,49 +259,6 @@ export function renderTemplate(content: string, variables: Record<string, unknow
   };
 }
 
-/**
- * Writes beside the target and moves the result into place, so a crash or a full disk never
- * leaves half a file. With exclusive the write fails with EEXIST when the target already exists,
- * even if another process created it a moment ago.
- */
-function writeFileAtomic(file: string, data: string, options: { exclusive?: boolean } = {}): void {
-  const tmp = path.join(path.dirname(file), `.${path.basename(file)}.${process.pid}.${crypto.randomBytes(4).toString('hex')}.tmp`);
-  const fd = fs.openSync(tmp, 'wx', 0o600);
-  try {
-    fs.writeSync(fd, data);
-    fs.fsyncSync(fd);
-  } finally {
-    fs.closeSync(fd);
-  }
-  try {
-    if (!options.exclusive) {
-      fs.renameSync(tmp, file);
-      return;
-    }
-    try {
-      // A hard link is the atomic "create only if absent"; rename would replace the other file.
-      fs.linkSync(tmp, file);
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw error;
-      // File systems without hard links (some network and removable ones).
-      fs.copyFileSync(tmp, file, fs.constants.COPYFILE_EXCL);
-    }
-  } finally {
-    fs.rmSync(tmp, { force: true });
-  }
-}
-
-/** A temporary file this old was left by a write that never finished, not by one in progress. */
-const STALE_TMP_MS = 60_000;
-
-/**
- * A directory's timestamp only moves in steps: a few milliseconds on most file systems, one or
- * two seconds on some. A change made within a step of the last scan can leave the timestamp as
- * it was, so a scan that close to the timestamp is repeated.
- */
-const FINE_MTIME_MS = 50;
-const COARSE_MTIME_MS = 2_000;
-
 /** JSON files in a library that are not prompts: a generated index, and the profiles. */
 const NOT_PROMPTS = ['index.json', 'profiles.json'];
 const CATALOG_TIMEOUT_MS = 5_000;
@@ -334,8 +301,6 @@ async function fetchCatalog(url: URL, allowLocalHttp: boolean, timeoutMs: number
 function byName(a: fs.Dirent, b: fs.Dirent): number {
   return a.name < b.name ? -1 : a.name > b.name ? 1 : 0;
 }
-
-const TOMBSTONES_FILE = '.deleted.json';
 
 /**
  * Which library prompts an install serves. Plain prompts and templates are chosen separately:
@@ -444,21 +409,61 @@ interface SharedState {
   /** The library's profiles.json, by name. */
   profiles: Map<string, Profile>;
   /** Where add, update and delete are saved; undefined keeps them in memory only. */
-  stateDir?: string;
+  backend?: StateBackend;
   /**
-   * Set once a state directory is open: what the library and the user's directories hold, before
-   * anything saved is applied. The served prompts are rebuilt from it whenever the state directory
-   * changes, which is how several servers sharing one directory see each other's changes.
+   * Set once a backend is attached: what the library and the user's directories hold, before
+   * anything saved is applied. The served prompts are rebuilt from it whenever the backend
+   * changes, which is how several servers sharing one backend see each other's changes.
    */
   pristine?: { prompts: Map<string, StoredPrompt>; origins: Map<string, PromptOrigin> };
-  /** The open state directory, what it looked like when last read, and the files reported as unusable. */
-  watch?: { dir: string; mtimeMs: number; scannedAt: number; writable: boolean; reported: Set<string> };
+  /** What the backend held when it was last read, and its revision from just before that read. */
+  saved?: { snapshot: StateSnapshot; revision: string };
+  /** The change last queued for each prompt id, so changes to one prompt are applied one by one. */
+  queued: Map<string, Promise<unknown>>;
+  /** The backend answers with promises, so it is checked in the background (see refresh). */
+  asyncBackend?: boolean;
+  /** How long to leave between checks of an asynchronous backend. */
+  refreshMs: number;
+  /** When an asynchronous backend was last asked, from Date.now(). */
+  lastCheck: number;
+  /** The check of the backend that is running, so concurrent callers share one. */
+  checking?: Promise<void>;
+  /** Changes made through this store so far; a read of the backend that overlapped one is repeated. */
+  writes: number;
+  /** The last check failed and was reported; the next failure is not reported again until one succeeds. */
+  checkFailed: boolean;
+  /** How long one question to an asynchronous backend may take before it counts as failed. */
+  checkTimeoutMs: number;
+}
+
+/** A backend that has not answered in this long is treated as down; its own limits normally come first. */
+export const CHECK_TIMEOUT_MS = 15_000;
+
+/** Settles with the work, or rejects with a PromptStorageError (which says nothing about the cause) after ms. */
+function withTimeout<T>(work: Promise<T> | T, ms: number): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new PromptStorageError('The database did not answer in time')), ms);
+    Promise.resolve(work).then(
+      value => { clearTimeout(timer); resolve(value); },
+      error => { clearTimeout(timer); reject(error); }
+    );
+  });
+}
+
+/** How long to leave between checks of a backend that can only be asked asynchronously. */
+export const REFRESH_INTERVAL_MS = 2_000;
+
+function newSharedState(): SharedState {
+  return {
+    prompts: new Map(), origins: new Map(), profiles: new Map(), queued: new Map(),
+    refreshMs: REFRESH_INTERVAL_MS, lastCheck: 0, writes: 0, checkFailed: false, checkTimeoutMs: CHECK_TIMEOUT_MS,
+  };
 }
 
 export class PromptStore {
   // Views made by select() share this state and add filters, so a prompt added through any view
   // is stored once.
-  private shared: SharedState = { prompts: new Map(), origins: new Map(), profiles: new Map() };
+  private shared: SharedState = newSharedState();
   private filters: Visibility[] = [];
 
   /** Number of prompts this store serves. */
@@ -466,9 +471,16 @@ export class PromptStore {
     return this.all().length;
   }
 
+  /** Where changes are saved: the backend's kind while it can be written, otherwise memory. */
+  get storage(): 'memory' | 'file' | 'postgres' {
+    const { backend } = this.shared;
+    return backend?.writable ? backend.kind : 'memory';
+  }
+
   /** The directory changes are saved to, or undefined when they are kept in memory only. */
   get stateDir(): string | undefined {
-    return this.shared.stateDir;
+    const { backend } = this.shared;
+    return backend instanceof FileStateBackend && backend.writable ? backend.dir : undefined;
   }
 
   /**
@@ -686,7 +698,7 @@ export class PromptStore {
     }
     const count = this.loadTree(dir, dir, kind, new Map(), visited);
     // Saved edits and deletions apply to what was just loaded as well.
-    if (this.shared.watch) this.applyState();
+    if (this.shared.saved) this.applySaved();
     return count;
   }
 
@@ -765,23 +777,16 @@ export class PromptStore {
     return count;
   }
 
-  /**
-   * Reads one prompt file; logs why and returns undefined when it cannot be served. The state
-   * directory is read again whenever it changes, so there a file is reported once (`reported`).
-   */
-  private readPromptFile(file: string, reported?: Set<string>): StoredPrompt | undefined {
-    const quiet = reported?.has(file) ?? false;
-    reported?.add(file);
+  /** Reads one library file; logs why and returns undefined when it cannot be served. */
+  private readPromptFile(file: string): StoredPrompt | undefined {
     let raw: unknown;
     try {
       raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (err) {
-      if (!quiet) logger.warn({ err }, `Skipped ${file}: it is not readable JSON`);
+      logger.warn({ err }, `Skipped ${file}: it is not readable JSON`);
       return undefined;
     }
-    const prompt = this.checkPromptData(raw, file, quiet);
-    if (prompt) reported?.delete(file);
-    return prompt;
+    return this.checkPromptData(raw, file);
   }
 
   private checkPromptData(raw: unknown, source: string, quiet = false): StoredPrompt | undefined {
@@ -814,138 +819,243 @@ export class PromptStore {
    */
   openStateDir(dir: string, options: { readOnly?: boolean } = {}): number {
     const readOnly = options.readOnly ?? false;
-    if (!readOnly) {
-      try {
-        fs.mkdirSync(dir, { recursive: true, mode: 0o700 });
-        fs.accessSync(dir, fs.constants.R_OK | fs.constants.W_OK);
-        // Left behind by a write that was interrupted before it finished. Recent ones are left
-        // alone: another server sharing the directory may be in the middle of a write.
-        const now = Date.now();
-        for (const name of fs.readdirSync(dir)) {
-          if (!name.startsWith('.') || !name.endsWith('.tmp')) continue;
-          const file = path.join(dir, name);
-          if (now - fs.statSync(file).mtimeMs > STALE_TMP_MS) fs.rmSync(file, { force: true });
-        }
-      } catch (error) {
-        throw new PromptStorageError(
-          `State directory ${dir} is not writable (${error instanceof Error ? error.message : String(error)}). ` +
-          'Mount or create a writable directory, or start read-only.'
-        );
-      }
-    } else if (!fs.existsSync(dir)) {
+    if (readOnly && !fs.existsSync(dir)) {
       logger.warn(`State directory ${dir} does not exist; nothing saved was loaded`);
       return 0;
     }
-
-    this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) };
-    this.shared.watch = { dir, mtimeMs: -1, scannedAt: 0, writable: !readOnly, reported: new Set() };
-    if (!readOnly) this.shared.stateDir = dir;
-    const count = this.applyState();
+    const backend = new FileStateBackend(dir, {
+      readOnly,
+      parse: (raw, source, quiet) => this.checkPromptData(raw, source, quiet)
+    });
+    const revision = backend.revision();
+    let snapshot: StateSnapshot = { prompts: [], tombstones: [] };
+    try {
+      snapshot = backend.load();
+    } catch (err) {
+      logger.warn({ err }, `Could not read state directory ${dir}; serving what was read before`);
+    }
+    const count = this.attach(backend, snapshot, revision);
     logger.info(`Loaded ${count} saved prompts from ${dir}`);
     return count;
+  }
+
+  /**
+   * Saves add, update and delete to the backend from now on, after loading what it holds. Like
+   * openStateDir, but for a backend that may answer asynchronously: such a backend is asked about
+   * changes in the background, at most once per refreshIntervalMs (two seconds by default), and
+   * by sync(). Returns how many saved prompts were loaded. Throws PromptStorageError when the
+   * backend cannot be read, and PromptUsageError when this store already has a backend.
+   */
+  async useBackend(backend: StateBackend, options: { refreshIntervalMs?: number; checkTimeoutMs?: number } = {}): Promise<number> {
+    this.assertNoBackend();
+    let asyncBackend: boolean;
+    let revision: string;
+    let snapshot: StateSnapshot;
+    try {
+      const first = backend.revision();
+      asyncBackend = typeof first !== 'string';
+      revision = await first;
+      snapshot = await backend.load();
+    } catch (error) {
+      if (error instanceof PromptStorageError) throw error;
+      logger.error({ err: error }, 'Could not read the saved prompts');
+      throw new PromptStorageError('Could not read the saved prompts; the backend was not used');
+    }
+    // Another call may have attached a backend while this one was reading.
+    this.assertNoBackend();
+    this.shared.asyncBackend = asyncBackend;
+    this.shared.refreshMs = options.refreshIntervalMs ?? REFRESH_INTERVAL_MS;
+    this.shared.checkTimeoutMs = options.checkTimeoutMs ?? CHECK_TIMEOUT_MS;
+    this.shared.lastCheck = Date.now();
+    return this.attach(backend, snapshot, revision);
+  }
+
+  private assertNoBackend(): void {
+    if (this.shared.backend) throw new PromptUsageError('This store already saves to a backend; it can have only one');
+  }
+
+  /**
+   * A store over the same library whose saved prompts come from its own backend: one owner's view
+   * of a shared library. The library (and the catalog and user directories loaded into this
+   * store) must be loaded before; the prompts it holds are shared, not copied, while what the
+   * backend saved is private to the new store. This store must not have a backend itself.
+   */
+  async overlay(backend: StateBackend, options: { refreshIntervalMs?: number; checkTimeoutMs?: number } = {}): Promise<PromptStore> {
+    this.assertNoBackend();
+    const pristine = (this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) });
+    const store = new PromptStore();
+    store.shared = {
+      ...newSharedState(),
+      prompts: new Map(pristine.prompts),
+      origins: new Map(pristine.origins),
+      library: this.shared.library,
+      profiles: this.shared.profiles,
+      pristine,
+    };
+    await store.useBackend(backend, options);
+    return store;
+  }
+
+  /**
+   * Asks the backend now, whatever the interval, and reads it again if something changed. Meant
+   * for a request that must see what another server saved. A backend that fails is not an error
+   * here: the store keeps serving what it has (and says so once in the log).
+   */
+  async sync(): Promise<void> {
+    const { backend, saved } = this.shared;
+    if (!backend || !saved) return;
+    if (!this.shared.asyncBackend) {
+      this.refresh();
+      return;
+    }
+    // A check that started before this call may have missed what this call must see.
+    if (this.shared.checking) await this.shared.checking;
+    await this.runCheck();
+  }
+
+  /** Throws when the backend cannot be reached in time. A store without a backend is always fine. */
+  async checkStorage(): Promise<void> {
+    const { backend, checkTimeoutMs } = this.shared;
+    if (backend) await withTimeout(backend.revision(), checkTimeoutMs);
+  }
+
+  /** The kind of backend behind this store, whether or not it can be written; undefined for memory only. */
+  get backendKind(): 'file' | 'postgres' | undefined {
+    return this.shared.backend?.kind;
+  }
+
+  private attach(backend: StateBackend, snapshot: StateSnapshot, revision: string): number {
+    this.shared.pristine ??= { prompts: new Map(this.shared.prompts), origins: new Map(this.shared.origins) };
+    this.shared.backend = backend;
+    this.shared.saved = { snapshot, revision };
+    return this.applySaved();
   }
 
   /**
    * Rebuilds what is served: the library and the user's directories, without the ids recorded as
    * deleted, with every saved prompt put over or beside them. Returns the number of saved prompts.
    */
-  private applyState(): number {
-    const { watch, pristine } = this.shared;
-    if (!watch || !pristine) return 0;
-    let mtimeMs: number;
-    let entries: fs.Dirent[];
-    try {
-      // The timestamp first: a change made while the files are read is then seen by the next check.
-      mtimeMs = fs.statSync(watch.dir).mtimeMs;
-      entries = fs.readdirSync(watch.dir, { withFileTypes: true }).sort(byName);
-    } catch (err) {
-      logger.warn({ err }, `Could not read state directory ${watch.dir}; serving what was read before`);
-      return 0;
-    }
+  private applySaved(): number {
+    const { saved, pristine } = this.shared;
+    if (!saved || !pristine) return 0;
     const prompts = new Map(pristine.prompts);
     const origins = new Map(pristine.origins);
-    for (const id of this.readTombstones(watch.dir)) {
+    for (const id of saved.snapshot.tombstones) {
       prompts.delete(id);
       origins.delete(id);
     }
-    let count = 0;
-    for (const entry of entries) {
-      if (!entry.isFile() || !entry.name.endsWith('.json') || entry.name.startsWith('.')) continue;
-      const prompt = this.readPromptFile(path.join(watch.dir, entry.name), watch.reported);
-      if (!prompt) continue;
+    for (const prompt of saved.snapshot.prompts) {
       prompts.set(prompt.id, prompt);
       // A saved edit of a library prompt stays a library prompt, so selections still apply to it.
       origins.set(prompt.id, pristine.origins.get(prompt.id) ?? { kind: 'runtime' });
-      count++;
     }
     this.shared.prompts = prompts;
     this.shared.origins = origins;
-    watch.mtimeMs = mtimeMs;
-    watch.scannedAt = Date.now();
-    return count;
+    return saved.snapshot.prompts.length;
   }
 
-  /** Reads the state directory again if it changed since it was last read. */
+  /**
+   * Reads the backend again if it changed since it was last read. Reads of the store are
+   * synchronous, so a backend that can only answer asynchronously is asked in the background:
+   * this starts a check when the interval has passed and returns at once, and what the check
+   * finds is served from the next read on.
+   */
   private refresh(): void {
-    const watch = this.shared.watch;
-    if (!watch) return;
-    let mtimeMs: number;
-    try {
-      mtimeMs = fs.statSync(watch.dir).mtimeMs;
-    } catch {
+    const { backend, saved } = this.shared;
+    if (!backend || !saved) return;
+    if (this.shared.asyncBackend) {
+      if (!this.shared.checking && Date.now() - this.shared.lastCheck >= this.shared.refreshMs) void this.runCheck();
       return;
     }
-    // Whole seconds mean a file system that keeps no finer time than that.
-    const granularity = Number.isInteger(mtimeMs / 1000) ? COARSE_MTIME_MS : FINE_MTIME_MS;
-    if (mtimeMs === watch.mtimeMs && watch.scannedAt - mtimeMs >= granularity) return;
-    this.applyState();
+    const revision = backend.revision();
+    if (typeof revision !== 'string') {
+      Promise.resolve(revision).catch(() => undefined);
+      return;
+    }
+    if (revision === saved.revision) return;
+    let snapshot: StateSnapshot | Promise<StateSnapshot>;
+    try {
+      snapshot = backend.load();
+    } catch (err) {
+      logger.warn({ err }, 'Could not read the saved prompts again; serving what was read before');
+      return;
+    }
+    if (snapshot instanceof Promise) {
+      snapshot.catch(() => undefined);
+      return;
+    }
+    this.shared.saved = { snapshot, revision };
+    this.applySaved();
+  }
+
+  /** Runs one check of an asynchronous backend, or joins the one that is running. */
+  private runCheck(): Promise<void> {
+    const shared = this.shared;
+    if (!shared.checking) {
+      shared.lastCheck = Date.now();
+      shared.checking = this.checkBackend().finally(() => {
+        shared.checking = undefined;
+      });
+    }
+    return shared.checking;
+  }
+
+  /** Compares the backend's revision with the one last read, and reads it again if it moved. Never throws. */
+  private async checkBackend(): Promise<void> {
+    const shared = this.shared;
+    // A change made through this store while the backend was being read is not in what was read,
+    // and applying that would take it out of memory: read again instead.
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const { backend, saved, writes } = shared;
+      if (!backend || !saved) return;
+      try {
+        // Bounded, so that a backend that never answers fails this check and the next one can start.
+        const revision = await withTimeout(backend.revision(), shared.checkTimeoutMs);
+        if (revision !== saved.revision) {
+          const snapshot = await withTimeout(backend.load(), shared.checkTimeoutMs);
+          if (shared.writes !== writes) continue;
+          shared.saved = { snapshot, revision };
+          this.applySaved();
+        }
+        if (shared.checkFailed) logger.info('The saved prompts can be read again');
+        shared.checkFailed = false;
+        return;
+      } catch (error) {
+        // PromptStorageError messages carry no connection details; anything else is named by its type only.
+        if (!shared.checkFailed) {
+          const reason = error instanceof PromptStorageError ? error.message : error instanceof Error ? error.name : 'error';
+          logger.warn(`Could not check the saved prompts for changes (${reason}); serving what was read before`);
+        }
+        shared.checkFailed = true;
+        return;
+      }
+    }
   }
 
   private assertWritable(): void {
-    if (this.shared.watch && !this.shared.watch.writable) {
-      throw new PromptUsageError('This server reads its state directory read-only, so prompts cannot be changed here');
+    if (this.shared.backend && !this.shared.backend.writable) {
+      throw new PromptUsageError(this.shared.backend.kind === 'file'
+        ? 'This server reads its state directory read-only, so prompts cannot be changed here'
+        : 'This server reads its database read-only, so prompts cannot be changed here');
     }
   }
 
-  private stateFile(id: string): string {
-    // Lower-case safe ids are their own file name; anything else is hashed, so two ids can never
-    // share a file (not even on a case-insensitive file system) and no id can leave the directory.
-    const name = /^[a-z0-9][a-z0-9._-]{0,127}$/.test(id)
-      ? id
-      : `x-${crypto.createHash('sha256').update(id).digest('hex').slice(0, 40)}`;
-    return path.join(this.shared.stateDir!, `${name}.json`);
-  }
-
-  private readTombstones(dir: string): string[] {
+  /**
+   * Saves a change to the backend. Callers await it only when there is a backend, so a store that
+   * keeps changes in memory decides and applies a change in one step. A failure the backend did not word itself
+   * (a driver error, which may carry connection details) becomes a PromptStorageError that says
+   * nothing was changed; the log has the cause.
+   */
+  private async persist(what: string, save: (backend: StateBackend) => Promise<void>): Promise<void> {
+    const backend = this.shared.backend!;
     try {
-      const parsed = JSON.parse(fs.readFileSync(path.join(dir, TOMBSTONES_FILE), 'utf8'));
-      return Array.isArray(parsed) ? parsed.filter((id): id is string => typeof id === 'string') : [];
-    } catch {
-      return [];
-    }
-  }
-
-  private writeTombstones(change: (ids: Set<string>) => void): void {
-    const dir = this.shared.stateDir!;
-    // Re-read first: another server process may share this directory.
-    const ids = new Set(this.readTombstones(dir));
-    const before = ids.size;
-    change(ids);
-    if (ids.size === before) return;
-    writeFileAtomic(path.join(dir, TOMBSTONES_FILE), `${JSON.stringify(Array.from(ids).sort(), null, 2)}\n`);
-  }
-
-  /** Runs a state-directory write, turning a file system failure into a PromptStorageError. */
-  private saving(what: string, write: () => void): void {
-    if (!this.shared.stateDir) return;
-    try {
-      write();
+      await save(backend);
     } catch (error) {
-      if (error instanceof PromptConflictError) throw error;
-      logger.error({ err: error }, `Could not save ${what} to ${this.shared.stateDir}`);
-      // The log has the path and the full error; callers get the error code only.
-      const code = (error as NodeJS.ErrnoException)?.code ?? 'write failed';
-      throw new PromptStorageError(`Could not save ${what} to the state directory (${code}); nothing was changed`);
+      // Someone else changed the prompt: read what they saved, so that trying again starts from it.
+      if (error instanceof PromptStaleError && this.shared.asyncBackend) await this.sync();
+      if (error instanceof PromptConflictError || error instanceof PromptStorageError || error instanceof PromptUsageError) throw error;
+      logger.error({ err: error }, `Could not save ${what}`);
+      throw new PromptStorageError(`Could not save ${what}; nothing was changed`);
     }
   }
 
@@ -1016,66 +1126,86 @@ export class PromptStore {
     return prompt;
   }
 
-  add(input: CreatePromptInput): StoredPrompt {
-    this.assertWritable();
-    this.refresh();
+  /**
+   * Runs a change to one prompt after the changes queued for the same id, so two updates of a
+   * prompt cannot both start from the same version and an update cannot run after the deletion
+   * it was queued behind. A failed change does not stop the ones behind it. Without a backend a
+   * change is decided and applied in one step, so there is nothing to queue.
+   */
+  private serialised<T>(id: string, change: () => Promise<T>): Promise<T> {
+    if (!this.shared.backend) return change();
+    const { queued } = this.shared;
+    const run = (queued.get(id) ?? Promise.resolve()).then(change, change);
+    const settled = run.then(() => undefined, () => undefined);
+    queued.set(id, settled);
+    void settled.then(() => {
+      if (queued.get(id) === settled) queued.delete(id);
+    });
+    return run;
+  }
+
+  async add(input: CreatePromptInput): Promise<StoredPrompt> {
     const { id: requestedId, ...fields } = input;
-    // An id taken by a prompt outside this view's selection is taken all the same.
-    if (requestedId !== undefined && this.shared.prompts.has(requestedId)) throw new PromptConflictError(requestedId);
     const id = requestedId ?? `prompt_${Date.now()}_${Math.random().toString(36).substring(2)}`;
-    const now = new Date().toISOString();
-    const prompt: StoredPrompt = { ...fields, id, createdAt: now, updatedAt: now, version: 1 };
-    this.saving(`prompt ${id}`, () => {
-      try {
-        // Exclusive: another server sharing the directory may have saved this id a moment ago.
-        writeFileAtomic(this.stateFile(id), `${JSON.stringify(prompt, null, 2)}\n`, { exclusive: true });
-      } catch (error) {
-        if ((error as NodeJS.ErrnoException).code === 'EEXIST') throw new PromptConflictError(id);
-        throw error;
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      this.refresh();
+      // An id taken by a prompt outside this view's selection is taken all the same.
+      if (requestedId !== undefined && this.shared.prompts.has(requestedId)) throw new PromptConflictError(requestedId);
+      const now = new Date().toISOString();
+      const prompt: StoredPrompt = { ...fields, id, createdAt: now, updatedAt: now, version: 1 };
+      // Saved first: the backend decides a conflict (another server may have saved this id a moment ago).
+      if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(prompt, 'create'));
+      this.shared.prompts.set(id, prompt);
+      this.shared.writes++;
+      // An id the library also has (deleted earlier, now added again) keeps its place in the
+      // library, as it will after a restart; anything else was added at runtime.
+      this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
+      logger.info(`Added prompt: ${id}`);
+      return prompt;
+    });
+  }
+
+  async update(id: string, updates: UpdatePromptInput): Promise<StoredPrompt> {
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      const prompt = this.get(id);
+      const changes = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
+      if (Object.keys(changes).length === 0) {
+        throw new PromptUsageError('Nothing to update: give at least one field to change (name, description, content, isTemplate, tags, category, variables or metadata)');
       }
-      this.writeTombstones(ids => ids.delete(id));
+      const updated: StoredPrompt = {
+        ...prompt,
+        ...changes,
+        id,
+        updatedAt: new Date().toISOString(),
+        version: nextVersion(prompt.version)
+      };
+      // The backend only replaces the version this change started from; a library prompt that was
+      // never saved has none, which is the null.
+      const expectedVersion = prompt === this.shared.pristine?.prompts.get(id) ? null : String(prompt.version);
+      if (this.shared.backend) await this.persist(`prompt ${id}`, backend => backend.put(updated, 'replace', expectedVersion));
+      this.shared.prompts.set(id, updated);
+      this.shared.writes++;
+      logger.info(`Updated prompt: ${id}`);
+      return updated;
     });
-    this.shared.prompts.set(id, prompt);
-    // An id the library also has (deleted earlier, now added again) keeps its place in the
-    // library, as it will after a restart; anything else was added at runtime.
-    this.shared.origins.set(id, this.shared.pristine?.origins.get(id) ?? { kind: 'runtime' });
-    logger.info(`Added prompt: ${id}`);
-    return prompt;
   }
 
-  update(id: string, updates: UpdatePromptInput): StoredPrompt {
-    this.assertWritable();
-    const prompt = this.get(id);
-    const changes = Object.fromEntries(Object.entries(updates).filter(([, value]) => value !== undefined));
-    if (Object.keys(changes).length === 0) {
-      throw new PromptUsageError('Nothing to update: give at least one field to change (name, description, content, isTemplate, tags, category, variables or metadata)');
-    }
-    const updated: StoredPrompt = {
-      ...prompt,
-      ...changes,
-      id,
-      updatedAt: new Date().toISOString(),
-      version: nextVersion(prompt.version)
-    };
-    this.saving(`prompt ${id}`, () => writeFileAtomic(this.stateFile(id), `${JSON.stringify(updated, null, 2)}\n`));
-    this.shared.prompts.set(id, updated);
-    logger.info(`Updated prompt: ${id}`);
-    return updated;
-  }
-
-  delete(id: string): StoredPrompt {
-    this.assertWritable();
-    const prompt = this.get(id);
-    this.saving(`the deletion of prompt ${id}`, () => {
-      // A prompt that also exists in the library or a user directory would come back the next
-      // time the directory is read, so its id is recorded as deleted.
-      if (this.shared.pristine?.prompts.has(id)) this.writeTombstones(ids => ids.add(id));
-      fs.rmSync(this.stateFile(id), { force: true });
+  async delete(id: string): Promise<StoredPrompt> {
+    return this.serialised(id, async () => {
+      this.assertWritable();
+      const prompt = this.get(id);
+      // A prompt that also exists in the library or a user directory would come back the next time
+      // the backend is read, so its id is recorded as deleted.
+      const tombstone = this.shared.pristine?.prompts.has(id) ?? false;
+      if (this.shared.backend) await this.persist(`the deletion of prompt ${id}`, backend => backend.remove(id, tombstone));
+      this.shared.prompts.delete(id);
+      this.shared.origins.delete(id);
+      this.shared.writes++;
+      logger.info(`Deleted prompt: ${id}`);
+      return prompt;
     });
-    this.shared.prompts.delete(id);
-    this.shared.origins.delete(id);
-    logger.info(`Deleted prompt: ${id}`);
-    return prompt;
   }
 
   /** Fills a template prompt's placeholders and reports which were left unfilled. */
@@ -1108,9 +1238,23 @@ export class PromptStore {
       regular: promptList.filter(p => !p.isTemplate).length,
       tags: Array.from(new Set(promptList.flatMap(p => p.tags || []))).sort(),
       categories: Array.from(new Set(promptList.map(categoryOf).filter((c): c is string => Boolean(c)))).sort(),
-      storage: this.shared.stateDir ? 'file' : 'memory',
+      storage: this.storage,
       sources
     };
+  }
+
+  /** The categories this store serves with their sizes, sorted by name; prompts without a category are left out. */
+  categories(): CategorySummary[] {
+    const rows = new Map<string, CategorySummary>();
+    for (const prompt of this.all()) {
+      const category = categoryOf(prompt);
+      if (!category) continue;
+      const row = rows.get(category) ?? { category, count: 0, templates: 0 };
+      row.count++;
+      if (prompt.isTemplate) row.templates++;
+      rows.set(category, row);
+    }
+    return Array.from(rows.values()).sort((a, b) => a.category.localeCompare(b.category));
   }
 
   private libraryPrompts(): Array<{ prompt: StoredPrompt; group: string }> {

@@ -42,7 +42,7 @@ describe('tool definitions', () => {
     const client = await connect({ store: new PromptStore() });
     const { tools } = await client.listTools();
     expect(tools.map(t => t.name).sort()).toEqual([
-      'add_prompt', 'apply_template', 'delete_prompt', 'get_prompt', 'get_stats', 'list_prompts', 'update_prompt',
+      'add_prompt', 'apply_template', 'delete_prompt', 'get_prompt', 'get_stats', 'list_categories', 'list_prompts', 'update_prompt',
     ]);
     for (const tool of tools) {
       expect(tool.title, tool.name).toBeTruthy();
@@ -52,7 +52,7 @@ describe('tool definitions', () => {
       expect(tool.annotations?.openWorldHint, tool.name).toBe(false);
     }
     const hints = Object.fromEntries(tools.map(t => [t.name, t.annotations]));
-    for (const name of ['list_prompts', 'get_prompt', 'apply_template', 'get_stats']) {
+    for (const name of ['list_prompts', 'list_categories', 'get_prompt', 'apply_template', 'get_stats']) {
       expect(hints[name]).toMatchObject({ readOnlyHint: true, destructiveHint: false });
     }
     expect(hints.add_prompt).toMatchObject({ readOnlyHint: false, destructiveHint: false });
@@ -64,7 +64,7 @@ describe('tool definitions', () => {
     const client = await connect({ store: new PromptStore(), readOnly: true });
     const { tools } = await client.listTools();
     expect(tools.every(t => t.annotations?.readOnlyHint === true)).toBe(true);
-    expect(tools.map(t => t.name).sort()).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_prompts']);
+    expect(tools.map(t => t.name).sort()).toEqual(['apply_template', 'get_prompt', 'get_stats', 'list_categories', 'list_prompts']);
   });
 });
 
@@ -204,5 +204,138 @@ describe('tools over the bundled library', () => {
     expect(result.structuredContent).toMatchObject({ missing: [], unused: [] });
     expect(result.content[0].text).toContain('assembleDebug');
     expect(result.content[0].text).not.toContain('{{');
+  });
+});
+
+describe('context budget', () => {
+  const library = async () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 60; i++) {
+      await store.add({
+        id: `p${i}`, name: `P${i}`, description: 'd', content: 'c', isTemplate: i % 2 === 0, tags: [],
+        category: i < 40 ? 'embedded' : 'workflow',
+      });
+    }
+    return store;
+  };
+
+  it('lists categories with counts, without prompt content', async () => {
+    const client = await connect({ store: await library() });
+    const result = await call(client, 'list_categories');
+    expect(result.structuredContent).toEqual({
+      categories: [
+        { category: 'embedded', count: 40, templates: 20 },
+        { category: 'workflow', count: 20, templates: 10 },
+      ],
+    });
+    expect(result.content[0].text.length).toBeLessThan(500);
+  });
+
+  it('returns at most 20 prompts by default', async () => {
+    const client = await connect({ store: await library() });
+    const page = await call(client, 'list_prompts');
+    expect(page.structuredContent).toMatchObject({ total: 60, count: 20, limit: 20, has_more: true, next_offset: 20 });
+  });
+
+  it('keeps a page of 50 prompts small however long their descriptions are', async () => {
+    const store = new PromptStore();
+    for (let i = 0; i < 50; i++) {
+      await store.add({ id: `huge-${i}`, name: `Huge ${i}`, description: `${'D'.repeat(100_000)}`, content: 'c', isTemplate: false, tags: ['huge'], category: 'big' });
+    }
+    const client = await connect({ store });
+    const page = await call(client, 'list_prompts', { limit: 50 });
+    const rows = (page.structuredContent as { prompts: Array<{ description: string }> }).prompts;
+    expect(rows).toHaveLength(50);
+    for (const row of rows) {
+      expect(row.description.length).toBeLessThanOrEqual(110);
+      expect(row.description.endsWith('\u2026')).toBe(true);
+    }
+    const bytes = Buffer.byteLength(JSON.stringify(page));
+    expect(bytes).toBeLessThan(30_000);
+    // The whole description is one get_prompt away.
+    const whole = await call(client, 'get_prompt', { id: 'huge-0' });
+    expect((whole.structuredContent as { description: string }).description).toHaveLength(100_000);
+  });
+
+  it('leaves a short description as it is', async () => {
+    const store = new PromptStore();
+    await store.add({ id: 'short', name: 'Short', description: 'x'.repeat(110), content: 'c', isTemplate: false, tags: [] });
+    const page = await call(await connect({ store }), 'list_prompts');
+    expect((page.structuredContent as { prompts: Array<{ description: string }> }).prompts[0].description).toBe('x'.repeat(110));
+  });
+
+  it('tells the model to go by category first and that lists are capped', async () => {
+    const instructions = (await connect({ store: await library() })).getInstructions() ?? '';
+    const at = (needle: string) => {
+      const index = instructions.indexOf(needle);
+      expect(index, needle).toBeGreaterThanOrEqual(0);
+      return index;
+    };
+    expect(at('list_categories')).toBeLessThan(at('list_prompts'));
+    expect(at('list_prompts')).toBeLessThan(at('get_prompt'));
+    expect(at('get_prompt')).toBeLessThan(at('apply_template'));
+    expect(instructions).toMatch(/category/);
+    expect(instructions).toMatch(/capped|at most 50/);
+    expect(instructions).toContain('default 20');
+    expect(instructions).toContain('next_offset');
+    // The usage notes stay short: they are in the model's context all the time.
+    expect(instructions.length).toBeLessThan(2_000);
+  });
+
+  it('refuses a page over 50 prompts', async () => {
+    const client = await connect({ store: await library() });
+    expect((await call(client, 'list_prompts', { limit: 51 })).isError).toBe(true);
+    expect((await call(client, 'list_prompts', { limit: 50 })).isError).toBeFalsy();
+  });
+});
+
+describe('listing prompts and resources over MCP', () => {
+  const bigStore = async (count: number) => {
+    const store = new PromptStore();
+    for (let i = 0; i < count; i++) {
+      await store.add({ id: `bulk-${i}`, name: `Bulk ${i}`, description: i === 0 ? 'D'.repeat(50_000) : 'd', content: 'c', isTemplate: false, tags: [] });
+    }
+    return store;
+  };
+
+  it('pages prompts/list and resources/list at 50 and reaches every prompt by following nextCursor', async () => {
+    const client = await connect({ store: await bigStore(5_000), expose: ['tools', 'prompts', 'resources'] });
+    const seenPrompts: string[] = [];
+    let cursor: string | undefined;
+    let pages = 0;
+    do {
+      const page = await client.listPrompts(cursor ? { cursor } : undefined);
+      expect(page.prompts.length).toBeLessThanOrEqual(50);
+      for (const prompt of page.prompts) {
+        expect((prompt.description ?? '').length).toBeLessThanOrEqual(110);
+        seenPrompts.push(prompt.name);
+      }
+      cursor = page.nextCursor;
+      pages++;
+    } while (cursor);
+    expect(pages).toBe(100);
+    expect(new Set(seenPrompts).size).toBe(5_000);
+
+    const seenResources = new Set<string>();
+    cursor = undefined;
+    do {
+      const page = await client.listResources(cursor ? { cursor } : undefined);
+      expect(page.resources.length).toBeLessThanOrEqual(50);
+      for (const resource of page.resources) {
+        expect((resource.description ?? '').length).toBeLessThanOrEqual(110);
+        seenResources.add(resource.uri);
+      }
+      cursor = page.nextCursor;
+    } while (cursor);
+    expect(seenResources.size).toBe(5_000);
+  }, 60_000);
+
+  it('gives no cursor when everything fits one page, and refuses a cursor it did not give', async () => {
+    const client = await connect({ store: await bigStore(3), expose: ['tools', 'prompts', 'resources'] });
+    const page = await client.listPrompts();
+    expect(page.prompts).toHaveLength(3);
+    expect(page.nextCursor).toBeUndefined();
+    await expect(client.listPrompts({ cursor: 'not-a-cursor' })).rejects.toThrow(/cursor/i);
+    await expect(client.listResources({ cursor: 'not-a-cursor' })).rejects.toThrow(/cursor/i);
   });
 });
