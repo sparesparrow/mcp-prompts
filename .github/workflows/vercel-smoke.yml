@@ -10,15 +10,15 @@ on:
 permissions:
   contents: read
 
-# Keep each push's check run alive until Vercel can consume its result.
-# Scheduled/manual monitoring must not cancel a deployment check for a main commit.
+# Keep each push check alive until Vercel can consume its result. Monitoring runs
+# use their run ID so they cannot replace one another or the required push check.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name }}-${{ github.sha || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.run_id }}
   cancel-in-progress: false
 
 jobs:
   smoke-test:
-    name: Verify production MCP endpoint
+    name: ${{ github.event_name == 'push' && 'Verify production MCP endpoint' || 'Monitor production MCP endpoint' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -76,8 +76,7 @@ jobs:
         run: |
           set -euo pipefail
           curl --fail --silent --show-error "$BASE_URL/health"
-          actual="$(node -p "require('./version.json').version")"
-          echo "Verified production package version $actual"
+          echo "Production health endpoint returned HTTP 200"
 
       - name: Exercise every published MCP profile
         env:
