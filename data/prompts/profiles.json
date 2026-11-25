@@ -27,7 +27,7 @@
       "templates": ["android-automation", "android-proot-phone-ops", "phone-voice-assistant"]
     },
     "tasker-automation": {
-      "description": "Building and maintaining Tasker on Android: project architecture, profiles and contexts, tasks and action codes, variables and secrets policy, config audits and safe direct edits of Tasker's config, plus scene XML. Combine with android-automation for the full phone stack.",
+      "description": "Building and maintaining Tasker on Android: project architecture, profiles and contexts, scene design/XML, tasks and action codes, variables and secrets policy, config audits and safe direct edits of Tasker's config. Combine with android-automation for the full phone stack.",
       "prompts": ["tasker-scene-xml"],
       "templates": ["tasker"]
     },

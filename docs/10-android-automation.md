@@ -177,9 +177,10 @@ the voice scripts read, and the tools never print it.
 | `tasker-variables` | template | Variable scope, built-ins, arrays, return values, where values are stored (in plain text), and the secrets policy. |
 | `tasker-config-audit` | template | Audits a whole configuration: unused and duplicate items, dangling references, plaintext secrets, orphaned tiles. |
 | `tasker-direct-edit` | template | The safe procedure for editing Tasker's live config with `tasker-edit.py`: pull, edit, check references, push, verify, roll back. |
-| `tasker-scene-xml` | prompt | Tasker scene XML: elements, geometry and the importer's quirks. |
+| `tasker-scene-builder` | template | Designs a reusable scene, its callbacks and lifecycle; uses known XML shapes or falls back to UI steps. |
+| `tasker-scene-xml` | prompt | Tasker scene XML reference: elements, geometry and the importer's quirks. |
 
-All 13 prompts of the `android-automation` group and all 6 of the `tasker` group are new in 4.3.0.
+All 13 prompts of the `android-automation` group and all 7 templates of the `tasker` group are new in 4.3.0.
 Only `android-proot-phone-ops`, `phone-voice-assistant` and `tasker-scene-xml` existed before. If
 one is missing from your install, `mcp-prompts catalog --profile android-automation` shows what
 your version has.

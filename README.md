@@ -18,8 +18,8 @@ command, client config, URL or config file. The page reads the library from this
 - **Android automation, the flagship use case.** Two new profiles: `android-automation` (app agents,
   Termux and the PRoot bridge, the router, and end-to-end scenarios such as Deep Research into a
   notebook with an audio overview, or a multi-AI PR review) and `tasker-automation` (project
-  architecture, profiles, tasks, variables and secrets, config audits, safe direct edits, scene
-  XML). Use them together with `--profile android-automation,tasker-automation`, and add
+  architecture, profiles, tasks and actions, variables and secrets, scene design/XML, config
+  audits and safe direct edits). Use them together with `--profile android-automation,tasker-automation`, and add
   `voice-home` for home commands. See [docs/10-android-automation.md](docs/10-android-automation.md).
   The phone-side code they are written for (MCP server, app agents, Tasker tools) is in the
   [android-assistant](https://github.com/sparesparrow/android-assistant) repository, split out of
@@ -148,7 +148,7 @@ much smaller:
 | `voice-home` | Voice commands and home automation | 13 |
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
-| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, tasks, audits, direct edits | 7 |
+| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
 
 ```bash
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev
