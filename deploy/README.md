@@ -95,8 +95,8 @@ and `phone-voice-assistant`. Home commands go to `openclaw-home-command-interpre
 `voice-home`: combine the two (`--profile android-automation,tasker-automation,voice-home`).
 [docs/10-android-automation.md](../docs/10-android-automation.md) is the guide.
 
-**`tasker-automation`** (1 plain, 6 templates). The `tasker` group (project architecture, profile
-builder, task actions, variables, config audit, direct edit) and the plain `tasker-scene-xml`.
+**`tasker-automation`** (1 plain, 7 templates). The `tasker` group (project architecture, profile
+builder, scene builder, task actions, variables, config audit, direct edit) and the plain `tasker-scene-xml`.
 Combine with `android-automation` for the full phone stack.
 
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
