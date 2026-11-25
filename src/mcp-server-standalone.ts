@@ -83,7 +83,7 @@ export async function main(
     process.stderr.write(`mcp-prompts: ${error.message}\n`);
     return 1;
   }
-  const { base, store, warnings } = opened;
+  const { base, store, warnings, close: closeStore } = opened;
   const allWarnings = [...resolved.warnings, ...warnings];
 
   if (commandLine.command !== undefined) {
@@ -112,11 +112,13 @@ export async function main(
   // stdout carries JSON-RPC from here on; warnings go to the log on stderr.
   for (const warning of allWarnings) logger.warn(warning);
   const server = await startMcpServer({ store, expose: options.expose, readOnly: options.readOnly, profiles: options.profiles });
+  // The database connections of a postgres install end with the server.
+  server.server.onclose = () => { void closeStore(); };
   // As PID 1 in a container node ignores SIGTERM unless something handles it, and `docker stop`
   // would wait out its timeout and kill the process.
   for (const signal of ['SIGTERM', 'SIGINT'] as const) {
     process.once(signal, () => {
-      server.close().then(() => process.exit(0), () => process.exit(1));
+      server.close().then(closeStore).then(() => process.exit(0), () => process.exit(1));
     });
   }
   return undefined;

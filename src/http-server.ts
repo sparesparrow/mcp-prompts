@@ -3,7 +3,7 @@ import * as http from 'http';
 import type { AddressInfo } from 'net';
 import { z, ZodError } from 'zod';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
-import { logger } from './utils.js';
+import { logger, SYNC_WAIT_MS, waitAtMost } from './utils.js';
 import {
   CreatePromptParams,
   PromptConflictError,
@@ -76,7 +76,14 @@ export interface HttpServerOptions {
   allowedOrigins?: string[];
   /** Listen beyond loopback with writes enabled and no token. */
   allowInsecure?: boolean;
+  /** Where DATABASE_URL is read from, for a postgres install. Defaults to process.env. */
+  env?: NodeJS.ProcessEnv;
+  /** How long /ready waits for the database before it says it is unavailable. */
+  readyTimeoutMs?: number;
 }
+
+/** How long /ready waits for the database; a health check gives up sooner than this on its own. */
+const READY_WAIT_MS = 5_000;
 
 class HttpError extends Error {
   constructor(public readonly statusCode: number, message: string) {
@@ -85,24 +92,29 @@ class HttpError extends Error {
 }
 
 const ApplyTemplateBody = z.object({ variables: z.record(z.string(), z.any()).default({}) });
+// A list never carries more than a page: the whole library must not land in an agent's context.
+const DEFAULT_PAGE = 20;
+const MAX_PAGE = 50;
 const ListFilterArgs = z.object({
   tags: z.array(z.string()).optional(),
   search: z.string().optional(),
   category: z.string().optional(),
   isTemplate: z.boolean().optional(),
+  limit: z.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
+  offset: z.number().int().min(0).default(0),
 });
 const ListQuery = z.object({
   search: z.string().optional(),
   category: z.string().optional(),
   isTemplate: z.enum(['true', 'false']).transform(value => value === 'true').optional(),
-  limit: z.coerce.number().int().min(1).max(1000).optional(),
+  limit: z.coerce.number().int().min(1).max(MAX_PAGE).default(DEFAULT_PAGE),
   offset: z.coerce.number().int().min(0).optional(),
 });
 const ToolCallBody = z.object({ arguments: z.record(z.string(), z.any()).default({}) });
 
 const WRITE_TOOLS = ['add_prompt', 'update_prompt', 'delete_prompt'];
 
-function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: AccessPolicy): Route[] {
+function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: AccessPolicy, readyTimeoutMs: number): Route[] {
   const version = packageVersion();
   const { readOnly } = serverOptions;
 
@@ -110,7 +122,10 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
   const allTools: Record<string, { description: string; run: (args: Record<string, unknown>) => unknown }> = {
     list_prompts: {
       description: 'List prompts, optionally filtered by tags (any match) or a search term.',
-      run: args => store.list(ListFilterArgs.parse(args)),
+      run: args => {
+        const { limit, offset, ...filter } = ListFilterArgs.parse(args);
+        return store.page(filter, { limit, offset });
+      },
     },
     get_prompt: {
       description: 'Get a prompt by its ID.',
@@ -138,6 +153,10 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
         return store.applyTemplate(id, variables);
       },
     },
+    list_categories: {
+      description: 'List the categories with the number of prompts and templates in each.',
+      run: () => store.categories(),
+    },
     get_stats: {
       description: 'Counts of prompts and templates, with the tags and categories in use.',
       run: () => store.stats(),
@@ -163,8 +182,21 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       // Readiness, and the mode the server runs in, so that a health check can insist on it:
       // deploy/http-catalog is healthy only while read-only, deploy/http-workspace only while it
       // requires a token and saves to disk. An image too old to know those settings fails the check.
-      handler: (_req, res) => {
+      handler: async (_req, res) => {
         const stateDir = store.stateDir;
+        // A read-only install reports its storage as memory, but its database must answer all the same.
+        if (store.backendKind === 'postgres') {
+          try {
+            await Promise.race([
+              store.checkStorage(),
+              new Promise<never>((_resolve, reject) => { setTimeout(reject, readyTimeoutMs).unref(); }),
+            ]);
+          } catch {
+            // The cause is in the log; a health check needs no more than this.
+            res.status(503).json({ status: 'unavailable', service: 'mcp-prompts', reason: 'the database cannot be reached' });
+            return;
+          }
+        }
         if (stateDir) {
           try {
             fs.accessSync(stateDir, fs.constants.R_OK | fs.constants.W_OK);
@@ -178,7 +210,7 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           service: 'mcp-prompts',
           readOnly,
           auth: access.token ? 'token' : 'none',
-          storage: stateDir ? 'file' : 'memory',
+          storage: store.storage,
         });
       },
     },
@@ -202,7 +234,7 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           limit: req.query.get('limit') ?? undefined,
           offset: req.query.get('offset') ?? undefined,
         });
-        // Every match unless the caller asks for a page; total and has_more say what was left out.
+        // One page at most; total and has_more say what was left out.
         res.json(store.page({ tags, ...filter }, { limit, offset }));
       },
     },
@@ -210,8 +242,8 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       method: 'POST',
       path: '/v1/prompts',
       write: true,
-      handler: (req, res) => {
-        res.status(201).json(store.add(CreatePromptParams.parse(req.body)));
+      handler: async (req, res) => {
+        res.status(201).json(await store.add(CreatePromptParams.parse(req.body)));
       },
     },
     {
@@ -225,16 +257,16 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
       method: 'PUT',
       path: '/v1/prompts/:id',
       write: true,
-      handler: (req, res) => {
-        res.json(store.update(req.params.id, UpdatePromptParams.parse(req.body)));
+      handler: async (req, res) => {
+        res.json(await store.update(req.params.id, UpdatePromptParams.parse(req.body)));
       },
     },
     {
       method: 'DELETE',
       path: '/v1/prompts/:id',
       write: true,
-      handler: (req, res) => {
-        store.delete(req.params.id);
+      handler: async (req, res) => {
+        await store.delete(req.params.id);
         res.status(204).end();
       },
     },
@@ -265,11 +297,11 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
     {
       method: 'POST',
       path: '/mcp/tools/:name',
-      handler: (req, res) => {
+      handler: async (req, res) => {
         const tool = tools[req.params.name];
         if (!tool) throw new HttpError(404, `Unknown tool: ${req.params.name}`);
         const { arguments: args } = ToolCallBody.parse(req.body ?? {});
-        res.json({ result: tool.run(args) });
+        res.json({ result: await tool.run(args) });
       },
     },
     {
@@ -298,6 +330,8 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
           // A URL can make the session read-only, never the reverse.
           readOnly: readOnly || fromUrl.readOnly === true,
           profiles: fromUrl.profiles ?? serverOptions.profiles,
+          // This request has already asked the database (above): do not ask again for each call.
+          syncBeforeRead: false,
         });
         const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined, enableJsonResponse: true });
         req.raw.res.on('close', () => {
@@ -374,17 +408,24 @@ function readJsonBody(req: http.IncomingMessage): Promise<unknown> {
 
 export async function createServer(options: HttpServerOptions = {}): Promise<HttpServerApp> {
   const serverOptions = options.serverOptions ?? resolveOptions([], process.env).options;
-  const base = options.store ?? (await openConfiguredStore(serverOptions)).base;
+  const opened = options.store ? undefined : await openConfiguredStore(serverOptions, options.env);
+  const base = options.store ?? opened!.base;
   for (const warning of base.selectionWarnings(serverOptions.selection)) logger.warn(warning);
   // Throws OptionsError for a profile the library does not define.
-  const served = selectFor(base, serverOptions);
+  let served: PromptStore;
+  try {
+    served = selectFor(base, serverOptions);
+  } catch (error) {
+    await opened?.close();
+    throw error;
+  }
   const access = options.access ?? buildAccessPolicy('127.0.0.1', {
     token: options.authToken,
     allowedHosts: options.allowedHosts,
     allowedOrigins: options.allowedOrigins,
     corsOrigin: options.corsOrigin,
   });
-  const routes = buildRoutes(served, serverOptions, access);
+  const routes = buildRoutes(served, serverOptions, access, options.readyTimeoutMs ?? READY_WAIT_MS);
 
   const server = http.createServer(async (req, res) => {
     if (options.corsOrigin) res.setHeader('Access-Control-Allow-Origin', options.corsOrigin);
@@ -450,6 +491,9 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       }
 
       const body = req.method === 'POST' || req.method === 'PUT' ? await readJsonBody(req) : undefined;
+      // Other servers may have saved changes since the last request: ask the database before answering.
+      // A database that hangs must not hold up reads that memory can answer: wait a moment, no longer.
+      if (!isProbe && served.backendKind === 'postgres') await waitAtMost(served.sync(), SYNC_WAIT_MS);
       let statusCode = 200;
       const routeRes: RouteResponse = {
         status: code => { statusCode = code; return routeRes; },
@@ -480,13 +524,19 @@ export async function createServer(options: HttpServerOptions = {}): Promise<Htt
       server.listen(Number(port), hostname, () => cb?.());
       return app;
     },
-    close: () =>
-      new Promise<void>((resolve, reject) => {
-        if (!server.listening) return resolve();
-        server.close(err => (err ? reject(err) : resolve()));
-        // Idle keep-alive connections would otherwise hold the shutdown until they time out.
-        server.closeIdleConnections();
-      }),
+    close: async () => {
+      try {
+        await new Promise<void>((resolve, reject) => {
+          if (!server.listening) return resolve();
+          server.close(err => (err ? reject(err) : resolve()));
+          // Idle keep-alive connections would otherwise hold the shutdown until they time out.
+          server.closeIdleConnections();
+        });
+      } finally {
+        // The database connections this server opened itself, if any.
+        await opened?.close();
+      }
+    },
     address: () => {
       const addr = server.address();
       return addr && typeof addr === 'object' ? addr : null;
@@ -521,10 +571,15 @@ export async function startHttpServer(
     corsOrigin: options.corsOrigin,
   });
   const app = await createServer({ ...options, serverOptions, access });
-  await new Promise<void>((resolve, reject) => {
-    app.onListenError(reject);
-    app.listen(port, host, resolve);
-  });
+  try {
+    await new Promise<void>((resolve, reject) => {
+      app.onListenError(reject);
+      app.listen(port, host, resolve);
+    });
+  } catch (error) {
+    await app.close().catch(() => undefined);
+    throw error;
+  }
   const addr = app.address();
   logger.info(
     `MCP Prompts HTTP server listening on ${host}:${addr?.port ?? port} ` +

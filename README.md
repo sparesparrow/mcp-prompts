@@ -116,16 +116,19 @@ Check it with `claude mcp list`. Use one of the two: registering the same name a
 
 ### Install a profile
 
-By default an install serves every bundled prompt, so every unfiltered `list_prompts` call returns
-all of them. A **profile** serves only the prompts one kind of work needs:
+By default an install serves every bundled prompt. No call returns them all at once: `list_prompts`
+gives 20 summaries a page (at most 50, descriptions cut to 110 characters) and `list_categories`
+says what each part of the library holds, so an agent starts there and asks for one category. A
+**profile** serves only the prompts one kind of work needs, so its categories and pages are that
+much smaller:
 
-| Profile | For | Prompts | A `list_prompts` call returns |
-|---|---|---|---|
-| `software-dev` | Analysing and reviewing a software project | 13 | 21% of the whole library's |
-| `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 | 23% |
-| `mia-vehicle` | The MIA in-car assistant at run time | 8 | 13% |
-| `voice-home` | Voice commands and home automation | 13 | 37% |
-| `learning-loop` | The self-improvement loop | 8 | 11% |
+| Profile | For | Prompts |
+|---|---|---|
+| `software-dev` | Analysing and reviewing a software project | 13 |
+| `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 |
+| `mia-vehicle` | The MIA in-car assistant at run time | 8 |
+| `voice-home` | Voice commands and home automation | 13 |
+| `learning-loop` | The self-improvement loop | 8 |
 
 ```bash
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev
@@ -243,7 +246,7 @@ Ask Claude:
 - "Apply the claudepy-esp32-android-bridge-workflow template with esp32_firmware_path set to ./firmware"
 - "Add a prompt for Python FastAPI best practices"
 
-Prompts added or changed through `add_prompt` / `update_prompt` live in memory and are lost when the server restarts, unless the server has a state directory: with `--state-dir ~/.local/share/mcp-prompts` each change is saved there as a JSON file and loaded at the next start. Every MCP client on a machine starts its own server; pointed at the same directory they see each other's changes without a restart. `get_stats` says which applies (`"storage": "file"` or `"memory"`). A prompt that belongs in the bundled library is a JSON file under `data/prompts/` with a stable id, added by pull request.
+Prompts added or changed through `add_prompt` / `update_prompt` live in memory and are lost when the server restarts, unless the server has a state directory: with `--state-dir ~/.local/share/mcp-prompts` each change is saved there as a JSON file and loaded at the next start. Every MCP client on a machine starts its own server; pointed at the same directory they see each other's changes without a restart. `get_stats` says which applies (`"storage": "file"`, `"postgres"` or `"memory"`). Several servers can instead save to one Postgres database: set `MCP_PROMPTS_STORAGE=postgres`, `DATABASE_URL` and `MCP_PROMPTS_OWNER` (see [deploy/README.md](deploy/README.md#save-changes-to-postgres-optional)). A prompt that belongs in the bundled library is a JSON file under `data/prompts/` with a stable id, added by pull request.
 
 ## HTTP Mode
 
@@ -260,7 +263,7 @@ It listens on `127.0.0.1` unless `HOST` says otherwise.
 | Method and path | Does |
 |---|---|
 | `GET /health`, `/ready`, `/version` | Liveness; readiness and mode (`readOnly`, `auth`, `storage`); package version |
-| `GET /v1/prompts?tags=a,b&search=text&category=c&isTemplate=true&limit=20&offset=0` | List prompt summaries, with `total` and `has_more` |
+| `GET /v1/prompts?tags=a,b&search=text&category=c&isTemplate=true&limit=20&offset=0` | List prompt summaries, 20 by default and at most 50 (`limit` above 50 is a 400), with `total` and `has_more` |
 | `POST /v1/prompts` | Add a prompt (same fields as `add_prompt`) |
 | `GET` / `PUT` / `DELETE /v1/prompts/:id` | Read, update or delete one prompt |
 | `POST /v1/prompts/:id/apply` | Fill a template: `{ "variables": { ... } }` → `{ "result": "...", "missing": [], "unused": [] }` |
@@ -304,7 +307,8 @@ This automatically:
 
 | Tool | Description |
 |------|-------------|
-| `list_prompts` | List prompts, filtered by tags, category, kind or a search term, a page at a time |
+| `list_categories` | Start here: the categories this server serves, with the number of prompts and templates in each |
+| `list_prompts` | List prompt summaries, filtered by category, tags, kind or a search term, a page at a time (default 20, at most 50, `has_more` and `next_offset` lead to the rest) |
 | `get_prompt` | Retrieve a prompt by ID |
 | `add_prompt` | Add a new prompt or template |
 | `update_prompt` | Modify existing prompt |

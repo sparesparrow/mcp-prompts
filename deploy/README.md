@@ -2,25 +2,26 @@
 
 The bundled library holds prompts for very different work: reviewing a web backend, building
 ESP32 firmware, running the MIA car assistant, understanding voice commands. An install that
-serves all of it makes every `list_prompts` call return all of it, and offers an agent that is
-reviewing Python code a prompt for car climate control.
+serves all of it: an agent that is reviewing Python code is offered a prompt for car climate
+control, and every category and page of `list_prompts` has to be read to tell them apart.
 
 A **profile** is a named selection kept with the library, in
 [`data/prompts/profiles.json`](../data/prompts/profiles.json). An install that names one serves
 only those prompts; the rest do not exist for it.
 
-| Profile | For | Prompts | One `list_prompts` call returns | Of the whole library |
-|---|---|---|---|---|
-| `software-dev` | Analysing and reviewing a software project | 13 | 2,175 characters | 21% |
-| `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 | 2,389 | 23% |
-| `mia-vehicle` | The MIA in-car assistant at run time | 8 | 1,362 | 13% |
-| `voice-home` | Voice commands and home automation | 13 | 3,865 | 37% |
-| `learning-loop` | The self-improvement loop | 8 | 1,111 | 11% |
-| (none) | Everything | 49 | 10,397 | 100% |
+| Profile | For | Prompts |
+|---|---|---|
+| `software-dev` | Analysing and reviewing a software project | 13 |
+| `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 |
+| `mia-vehicle` | The MIA in-car assistant at run time | 8 |
+| `voice-home` | Voice commands and home automation | 13 |
+| `learning-loop` | The self-improvement loop | 8 |
+| (none) | Everything | 49 |
 
-The sizes are the text of a `list_prompts` result with no filter, measured through an MCP client
-against this library. The structured copy of the result that the tool also returns shrinks by the
-same share (16,913 characters without a profile). `mcp-prompts profiles` prints the current counts.
+No call returns a whole library, with or without a profile: `list_prompts` gives 20 summaries a page
+(at most 50, descriptions cut to 110 characters), and `list_categories` shows what each part holds.
+A profile makes the categories and the number of pages smaller. `mcp-prompts profiles` prints the
+current counts.
 
 ## Install a profile
 
@@ -107,12 +108,53 @@ Only the library is filtered. Prompts in your own `--dir` directories, and promp
 `add_prompt`, are served by every install whatever its profile. With a shared `--state-dir` that
 means a prompt one agent saves appears in every profile.
 
+## Save changes to Postgres (optional)
+
+Instead of memory or a `--state-dir`, `add_prompt`, `update_prompt` and `delete_prompt` can be
+saved to a Postgres database, so that several servers share them. Environment variables, names
+only (put the values in your secret store, not in a file you commit):
+
+- `MCP_PROMPTS_STORAGE=postgres` (the default is `file`)
+- `DATABASE_URL`, the database
+- `MCP_PROMPTS_OWNER`, whose prompts this server saves and serves; every row carries its owner
+  and one owner never sees another's. It cannot be combined with `MCP_PROMPTS_STATE_DIR`.
+
+A pooled connection string (a PgBouncer in transaction mode, such as the `-pooler` host Neon
+gives) is supported: the server sends no startup parameters a pooler refuses and sets its
+10-second statement limit with `SET` once a connection is open.
+
+The server applies the SQL files in `migrations/` when it starts (the Docker images carry them).
+Servers that share an owner check the database every two seconds, and an HTTP request or an MCP
+read (tool, prompt or resource) asks it first, waiting at most a second, so the first read after
+a quiet time shows what another server saved. An update made from an older version of a prompt
+is refused with a 409 saying to read it again; the store has by then read what the other server
+saved, so the same call, repeated, goes through. That check compares version labels, and an
+update only moves a version that is a number or `x.y.z`: a prompt whose version is any other
+text keeps it through every update, so for it a stale update is not detected.
+
+The server applies migrations only when some are missing: once they are applied, a database role
+with just SELECT, INSERT, UPDATE and DELETE on the tables is enough. With `--read-only` it never
+changes the schema (apply the migrations with a writable start first) and refuses changes; its
+`storage` shows as `memory`, as for a read-only state directory. Every statement is stopped after
+10 seconds, so a stuck connection or a lock held by someone else makes a call fail (and `/ready`
+answer 503) instead of waiting for ever; the store keeps serving what it has and checks again.
+
+The library stays read-only and shared; saved prompts are laid over it as they are over a state
+directory. To copy a directory of prompts into the database once (ids the owner already has are
+skipped, nothing is overwritten, only counts are printed), after `pnpm run build`:
+
+```bash
+DATABASE_URL=... node scripts/seed-postgres.mjs ./my-prompts --owner <owner>
+```
+
 ## Other ways to keep calls small
 
 - Leave `--expose` at `tools` unless you want slash commands: with `prompts`, a client loads the
-  name, description and arguments of every prompt when it connects.
-- `list_prompts` takes `tags`, `category`, `isTemplate`, `search` and `limit`; a filtered call
-  returns less than an unfiltered one in any profile.
+  name, description and arguments of every prompt (50 at a time) when it connects.
+- Start with `list_categories`, then `list_prompts` with a `category` (or `tags`, `isTemplate`,
+  `search`); a page is 20 summaries unless `limit` asks for up to 50.
+- With `prompts` or `resources` exposed, `prompts/list` and `resources/list` also return 50 entries
+  at a time and a `nextCursor` for the rest.
 - `--read-only` leaves out three tool definitions (`add_prompt`, `update_prompt`, `delete_prompt`).
 
 ## Change a profile, or add one
