@@ -10,18 +10,22 @@ on:
 permissions:
   contents: read
 
+# Keep each push check alive until Vercel can consume its result. Monitoring runs
+# use their run ID so they cannot replace one another or the required push check.
 concurrency:
-  group: vercel-deployment-smoke
-  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
   smoke-test:
-    name: Verify production MCP endpoint
+    name: ${{ github.event_name == 'push' && 'Verify production MCP endpoint' || 'Monitor production MCP endpoint' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
 
       - name: Set up pnpm
         uses: pnpm/action-setup@v4
@@ -37,7 +41,7 @@ jobs:
       - name: Install smoke-test dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Wait for the Vercel deployment to become ready
+      - name: Wait for the production release version and safe runtime mode
         env:
           BASE_URL: https://mcp-prompts.vercel.app
         run: |
@@ -57,23 +61,22 @@ jobs:
                 break
               fi
             fi
-            echo "Waiting for the expected commit and safe runtime mode (attempt $attempt/60)"
+            echo "Waiting for the expected package version and safe runtime mode (attempt $attempt/60)"
             sleep 10
           done
           test "$ready" = true || {
-            echo "::error::Vercel did not deploy the expected version in 10 minutes, or its runtime mode is unsafe."
+            echo "::error::Production did not serve the expected package version within 10 minutes, or its runtime mode is unsafe."
             cat ready.json 2>/dev/null || true
             exit 1
           }
 
-      - name: Verify health and deployed version
+      - name: Verify health endpoint
         env:
           BASE_URL: https://mcp-prompts.vercel.app
         run: |
           set -euo pipefail
           curl --fail --silent --show-error "$BASE_URL/health"
-          actual="$(node -p "require('./version.json').version")"
-          echo "Verified deployed version $actual"
+          echo "Production health endpoint returned HTTP 200"
 
       - name: Exercise every published MCP profile
         env:
