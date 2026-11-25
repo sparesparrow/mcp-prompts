@@ -387,4 +387,4 @@ Most users don't need this - the local MCP server is sufficient.
 
 ## License
 
-MIT
+MIT, see [LICENSE](LICENSE).
