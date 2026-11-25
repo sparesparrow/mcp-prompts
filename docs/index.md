@@ -20,6 +20,10 @@ Welcome to the MCP Prompts documentation. This guide provides comprehensive info
 - [Roadmap](08-roadmap.md) - Future development plans
 - [Workflow Guide](09-workflow-guide.md) - Development workflows
 
+### **Use Cases**
+- [Android Automation](10-android-automation.md) - Natural-language control of an Android phone with the `android-automation` and `tasker-automation` profiles
+- [Research: AI ecosystem consolidation (2026-11)](research/2026-11-ai-ecosystem-consolidation.md) - Deep Research summary, fact-check and assessment
+
 ## 🚀 **Quick Start**
 
 ### **Run with NPX (Recommended)**
