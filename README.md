@@ -19,14 +19,17 @@ command, client config, URL or config file. The page reads the library from this
   Termux and the PRoot bridge, the router, and end-to-end scenarios such as Deep Research into a
   notebook with an audio overview, or a multi-AI PR review) and `tasker-automation` (project
   architecture, profiles, tasks, variables and secrets, config audits, safe direct edits, scene
-  XML). Use them together with `--profile android-automation,tasker-automation`. See
-  [docs/10-android-automation.md](docs/10-android-automation.md).
+  XML). Use them together with `--profile android-automation,tasker-automation`, and add
+  `voice-home` for home commands. See [docs/10-android-automation.md](docs/10-android-automation.md).
+  The phone-side code they are written for (MCP server, app agents, Tasker tools) is in the
+  [android-assistant](https://github.com/sparesparrow/android-assistant) repository, split out of
+  cliphist-android's `assistant/` with its history.
 - **New prompt groups** `data/prompts/android-automation/` and `data/prompts/tasker/`.
 - **Research write-up**
   [docs/research/2026-11-ai-ecosystem-consolidation.md](docs/research/2026-11-ai-ecosystem-consolidation.md):
   an English summary of a Deep Research report on consolidating a personal agent ecosystem across
   Android and Linux, with a fact-check and Claude's assessment. The
-  [roadmap issue drafts](docs/research/../../issues/136) come from it.
+  [roadmap issues](https://github.com/sparesparrow/mcp-prompts/issues/136) come from it.
 
 ## What It Does
 

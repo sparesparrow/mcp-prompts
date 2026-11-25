@@ -16,6 +16,8 @@ only those prompts; the rest do not exist for it.
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 | 1,362 | 13% |
 | `voice-home` | Voice commands and home automation | 13 | 3,865 | 37% |
 | `learning-loop` | The self-improvement loop | 8 | 1,111 | 11% |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 | not measured | not measured |
+| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, tasks, audits, direct edits | 7 | not measured | not measured |
 | (none) | Everything | 49 | 10,397 | 100% |
 
 The sizes are the text of a `list_prompts` result with no filter, measured through an MCP client
@@ -82,6 +84,19 @@ implicit-reference resolution, light feedback, design principles), the three Ope
 
 **`learning-loop`** (7 plain, 1 template). The seven cognitive-layer instructions (perception,
 episodes, semantic, procedures, meta, transfer, evaluation) and `learning-loop-analyzer`.
+
+**`android-automation`** (1 plain, 14 templates). The `android-automation` group: the router
+(`android-automation-router`), the scenarios (Deep Research into a notebook with an audio
+overview, multi-AI PR review), split screen with two apps, the app-agent pack (design, calibrate,
+use, eval), the Gemini advisor and Deep Research briefs, `termux-api-commands`,
+`termux-proot-bridge` and the plain `phone-agent-handoff` contract; plus `android-proot-phone-ops`
+and `phone-voice-assistant`. Home commands go to `openclaw-home-command-interpreter`, which is in
+`voice-home`: combine the two (`--profile android-automation,tasker-automation,voice-home`).
+[docs/10-android-automation.md](../docs/10-android-automation.md) is the guide.
+
+**`tasker-automation`** (1 plain, 6 templates). The `tasker` group (project architecture, profile
+builder, task actions, variables, config audit, direct edit) and the plain `tasker-scene-xml`.
+Combine with `android-automation` for the full phone stack.
 
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
 these kinds of work), `analysis-assistant` (a demonstration prompt) and

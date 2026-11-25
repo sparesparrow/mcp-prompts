@@ -43,7 +43,7 @@ configuring a strong token, durable state storage and a reviewed access policy.
 
 `.github/workflows/vercel-smoke.yml` checks the production URL after pushes to `main`, every
 six hours, and on manual dispatch. It waits for readiness, checks the runtime mode and version,
-then connects as an actual MCP client to all five profiles and verifies the read-only tool set,
+then connects as an actual MCP client to all seven profiles and verifies the read-only tool set,
 prompt listing and template application.
 
 This is an operational smoke test, not a release gate: Vercel's Git integration may assign the

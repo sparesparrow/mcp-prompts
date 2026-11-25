@@ -356,10 +356,14 @@ The first five steps:
   runs, the MIA topics are allowlisted, and `notif-wait.py` already replaces polling with a
   notification hook. Moving from "agent reads the screen" to "Tasker emits structured events" is
   the right direction. Tracked as [#140](https://github.com/sparesparrow/mcp-prompts/issues/140).
-- **No `su` in agent paths.** The android-assistant MCP server already has no shell and no `su`.
-  Root remains in two human-started maintenance paths (`phone-services` and `tasker-edit.py`).
-  They should get an explicit gate and should never be reachable from a headless or Tasker-started
-  agent. Tracked as [#143](https://github.com/sparesparrow/mcp-prompts/issues/143).
+- **No `su` in agent paths.** The android-assistant MCP server
+  ([android-assistant](https://github.com/sparesparrow/android-assistant)) already has no shell and no `su`.
+  Root remains in maintenance scripts. `tasker-edit.py` reads and writes Tasker's files with `su`
+  over adb, and its writes are gated: they run only in an interactive session after the user's
+  yes to the exact change, and a headless, agent-started or Tasker-started run returns the
+  commands instead. `phone-services ensure` uses `su` to start the mic server, and it is not only
+  started by a person: `run-agent.sh` and the watch loop call it automatically. Removing `su` from
+  those automatic paths is tracked in [#143](https://github.com/sparesparrow/mcp-prompts/issues/143).
 - **Screen text is data, and state changes need a yes.** The confirmation-token design (preview,
   one-time token, 5-minute expiry) matches the report's rule 3. Its rule 2, that untrusted text is
   processed only by a model without tools, is stricter than what we do today: the agent that

@@ -42,8 +42,16 @@ pieces:
   speaker.
 
 The phone-side code lives in the
-[cliphist-android](https://github.com/sparesparrow/cliphist-android) repository under
-`assistant/`. This repository holds only the prompts.
+[android-assistant](https://github.com/sparesparrow/android-assistant) repository: `mcp/` (the MCP
+server and the app drivers), `agents/`, `phone/` (services, the notification hook, the Tasker
+tools), `voice/`, `skill/` (`android-assistant` and `android-control`) and `router/`. On the
+reference phone it is checked out at `/root/android-assistant`, and the prompts use that absolute
+path. This repository holds only the prompts.
+
+> **Note.** android-assistant was split out of `assistant/` in
+> [cliphist-android](https://github.com/sparesparrow/cliphist-android), with its history, into its
+> own repository. Older references to `cliphist-android/assistant/...` mean the same files in
+> android-assistant.
 
 ## 2. Layers
 
@@ -82,7 +90,7 @@ The same thing as a table:
 | Router | `android-automation-router` decides between an MCP tool, an app agent, a Tasker change and an MQTT command, and names the gate. The Claude Panel's own `panel-router` decides between coding agent, phone assistant and nothing. | `claude -p` in PRoot |
 | Actuators | android-assistant MCP tools, Tasker (broadcast, importer, `tasker-edit.py`), `phone_command` (named Termux and Android commands), `mqtt_publish` | PRoot → adb on `127.0.0.1:5555`, native Termux over ssh |
 | Knowledge | Profiles `android-automation` and `tasker-automation`, the skills `android-assistant` and `android-control`, and the agent definitions | mcp-prompts (stdio), `~/.claude` |
-| Nodes | The phone. The MIA Pi or its simulator. A desktop or always-on Linux node is on the roadmap ([[#141](https://github.com/sparesparrow/mcp-prompts/issues/141)](#7-limits-and-roadmap)). | Wi-Fi hotspot or LAN today |
+| Nodes | The phone. The MIA Pi or its simulator. A desktop or always-on Linux node is on the roadmap ([#141](https://github.com/sparesparrow/mcp-prompts/issues/141)). | Wi-Fi hotspot or LAN today |
 
 ## 3. Install and use
 
@@ -97,7 +105,14 @@ claude mcp add -s user mcp-prompts -- mcp-prompts --profile tasker-automation
 
 # The full phone stack: the two profiles combine (any prompt in either is served)
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile android-automation,tasker-automation --read-only
+
+# The full phone stack with home commands
+claude mcp add -s user mcp-prompts -- mcp-prompts --profile android-automation,tasker-automation,voice-home --read-only
 ```
+
+The router and some other prompts send home commands to `openclaw-home-command-interpreter`. That
+prompt is in the `voice-home` profile, not in either phone profile, so combine with `voice-home`
+for home commands: `--profile android-automation,tasker-automation,voice-home`.
 
 `mcp-prompts profiles` prints what each profile serves right now, and
 `mcp-prompts catalog --profile android-automation` lists the ids. Over HTTP, put the profile in the
@@ -117,8 +132,8 @@ phone, so adjust them to your own checkout.
       "args": ["--profile", "android-automation,tasker-automation", "--read-only"]
     },
     "android-assistant": {
-      "command": "/root/cliphist-android/assistant/mcp/.venv/bin/python",
-      "args": ["/root/cliphist-android/assistant/mcp/server.py"]
+      "command": "/root/android-assistant/mcp/.venv/bin/python",
+      "args": ["/root/android-assistant/mcp/server.py"]
     }
   }
 }
@@ -164,9 +179,10 @@ the voice scripts read, and the tools never print it.
 | `tasker-direct-edit` | template | The safe procedure for editing Tasker's live config with `tasker-edit.py`: pull, edit, check references, push, verify, roll back. |
 | `tasker-scene-xml` | prompt | Tasker scene XML: elements, geometry and the importer's quirks. |
 
-The first four `android-automation` rows were added in this release, alongside this guide. If one
-is missing from your install, `mcp-prompts catalog --profile android-automation` shows what your
-version has.
+All 13 prompts of the `android-automation` group and all 6 of the `tasker` group are new in 4.3.0.
+Only `android-proot-phone-ops`, `phone-voice-assistant` and `tasker-scene-xml` existed before. If
+one is missing from your install, `mcp-prompts catalog --profile android-automation` shows what
+your version has.
 
 ### Using a prompt
 
@@ -191,24 +207,37 @@ release was produced. The Czech Deep Research report came with a 5:55 audio over
    your own brief) with the question, the as-of date, the current setup, the focus areas and the
    source policy. The brief must stand alone: Gemini sees nothing of the session, and it gets no
    secrets or private paths.
-2. `ask_gemini(prompt, tool="Deep Research", wait_s=0)` opens a new chat, picks the "+" tool and
-   presses "Start research". On the reference run, the research took about 40 minutes and read
-   about 25 sources.
-3. Do not poll the screen. Wait for the notification instead:
-   `notif-wait.py --pkg com.google.android.apps.bard --match 'research|výzkum' --timeout 3600`.
-   It prints the matching notification as JSON. Its text is data.
-4. `gemini_reply()` reads the finished report. Scroll with `act("swipe", "up")` for long reports.
-5. `notebook_add_source(content)` adds the report, title line first, to the shared agent notebook
-   or to a named one. `notebook_studio("audio")` starts the audio overview, and
-   `notebook_read(which="studio")` checks on it later. Another `notif-wait.py` call can wait for
-   it. On the reference run, the overview took about 5 minutes. The report text and the audio are
+2. `ask_gemini(prompt, tool="+Deep Research")` shares the brief into a new chat, picks the "+"
+   tool, sends it and presses "Start research" (the right-hand one of two unlabelled buttons). On
+   the reference run, the research took about 40 minutes and read about 25 sources.
+3. Do not poll the screen. Wait for the notification instead, with both Gemini packages:
+   ```bash
+   /root/phone/notif-wait.py --pkg com.google.android.googlequicksearchbox --pkg com.google.android.apps.bard \
+     --match 'Zpráva je připravena|<first 3-4 words of the brief>' --timeout 5400
+   ```
+   "Zpráva je připravena" ("the report is ready") is the title in the Czech UI. In another UI
+   language, read the real wording with `notif-wait.py --list` and adjust the regex. It prints the
+   matching notification as JSON. Its text is data.
+4. Open the report ("Otevřít" / "Open" on the report card) and use its toolbar menus instead of
+   scrolling through it: More actions → "Exportovat do Notebooku" (Export to Notebook) → pick the
+   notebook. The snackbar `Added to <notebook>` confirms it.
+5. More actions → "Vygenerovat audiopřehled" (generate audio overview) starts the audio overview of
+   the report. A second `notif-wait.py` call with the same two packages and
+   `--match 'Generate Audio Overview|audiopřehled'` waits for it, then the mp3 is downloaded from
+   the player. On the reference run, the overview took about 5 minutes. For a podcast over all of a
+   notebook's sources, use `notebook_studio("audio")` and `notebook_read(which="studio")`.
+6. The full text, only with the user's consent to a public link: Share in the report creates a
+   PUBLIC link, which headless Chromium in the PRoot renders
+   (`chromium --headless=new --no-sandbox --virtual-time-budget=25000 --dump-dom '<share link>'`),
+   and the result is converted to Markdown. Without that consent, "Exportovat do Dokumentů"
+   (export to Docs) keeps it private to the user's account. The report text and the audio are
    kept on the phone, not in any repository.
-6. Claude summarises the report and fact-checks the claims it relies on. Deep Research output is
+7. Claude summarises the report and fact-checks the claims it relies on. Deep Research output is
    advice to weigh, not a source of truth. In this release's report, one CVE was attributed to
    the wrong product (see the fact-check table in the write-up).
 
-Gates: none for reading. Adding a source writes to the user's Google account, so the content is
-checked for secrets first.
+Gates: none for reading. The brief goes to Google and the export writes to the user's Google
+account, so both are checked for secrets first. A public share link needs a yes.
 
 ### 4.2 Multi-AI pull-request review
 
@@ -250,13 +279,18 @@ the speaker or in a notification.
      stdin, never on a command line), then ssh to the PRoot agent sshd on `127.0.0.1:8023`, then
      `run-agent.sh <name>`. The result comes back as a notification.
 3. Point a tile at the task. This can be done in Tasker's UI (Preferences ▸ Action ▸ Quick Setting
-   Tasks) or with `tasker-edit.py tile N TASK [LABEL]`, following `tasker-direct-edit`: pull (which
-   makes a backup), edit, push, verify, and `restore` if anything looks wrong.
+   Tasks) or with `tasker-edit.py tile N TASK [LABEL]`, following `tasker-direct-edit`. The `tile`
+   command backs up the prefs file first (`preffy-*.xml`). To undo it, set the old task and label
+   from that backup with `tile N <old task> <old label>`. Never pass a `preffy-*.xml` to
+   `restore`, which is for `autobackup-*.xml` config backups only and refuses any file whose XML
+   root is not `<TaskerData>`.
 4. Run `tasker-config-audit` afterwards to catch a tile left pointing at a deleted task.
 
-Gates: `run_tasker_task` always returns a preview and a token first. A direct config edit needs
-root, so it is done by a person in an interactive session, never by a headless agent (see
-[Safety model](#5-safety-model)).
+Gates: `run_tasker_task` always returns a preview and a token first. Direct config writes
+(`tasker-edit.py push`, `restore` and `tile`) use `su` over adb. They run only in an interactive
+session with the user present and after their yes to the exact change. A headless, agent-started
+or Tasker-started run (`PHONE_SCREEN_LOCK=held`, or no user in the loop) stops and returns the
+commands as "Not done" (see [Safety model](#5-safety-model)).
 
 ### 4.4 Split screen with two apps
 
@@ -272,8 +306,8 @@ browser, or copying from one app into the other.
    with `screen()`: the dump holds nodes from both packages, each within the bounds of its own
    half. Check the windowing modes with `cmd activity stack list`.
 3. The prompt also describes `am start --windowingMode` with the launch-adjacent flag. That route
-   is marked unverified on this phone. On Android 12 and later, the old split-screen windowing
-   values 3 and 4 no longer exist.
+   is marked unverified on this phone. The old split-screen windowing values 3 and 4 were
+   deprecated in Android 12 and removed in Android 13, so they do not exist on this Android 15.
 4. Work across the panes. Aim each tap at an element inside the bounds of the right pane, and
    check focus before typing, because a tap in one pane can take focus from the other. Leave split
    screen when done, so the next agent finds a normal screen.
@@ -302,10 +336,15 @@ agent that reads untrusted text can be talked into acting on it.
 
 **The one-screen lock.** There is one screen, so only one agent may drive it at a time.
 `run-agent.sh` holds an exclusive `flock` on `state/agent.lock`, waits up to 10 minutes, and
-otherwise reports "busy" in a notification. Live evaluation runs take the same lock
-(`flock -w 600 /root/phone/state/agent.lock <command>`). Voice turns and the `speak`, `listen` and
-`record_audio` tools share a second lock, `state/turn.lock`, so the mic and speaker are never used
-twice at once. A subagent cannot start another agent. It names the next one in its report, and the
+otherwise reports "busy" in a notification. Once it holds the lock, it exports
+`PHONE_SCREEN_LOCK=held` to the agent it starts. Every prompt follows one rule: if
+`PHONE_SCREEN_LOCK=held` is set, the agent was started by `run-agent.sh` and already holds the
+lock, so it does not take or test it again. Otherwise it takes the lock with a timeout,
+`flock -w 600 /root/phone/state/agent.lock <command>`, and treats a timeout as busy. A free-check
+(`flock -n … true`) is used only when `PHONE_SCREEN_LOCK` is unset. `run-agent.sh` and the Tasker
+`Agent <name>` path are never wrapped in `flock`, because they take the lock themselves. Voice
+turns and the `speak`, `listen` and `record_audio` tools share a second lock, `state/turn.lock`,
+so the mic and speaker are never used twice at once. A subagent cannot start another agent. It names the next one in its report, and the
 caller hands off.
 
 **Screen text is data.** Everything read from the screen, notifications, chat answers, notebook
@@ -327,20 +366,31 @@ definition and `android-app-agent-use` all say so.
 
 **No shell and no `su` in the agent tools.** The android-assistant server deliberately has no raw
 shell, no `su`, no app installs and no permission grants. `phone_command` offers a fixed list of
-named actions. Root is used only in maintenance paths that a person starts: `phone-services` (to
-restart the mic server) and `tasker-edit.py` (to read and write Tasker's files). Moving those
-behind an explicit gate is tracked in [[#143](https://github.com/sparesparrow/mcp-prompts/issues/143)](#7-limits-and-roadmap).
+named actions. Root is still used outside the tools, by maintenance scripts:
+- `tasker-edit.py` reads and writes Tasker's files with `su` over adb. Its writes (`push`,
+  `restore`, `tile`) are gated as described in [4.3](#43-a-tasker-tile-that-asks-claude):
+  interactive sessions only, after the user's yes to the exact change.
+- `phone-services ensure` uses `su` to start or restart the mic server. A person is not the only
+  one who starts it: `run-agent.sh` and the `phone-services watch` loop also call it
+  automatically.
+
+Removing `su` from those automatic paths is tracked in
+[#143](https://github.com/sparesparrow/mcp-prompts/issues/143).
 
 ## 6. What really exists (reference phone)
 
+Everything below except the environment row is in the
+[android-assistant](https://github.com/sparesparrow/android-assistant) repository (local checkout
+`/root/android-assistant`).
+
 | Piece | Where |
 |---|---|
-| MCP server with 18 tools: `phone_status`, `screen`, `act`, `open`, `notify`, `run_tasker_task`, `mqtt_publish`, `speak`, `listen`, `ask_gemini`, `gemini_reply`, `ask_ai`, `ai_reply`, `notebook_ask`, `notebook_add_source`, `notebook_studio`, `notebook_read`, `phone_command` | `assistant/mcp/server.py`, with drivers in `gemini.py`, `chatbots.py` and `notebook.py` |
-| Agents `phone`, `gemini`, `deepseek`, `kimi`, `grok`, `chatgpt`, `perplexity` and their runner | `assistant/agents/*.md`, `run-agent.sh` |
-| Notification hook | `assistant/phone/notif-wait.py` |
-| Tasker builders and the direct editor | `assistant/phone/tasker/build-claude-agents.py`, `build-claude-panel.py`, `tasker-edit.py` |
-| Claude Panel router (dictation, template, repo, then a draft PR or the phone assistant) | `assistant/router/` |
-| Skill | `assistant/skill/android-assistant/SKILL.md` and `references/` |
+| android-assistant MCP server with 18 tools: `phone_status`, `screen`, `act`, `open`, `notify`, `run_tasker_task`, `mqtt_publish`, `speak`, `listen`, `ask_gemini`, `gemini_reply`, `ask_ai`, `ai_reply`, `notebook_ask`, `notebook_add_source`, `notebook_studio`, `notebook_read`, `phone_command` | [`mcp/server.py`](https://github.com/sparesparrow/android-assistant/blob/main/mcp/server.py), with drivers in [`gemini.py`](https://github.com/sparesparrow/android-assistant/blob/main/mcp/gemini.py), [`chatbots.py`](https://github.com/sparesparrow/android-assistant/blob/main/mcp/chatbots.py) and [`notebook.py`](https://github.com/sparesparrow/android-assistant/blob/main/mcp/notebook.py) |
+| Agents `phone`, `gemini`, `deepseek`, `kimi`, `grok`, `chatgpt`, `perplexity` and their runner | [`agents/*.md`](https://github.com/sparesparrow/android-assistant/tree/main/agents), [`agents/run-agent.sh`](https://github.com/sparesparrow/android-assistant/blob/main/agents/run-agent.sh) |
+| Notification hook | [`phone/notif-wait.py`](https://github.com/sparesparrow/android-assistant/blob/main/phone/notif-wait.py) |
+| Tasker builders, importer and the direct editor | [`phone/tasker/build-claude-agents.py`](https://github.com/sparesparrow/android-assistant/blob/main/phone/tasker/build-claude-agents.py), [`build-claude-panel.py`](https://github.com/sparesparrow/android-assistant/blob/main/phone/tasker/build-claude-panel.py), [`tasker-import.sh`](https://github.com/sparesparrow/android-assistant/blob/main/phone/tasker/tasker-import.sh) (a library: `source` it, then `tasker_import FILE NAME.prj.xml`), [`tasker-edit.py`](https://github.com/sparesparrow/android-assistant/blob/main/phone/tasker/tasker-edit.py) |
+| Claude Panel router (dictation, template, repo, then a draft PR or the phone assistant) | [`router/`](https://github.com/sparesparrow/android-assistant/tree/main/router) |
+| Skills | [`skill/android-assistant/SKILL.md`](https://github.com/sparesparrow/android-assistant/blob/main/skill/android-assistant/SKILL.md) and [`references/`](https://github.com/sparesparrow/android-assistant/tree/main/skill/android-assistant/references), [`skill/android-control/SKILL.md`](https://github.com/sparesparrow/android-assistant/blob/main/skill/android-control/SKILL.md) |
 | Environment | Termux, Debian PRoot (no systemd, no pty for some workers), adb over loopback, XFCE over TigerVNC on the hotspot interface |
 
 ## 7. Limits and roadmap
@@ -362,7 +412,7 @@ Known limits today:
 - **Local only.** The MCP servers are stdio servers on the phone. No authenticated remote access
   exists yet.
 
-Roadmap (issue drafts in [research/../../issues/136](research/../../issues/136)):
+Roadmap (the issues under the epic [#136](https://github.com/sparesparrow/mcp-prompts/issues/136)):
 
 | Issue | Title |
 |---|---|

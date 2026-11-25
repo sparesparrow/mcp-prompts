@@ -93,4 +93,6 @@ jobs:
           mia-vehicle 15
           voice-home 15
           learning-loop 15
+          android-automation 15
+          tasker-automation 15
           PROFILES
