@@ -385,12 +385,6 @@ For enterprise features (AWS, multi-tenant, payments), see [archive/aws/README.m
 
 Most users don't need this - the local MCP server is sufficient.
 
-## Pro prompt pack (optional)
-
-The library in this repository stays free under the MIT licence. A separate paid pack of
-additional, original prompts and templates is planned; its checkout link is not live yet
-(`<PAYMENT-LINK-URL>` placeholder, to be filled in by the maintainer before this section is merged).
-
 ## License
 
 MIT, see [LICENSE](LICENSE).
