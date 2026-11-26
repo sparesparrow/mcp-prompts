@@ -96,14 +96,14 @@ The same thing as a table:
 
 ### The menu
 
-The router prompt holds a fixed menu: eight branches and 37 leaves. Every request maps to one leaf
+The router prompt holds a fixed menu: eight branches. Every request maps to one leaf
 or a short sequence of leaves. A request that fits no leaf goes to `Ask > Clarify`. The `## Menu`
 table in `android-automation-router` is the source of truth for the leaves, prompt ids, tools and
 gates. This is a summary.
 
 | Branch | Example leaves | Gate |
 |---|---|---|
-| Ask | Clarify, Read the screen, Open app or link; Send message or comment; Payment or banking | `none`; `yes-exact`; `never` |
+| Ask | Clarify, Read the screen, Open app or link, Act in an app; Send message or comment; Payment or banking | `none`; `yes-exact`; `never` |
 | Research | Deep research to notebook, Sourced web answer; Add notebook source | `none`; `yes-exact` |
 | Review | Multi-AI PR review, Compare answers; Post review comment | `none`; `yes-exact` |
 | Tasker | Run task; New automation, Change automation; Audit config | `token`; `yes-exact`; `none` |
@@ -116,10 +116,12 @@ Gates:
 
 | Gate | Meaning |
 |---|---|
-| `none` | Reads or opens only, or asks an AI app with a brief that has no secrets and no other people's private data. |
+| `none` | Reads or opens only, asks an AI app with a brief that has no secrets and no other people's private data, or makes a small, reversible, additive change: the four direct light topics, speaking, a notification, a new notebook source or Studio output from Gemini's own report, a split screen. |
 | `token` | The tool returns a preview and a one-time confirmation token. Used by `run_tasker_task` and by `mqtt_publish` outside the direct light topics. |
 | `yes-exact` | The user's yes to the exact text or diff shown. |
 | `never` | Payments, banking, trading. The router hands them to the user. |
+
+A leaf's gate is the minimum. When a step needs more under the router prompt's consent gate (a deletion, other people's data in a brief, a send), that gate wins.
 
 Only `mia/lights/mood`, `mia/lights/effect`, `mia/lights/off` and `mia/lights/sound` publish
 without confirmation. See the safety model in section 5.
@@ -238,13 +240,13 @@ The menu has three surfaces. All three pass a request to the router prompt.
 
 | Surface | How it works | Example |
 |---|---|---|
-| Voice | The router reads the branches as a short spoken list. You say a branch, it reads that branch's leaves, you say a leaf. | "Lights", then "Mood", then "calm" |
-| Claude Panel | A Tasker List Dialog lists the branches, then the leaves of the chosen branch. The chosen path is passed as the request. | Pick Lights, then Mood |
+| Voice | The router reads the branches as a short spoken list. You say a branch, it reads that branch's leaves, you say a leaf. The router then asks for the one missing value. | "Lights", then "Mood", then "calm" |
+| Claude Panel | A Tasker List Dialog lists the branches, then the leaves of the chosen branch. The chosen path is passed as the request. Choosing on the Panel is the user's own request, so the modality is `typed`, not `agent`. `yes-exact` and `token` leaves still show the preview and need the user's yes in the Panel (a second List Dialog Yes/No), otherwise the router returns "Not done". | Pick Lights, then Mood |
 | `claude -p` | Give the path directly. | `claude -p "Lights > Mood: calm"` |
 
 Config mode is for a request that describes a result and not a menu action, such as "turn the
 lights blue when the car connects". The router plans the change first, using the Tasker or Termux
-prompts, and shows the diff or preview. It acts only on `yes-exact`, and it says how to undo the
+prompts, and shows the diff or preview. It acts only on `yes-exact`, and it prints the menu path of the leaf the change lands in (`Tasker > New automation`, `Tasker > Change automation` or `Phone settings > Termux command`) and says how to undo the
 change.
 
 ## 4. Worked scenarios

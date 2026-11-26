@@ -36,7 +36,7 @@
     "stateChanging": false
   },
   {
-    "request": "Send Anna a message that I am ten minutes late",
+    "request": "Send my sister a message that I am ten minutes late",
     "modality": "spoken",
     "menuPath": "Ask > Send message or comment",
     "promptId": "phone-agent-handoff",
@@ -322,5 +322,41 @@
     "toolOrAgent": "/root/phone/phone-services status",
     "gate": "none",
     "stateChanging": false
+  },
+  {
+    "request": "Delete the shopping-list note in Keep",
+    "modality": "typed",
+    "menuPath": "Ask > Act in an app",
+    "promptId": "-",
+    "toolOrAgent": "act",
+    "gate": "yes-exact",
+    "stateChanging": true
+  },
+  {
+    "request": "Make the Quick Settings tile open my Agent phone task",
+    "modality": "typed",
+    "menuPath": "Tasker > Quick Settings tile",
+    "promptId": "tasker-direct-edit",
+    "toolOrAgent": "tasker-edit.py",
+    "gate": "yes-exact",
+    "stateChanging": true
+  },
+  {
+    "request": "Build a Tasker scene with three buttons for the lights",
+    "modality": "typed",
+    "menuPath": "Tasker > Scene",
+    "promptId": "tasker-scene-xml",
+    "toolOrAgent": "tasker_import",
+    "gate": "yes-exact",
+    "stateChanging": true
+  },
+  {
+    "request": "Turn off everything in the living room for the night",
+    "modality": "spoken",
+    "menuPath": "Lights > Home command",
+    "promptId": "openclaw-home-command-interpreter",
+    "toolOrAgent": "mqtt_publish",
+    "gate": "token",
+    "stateChanging": true
   }
 ]

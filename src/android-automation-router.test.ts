@@ -145,6 +145,7 @@ describe('android-automation-router menu fixtures', () => {
   });
 
   it('keep state-changing requests off the none gate', () => {
+    // stateChanging means the request needs a gate stronger than none.
     for (const f of fixtures) if (f.stateChanging) expect(['token', 'yes-exact', 'never'], f.request).toContain(f.gate);
     const used = new Set(fixtures.filter(f => f.stateChanging).map(f => f.menuPath));
     for (const l of leaves) if (l.gate === 'none') expect(used.has(l.path), l.path).toBe(false);
