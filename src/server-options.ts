@@ -118,7 +118,7 @@ owner MCP_PROMPTS_OWNER. MCP_PROMPTS_STORAGE=file is the default.
 HTTP: the URL http://<host>:<port>/mcp takes profile, prompts, templates, exclude, expose and
 readOnly as query parameters, and can only narrow what the server itself serves.
 mcp-prompts-http also reads HOST (default 127.0.0.1), PORT (default 3003), CORS_ORIGIN and:
-  MCP_PROMPTS_AUTH_TOKEN        bearer token every request except /health, /ready and /version
+  MCP_PROMPTS_AUTH_TOKEN        bearer token every request except /, /health, /ready and /version
                                 must carry (or MCP_PROMPTS_AUTH_TOKEN_FILE, a file holding it)
   MCP_PROMPTS_ALLOWED_HOSTS     Host header names to accept (default: loopback names when HOST
                                 is loopback, otherwise unchecked)
