@@ -299,7 +299,9 @@ PORT=3003 pnpm start:http
 # or: mcp-prompts-http, or the default Docker image (port 3003), or: docker compose up -d --wait --build
 ```
 
-It listens on `127.0.0.1` unless `HOST` says otherwise.
+It listens on `127.0.0.1` unless `HOST` says otherwise. To reach it from another machine, keep it
+inside a Tailscale network, read-only and behind a token: [docs/10, Remote use over Tailscale](docs/10-android-automation.md#remote-use-over-tailscale)
+has the settings and the client config.
 
 | Method and path | Does |
 |---|---|

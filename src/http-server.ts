@@ -604,6 +604,14 @@ export async function startHttpServer(
     throw error;
   }
   const addr = app.address();
+  if (!access.allowedHosts) {
+    // Beyond loopback the server cannot know the name it is reached by, so it accepts any Host,
+    // and a page that rebinds its own name to this address can call it from the user's browser.
+    logger.warn(
+      `listening on ${host} without MCP_PROMPTS_ALLOWED_HOSTS: the Host header is not checked. ` +
+      'List the names clients use (for a Tailscale node: its MagicDNS name and its 100.x address).'
+    );
+  }
   logger.info(
     `MCP Prompts HTTP server listening on ${host}:${addr?.port ?? port} ` +
     `(${readOnly ? 'read-only' : 'read-write'}, ${access.token ? 'bearer token required' : 'no auth token'})`
