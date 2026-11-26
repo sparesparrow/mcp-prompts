@@ -697,7 +697,8 @@ describe('bundled profiles', () => {
     for (const profile of store.profiles()) {
       const count = profile.prompts + profile.templates;
       expect(count, profile.name).toBeGreaterThan(0);
-      expect(count, profile.name).toBeLessThanOrEqual(15);
+      // 20, not 15: the android-automation flagship profile needs 16 (android-event-bus, #140).
+      expect(count, profile.name).toBeLessThanOrEqual(20);
       expect(count, profile.name).toBeLessThan(store.size / 2);
     }
   });

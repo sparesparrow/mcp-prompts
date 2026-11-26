@@ -22,7 +22,7 @@
       "templates": ["voice-intelligence", "openclaw", "home-automation"]
     },
     "android-automation": {
-      "description": "Natural-language control of an Android phone: agents that drive specific apps through android-control, Termux and termux-* commands, the Termux/PRoot bridge, and end-to-end scenarios such as Deep Research to an audio overview in a notebook, and the router that turns a typed, spoken or agent request into the right layer. Combine with tasker-automation for Tasker work.",
+      "description": "Natural-language control of an Android phone: agents that drive specific apps through android-control, Termux and termux-* commands, the Termux/PRoot bridge, and end-to-end scenarios such as Deep Research to an audio overview in a notebook, the MQTT phone event bus that agents wait on instead of polling, and the router that turns a typed, spoken or agent request into the right layer. Combine with tasker-automation for Tasker work.",
       "prompts": ["android-automation"],
       "templates": ["android-automation", "android-proot-phone-ops", "phone-voice-assistant"]
     },

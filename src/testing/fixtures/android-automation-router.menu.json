@@ -358,5 +358,32 @@
     "toolOrAgent": "mqtt_publish",
     "gate": "token",
     "stateChanging": true
+  },
+  {
+    "request": "Tell me when the Gemini deep research report is ready",
+    "modality": "spoken",
+    "menuPath": "Ask > Wait for an event",
+    "promptId": "android-event-bus",
+    "toolOrAgent": "wait_event",
+    "gate": "none",
+    "stateChanging": false
+  },
+  {
+    "request": "Wait for the download notification, then continue (agent step)",
+    "modality": "agent",
+    "menuPath": "Ask > Wait for an event",
+    "promptId": "android-event-bus",
+    "toolOrAgent": "wait_event",
+    "gate": "none",
+    "stateChanging": false
+  },
+  {
+    "request": "Make Tasker publish a battery event when the phone drops below 15%",
+    "modality": "typed",
+    "menuPath": "Tasker > Publish events",
+    "promptId": "android-event-bus",
+    "toolOrAgent": "tasker_import",
+    "gate": "yes-exact",
+    "stateChanging": true
   }
 ]
