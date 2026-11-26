@@ -268,7 +268,7 @@ describe('mcp-prompts commands', () => {
     expect(bad.stderr).toContain('mcp-prompts --help');
     expect(bad.stdout).toBe('');
     expect(run(['catalogue']).stderr).toContain('unknown command "catalogue"');
-    expect(run(['--json']).stderr).toContain('--json goes with the catalog and profiles commands');
+    expect(run(['--json']).stderr).toContain('--json goes with the catalog, profiles and export commands');
   }, 30_000);
 
   it('profiles lists the library\'s profiles, what each serves and what none serves', () => {

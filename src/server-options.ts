@@ -81,6 +81,10 @@ export const HELP_TEXT = `Usage:
   mcp-prompts config [options] [--name <server>] [--url <base url>]
                                         print the install command, client config, URL and config
                                         file that serve what the options select
+  mcp-prompts export --skills <dir> [options] [--json]
+                                        write what the options select as Agent Skills:
+                                        <dir>/<name>/SKILL.md, for Claude Code, Codex and other
+                                        CLIs (a --dir of such folders is read back as prompts)
   mcp-prompts-http [options]            serve the HTTP API, with MCP at /mcp
   (start and serve are accepted before the options, as in "mcp-prompts start", and change nothing)
 
@@ -192,7 +196,7 @@ export function resolvePath(value: string, base: string): string {
 }
 
 export interface CommandLine {
-  /** The subcommand (catalog, config), or undefined to serve. */
+  /** The subcommand (profiles, catalog, config, export), or undefined to serve. */
   command?: string;
   /** --mode as given (3.x chose the transport with it); each entry point serves only its own. */
   mode?: string;
@@ -203,6 +207,8 @@ export interface CommandLine {
   json: boolean;
   name?: string;
   url?: string;
+  /** export: the directory the skills are written to. */
+  skills?: string;
 }
 
 const ARG_OPTIONS = {
@@ -221,6 +227,7 @@ const ARG_OPTIONS = {
   json: { type: 'boolean' },
   name: { type: 'string' },
   url: { type: 'string' },
+  skills: { type: 'string' },
   mode: { type: 'string', short: 'm' },
 } as const;
 
@@ -263,6 +270,7 @@ export function parseCommandLine(argv: readonly string[], cwd: string = process.
     json: Boolean(values.json),
     name: values.name,
     url: values.url,
+    skills: values.skills ? resolvePath(values.skills, cwd) : undefined,
   };
 }
 

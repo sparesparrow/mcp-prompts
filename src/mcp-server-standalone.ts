@@ -6,9 +6,10 @@ import { createMcpServer, packageVersion, type McpServerOptions } from './mcp-pr
 import { formatCatalog, formatInstallSnippets, formatProfiles, type ProfileListing } from './install-commands.js';
 import { HELP_TEXT, OptionsError, openConfiguredStore, openStore, resolveOptions } from './server-options.js';
 import { PromptStorageError } from './prompt-store.js';
+import { exportSkills } from './skills.js';
 
 // The `mcp-prompts` binary: serves MCP over stdio, or with `catalog` / `config` shows what an install
-// can serve and how to install exactly that. Options come from flags, environment variables and a
+// can serve and how to install exactly that, and with `export` writes it as Agent Skills. Options come from flags, environment variables and a
 // config file (see server-options.ts).
 
 export { createMcpServer, type McpServerOptions } from './mcp-prompts-server.js';
@@ -21,7 +22,7 @@ export async function startMcpServer(options: McpServerOptions = {}) {
   return server;
 }
 
-const COMMANDS = ['profiles', 'catalog', 'config'];
+const COMMANDS = ['profiles', 'catalog', 'config', 'export'];
 
 /**
  * Runs the command line. Resolves to an exit code for commands that finish, or undefined once the
@@ -44,7 +45,13 @@ export async function main(
         ? '--mode http is gone: mcp-prompts serves MCP over stdio; start the HTTP server with mcp-prompts-http'
         : `unknown --mode "${mode}" (mcp-prompts serves MCP over stdio; mcp-prompts-http serves HTTP)`);
     }
-    if (json && command !== 'catalog' && command !== 'profiles') throw new OptionsError('--json goes with the catalog and profiles commands');
+    if (json && command !== 'catalog' && command !== 'profiles' && command !== 'export') {
+      throw new OptionsError('--json goes with the catalog, profiles and export commands');
+    }
+    if (command === 'export' && resolved.commandLine.skills === undefined) {
+      throw new OptionsError('export needs --skills <dir>, the directory to write the skills to');
+    }
+    if (resolved.commandLine.skills !== undefined && command !== 'export') throw new OptionsError('--skills goes with the export command');
     if ((name !== undefined || url !== undefined) && command !== 'config') {
       throw new OptionsError('--name and --url go with the config command');
     }
@@ -103,6 +110,15 @@ export async function main(
       process.stdout.write(`${commandLine.json ? JSON.stringify(listing, null, 2) : formatProfiles(listing)}\n`);
     } else if (commandLine.command === 'catalog') {
       process.stdout.write(`${commandLine.json ? JSON.stringify(store.catalog(), null, 2) : formatCatalog(store.catalog())}\n`);
+    } else if (commandLine.command === 'export') {
+      const result = exportSkills(store.all(), commandLine.skills as string);
+      for (const skipped of result.skipped) process.stderr.write(`warning: ${skipped.id} not exported: ${skipped.reason}\n`);
+      process.stdout.write(commandLine.json
+        ? `${JSON.stringify(result, null, 2)}\n`
+        : `Wrote ${result.written.length} skills to ${result.dir}` +
+          `${result.skipped.length > 0 ? ` (${result.skipped.length} skipped, see the warnings)` : ''}.\n`);
+      // A skipped prompt is a conflict the user has to resolve, so a script running this notices.
+      return result.skipped.length > 0 ? 1 : 0;
     } else {
       process.stdout.write(`${formatInstallSnippets(options, commandLine.name, commandLine.url)}\n`);
     }

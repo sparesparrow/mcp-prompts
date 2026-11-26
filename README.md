@@ -238,6 +238,23 @@ claude mcp add -s user --transport http mcp-prompts "http://localhost:3003/mcp?p
 
 A URL chooses from what that server serves. It can narrow the server's selection and turn read-only on, but it cannot widen the selection, turn read-only off, or name directories. Mistyped options, and a profile the library does not have, stop the server with exit code 2, and a URL with them gets HTTP 400. An entry that matches nothing, or matches only the other list (`--prompts mia-car` when mia-car holds only templates), is logged as a warning.
 
+### Export prompts as Agent Skills
+
+`mcp-prompts export --skills <dir>` writes what the options select as Agent Skills
+(`<dir>/<name>/SKILL.md`, valid against the [specification](https://agentskills.io/specification)),
+for Claude Code, Codex, opencode and other CLIs that read skills. A template's variables become a
+Parameters section. A `--dir` that holds skill folders is served as prompts, so an export read
+back gives the same prompts, and skills written by hand are served too.
+
+```bash
+mcp-prompts export --skills ~/.agent-rules/skills --profile android-automation
+mcp-prompts --dir ~/.claude/skills            # skills as prompts
+```
+
+[docs/11-agent-skills.md](docs/11-agent-skills.md) describes the mapping, and
+`contrib/agent-rules/sync.sh`, which links one `AGENTS.md` and one `skills/` folder into every
+CLI's place instead of copying them.
+
 ### Build from source
 
 To run unreleased changes:

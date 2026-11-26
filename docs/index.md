@@ -21,6 +21,7 @@ Welcome to the MCP Prompts documentation. This guide provides comprehensive info
 - [Workflow Guide](09-workflow-guide.md) - Development workflows
 
 ### **Use Cases**
+- [Agent Skills](11-agent-skills.md) - Export prompts as SKILL.md folders, read skills back as prompts, and link one source of rules and skills into Claude Code, Codex, opencode and Qwen Code
 - [Android Automation](10-android-automation.md) - Natural-language control of an Android phone with the `android-automation` and `tasker-automation` profiles
 - [Research: AI ecosystem consolidation (2026-11)](research/2026-11-ai-ecosystem-consolidation.md) - Deep Research summary, fact-check and assessment
 - [Research: Android natural-language automation (2026-11)](research/2026-11-android-nl-automation.md) - Next changes per repository, verified against the code, with a fact-check

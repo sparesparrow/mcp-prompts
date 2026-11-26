@@ -55,6 +55,7 @@ src/
 ├── prompt-store.ts           # loading, selections, profiles, templates, the state directory
 ├── server-options.ts         # options from flags, environment, config file and URL query
 ├── install-commands.ts       # text of the profiles, catalog and config commands
+├── skills.ts                 # prompts as Agent Skills (SKILL.md) and back: export command, --dir import
 ├── config.ts                 # HTTP-only settings (HOST, PORT, token, allowed hosts)
 ├── utils.ts                  # pino logger on stderr
 └── testing/                  # fixture library for tests
@@ -77,7 +78,9 @@ and `cdk/`.
 ### MCP over stdio (`mcp-prompts`)
 - Entry point: `src/mcp-server-standalone.ts`; what MCP clients start
 - `mcp-prompts start` is accepted for configurations written for 3.x
-- Commands: `mcp-prompts profiles`, `mcp-prompts catalog`, `mcp-prompts config` (each takes the options below)
+- Commands: `mcp-prompts profiles`, `mcp-prompts catalog`, `mcp-prompts config`, `mcp-prompts export --skills <dir>` (each takes the options below)
+- `src/skills.ts` maps prompts to Agent Skills (`SKILL.md`) and back; `loadTree` in `prompt-store.ts`
+  reads a directory holding `SKILL.md` as one prompt. See `docs/11-agent-skills.md`
 
 ### HTTP (`mcp-prompts-http`)
 - JSON API on `node:http` (no web framework), sharing `src/prompt-store.ts` with the stdio server

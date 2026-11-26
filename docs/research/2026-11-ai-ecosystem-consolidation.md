@@ -351,7 +351,11 @@ The first five steps:
 - **One source of truth for rules and skills.** Rules, skills and MCP config are copied by hand
   between CLIs today, and the copies drift. Agent Skills is now an AAIF standard, and Claude Code
   reads `AGENTS.md` (see the fact-check). Generating each CLI's files from one repository is
-  cheap and removes a whole class of drift. Tracked as [#139](https://github.com/sparesparrow/mcp-prompts/issues/139).
+  cheap and removes a whole class of drift. Tracked as [#139](https://github.com/sparesparrow/mcp-prompts/issues/139);
+  the result is [docs/11-agent-skills.md](../11-agent-skills.md): `mcp-prompts export --skills`,
+  SKILL.md folders read back through `--dir`, and a script that links one source into each CLI.
+  Checking it showed that Claude Code reads `AGENTS.md` reliably only through an `@AGENTS.md`
+  import from `CLAUDE.md`, and follows an import that leaves the project only after an approval.
 - **Tasker as a deterministic event bus over MQTT.** This fits what is already here: mosquitto
   runs, the MIA topics are allowlisted, and `notif-wait.py` already replaces polling with a
   notification hook. Moving from "agent reads the screen" to "Tasker emits structured events" is
@@ -418,8 +422,9 @@ We keep the risks bounded this way, and the hardening backlog extends it:
 **"Retire mcp-prompts in favour of SKILL.md."** We disagree in part. Skills and prompts overlap,
 but mcp-prompts gives something a folder of skills does not: templates with typed variables,
 profiles that limit a listing to one kind of work, and one server that every MCP client can query,
-including clients with no skill support. The plan is to generate both from one source ([#139](https://github.com/sparesparrow/mcp-prompts/issues/139)),
-not to drop either.
+including clients with no skill support. Both are now generated from one source ([#139](https://github.com/sparesparrow/mcp-prompts/issues/139),
+[docs/11](../11-agent-skills.md)): `mcp-prompts export --skills` writes prompts as skills, and
+`--dir` serves skill folders as prompts. Neither is dropped.
 
 **"Stop running agent CLIs in PRoot."** We agree about the six overlapping CLIs. We disagree about
 Claude Code. Running Claude Code on the phone is the whole point of the phone as an assistant: the
