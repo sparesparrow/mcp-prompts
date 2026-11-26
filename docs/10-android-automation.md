@@ -110,7 +110,14 @@ claude mcp add -s user mcp-prompts -- mcp-prompts --profile android-automation,t
 
 # The full phone stack with home commands
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile android-automation,tasker-automation,voice-home --read-only
+
+# The phone's agents and the Claude Panel (dictate a task, get an answer or a draft PR)
+claude mcp add -s user mcp-prompts -- mcp-prompts --profile android-automation,claude-panel --read-only
 ```
+
+The Claude Panel templates (`panel-router`, `panel-repo-question`, `panel-bug-fix`,
+`panel-coding-task`) are in their own small profile, `claude-panel`, so each profile stays a
+small part of the library.
 
 The router and some other prompts send home commands to `openclaw-home-command-interpreter`. That
 prompt is in the `voice-home` profile, not in either phone profile, so combine with `voice-home`

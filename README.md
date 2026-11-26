@@ -20,7 +20,7 @@ command, client config, URL or config file. The page reads the library from this
   notebook with an audio overview, or a multi-AI PR review) and `tasker-automation` (project
   architecture, profiles, tasks and actions, variables and secrets, scene design/XML, config
   audits and safe direct edits). Use them together with `--profile android-automation,tasker-automation`, and add
-  `voice-home` for home commands. See [docs/10-android-automation.md](docs/10-android-automation.md).
+  `voice-home` for home commands and `claude-panel` for the Claude Panel templates. See [docs/10-android-automation.md](docs/10-android-automation.md).
   The phone-side code they are written for (MCP server, app agents, Tasker tools) is in the
   [android-assistant](https://github.com/sparesparrow/android-assistant) repository, split out of
   cliphist-android's `assistant/` with its history.
@@ -149,6 +149,7 @@ much smaller:
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
+| `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 
 ```bash
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev

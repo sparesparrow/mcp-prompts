@@ -18,6 +18,7 @@ only those prompts; the rest do not exist for it.
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
+| `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | (none) | Everything | 80 |
 
 No call returns a whole library, with or without a profile: `list_prompts` gives 20 summaries a page
@@ -98,6 +99,11 @@ and `phone-voice-assistant`. Home commands go to `openclaw-home-command-interpre
 **`tasker-automation`** (1 plain, 7 templates). The `tasker` group (project architecture, profile
 builder, scene builder, task actions, variables, config audit, direct edit) and the plain `tasker-scene-xml`.
 Combine with `android-automation` for the full phone stack.
+
+**`claude-panel`** (4 templates). The `panel` group: `panel-router`, which classifies a dictated or
+typed task, and the three routes it picks from (`panel-repo-question`, `panel-bug-fix`,
+`panel-coding-task`) for local Claude Code. A profile of its own so `android-automation` stays
+within the size limit; the phone's agents use `--profile android-automation,claude-panel`.
 
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
 these kinds of work), `analysis-assistant` (a demonstration prompt) and

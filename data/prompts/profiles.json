@@ -26,6 +26,11 @@
       "prompts": ["android-automation"],
       "templates": ["android-automation", "android-proot-phone-ops", "phone-voice-assistant"]
     },
+    "claude-panel": {
+      "description": "The Claude Panel on the phone: route a dictated or typed task to a repository question, a bug fix or a coding task for local Claude Code, which answers or opens a draft pull request. Combine with android-automation (android-automation,claude-panel) for the phone's agents.",
+      "prompts": "none",
+      "templates": ["panel"]
+    },
     "tasker-automation": {
       "description": "Building and maintaining Tasker on Android: project architecture, profiles and contexts, scene design/XML, tasks and action codes, variables and secrets policy, config audits and safe direct edits of Tasker's config. Combine with android-automation for the full phone stack.",
       "prompts": ["tasker-scene-xml"],
