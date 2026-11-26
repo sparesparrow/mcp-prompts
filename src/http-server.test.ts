@@ -35,11 +35,20 @@ describe('http-server routes', () => {
     const app = await createServer({ store: new PromptStore() });
     const routes = app._router.stack.map(layer => `${layer.route.method} ${layer.route.path}`);
     expect(routes).toEqual(expect.arrayContaining([
-      'GET /health', 'GET /ready', 'GET /version',
+      'GET /', 'GET /health', 'GET /ready', 'GET /version',
       'GET /v1/prompts', 'POST /v1/prompts', 'GET /v1/prompts/:id', 'PUT /v1/prompts/:id',
       'DELETE /v1/prompts/:id', 'POST /v1/prompts/:id/apply', 'GET /v1/stats',
       'GET /mcp/tools', 'POST /mcp/tools/:name', 'POST /mcp',
     ]));
+  });
+
+  it('/ answers a visitor with the service, its version, the docs and the endpoints', async () => {
+    const app = await createServer({ store: new PromptStore() });
+    const payload = callHandler(findRoute(app, 'GET', '/')) as { service: string; version: string; docs: string; endpoints: Record<string, string> };
+    expect(payload.service).toBe('mcp-prompts');
+    expect(payload.version).toMatch(/^\d+\.\d+\.\d+/);
+    expect(payload.docs).toMatch(/^https:\/\//);
+    expect(Object.keys(payload.endpoints)).toEqual(expect.arrayContaining(['/mcp', '/v1/prompts', '/health']));
   });
 
   it('/health returns status=ok, service=mcp-prompts and an ISO timestamp', async () => {
@@ -319,6 +328,7 @@ describe('HTTP access control', () => {
   it('requires the bearer token for the API and MCP, but not for the health probes', async () => {
     expect((await raw(guarded, { path: '/health' })).status).toBe(200);
     expect((await raw(guarded, { path: '/version' })).status).toBe(200);
+    expect((await raw(guarded, { path: '/' })).status).toBe(200);
 
     const denied = await raw(guarded, { path: '/v1/prompts' });
     expect(denied.status).toBe(401);

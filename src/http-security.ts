@@ -10,9 +10,10 @@ import type { IncomingMessage } from 'http';
 //   Origin  a browser page from another site is calling us (a plain form post needs no CORS preflight)
 //   Token   when one is configured, the request must carry it
 //
-// The health probes (/health, /ready, /version) skip all three: load balancers and container
-// runtimes call them by IP address and without credentials. They reveal the version and the mode
-// (read-only or not, token required or not, saving to disk or not), and no prompt.
+// The health probes (/health, /ready, /version) and the index at / skip all three: load balancers
+// and container runtimes call them by IP address and without credentials, and a person opening the
+// address in a browser should learn what it is. They reveal the version, the mode (read-only or not,
+// token required or not, saving to disk or not) and the list of routes, and no prompt.
 
 export interface AccessPolicy {
   /** Bearer token; when set, every route that is not public requires it. */

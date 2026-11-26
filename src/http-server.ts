@@ -169,6 +169,29 @@ function buildRoutes(store: PromptStore, serverOptions: ServerOptions, access: A
   const routes: Array<Route & { write?: boolean }> = [
     {
       method: 'GET',
+      path: '/',
+      public: true,
+      // A person who opens the deployment's address in a browser gets told what it is, instead of
+      // a 404. It reveals no more than /version and the list of routes below.
+      handler: (_req, res) => {
+        res.json({
+          service: 'mcp-prompts',
+          version,
+          docs: 'https://sparesparrow.github.io/mcp-prompts/',
+          endpoints: {
+            '/mcp': 'MCP over streamable HTTP (POST)',
+            '/mcp/tools': 'the MCP tools as plain HTTP',
+            '/v1/prompts': 'the prompt REST API',
+            '/v1/stats': 'counts of prompts, templates, tags and categories',
+            '/health': 'liveness probe',
+            '/ready': 'readiness and the mode the server runs in',
+            '/version': 'the version',
+          },
+        });
+      },
+    },
+    {
+      method: 'GET',
       path: '/health',
       public: true,
       handler: (_req, res) => {
