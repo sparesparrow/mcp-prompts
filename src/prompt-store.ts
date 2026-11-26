@@ -3,6 +3,7 @@ import * as crypto from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { logger } from './utils.js';
+import { SKILL_FILE, skillToPrompt } from './skills.js';
 import { FileStateBackend, PromptConflictError, PromptStaleError, PromptStorageError, type StateBackend, type StateSnapshot } from './state-backend.js';
 
 export { PromptConflictError, PromptStaleError, PromptStorageError } from './state-backend.js';
@@ -686,6 +687,7 @@ export class PromptStore {
 
   /**
    * Recursively loads every *.json prompt under dir (index.json, profiles.json and hidden entries excluded),
+   * and every Agent Skills folder (a directory holding SKILL.md) as one prompt,
    * following symbolic links. Library prompts are grouped by their directory relative to dir.
    * Returns how many prompts loaded; two files with one id count once, and the later file wins.
    */
@@ -727,6 +729,27 @@ export class PromptStore {
       return 0;
     }
     let count = 0;
+    const record = (prompt: StoredPrompt, file: string, group: string): void => {
+      const earlier = files.get(prompt.id);
+      if (earlier) {
+        logger.warn(`Duplicate prompt id "${prompt.id}": ${file} replaces ${earlier}`);
+      } else {
+        count++;
+      }
+      files.set(prompt.id, file);
+      this.put(prompt, kind === 'user' ? { kind: 'user', dir: root } : { kind: 'library', group });
+    };
+
+    // An Agent Skills folder (a SKILL.md, with scripts, references or assets beside it) is one
+    // prompt: what else it holds belongs to the skill and is not read as prompts.
+    const skill = entries.find(entry => entry.name === SKILL_FILE && (entry.isFile() || entry.isSymbolicLink()));
+    if (skill) {
+      const file = path.join(dir, skill.name);
+      const prompt = this.readSkillFile(file);
+      if (prompt) record(prompt, file, dir === root ? '' : path.relative(root, path.dirname(dir)).split(path.sep).join('/'));
+      return count;
+    }
+
     for (const entry of entries) {
       // Hidden entries are never prompts: .git, editors' swap files, and the ..data and
       // ..<timestamp> directories behind a Kubernetes ConfigMap mount (whose visible files are
@@ -759,19 +782,7 @@ export class PromptStore {
       } else if (isFile && entry.name.endsWith('.json') && !NOT_PROMPTS.includes(entry.name)) {
         const prompt = this.readPromptFile(fullPath);
         if (!prompt) continue;
-        const earlier = files.get(prompt.id);
-        if (earlier) {
-          logger.warn(`Duplicate prompt id "${prompt.id}": ${fullPath} replaces ${earlier}`);
-        } else {
-          count++;
-        }
-        files.set(prompt.id, fullPath);
-        this.put(
-          prompt,
-          kind === 'user'
-            ? { kind: 'user', dir: root }
-            : { kind: 'library', group: path.relative(root, dir).split(path.sep).join('/') }
-        );
+        record(prompt, fullPath, path.relative(root, dir).split(path.sep).join('/'));
       }
     }
     return count;
@@ -784,6 +795,18 @@ export class PromptStore {
       raw = JSON.parse(fs.readFileSync(file, 'utf8'));
     } catch (err) {
       logger.warn({ err }, `Skipped ${file}: it is not readable JSON`);
+      return undefined;
+    }
+    return this.checkPromptData(raw, file);
+  }
+
+  /** Reads an Agent Skills SKILL.md as a prompt; logs why and returns undefined when it cannot be served. */
+  private readSkillFile(file: string): StoredPrompt | undefined {
+    let raw: Record<string, unknown>;
+    try {
+      raw = skillToPrompt(fs.readFileSync(file, 'utf8'), path.basename(path.dirname(file)));
+    } catch (err) {
+      logger.warn(`Skipped ${file}: ${err instanceof Error ? err.message : String(err)}`);
       return undefined;
     }
     return this.checkPromptData(raw, file);
