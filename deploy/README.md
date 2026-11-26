@@ -14,11 +14,11 @@ only those prompts; the rest do not exist for it.
 | `software-dev` | Analysing and reviewing a software project | 13 |
 | `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 |
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
-| `voice-home` | Voice commands and home automation | 13 |
+| `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
-| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, tasks, audits, direct edits | 7 |
-| (none) | Everything | 79 |
+| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
+| (none) | Everything | 80 |
 
 No call returns a whole library, with or without a profile: `list_prompts` gives 20 summaries a page
 (at most 50, descriptions cut to 110 characters), and `list_categories` shows what each part holds.
@@ -78,9 +78,9 @@ ESP32-Android bridge), `mia-gpio-config`, and the MIA repository's pull-request 
 maintenance, navigation, voice command, voice response) and `mia-gpio-config`. This is what the
 assistant in the car needs at run time; nothing for developing it.
 
-**`voice-home`** (1 plain, 12 templates). The `voice-intelligence` group (the MIA system identity,
+**`voice-home`** (1 plain, 13 templates). The `voice-intelligence` group (the MIA system identity,
 voice-command learning, pattern and knowledge synthesis, failure analysis, context analysis,
-implicit-reference resolution, light feedback, design principles), the three OpenClaw templates
+implicit-reference resolution, light feedback, design principles, and `phone-voice-assistant`), the three OpenClaw templates
 (agent router, cron failure recovery, weekly health summary) and the home command interpreter.
 
 **`learning-loop`** (7 plain, 1 template). The seven cognitive-layer instructions (perception,
@@ -102,7 +102,8 @@ Combine with `android-automation` for the full phone stack.
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
 these kinds of work), `analysis-assistant` (a demonstration prompt) and
 `ai-self-improvement-orchestrator` (its placeholders are Jinja expressions that `apply_template`
-cannot fill, so it always comes back incomplete).
+cannot fill, so it always comes back incomplete), the four `panel` templates (the Claude Panel
+router reads them from the library files, not through a profile) and the four `sdlc` templates.
 
 ## Combine and narrow
 

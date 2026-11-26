@@ -6,7 +6,9 @@ stack runs on a rooted Android phone (aarch64), with Claude Code in a Debian PRo
 
 > Related: [Install a profile](../README.md#install-a-profile), [deploy/README.md](../deploy/README.md)
 > (what each profile serves and how to change one), and the research write-up behind the design
-> choices, [research/2026-11-ai-ecosystem-consolidation.md](research/2026-11-ai-ecosystem-consolidation.md).
+> choices, [research/2026-11-ai-ecosystem-consolidation.md](research/2026-11-ai-ecosystem-consolidation.md),
+> and the verified review of next changes per repository,
+> [research/2026-11-android-nl-automation.md](research/2026-11-android-nl-automation.md).
 
 ---
 

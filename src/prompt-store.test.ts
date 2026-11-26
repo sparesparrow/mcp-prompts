@@ -713,6 +713,20 @@ describe('bundled profiles', () => {
     ]));
   });
 
+  // apply_template does plain {{name}} replacement, so a Jinja block or an undeclared placeholder
+  // in a profile's template would always come back unfilled.
+  it('serve only templates that apply_template can fill', () => {
+    for (const profile of store.profiles()) {
+      for (const p of served(profile.name).filter(p => p.isTemplate)) {
+        const content = String(p.content ?? '');
+        expect(content, `${profile.name}: ${p.id}`).not.toMatch(/\{%/);
+        const declared = new Set((p.variables ?? []).map(v => (typeof v === 'string' ? v : v.name)));
+        const used = [...content.matchAll(/\{\{\s*([A-Za-z_]\w*)\s*\}\}/g)].map(m => m[1]);
+        expect(used.filter(name => !declared.has(name)), `${profile.name}: ${p.id}`).toEqual([]);
+      }
+    }
+  });
+
   it('give the car assistant every car prompt and no development prompt', () => {
     const car = served('mia-vehicle').map(p => p.id);
     const group = store.catalog().served.filter(p => p.group === 'mia-car').map(p => p.id);

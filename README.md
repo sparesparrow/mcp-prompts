@@ -145,7 +145,7 @@ much smaller:
 | `software-dev` | Analysing and reviewing a software project | 13 |
 | `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 |
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
-| `voice-home` | Voice commands and home automation | 13 |
+| `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
