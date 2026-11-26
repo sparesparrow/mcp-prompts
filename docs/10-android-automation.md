@@ -68,7 +68,7 @@ flowchart TD
   subgraph X[Actuators]
     M[android-assistant MCP: screen, act, open, notify,<br/>ask_ai / ask_gemini / notebook_*, phone_command]
     K[Tasker: run_tasker_task, built .prj.xml, tasker-edit.py]
-    Q[MQTT: mia/lights/*, other mia/* and zigbee2mqtt/* with a gate]
+    Q[MQTT: mia/lights mood, effect, off and sound run directly;<br/>other mia/* and zigbee2mqtt/* need a token]
   end
   subgraph N[Knowledge]
     P[mcp-prompts: android-automation + tasker-automation profiles]
@@ -93,6 +93,36 @@ The same thing as a table:
 | Actuators | android-assistant MCP tools, Tasker (broadcast, importer, `tasker-edit.py`), `phone_command` (named Termux and Android commands), `mqtt_publish` | PRoot → adb on `127.0.0.1:5555`, native Termux over ssh |
 | Knowledge | Profiles `android-automation` and `tasker-automation`, the skills `android-assistant` and `android-control`, and the agent definitions | mcp-prompts (stdio), `~/.claude` |
 | Nodes | The phone. The MIA Pi or its simulator. A desktop or always-on Linux node is on the roadmap ([#141](https://github.com/sparesparrow/mcp-prompts/issues/141)). | Wi-Fi hotspot or LAN today |
+
+### The menu
+
+The router prompt holds a fixed menu: eight branches and 37 leaves. Every request maps to one leaf
+or a short sequence of leaves. A request that fits no leaf goes to `Ask > Clarify`. The `## Menu`
+table in `android-automation-router` is the source of truth for the leaves, prompt ids, tools and
+gates. This is a summary.
+
+| Branch | Example leaves | Gate |
+|---|---|---|
+| Ask | Clarify, Read the screen, Open app or link; Send message or comment; Payment or banking | `none`; `yes-exact`; `never` |
+| Research | Deep research to notebook, Sourced web answer; Add notebook source | `none`; `yes-exact` |
+| Review | Multi-AI PR review, Compare answers; Post review comment | `none`; `yes-exact` |
+| Tasker | Run task; New automation, Change automation; Audit config | `token`; `yes-exact`; `none` |
+| Lights | Mood, Effect, Off, Sound; Zigbee device, Home command | `none`; `token` |
+| Voice | Speak, Listen, Notify when done | `none` |
+| Phone settings | Split screen; Termux command, Change a setting | `none`; `yes-exact` |
+| Diagnostics | Phone status, Services, Handoff report | `none` |
+
+Gates:
+
+| Gate | Meaning |
+|---|---|
+| `none` | Reads or opens only, or asks an AI app with a brief that has no secrets and no other people's private data. |
+| `token` | The tool returns a preview and a one-time confirmation token. Used by `run_tasker_task` and by `mqtt_publish` outside the direct light topics. |
+| `yes-exact` | The user's yes to the exact text or diff shown. |
+| `never` | Payments, banking, trading. The router hands them to the user. |
+
+Only `mia/lights/mood`, `mia/lights/effect`, `mia/lights/off` and `mia/lights/sound` publish
+without confirmation. See the safety model in section 5.
 
 ## 3. Install and use
 
@@ -201,6 +231,21 @@ or `tasker`, then `get_prompt <id>` to see its `variables`, then `apply_template
 each. Check that no `{{` is left, then act on the result. The agents on the phone do this
 themselves. For example, the `gemini` agent fills `gemini-advisor-brief` before every advice
 question.
+
+### Using the menu
+
+The menu has three surfaces. All three pass a request to the router prompt.
+
+| Surface | How it works | Example |
+|---|---|---|
+| Voice | The router reads the branches as a short spoken list. You say a branch, it reads that branch's leaves, you say a leaf. | "Lights", then "Mood", then "calm" |
+| Claude Panel | A Tasker List Dialog lists the branches, then the leaves of the chosen branch. The chosen path is passed as the request. | Pick Lights, then Mood |
+| `claude -p` | Give the path directly. | `claude -p "Lights > Mood: calm"` |
+
+Config mode is for a request that describes a result and not a menu action, such as "turn the
+lights blue when the car connects". The router plans the change first, using the Tasker or Termux
+prompts, and shows the diff or preview. It acts only on `yes-exact`, and it says how to undo the
+change.
 
 ## 4. Worked scenarios
 
@@ -332,7 +377,9 @@ agent that reads untrusted text can be talked into acting on it.
 
 **Consent gates.**
 - Tools that change things outside the phone UI return a preview and a one-time token:
-  `run_tasker_task` always, and `mqtt_publish` for every topic except `mia/lights/*`. The model
+  `run_tasker_task` always, and `mqtt_publish` for every topic except the four direct light topics
+  (`mia/lights/mood`, `mia/lights/effect`, `mia/lights/off` and `mia/lights/sound`). Every other
+  `mia/*` topic and all `zigbee2mqtt/*` topics need the token. The model
   reads the preview to the user and calls again with `confirm=<token>` only after an explicit yes.
   Tokens expire after 5 minutes. They are kept in a mode-0600 file because each `claude -p` turn
   starts a new server process.
