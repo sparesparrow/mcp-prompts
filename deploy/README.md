@@ -197,7 +197,7 @@ place of a list. A group entry picks up prompts added to that directory later; a
 
 `mcp-prompts profiles` then shows what it serves and warns about entries that match nothing. The
 tests in `src/prompt-store.test.ts` ("bundled profiles") fail when a bundled profile has such an
-entry, grows past 16 prompts, or lets a vehicle, voice or home prompt into `software-dev`.
+entry, grows past 20 prompts, or lets a vehicle, voice or home prompt into `software-dev`.
 
 A library of your own (`--prompts-dir`) gets profiles the same way: a `profiles.json` at its root.
 
