@@ -13,6 +13,24 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 or your own prompts and templates, choose the MCP capabilities, and copy the matching `claude mcp add`
 command, client config, URL or config file. The page reads the library from this branch.
 
+## What's new in 4.3.0
+
+- **Android automation, the flagship use case.** Two new profiles: `android-automation` (app agents,
+  Termux and the PRoot bridge, the router, and end-to-end scenarios such as Deep Research into a
+  notebook with an audio overview, or a multi-AI PR review) and `tasker-automation` (project
+  architecture, profiles, tasks and actions, variables and secrets, scene design/XML, config
+  audits and safe direct edits). Use them together with `--profile android-automation,tasker-automation`, and add
+  `voice-home` for home commands and `claude-panel` for the Claude Panel templates. See [docs/10-android-automation.md](docs/10-android-automation.md).
+  The phone-side code they are written for (MCP server, app agents, Tasker tools) is in the
+  [android-assistant](https://github.com/sparesparrow/android-assistant) repository, split out of
+  cliphist-android's `assistant/` with its history.
+- **New prompt groups** `data/prompts/android-automation/` and `data/prompts/tasker/`.
+- **Research write-up**
+  [docs/research/2026-11-ai-ecosystem-consolidation.md](docs/research/2026-11-ai-ecosystem-consolidation.md):
+  an English summary of a Deep Research report on consolidating a personal agent ecosystem across
+  Android and Linux, with a fact-check and Claude's assessment. The
+  [roadmap issues](https://github.com/sparesparrow/mcp-prompts/issues/136) come from it.
+
 ## What It Does
 
 - **Stores prompts** as JSON files in `data/prompts/`
@@ -127,8 +145,11 @@ much smaller:
 | `software-dev` | Analysing and reviewing a software project | 13 |
 | `embedded-iot` | Firmware, Raspberry Pi, Android and device bridges | 11 |
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
-| `voice-home` | Voice commands and home automation | 13 |
+| `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
+| `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
+| `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 
 ```bash
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev
@@ -139,6 +160,9 @@ Several names (`--profile software-dev,embedded-iot`) serve the prompts of any o
 profiles live in [`data/prompts/profiles.json`](data/prompts/profiles.json);
 [deploy/README.md](deploy/README.md) says what is in each, how the sizes were measured, how to
 install one over Docker or HTTP, and how to change or add one.
+The two phone profiles, `android-automation` and `tasker-automation`, have their own guide:
+[docs/10-android-automation.md](docs/10-android-automation.md) explains the stack they are written
+for, an example client config, every prompt in them, four worked scenarios and the safety model.
 
 ### Choose what gets installed
 

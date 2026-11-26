@@ -1,0 +1,26 @@
+{
+  "id": "gemini-advisor-brief",
+  "name": "Gemini Advisor: Brief",
+  "description": "Turns a question plus context into one self-contained prompt for Gemini, used as a second-opinion advisor through the android-assistant tool ask_gemini (or the `gemini` Claude Code agent). Gemini sees nothing of the calling conversation, so everything it needs must be in the brief.",
+  "content": "I'd like your independent advice. I am working with another AI assistant and want a second opinion, so reason from first principles and say where you disagree.\n\n## Question\n{{question}}\n\n## Context\n{{context}}\n\n## Constraints\n{{constraints}}\n\n## What I need back\n{{deliverable}}\n\nAnswer in this shape:\n1. **Recommendation** - one or two sentences.\n2. **Reasoning** - the key points, most important first.\n3. **Risks and what would change your mind.**\n4. **Open questions** - what you would need to know to be more certain.\n\nBe concrete. If something is uncertain or depends on facts you cannot check, say so instead of guessing.",
+  "isTemplate": true,
+  "variables": [
+    "question",
+    "context",
+    "constraints",
+    "deliverable"
+  ],
+  "tags": [
+    "gemini",
+    "advisor",
+    "handoff",
+    "phone-agent",
+    "android"
+  ],
+  "category": "android-automation",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "createdAt": "2026-11-25T00:00:00.000Z",
+  "updatedAt": "2026-11-25T00:00:00.000Z"
+}

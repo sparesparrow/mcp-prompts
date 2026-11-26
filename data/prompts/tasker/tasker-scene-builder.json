@@ -1,0 +1,30 @@
+{
+  "id": "tasker-scene-builder",
+  "name": "Tasker: Reusable Scene Builder",
+  "description": "Designs or updates a reusable Tasker scene with stable element ids, named task callbacks, lifecycle, accessibility, delivery and a test/rollback plan. Uses verified XML shapes only and falls back to UI steps for unknown structures. Use for persistent multi-control interfaces; prefer Input/List Dialog for simple choices. Pairs with tasker-scene-xml for XML reference, tasker-task-actions for callbacks, tasker-project-architecture for placement and tasker-config-audit for cleanup.",
+  "content": "Build or update a reusable Tasker Scene for this interface.\n\n## Goal\n{{scene_goal}}\n\n## Project and existing scene\nProject: {{project_name}}\nCurrent scene, project inventory, or exported XML (use \"none\" when new):\n{{existing_scene}}\n\n## Elements and integrations\n{{elements}}\n\n## Delivery and constraints\nDelivery: {{delivery}}\nConstraints: {{constraints}}\n\n## Design rules\n\n1. **Check that a Scene is the right control.** For a simple one-off choice or text input, prefer Tasker's Input Dialog or List Dialog unless the request needs a persistent layout, multiple controls, or branded/interactive UI. State the trade-off.\n2. **Design for reuse.** Give the scene and every callable task a stable, unique name. List each element's type, stable element id, label/text, position and size, data source, click/long-click task, and lifecycle. Keep per-run state local; use a global only when another task or scene must read it, and explain why.\n3. **Make interactions complete.** Specify how the scene is shown, hidden, destroyed, cancelled, and returned from. Handle back/outside taps, duplicate taps, empty or long values, keyboard/focus, orientation changes, and task errors. Buttons call named tasks; task inputs/outputs and any %par1/%par2 or return variable must be explicit. Avoid long JavaScriptlet loops and hard-coded secrets.\n4. **Respect the device and accessibility.** Account for screen size/density, portrait/landscape, large text, touch targets, contrast, TalkBack labels, and the UI language. Do not use fixed coordinates as the only interaction method.\n5. **Do not invent Tasker XML.** Use `tasker-scene-xml` as the reference for known element shapes and importer behavior. Generate `.prj.xml` only when the needed Scene and action shapes are present in a user-provided export or a verified project generator. If a shape is unknown, mark it unknown and give numbered Tasker UI steps instead; ask for a minimal exported example only when it blocks a correct result.\n6. **Keep changes reviewable.** For updates, list what will be added, replaced, or left intact and which tasks/profile/scene buttons reference it. Never overwrite an existing scene silently. Do not write live Tasker files, run `su`, push configuration, install plugins, or grant permissions. Show the proposed XML or UI steps for review; a user imports or applies them interactively.\n\n## Output\n\n1. **Recommendation**: Scene or simpler Dialog, with a short reason.\n2. **Scene specification**: a table of elements, ids, labels, layout, values, callbacks and accessibility text.\n3. **Task contract**: named tasks called by each element, inputs, outputs, cancellation and error behavior.\n4. **Lifecycle and references**: show/hide/destroy sequence, callers and any existing item that must change.\n5. **Delivery**: verified `.prj.xml` only when its schema is known; otherwise exact Tasker UI steps, with unknowns clearly labeled.\n6. **Test and rollback plan**: open/close/cancel each path, exercise every callback and error case, rotate/resize, verify no overlapping dialog, check Tasker's Run Log, then disable/remove only the new scene and tasks if rollback is needed.\n\nNo direct device changes are made by this prompt. State any user action required to import, enable, configure a plugin, or grant a permission.",
+  "isTemplate": true,
+  "variables": [
+    "scene_goal",
+    "project_name",
+    "existing_scene",
+    "elements",
+    "delivery",
+    "constraints"
+  ],
+  "tags": [
+    "android",
+    "android-automation",
+    "tasker",
+    "scenes",
+    "ui",
+    "accessibility",
+    "template"
+  ],
+  "category": "tasker",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "createdAt": "2026-11-26T00:00:00.000Z",
+  "updatedAt": "2026-11-26T00:00:00.000Z"
+}

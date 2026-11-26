@@ -489,9 +489,9 @@ name go to the server:
 variants are in `archive/`.
 
 ### Profiles
-`deploy/README.md` describes the five profiles (`software-dev`, `embedded-iot`, `mia-vehicle`,
-`voice-home`, `learning-loop`) and how to install one; `deploy/smoke-test.mjs` checks an install
-through a real MCP client.
+`deploy/README.md` describes the seven profiles (`software-dev`, `embedded-iot`, `mia-vehicle`,
+`voice-home`, `learning-loop`, `android-automation`, `tasker-automation`) and how to install
+one; `deploy/smoke-test.mjs` checks an install through a real MCP client.
 
 ## Template System
 

@@ -21,6 +21,21 @@
       "prompts": ["voice-intelligence"],
       "templates": ["voice-intelligence", "openclaw", "home-automation"]
     },
+    "android-automation": {
+      "description": "Natural-language control of an Android phone: agents that drive specific apps through android-control, Termux and termux-* commands, the Termux/PRoot bridge, and end-to-end scenarios such as Deep Research to an audio overview in a notebook, and the router that turns a typed, spoken or agent request into the right layer. Combine with tasker-automation for Tasker work.",
+      "prompts": ["android-automation"],
+      "templates": ["android-automation", "android-proot-phone-ops", "phone-voice-assistant"]
+    },
+    "claude-panel": {
+      "description": "The Claude Panel on the phone: route a dictated or typed task to a repository question, a bug fix or a coding task for local Claude Code, which answers or opens a draft pull request. Combine with android-automation (android-automation,claude-panel) for the phone's agents.",
+      "prompts": "none",
+      "templates": ["panel"]
+    },
+    "tasker-automation": {
+      "description": "Building and maintaining Tasker on Android: project architecture, profiles and contexts, scene design/XML, tasks and action codes, variables and secrets policy, config audits and safe direct edits of Tasker's config. Combine with android-automation for the full phone stack.",
+      "prompts": ["tasker-scene-xml"],
+      "templates": ["tasker"]
+    },
     "learning-loop": {
       "description": "The self-improvement loop: the seven cognitive-layer instructions and the analyzer that turns results into learnings.",
       "prompts": ["cognitive"],
