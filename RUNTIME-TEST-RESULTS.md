@@ -1,3 +1,9 @@
+> **Obsolete (historical record).** This 2026-01-11 report tests `dist/http/server-with-agents.js` (built from `src/http/server-with-agents.ts`), `src/http/routes/orchestrate.router.ts`, the `/v1/orchestrate` endpoints and `scripts/claude-orchestrate-v4.sh`. Commit d4c1de8 (2026-01-11, "feat: simplify to MCP-only architecture") added this file and removed all of that code in the same commit; none of it exists on `main` (the current `src/http-server.ts` is a different server with no `/v1/orchestrate` routes).
+>
+> Its "Recommendations" and "Next Steps", including "Fix main agent lookup configuration", no longer apply. Do not act on them.
+>
+> Orchestration now runs through `scripts/orchestrate-project.sh` (`pnpm run orchestrate`). Current tests: `pnpm test` (vitest, `src/**/*.test.ts`), run in CI by `.github/workflows/test-matrix.yml` and `.github/workflows/ci-cd.yml`.
+
 # Runtime Test Results - Bug Fixes Verification
 
 ## Test Execution Summary
