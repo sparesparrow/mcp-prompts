@@ -697,7 +697,8 @@ describe('bundled profiles', () => {
     for (const profile of store.profiles()) {
       const count = profile.prompts + profile.templates;
       expect(count, profile.name).toBeGreaterThan(0);
-      expect(count, profile.name).toBeLessThanOrEqual(15);
+      // 16: android-automation holds its 13 prompts, the browser-agent brief (#144) and two templates.
+      expect(count, profile.name).toBeLessThanOrEqual(16);
       expect(count, profile.name).toBeLessThan(store.size / 2);
     }
   });

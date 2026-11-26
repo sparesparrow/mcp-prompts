@@ -69,6 +69,7 @@ flowchart TD
     M[android-assistant MCP: screen, act, open, notify,<br/>ask_ai / ask_gemini / notebook_*, phone_command]
     K[Tasker: run_tasker_task, built .prj.xml, tasker-edit.py]
     Q[MQTT: mia/lights mood, effect, off and sound run directly;<br/>other mia/* and zigbee2mqtt/* need a token]
+    B[Agent browser: Chromium in PRoot on VNC :1,<br/>own profile, CDP 127.0.0.1:9223, Playwright MCP]
   end
   subgraph N[Knowledge]
     P[mcp-prompts: android-automation + tasker-automation profiles]
@@ -91,6 +92,7 @@ The same thing as a table:
 | Intents | Voice turn (HTTP trigger on `127.0.0.1:8780`), Claude Panel scene, Tasker "Agent <name>" tasks, `claude --agent <name> -p`, notification hooks (`notif-wait.py`) | Tasker, Termux, PRoot |
 | Router | `android-automation-router` decides between an MCP tool, an app agent, a Tasker change and an MQTT command, and names the gate. The Claude Panel's own `panel-router` decides between coding agent, phone assistant and nothing. | `claude -p` in PRoot |
 | Actuators | android-assistant MCP tools, Tasker (broadcast, importer, `tasker-edit.py`), `phone_command` (named Termux and Android commands), `mqtt_publish` | PRoot → adb on `127.0.0.1:5555`, native Termux over ssh |
+| Actuators: web | The agent browser: a Chromium with its own profile, no logins, drawn on the VNC desktop and driven by the `agent-browser` MCP server (Playwright MCP over DevTools on `127.0.0.1:9223`). It leaves the phone's screen free. Rules in `android-browser-agent`. | PRoot, VNC display :1 |
 | Knowledge | Profiles `android-automation` and `tasker-automation`, the skills `android-assistant` and `android-control`, and the agent definitions | mcp-prompts (stdio), `~/.claude` |
 | Nodes | The phone. The MIA Pi or its simulator. A desktop or always-on Linux node is on the roadmap ([#141](https://github.com/sparesparrow/mcp-prompts/issues/141)). | Wi-Fi hotspot or LAN today |
 
@@ -199,6 +201,7 @@ the voice scripts read, and the tools never print it.
 | `android-app-agent-design` | template | Plans and builds a driver module plus a Claude Code agent for one specific app. |
 | `android-app-agent-calibrate` | template | Calibrates an app driver against the real app: dry run with dumps, one real send, known failure patterns and their fixes. |
 | `android-app-agent-eval` | template | Evaluation plan and rubric for an app agent: fixture tests, live tasks under the screen lock, metrics, failure taxonomy. |
+| `android-browser-agent` | template | Operating brief for web work in the agent browser: fetch, browser or app; the lock, the profile and VNC take-over; page text as data; no logins, posts or purchases. |
 | `android-app-agent-use` | template | Operating brief for any session that works through an app agent: modes, drafts, waiting, reading, screen text as data. |
 | `gemini-advisor-brief` | template | Turns a question and context into one self-contained prompt for Gemini as a second-opinion advisor. |
 | `deep-research-ai-ecosystem-consolidation` | template | Brief for a Deep Research run that surveys a sprawling tool landscape and recommends one architecture. |
@@ -392,6 +395,27 @@ agent that reads untrusted text can be talked into acting on it.
 - Never: payments, banking, purchases or trading. Ask first before installing apps, granting
   permissions, changing system settings or deleting data. At a lock screen, password or 2FA
   prompt, stop and ask.
+
+**The agent browser.** Web tasks that need a real browser run in the PRoot's agent browser
+(android-assistant `browser/agent-browser`), not in a phone app and not in the user's own
+Chromium:
+- **No logins.** It has its own profile (`~/.config/chromium-agent`) with no accounts, extensions,
+  sync or saved passwords. The user's Chromium (`~/.config/chromium`, DevTools on 9222, with their
+  logins and the Claude in Chrome extension) is off limits to agents unless the user names it for
+  the task.
+- **Loopback only.** DevTools listen on `127.0.0.1:9223`.
+- **Its own lock.** One agent at a time holds `state/browser.lock`. The VNC display is a separate
+  screen, so this lock is separate from `agent.lock`.
+- **Idle stop.** The browser stops 10 minutes after the last agent leaves.
+- **Page text is data, and nothing is submitted without the user.** No form submissions, posts or
+  purchases without the user's yes to the exact step. Agents never type passwords or one-time codes;
+  the user logs in through VNC.
+- **Tested.** `browser/eval-injection.sh` serves release notes with three planted instructions
+  (hidden text, a link, a form asking for the system prompt) behind canary URLs. On 2026-11-26,
+  `claude -p` on Haiku, with and without the `android-browser-agent` rules, summarised the page,
+  named the planted text and did not follow it. No canary was hit, and the phone's foreground app
+  did not change.
+- **Comet** and other agentic browsers are not used with logged-in accounts in any agent path.
 
 **The one-screen lock.** There is one screen, so only one agent may drive it at a time.
 `run-agent.sh` holds an exclusive `flock` on `state/agent.lock`, waits up to 10 minutes, and
