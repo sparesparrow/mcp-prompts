@@ -252,6 +252,113 @@ lights blue when the car connects". The router plans the change first, using the
 prompts, and shows the diff or preview. It acts only on `yes-exact`, and it prints the menu path of the leaf the change lands in (`Tasker > New automation`, `Tasker > Change automation` or `Phone settings > Termux command`) and says how to undo the
 change.
 
+### Remote use over Tailscale
+
+A desktop or an always-on Linux node on the same [Tailscale](https://tailscale.com) network
+(tailnet) can use the phone's prompts and a few phone tools over MCP Streamable HTTP
+([#141](https://github.com/sparesparrow/mcp-prompts/issues/141)). Both servers listen only on the
+phone's tailnet address, never on Wi-Fi, mobile data or the hotspot, and never on the public
+internet. Both need a bearer token, and both check the Host header, so a web page cannot reach
+them through DNS rebinding.
+
+| Server | Serves | Port |
+|---|---|---|
+| `mcp-prompts-http` | the prompts of a profile, read-only: `list_prompts`, `get_prompt`, `apply_template`, `list_categories`, `get_stats` | 3013 in the example |
+| android-assistant `mcp/remote.py` | `phone_status`, `screen` and `notify` only | 8791 |
+
+Nothing that drives the UI (`act`, `open`), runs Tasker tasks, publishes MQTT, records, speaks or
+asks the AI apps is served remotely, and neither are the tools that need a confirmation token. A
+remote caller is another agent, and the user is not there to read a preview. Widening the set waits
+for the injection hardening in [#143](https://github.com/sparesparrow/mcp-prompts/issues/143).
+
+On the phone (in the PRoot). Find the phone's tailnet address in the Tailscale app, or with
+`adb -s 127.0.0.1:5555 shell ip -4 addr show tun0`. Its MagicDNS name is in the Tailscale admin
+console. The names below are placeholders.
+
+```bash
+PHONE_IP=100.x.y.z                      # the phone's tailnet address
+PHONE_NAME=phone.tailnet-name.ts.net    # its MagicDNS name
+mkdir -p ~/.config/mcp-prompts ~/.config/android-assistant
+(umask 077; openssl rand -hex 32 > ~/.config/mcp-prompts/remote-token)
+(umask 077; openssl rand -hex 32 > ~/.config/android-assistant/remote-token)
+
+# Prompts, read-only, one profile
+HOST=$PHONE_IP PORT=3013 MCP_PROMPTS_READ_ONLY=true \
+MCP_PROMPTS_AUTH_TOKEN_FILE=~/.config/mcp-prompts/remote-token \
+MCP_PROMPTS_ALLOWED_HOSTS=$PHONE_NAME,$PHONE_IP \
+MCP_PROMPTS_PROFILE=android-automation,tasker-automation \
+nohup mcp-prompts-http > ~/mcp-prompts-remote.log 2>&1 &
+
+# Phone tools: phone_status, screen, notify
+cd /root/android-assistant/mcp
+nohup .venv/bin/python remote.py --host $PHONE_IP --allowed-hosts $PHONE_NAME,$PHONE_IP \
+  --token-file ~/.config/android-assistant/remote-token > ~/assistant-remote.log 2>&1 &
+```
+
+`mcp-prompts-http` refuses to start beyond loopback with writes enabled and no token, and warns
+when `MCP_PROMPTS_ALLOWED_HOSTS` is not set. `remote.py` refuses `0.0.0.0`, a missing
+`--allowed-hosts`, a token shorter than 32 characters, and a token file that other users can read.
+
+On the desktop, copy the two tokens over a channel you trust (for example `tailscale file cp`, or
+scp over the tailnet), keep them out of the config, and add the servers. Claude Code expands
+`${VAR}` in headers:
+
+```bash
+export PHONE_PROMPTS_TOKEN=$(cat ~/.config/phone/prompts-token)
+export PHONE_TOOLS_TOKEN=$(cat ~/.config/phone/tools-token)
+claude mcp add -s user --transport http phone-prompts "http://phone.tailnet-name.ts.net:3013/mcp" \
+  -H 'Authorization: Bearer ${PHONE_PROMPTS_TOKEN}'
+claude mcp add -s user --transport http phone "http://phone.tailnet-name.ts.net:8791/mcp" \
+  -H 'Authorization: Bearer ${PHONE_TOOLS_TOKEN}'
+claude mcp list      # both: ✔ Connected
+```
+
+The same entries in a `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "phone-prompts": {
+      "type": "http",
+      "url": "http://phone.tailnet-name.ts.net:3013/mcp",
+      "headers": { "Authorization": "Bearer ${PHONE_PROMPTS_TOKEN}" }
+    },
+    "phone": {
+      "type": "http",
+      "url": "http://phone.tailnet-name.ts.net:8791/mcp",
+      "headers": { "Authorization": "Bearer ${PHONE_TOOLS_TOKEN}" }
+    }
+  }
+}
+```
+
+Notes:
+
+- **Plain HTTP inside the tailnet.** Tailscale encrypts the traffic between the nodes
+  (WireGuard). If you want HTTPS as well, put `tailscale serve` in front on a node that has the
+  Tailscale CLI.
+- **Who can connect.** Every device on the tailnet can reach the ports; the token decides who gets
+  in. A Tailscale ACL that allows only your desktop to reach `tcp:3013,8791` on the phone narrows
+  it further.
+- **The 2026-07-28 protocol revision.** Both servers are stateless: no session is kept between
+  requests, and a request needs no `initialize` first, so a switch between Wi-Fi and mobile data
+  breaks nothing. The SDKs negotiate at most 2025-11-25. A client that sends only
+  `MCP-Protocol-Version: 2026-07-28` gets HTTP 400 with the list of supported versions.
+  Claude Code 2.1.332 connects without trouble. A test in `src/http-tailnet.test.ts` fails when the
+  SDK learns the new revision, so this note gets updated.
+- **Not on the public internet.** Do not forward these ports or use Tailscale Funnel for them.
+- **Stop when idle.** Both servers cost little while idle, but stop them (`pkill -f remote.py`,
+  `pkill -f mcp-prompts-http`) when no desktop needs them.
+
+How it was checked (2026-11-26, from the phone itself over its tailnet address, because no second
+tailnet machine was at hand):
+
+- With the token, `claude mcp list` showed both servers as connected. A Claude session listed only
+  the read-only tools, listed prompts and read the battery level through `phone_status`.
+- A wrong token got HTTP 401 and `claude mcp list` showed "Failed to connect". Another Host name
+  got HTTP 403.
+- The phone's loopback, Wi-Fi and hotspot addresses refused connections on both ports.
+
 ## 4. Worked scenarios
 
 Each scenario lists the prompts it loads, the tools it calls and the gates it passes. All four
@@ -507,8 +614,9 @@ Known limits today:
 - **Terms of service.** Driving consumer chat apps through their UI is automated access, and some
   providers' consumer terms restrict that. See the
   [assessment in the research write-up](research/2026-11-ai-ecosystem-consolidation.md#claudes-assessment).
-- **Local only.** The MCP servers are stdio servers on the phone. No authenticated remote access
-  exists yet.
+- **Remote access is narrow.** Over the tailnet, only the prompts (read-only) and `phone_status`,
+  `screen` and `notify` are served (see [Remote use over Tailscale](#remote-use-over-tailscale)).
+  Everything that drives the phone stays local.
 
 Roadmap (the issues under the epic [#136](https://github.com/sparesparrow/mcp-prompts/issues/136)):
 
