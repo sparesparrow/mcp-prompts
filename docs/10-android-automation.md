@@ -463,8 +463,14 @@ Known limits today:
 - **The phone sleeps.** Doze and background limits stop long-running daemons. Long jobs end on a
   notification hook, not a polling loop. `wake_lock` exists but costs battery.
 - **PRoot is not a VM.** It has no systemd, no container sandbox and no pty for some workers, and
-  system calls are slower. A real Linux desktop on the phone (Hyprland on termux-x11 or Arch Linux
-  ARM) is unproven here.
+  system calls are slower.
+- **No Hyprland on the phone.** Hyprland needs a GPU it can allocate buffers on. Android keeps the
+  display, and this phone's PowerVR GPU has no Mesa driver. The
+  [spike report](research/2026-11-omarchy-in-proot.md) shows it failing in every mode, in Arch
+  Linux ARM under PRoot.
+  - A software-rendered sway session over wayvnc does run, at about 60 MiB.
+  - XFCE over TigerVNC stays the default.
+  - From Omarchy, the router menu takes ideas, not the desktop.
 - **Terms of service.** Driving consumer chat apps through their UI is automated access, and some
   providers' consumer terms restrict that. See the
   [assessment in the research write-up](research/2026-11-ai-ecosystem-consolidation.md#claudes-assessment).
