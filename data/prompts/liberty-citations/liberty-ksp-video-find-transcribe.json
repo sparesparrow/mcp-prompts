@@ -1,0 +1,57 @@
+{
+  "id": "liberty-ksp-video-find-transcribe",
+  "name": "Kanál Svobodného přístavu: Find and Transcribe Talks",
+  "description": "Finds talks on Urza and Tereza's YouTube channel Kanál Svobodného přístavu (about 1,000 lectures, studio talks, conference talks and streams; #ne_poslušnosti videos via stoky.urza.cz/nep/) with youtube_find, youtube_catalog refresh and stoky_search, then transcribes and indexes a video or a clip as a background job (transcribe, job_status) so search_quotes finds the exact moment; explains the auto engine order (GPU faster-whisper, YouTube captions, Groq, CPU, OpenAI), which models are only for locating, that billed engines need a yes, and what to do in claude.ai where YouTube blocks downloads. Quoting a moment verbatim goes on to liberty-ksp-video-quote. Variables: topic_or_url, purpose, engine, clip.",
+  "content": "# Kanál Svobodného přístavu: find and transcribe talks\n\nUrza and Tereza's channel `https://www.youtube.com/@kanalsvobodnehopristavu` holds about 1,000 videos: lectures, Studio Svobodného přístavu talks, KSP conference talks and streams. #ne_poslušnosti videos are linked from `https://stoky.urza.cz/nep/`.\n\n## Task\n- Topic or URL: {{topic_or_url}}\n- Purpose: {{purpose}}\n- Engine: {{engine}}\n- Clip: {{clip}}\n\n## 1. Find\n- `youtube_find(query=<topic in Czech>, limit=10)` ranks videos by title, description and the Stoky post that announced them (which also gives the date); `transcript_hits` shows moments inside videos already transcribed.\n- Also `stoky_search(query=\"Kanál Svobodného přístavu <topic>\")`.\n- When `catalog_fetched` is old, run `youtube_catalog(refresh=true)` first.\n- Answer with the three to five best: title, date, duration, URL, why it matches, transcribed or not.\n\n## 2. Transcribe and index\n`transcribe(src=<url>, engine=<engine>, language=\"cs\", clip=<\"MM:SS-MM:SS\">)` (leave `clip` out for the whole video) returns a job id; poll `job_status(job_id)` every 30 to 60 seconds. The transcript lands in `$LIBERTY_HOME/transcripts/` (.txt with [mm:ss] markers, .srt, .json) and in the index, so `search_quotes(query=…, sources=[\"youtube\"])` finds the exact moment.\n- `engine=\"auto\"` order: GPU faster-whisper, YouTube's Czech captions, Groq (free tier), CPU faster-whisper, OpenAI or a compatible endpoint. Captions show where something was said but have no punctuation; `base` and `small` models are for locating only.\n- Ask before an engine that bills the user (OpenAI, ElevenLabs Scribe).\n- Direct media URLs (#ne_poslušnosti files on nostr.build, 0.5 to 4 GB) with a clip fetch only the minutes needed.\n\n## 3. Without the toolkit\nYouTube blocks cloud servers, so nothing can be downloaded from claude.ai. Offer a speech-to-text connector the user has (for example ElevenLabs) on an audio file they provide, or give the exact command to run in Claude Code: `liberty transcribe <url> --clip MM:SS-MM:SS --engine faster-whisper --model large-v3`.\n\n## 4. Report\nThe videos found, with links; jobs started (ids) and finished; where the transcript is; the matching moments as timestamp links (`&t=<seconds>s`). To quote a moment verbatim, continue with `liberty-ksp-video-quote`.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "topic_or_url",
+      "description": "A topic to search for (Czech works best) or a video URL."
+    },
+    {
+      "name": "purpose",
+      "description": "'find', 'transcribe and index', or 'both'."
+    },
+    {
+      "name": "engine",
+      "description": "'auto' (default), or one of captions, faster-whisper, groq, openai, custom."
+    },
+    {
+      "name": "clip",
+      "description": "A window 'MM:SS-MM:SS', or '-' for the whole video.",
+      "required": false
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "youtube",
+    "transcription",
+    "svobodny-pristav",
+    "video",
+    "czech"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "youtube_find",
+      "youtube_catalog",
+      "stoky_search",
+      "transcribe",
+      "job_status",
+      "search_quotes"
+    ],
+    "evalCases": [
+      "urza-video-timestamp-quote"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

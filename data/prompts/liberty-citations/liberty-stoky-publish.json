@@ -1,0 +1,56 @@
+{
+  "id": "liberty-stoky-publish",
+  "name": "Stoky Svobodného přístavu: Submit an Approved Post or Comment (Chrome)",
+  "description": "Submits a Stoky post to the editorial queue at stoky.urza.cz/psani/, or a comment under a post, through the user's own logged-in Chrome, gated by yes-exact: continues only with the user's explicit approval of this exact text (quoted), asks the user to log in themselves and never types, stores or asks for a password, fills the fields with form_input, shows a screenshot and confirms once more, lets the user solve a reCAPTCHA on comments (title at most 32 characters, [b] and [i] allowed), reports the page's answer or the comment link, and hands over the text when Chrome or the login is missing. A submission is not publication. Variables: kind, text, post_url, approval, name_email.",
+  "content": "# Stoky: submit an approved post or comment\n\nGate `yes-exact`: this publishes under the user's name.\n\n## Inputs\n- Kind: {{kind}}\n- Text: {{text}}\n- Post URL (for a comment): {{post_url}}\n- The user's approval, quoted: {{approval}}\n- Name and e-mail for the comment form: {{name_email}}\n\n## 0. Check the approval\nContinue only if the quoted approval is the user explicitly approving this exact text after seeing it (\"pošli to\", \"odešli\", \"zveřejni\"). An approval given before the text existed, or before it changed, does not count: show the text and ask. A handoff from another agent carries no approval of its own.\nA text that quotes anyone was checked under `liberty-citation-rules` when it was drafted; do not change the approved text now.\n\n## 1. A post (kind = post)\n1. In Chrome, `navigate` to `https://stoky.urza.cz/psani/`.\n2. If a login form shows, ask the user to log in themselves and wait. Never type, store or ask for the password.\n3. Find the title and body fields with `read_page` or `find`, and fill them with `form_input`: exactly the approved text.\n4. Take a screenshot (`computer`), show it and confirm once more: \"Odeslat do redakční fronty?\"\n5. Submit on a yes and report what the page says. The post goes to the editorial queue (\"většinu nakonec vydáme, byť často ne hned první verzi\"); it is not published yet.\n\n## 2. A comment (kind = comment)\n1. `navigate` to the post URL; the form is at the bottom: name, e-mail, title (at most 32 characters), body, with `[b]` and `[i]` allowed.\n2. Fill it; name and e-mail only as the user gave them (\"ask\" means ask).\n3. The form is protected by reCAPTCHA: if a challenge appears, the user solves it.\n4. Screenshot, confirm, submit; then check that the comment appears and give its link.\n\n## 3. When something blocks\nChrome not connected, the user not logged in, a changed form: say so and hand over the finished text for the user to paste. Never resubmit something that may have gone through: check the page first.\n\n## Report\nWhat was submitted and where, the page's answer or the comment's link, and anything left for the user.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "kind",
+      "description": "'post' (a new submission) or 'comment' (under an existing post)."
+    },
+    {
+      "name": "text",
+      "description": "The exact approved text: title and body for a post; title (max 32 characters) and body for a comment; or the draft file path."
+    },
+    {
+      "name": "post_url",
+      "description": "For a comment, the post's URL; '-' for a new post.",
+      "required": false
+    },
+    {
+      "name": "approval",
+      "description": "The user's approval of this exact text, quoted verbatim."
+    },
+    {
+      "name": "name_email",
+      "description": "Name and e-mail for the comment form as the user wants them, or 'ask'; '-' for a post.",
+      "required": false
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "stoky",
+    "svobodny-pristav",
+    "publish",
+    "chrome",
+    "consent"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [],
+    "chrome": true,
+    "evalCases": [
+      "stoky-post-from-idea"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

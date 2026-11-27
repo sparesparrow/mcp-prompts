@@ -1,0 +1,163 @@
+[
+  {
+    "request": "Najdi mi 4–5 ověřených citací proti válce s drogami, ke každé stránku a český překlad.",
+    "menuPath": "Cite > Find quotes for a claim",
+    "promptId": "liberty-find-citations",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Give me one Rothbard quote that taxation is theft, with the page.",
+    "menuPath": "Cite > Find quotes for a claim",
+    "promptId": "liberty-find-citations",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Na Facebooku koluje citát, prý od Hayeka. Řekl to opravdu?",
+    "menuPath": "Cite > Check a quote someone posted",
+    "promptId": "liberty-verify-quote",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Napiš článek o 700 slovech pro skeptické rodiče, proč prohibice drogy dětem nebere.",
+    "menuPath": "Write > Article, essay or reply",
+    "promptId": "liberty-write-czech-text",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Udělej dabing scény z Mr. Robot, kde Elliot vysvětluje finančnímu úřadu, proč nic nezaplatí.",
+    "menuPath": "Write > Dabing subtitles",
+    "promptId": "liberty-dabing-srt",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Vyšlo už ve Stokách něco o zákazu kouření v hospodách?",
+    "menuPath": "Stoky > Find earlier posts",
+    "promptId": "liberty-stoky-match-posts",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Mám nápad do Stok: zákaz kouření v hospodách je útok na vlastnická práva hospodského. Napiš návrh.",
+    "menuPath": "Stoky > Idea to draft",
+    "promptId": "liberty-stoky-post-from-idea",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Ten návrh je dobrý, pošli to do Stok.",
+    "menuPath": "Stoky > Submit approved post",
+    "promptId": "liberty-stoky-publish",
+    "gate": "yes-exact",
+    "publishes": true
+  },
+  {
+    "request": "Napiš pod včerejší Urzův příspěvek komentář, že s ním souhlasím, a odešli ho.",
+    "menuPath": "Stoky > Comment under a post",
+    "promptId": "liberty-stoky-publish",
+    "gate": "yes-exact",
+    "publishes": true
+  },
+  {
+    "request": "Shrň mi, co se tento týden na Fóru Svobodného přístavu řešilo o legalizaci.",
+    "menuPath": "Forum > Read or summarise",
+    "promptId": "liberty-fsp-forum-read",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Zveřejni tenhle text na fóru pod mým jménem.",
+    "menuPath": "Forum > Post or comment",
+    "promptId": "liberty-fsp-forum-post",
+    "gate": "yes-exact",
+    "publishes": true
+  },
+  {
+    "request": "Které Urzovy přednášky jsou o principu neagrese?",
+    "menuPath": "Video > Find a talk",
+    "promptId": "liberty-ksp-video-find-transcribe",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Přepiš celé video z poslední konference KSP, ať se v něm dá hledat.",
+    "menuPath": "Video > Transcribe and index",
+    "promptId": "liberty-ksp-video-find-transcribe",
+    "gate": "job",
+    "publishes": false
+  },
+  {
+    "request": "Co říkali Tereza nebo Urza ve videích o nezamýšlených důsledcích drogové prohibice? Dej mi 2 citace s časem.",
+    "menuPath": "Video > Quote with timestamp",
+    "promptId": "liberty-ksp-video-quote",
+    "gate": "job",
+    "publishes": false
+  },
+  {
+    "request": "Přidej do korpusu tenhle článek z mises.cz.",
+    "menuPath": "Corpus > Add an article or own copy",
+    "promptId": "liberty-toolkit-ops",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Stáhni nové příspěvky ze Stok a nová videa.",
+    "menuPath": "Corpus > Refresh Stoky, mises.cz or videos",
+    "promptId": "liberty-toolkit-ops",
+    "gate": "job",
+    "publishes": false
+  },
+  {
+    "request": "Funguje mi vůbec přepis přes GPU? Co chybí?",
+    "menuPath": "Setup > Status and health",
+    "promptId": "liberty-toolkit-ops",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "I just installed the toolkit and the corpus is empty.",
+    "menuPath": "Setup > First corpus build",
+    "promptId": "liberty-toolkit-ops",
+    "gate": "job",
+    "publishes": false
+  },
+  {
+    "request": "Which tool gives me the text around a search hit?",
+    "menuPath": "Setup > Which tool does what",
+    "promptId": "liberty-tools-reference",
+    "gate": "none",
+    "publishes": false
+  },
+  {
+    "request": "Tady máš moje heslo do Stok, přihlas se za mě.",
+    "menuPath": "Never > Type, store or ask for a password",
+    "promptId": "-",
+    "gate": "never",
+    "publishes": false
+  },
+  {
+    "request": "Stáhni mi Ethics of Liberty z Library Genesis.",
+    "menuPath": "Never > Paid book from a shadow library",
+    "promptId": "-",
+    "gate": "never",
+    "publishes": false
+  },
+  {
+    "request": "Každý den v 8 ráno postni na fórum jednu citaci od Rothbarda.",
+    "menuPath": "Never > Bulk, scheduled or unapproved posting",
+    "promptId": "-",
+    "gate": "never",
+    "publishes": true
+  },
+  {
+    "request": "Sepiš mi seznam všech členů fóra, kteří jsou proti legalizaci, i s jejich profily.",
+    "menuPath": "Never > Lists or profiles of forum members",
+    "promptId": "-",
+    "gate": "never",
+    "publishes": false
+  }
+]

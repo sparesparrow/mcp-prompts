@@ -1,0 +1,61 @@
+{
+  "id": "liberty-stoky-match-posts",
+  "name": "Stoky Svobodného přístavu: Find Earlier Posts on a Topic",
+  "description": "Finds what stoky.urza.cz has already published on a topic, without writing anything: stoky_search in two or three Czech phrasings with optional date and author filters (or WebSearch site:stoky.urza.cz and the month archive on the web path), a stoky_sync when recent posts matter and the index is old, stoky_post on the closest hits when the comment debate matters, and a ranked list of title, author, date, one-line gist and link, plus whether the topic is covered and which angle is still open. Use it before drafting a post or text, or to link to an earlier debate. Variables: topic, since, until, author, purpose.",
+  "content": "# Stoky: find earlier posts on a topic\n\n## Task\n- Topic: {{topic}}\n- From: {{since}}\n- To: {{until}}\n- Author: {{author}}\n- Purpose: {{purpose}}\n\n## 1. Search\n- Toolkit: `stoky_search(query=…, since=…, until=…, author=…, limit=10)` with two or three Czech phrasings: the core noun, the moral framing, the policy's name (for a smoking ban: \"zákaz kouření\", \"kouření hospoda\", \"vlastnická práva hospodský\"). A value of \"-\" or \"any\" means no filter: leave that argument out.\n- Web path: WebSearch `site:stoky.urza.cz <terms>`; the month archive `https://stoky.urza.cz/archiv/YYYY-MM` holds full texts.\n- Freshness: when the purpose needs recent posts and `liberty_status` shows an old Stoky sync, start `stoky_sync()` (a job; poll `job_status`) or check the latest archive months on the web.\n\n## 2. Read the best\nOpen the three to five closest with `stoky_post(url_or_id=…, include_comments=true)` when the debate matters for the purpose: where it went and the best counter-arguments in the comments.\n\n## 3. Answer\nA ranked list, closest first:\n`1. <title> — <author>, <date> — <one-line gist> — <url>`, plus \"diskuse: N komentářů; hlavní námitka: …\" when you read the comments.\nThen one line: is the topic already covered, and which angle is still open? If nothing was found, say so and what you searched. Name commenters only by their display name, and only where the answer needs it.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "topic",
+      "description": "The topic or idea, in Czech or English."
+    },
+    {
+      "name": "since",
+      "description": "Earliest date YYYY-MM-DD, or '-' for no limit.",
+      "required": false
+    },
+    {
+      "name": "until",
+      "description": "Latest date YYYY-MM-DD, or '-' for no limit.",
+      "required": false
+    },
+    {
+      "name": "author",
+      "description": "A Stoky author to filter by, or 'any'.",
+      "required": false
+    },
+    {
+      "name": "purpose",
+      "description": "Why: avoid repeating a post, link to an earlier debate, research."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "stoky",
+    "svobodny-pristav",
+    "search",
+    "czech"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "stoky_search",
+      "stoky_post",
+      "stoky_sync",
+      "liberty_status",
+      "job_status"
+    ],
+    "evalCases": [
+      "stoky-post-from-idea"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

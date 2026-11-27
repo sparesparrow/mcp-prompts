@@ -40,6 +40,11 @@
       "description": "The self-improvement loop: the seven cognitive-layer instructions and the analyzer that turns results into learnings.",
       "prompts": ["cognitive"],
       "templates": ["learning-loop-analyzer"]
+    },
+    "liberty-citations": {
+      "description": "Czech libertarian writing backed by verified, page-cited quotes, for the liberty-citations skill and its toolkit: the router, the citation rules and tool reference, finding and checking quotes, Czech texts with drug prohibition as home turf, Stoky posts from idea to submission, the Fórum Svobodného přístavu on Facebook, timestamped quotes from Kanál Svobodného přístavu videos, parody dabing subtitles, and toolkit setup and corpus upkeep.",
+      "prompts": ["liberty-citations"],
+      "templates": ["liberty-citations"]
     }
   }
 }

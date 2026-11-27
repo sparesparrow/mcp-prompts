@@ -1,0 +1,60 @@
+{
+  "id": "liberty-ksp-video-quote",
+  "name": "Kanál Svobodného přístavu: A Verified Quote with a Timestamp",
+  "description": "Produces a verified, timestamped quote from a Kanál Svobodného přístavu video: locates the moment (search_quotes on transcribed videos with get_passage, or a quick captions transcription), re-transcribes just a 60 to 120 second window with the strongest model (faster-whisper large-v3 or Groq) before quoting, attributes the words to Urza or Tereza only when the video makes the speaker unambiguous, and quotes with a timestamp link and the label strojový přepis, or paraphrases when in doubt. When transcription is impossible here, says why and gives the exact command; never presents remembered or invented wording as a speaker's words. Variables: video_url, claim, approx_time, speaker, count.",
+  "content": "# Kanál Svobodného přístavu: a verified quote with a timestamp\n\n## Task\n- Video: {{video_url}}\n- What the quote should show: {{claim}}\n- Approximate time: {{approx_time}}\n- Speaker: {{speaker}}\n- How many quotes: {{count}}\n\n## 1. Locate the moment\n- Video not known yet (\"find\"): run `liberty-ksp-video-find-transcribe` first.\n- Already transcribed: `search_quotes(query=<Czech terms>, sources=[\"youtube\"])`, then `get_passage(chunk_id=…)` for the window with its [mm:ss] markers.\n- Not transcribed: transcribe with a fast engine to locate (`engine=\"captions\"`), then search.\n\n## 2. Verify the window\nBefore quoting, re-transcribe only that window with the strongest model: `transcribe(src=<url>, clip=\"MM:SS-MM:SS\", engine=\"faster-whisper\", model=\"large-v3\")` or `engine=\"groq\"`, about 60 to 120 seconds around the moment; poll `job_status`, then read the new transcript. Small models garble Czech badly: never quote from `base`, `small` or raw captions.\n\n## 3. Attribute\nThe transcripts have no speaker labels. Attribute words to Urza or Tereza only when the video makes the speaker unambiguous (a single-speaker lecture, the speaker named on screen or in the title). Otherwise write \"ve videu zaznělo\".\n\n## 4. Quote\nUnder `liberty-citation-rules`. For each quote: the words copied from the verified transcript, marked *(strojový přepis)*; the timestamp link `https://www.youtube.com/watch?v=<id>&t=<seconds>s`; the video's title and date; one line on what it shows. When the wording is still uncertain, paraphrase: „Urza ve videu … (čas 12:34) vysvětluje, že …“.\n\n## 5. When it cannot be transcribed here\nSay concretely why (no toolkit, YouTube blocks cloud servers, no GPU and no key) and give the exact command: `liberty transcribe <url> --clip MM:SS-MM:SS --engine faster-whisper --model large-v3`. Never present remembered or invented wording as the speaker's words.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "video_url",
+      "description": "The video URL, or 'find' to look for one on the topic of the claim."
+    },
+    {
+      "name": "claim",
+      "description": "What the quote should show, e.g. 'nezamýšlené důsledky drogové prohibice'."
+    },
+    {
+      "name": "approx_time",
+      "description": "Approximate moment 'MM:SS', or 'unknown'.",
+      "required": false
+    },
+    {
+      "name": "speaker",
+      "description": "'Urza', 'Tereza', or 'unknown'."
+    },
+    {
+      "name": "count",
+      "description": "How many quotes, e.g. '2'."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "youtube",
+    "transcription",
+    "quotes",
+    "citations",
+    "svobodny-pristav",
+    "video"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "search_quotes",
+      "get_passage",
+      "transcribe",
+      "job_status"
+    ],
+    "evalCases": [
+      "urza-video-timestamp-quote"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

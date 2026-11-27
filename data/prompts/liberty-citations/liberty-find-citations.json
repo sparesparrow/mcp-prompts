@@ -1,0 +1,58 @@
+{
+  "id": "liberty-find-citations",
+  "name": "Liberty Citations: Find Verified Quotes for a Claim",
+  "description": "Finds one or two verified, page-cited quotes per claim from the liberty-citations corpus or the web: sharpen and split the claim, plan two to four queries in the language of each source (English for Mises, Rothbard, Hoppe, Spooner, Thornton and Block, Czech for Stoky, ankap.urza.cz, mises.cz and transcripts), search with search_quotes, open every candidate with get_passage and read its context, keep the shortest span that carries the point, and present each as a citation block with author, work, locator, own Czech translation marked as such, what it proves and the URL. Includes the drug-prohibition starting points (Spooner, Mises Human Action XXVII.6, Rothbard For a New Liberty ch. 6, Thornton, Block, Czech voices). Variables: claim, output_language, sources, authors, count.",
+  "content": "# Liberty Citations: find verified quotes for a claim\n\n## Task\n- Claim: {{claim}}\n- Output language: {{output_language}}\n- Preferred sources: {{sources}}\n- Preferred authors: {{authors}}\n- How many quotes: {{count}}\n\nFollow `liberty-citation-rules` (fetch it with `get_prompt` if it is not in your context).\n\n## 1. Sharpen the claim\nRestate it in one sentence. If it bundles several claims, split them: one claim gets one or two quotes, not ten. If an author on the list would not support it (Hayek on abolishing the state, Mises on anarchy), say so now.\n\n## 2. Plan the queries\n- Use the language of the source: English terms for the books (narcotics, drugs, prohibition, victimless, vice, opium, black market), Czech for Stoky, ankap, mises.cz and transcripts (drogy, prohibice, zločin bez oběti, černý trh; the index stems Czech).\n- Two to four variants per claim; \"quoted phrases\" for a wording you expect.\n- Mix the sources: a book for authority, a Czech voice (Urza, Stoky, mises.cz) for a Czech audience, a video when the user wants Urza's spoken words (then `liberty-ksp-video-quote`).\n\nStarting points; confirm the exact passage by search before quoting:\n| Argument | Where to look |\n|---|---|\n| vice is not crime, self-ownership | Spooner, *Vices Are Not Crimes*; ankap.urza.cz/drogy/; Mill, *On Liberty* |\n| the slippery slope of paternalism | Mises, *Human Action*, ch. XXVII § 6 \"Direct Government Interference with Consumption\" |\n| victimless crimes | Rothbard, *For a New Liberty*, ch. 6 \"Personal Liberty\" |\n| potency, corruption and crime under prohibition | Thornton, *The Economics of Prohibition* |\n| defending the dealer and the user | Block, *Defending the Undefendable*, \"The Drug Pusher\", \"The Drug Addict\" |\n| Czech voices | Stoky (Urza; Tereza: \"Důsledky drogové prohibice\"), KSP talks on YouTube, mises.cz |\n\n## 3. Search and open\n- Toolkit: `search_quotes(query=…, sources=[…], author=…, limit=8)`. Check `mode`: any means the all-words query found little, so read the hits critically.\n- Open every candidate with `get_passage(chunk_id=…, context=1)`; use `context=2` when the hit sits at the edge of a chunk. Drop a candidate whose context reverses or weakens it.\n- Web path: WebSearch and WebFetch with the URL patterns of `liberty-tools-reference`; take the page from the PDF, or the chapter and section from the HTML.\n\n## 4. Choose\nFor each claim keep the shortest span that carries the point. Prefer the primary source to the secondary. When the output is Czech and the user did not rule it out, include at least one Czech source with its URL.\n\n## 5. Present\nOne block per quote, as in `liberty-citation-rules`: author — work (year), locator and edition; the quote in „ “; the translation marked *(přel. vlastní)* when the quote's language differs from the output; \"K čemu:\" in one line; the URL. Then:\n- Not found or unverified: what you searched and where, with a paraphrase marked as unverified.\n- Caveats: positions the authors would not share, quotes whose context is subtle.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "claim",
+      "description": "The claim the quotes must support, in one sentence (any language)."
+    },
+    {
+      "name": "output_language",
+      "description": "Language of the answer: cs (default) or en."
+    },
+    {
+      "name": "sources",
+      "description": "Preferred sources: any of book, stoky, ankap, mises.cz, youtube, web, or 'mix'."
+    },
+    {
+      "name": "authors",
+      "description": "Preferred authors, e.g. 'Mises, Rothbard, Spooner, Thornton, Urza', or 'any'."
+    },
+    {
+      "name": "count",
+      "description": "How many quotes in total, e.g. '4-5', or '1-2 per claim'."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "citations",
+    "quotes",
+    "search",
+    "drug-policy",
+    "czech",
+    "mises",
+    "rothbard"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "search_quotes",
+      "get_passage"
+    ],
+    "evalCases": [
+      "drug-prohibition-citations-cs"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

@@ -19,7 +19,8 @@ only those prompts; the rest do not exist for it.
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
-| (none) | Everything | 80 |
+| `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
+| (none) | Everything | 95 |
 
 No call returns a whole library, with or without a profile: `list_prompts` gives 20 summaries a page
 (at most 50, descriptions cut to 110 characters), and `list_categories` shows what each part holds.
@@ -104,6 +105,14 @@ Combine with `android-automation` for the full phone stack.
 typed task, and the three routes it picks from (`panel-repo-question`, `panel-bug-fix`,
 `panel-coding-task`) for local Claude Code. A profile of its own so `android-automation` stays
 within the size limit; the phone's agents use `--profile android-automation,claude-panel`.
+
+**`liberty-citations`** (2 plain, 13 templates). The `liberty-citations` group, for the
+liberty-citations Agent Skill and its `liberty` MCP server: `liberty-router` (eight branches, a
+gate per leaf), the plain `liberty-citation-rules` and `liberty-tools-reference`, and templates to
+find and check quotes, write Czech texts, find, draft and submit Stoky posts, read and post in the
+Fórum Svobodného přístavu, find, transcribe and quote Kanál Svobodného přístavu videos, write
+parody dabing subtitles, and run the toolkit. Read-only knowledge: install it with `--read-only`.
+[docs/12-liberty-citations.md](../docs/12-liberty-citations.md) is the guide.
 
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
 these kinds of work), `analysis-assistant` (a demonstration prompt) and
