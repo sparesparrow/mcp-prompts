@@ -458,7 +458,16 @@ Known limits today:
 
 - **UI drivers are brittle.** An app update can move or rename a button. The drivers are pinned by
   fixture tests built from real dumps, and `android-app-agent-calibrate` covers re-calibration.
-  There is no automated check yet that runs after app updates.
+  - **Live eval:** android-assistant `agents/app-eval.sh run` runs one short real task per chat
+    app under the screen lock. It records each app's version, scores the run with the
+    `android-app-agent-eval` rubric, and counts false actions. The share sheet, or a messaging
+    app, on screen is a blocker.
+  - **After an app update:** an opt-in watcher re-runs the apps whose version changed, but only
+    while the phone is idle. A failure posts a notification naming the app, the step and the tag.
+  - **What it found first:** the Gemini driver tapped an answer's Share button, which creates a
+    public link and opens the share sheet. That was fixed in android-assistant#24.
+  - **Latest run (2026-11-27):** 4 of 6 apps passed. Kimi declined for capacity. ChatGPT's read
+    of the answer came back empty (android-assistant#26).
 - **One screen.** App agents run one after another, and a multi-app review takes minutes.
 - **The phone sleeps.** Doze and background limits stop long-running daemons. Long jobs end on a
   notification hook, not a polling loop. `wake_lock` exists but costs battery.
