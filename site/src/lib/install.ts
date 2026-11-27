@@ -114,7 +114,10 @@ export function formatInstallSnippets(options: InstallOptions, name = 'mcp-promp
 
 // --- The page's own forms, built on the functions above ---
 
-export type Runner = 'global' | 'npx' | 'docker' | 'http';
+export type Runner = 'hosted' | 'global' | 'npx' | 'docker' | 'http';
+
+/** The public, read-only server deployed from main on Vercel (vercel.json, the Dockerfile). */
+export const HOSTED_URL = 'https://mcp-prompts.vercel.app';
 
 export const PACKAGE = '@sparesparrow/mcp-prompts';
 export const IMAGE = 'ghcr.io/sparesparrow/mcp-prompts';
@@ -129,7 +132,7 @@ export interface Launch {
 }
 
 /** How a client starts the stdio server for these options. */
-export function stdioLaunch(options: InstallOptions, runner: Exclude<Runner, 'http'>, viaConfigFile = false): Launch {
+export function stdioLaunch(options: InstallOptions, runner: Exclude<Runner, 'http' | 'hosted'>, viaConfigFile = false): Launch {
   const args = viaConfigFile ? ['--config', '/absolute/path/mcp-prompts.json'] : optionArgs(options);
   if (runner === 'global') return { command: 'mcp-prompts', args, notes: [] };
   if (runner === 'npx') return { command: 'npx', args: ['-y', PACKAGE, ...args], notes: [] };
@@ -169,6 +172,10 @@ export interface Snippets {
   mcpServersJson: string;
   /** VS Code's .vscode/mcp.json. */
   vscodeJson: string;
+  /** Codex's ~/.codex/config.toml. */
+  codexToml: string;
+  /** For a URL install: what to paste in claude.ai or Claude Desktop under Settings → Connectors. */
+  connectorUrl?: string;
   /** mcp-prompts.json and how to point an install at it. */
   configFile: string;
   configFileLaunch: string;
@@ -186,6 +193,21 @@ function base64(text: string): string {
   return btoa(binary);
 }
 
+const tomlString = (value: string) => JSON.stringify(value);
+const tomlKey = (key: string) => (/^[A-Za-z0-9_-]+$/.test(key) ? key : tomlString(key));
+
+/** The [mcp_servers.<name>] table of Codex's config.toml. */
+function codexToml(name: string, server: { command: string; args: string[] } | { url: string; tokenVariable?: string }): string {
+  const lines = [`[mcp_servers.${tomlKey(name)}]`];
+  if ('url' in server) {
+    lines.push(`url = ${tomlString(server.url)}`);
+    if (server.tokenVariable) lines.push(`bearer_token_env_var = ${tomlString(server.tokenVariable)}`);
+  } else {
+    lines.push(`command = ${tomlString(server.command)}`, `args = [${server.args.map(tomlString).join(', ')}]`);
+  }
+  return lines.join('\n');
+}
+
 export function buildSnippets(
   options: InstallOptions,
   runner: Runner,
@@ -195,6 +217,20 @@ export function buildSnippets(
 ): Snippets {
   const configFile = JSON.stringify(optionConfigFile(options), null, 2);
 
+  if (runner === 'hosted') {
+    // The public deployment: the same URL forms as HTTP, nothing to start, no token, read-only.
+    const hosted = buildSnippets(options, 'http', name, HOSTED_URL, false);
+    const notes = [
+      `${HOSTED_URL} is public and read-only, and runs the latest release from main: nothing to install or start.`,
+      'Its prompts are the bundled library. Your own directories and saved changes need a local install (npm, npx or Docker).',
+      'claude.ai and Claude Desktop: Settings → Connectors → Add custom connector, and paste the URL.',
+    ];
+    if (options.dirs.length > 0 || options.stateDir || options.promptsDir) {
+      notes.unshift('The hosted server ignores your own directories and state directory: a URL cannot name paths.');
+    }
+    return { ...hosted, server: undefined, configFileLaunch: '', notes };
+  }
+
   if (runner !== 'http') {
     const launch = stdioLaunch(options, runner);
     const viaFile = stdioLaunch(options, runner, true);
@@ -203,6 +239,7 @@ export function buildSnippets(
       claudeCode: commandLine(['claude', 'mcp', 'add', '-s', 'user', name, '--', launch.command, ...launch.args]),
       mcpServersJson: JSON.stringify({ mcpServers: { [name]: entry } }, null, 2),
       vscodeJson: JSON.stringify({ servers: { [name]: { type: 'stdio', ...entry } } }, null, 2),
+      codexToml: codexToml(name, { command: launch.command, args: launch.args }),
       configFile,
       configFileLaunch: JSON.stringify({ mcpServers: { [name]: { command: viaFile.command, args: viaFile.args } } }, null, 2),
       cursorLink: `cursor://anysphere.cursor-deeplink/mcp/install?name=${encodeURIComponent(name)}&config=${encodeURIComponent(base64(JSON.stringify(entry)))}`,
@@ -257,11 +294,13 @@ export function buildSnippets(
     notes.push('A server reachable beyond this machine refuses to start with writes enabled and no token: turn on read-only or use a token.');
   }
   if (useToken) notes.push(`Set ${TOKEN_VARIABLE} to the token before running these; clients send it as a bearer token.`);
-  notes.push('Claude Desktop adds remote servers under Settings → Connectors, not in claude_desktop_config.json.');
+  notes.push('claude.ai and Claude Desktop add a URL under Settings → Connectors → Add custom connector (it must be reachable from the internet over HTTPS), not in claude_desktop_config.json.');
   return {
     claudeCode,
     mcpServersJson: JSON.stringify({ mcpServers: { [name]: httpEntry } }, null, 2),
     vscodeJson: JSON.stringify(vscode, null, 2),
+    codexToml: codexToml(name, { url, ...(useToken ? { tokenVariable: TOKEN_VARIABLE } : {}) }),
+    connectorUrl: url,
     configFile,
     configFileLaunch: commandLine(['mcp-prompts-http', '--config', '/absolute/path/mcp-prompts.json']),
     server,

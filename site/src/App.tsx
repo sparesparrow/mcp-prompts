@@ -21,6 +21,7 @@ const REPO = 'https://github.com/sparesparrow/mcp-prompts';
 const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`;
 
 const RUNNERS: Array<{ value: Runner; label: string; detail: string }> = [
+  { value: 'hosted', label: 'Hosted URL', detail: 'nothing to install, read-only' },
   { value: 'global', label: 'npm install', detail: 'the mcp-prompts command' },
   { value: 'npx', label: 'npx', detail: 'nothing to install' },
   { value: 'docker', label: 'Docker', detail: 'the stdio image' },
@@ -340,7 +341,9 @@ export default function App() {
                   <TabsTrigger value="claude" className="rounded-sm text-xs">Claude Code</TabsTrigger>
                   <TabsTrigger value="json" className="rounded-sm text-xs">Claude Desktop · Cursor</TabsTrigger>
                   <TabsTrigger value="vscode" className="rounded-sm text-xs">VS Code</TabsTrigger>
-                  <TabsTrigger value="file" className="rounded-sm text-xs">Config file</TabsTrigger>
+                  <TabsTrigger value="codex" className="rounded-sm text-xs">Codex</TabsTrigger>
+                  {snippets.connectorUrl && <TabsTrigger value="connector" className="rounded-sm text-xs">claude.ai · Connector</TabsTrigger>}
+                  {state.runner !== 'hosted' && <TabsTrigger value="file" className="rounded-sm text-xs">Config file</TabsTrigger>}
                   {snippets.server && <TabsTrigger value="server" className="rounded-sm text-xs">Server</TabsTrigger>}
                 </TabsList>
                 <TabsContent value="claude" className="mt-3">
@@ -350,7 +353,7 @@ export default function App() {
                   <CodeBlock
                     code={snippets.mcpServersJson}
                     caption={
-                      state.runner === 'http'
+                      state.runner === 'http' || state.runner === 'hosted'
                         ? '.mcp.json in a project, or ~/.cursor/mcp.json.'
                         : '.mcp.json in a project, claude_desktop_config.json, or ~/.cursor/mcp.json.'
                     }
@@ -365,6 +368,18 @@ export default function App() {
                     Add to VS Code <ArrowUpRight className="size-3.5" />
                   </a>
                 </TabsContent>
+                <TabsContent value="codex" className="mt-3">
+                  <CodeBlock code={snippets.codexToml} caption="~/.codex/config.toml" />
+                </TabsContent>
+                {snippets.connectorUrl && (
+                  <TabsContent value="connector" className="mt-3">
+                    <CodeBlock
+                      wrap
+                      code={snippets.connectorUrl}
+                      caption="claude.ai or Claude Desktop: Settings → Connectors → Add custom connector, then paste this URL. It must be reachable from the internet over HTTPS."
+                    />
+                  </TabsContent>
+                )}
                 <TabsContent value="file" className="mt-3 space-y-3">
                   <CodeBlock code={snippets.configFile} caption="Save as mcp-prompts.json. Paths in it are relative to the file." />
                   <CodeBlock

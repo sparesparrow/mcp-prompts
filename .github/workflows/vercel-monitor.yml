@@ -1,0 +1,77 @@
+name: Vercel production monitor
+
+# Checks the live https://mcp-prompts.vercel.app after Vercel reports a successful production
+# deployment, every six hours, and on demand: safe mode, the deployed version, every profile.
+
+on:
+  deployment_status:
+  schedule:
+    - cron: '17 */6 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.run_id }}
+  cancel-in-progress: false
+
+jobs:
+  monitor-production:
+    name: Monitor production MCP endpoint
+    if: >-
+      github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'deployment_status' &&
+       github.event.deployment_status.state == 'success' &&
+       github.event.deployment.environment == 'Production')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      BASE_URL: https://mcp-prompts.vercel.app
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          # On deployment_status this is the deployed commit; otherwise main.
+          ref: ${{ github.event.deployment.sha || github.sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install smoke-test dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Check safe runtime mode and version
+        run: |
+          set -euo pipefail
+          expected="$(node -p "require('./package.json').version")"
+          for attempt in $(seq 1 30); do
+            curl --fail --silent "$BASE_URL/ready" -o ready.json && curl --fail --silent "$BASE_URL/version" -o version.json &&
+              EXPECTED="$expected" node -e '
+                const r = require("./ready.json"), v = require("./version.json");
+                process.exit(r.status === "ready" && r.readOnly === true && r.auth === "none" && v.version === process.env.EXPECTED ? 0 : 1);
+              ' && { echo "production serves $expected, read-only"; exit 0; }
+            echo "waiting for production to serve $expected (attempt $attempt/30)"
+            sleep 10
+          done
+          echo "::error::$BASE_URL does not serve $expected in safe mode"
+          cat ready.json version.json 2>/dev/null || true
+          exit 1
+
+      - name: Exercise every profile over MCP
+        run: |
+          set -euo pipefail
+          for profile in $(node -p 'Object.keys(require("./data/prompts/profiles.json").profiles).join(" ")'); do
+            echo "::group::MCP profile: $profile"
+            pnpm exec node deploy/smoke-test.mjs --expect-read-only --max-prompts 20 --url "$BASE_URL/mcp?profile=$profile"
+            echo "::endgroup::"
+          done
