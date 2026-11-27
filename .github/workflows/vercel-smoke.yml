@@ -1,26 +1,30 @@
 name: Vercel deployment smoke test
 
+# Vercel's Deployment Checks wait for "Verify production MCP endpoint" before they promote a
+# deployment of main to https://mcp-prompts.vercel.app. The check must not wait for production
+# itself (it once did, and production stayed on an old version: Vercel waited for the check, the
+# check waited for Vercel). It builds the image Vercel runs (Dockerfile), starts it as production
+# does, and checks safe mode, the package version, and every profile over MCP.
+# The live URL is checked by vercel-monitor.yml, which runs after Vercel deploys. This workflow
+# runs on push only, so no skipped copy of the check ever lands on a commit Vercel is waiting for.
+
 on:
   push:
     branches: [main]
-  schedule:
-    - cron: '17 */6 * * *'
   workflow_dispatch:
 
 permissions:
   contents: read
 
-# Keep each push check alive until Vercel can consume its result. Monitoring runs
-# use their run ID so they cannot replace one another or the required push check.
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event_name == 'push' && github.sha || github.run_id }}
+  group: ${{ github.workflow }}-${{ github.sha }}
   cancel-in-progress: false
 
 jobs:
-  smoke-test:
-    name: ${{ github.event_name == 'push' && 'Verify production MCP endpoint' || 'Monitor production MCP endpoint' }}
+  verify-image:
+    name: Verify production MCP endpoint
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -41,61 +45,45 @@ jobs:
       - name: Install smoke-test dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Wait for the production release version and safe runtime mode
-        env:
-          BASE_URL: https://mcp-prompts.vercel.app
+      - name: Build the production image (the Dockerfile Vercel runs)
+        run: docker build -t mcp-prompts:candidate .
+
+      - name: Start it as production runs it
         run: |
           set -euo pipefail
-          ready=false
-          expected="$(node -p "require('./package.json').version")"
-          for attempt in $(seq 1 60); do
-            if curl --fail --silent --show-error "$BASE_URL/ready" -o ready.json 2>/dev/null &&
-               curl --fail --silent --show-error "$BASE_URL/version" -o version.json 2>/dev/null; then
-              if EXPECTED_VERSION="$expected" node -e '
-                const r = require("./ready.json");
-                const v = require("./version.json");
-                const safeMode = r.status === "ready" && r.readOnly === true && r.auth === "none" && r.storage === "memory";
-                process.exit(safeMode && v.version === process.env.EXPECTED_VERSION ? 0 : 1);
-              '; then
-                ready=true
-                break
-              fi
-            fi
-            echo "Waiting for the expected package version and safe runtime mode (attempt $attempt/60)"
-            sleep 10
+          docker run -d --name candidate -p 127.0.0.1:3003:3003 mcp-prompts:candidate
+          for attempt in $(seq 1 30); do
+            curl --fail --silent http://127.0.0.1:3003/health >/dev/null && exit 0
+            sleep 2
           done
-          test "$ready" = true || {
-            echo "::error::Production did not serve the expected package version within 10 minutes, or its runtime mode is unsafe."
-            cat ready.json 2>/dev/null || true
-            exit 1
-          }
+          docker logs candidate
+          exit 1
 
-      - name: Verify health endpoint
-        env:
-          BASE_URL: https://mcp-prompts.vercel.app
+      - name: Check safe runtime mode and version
         run: |
           set -euo pipefail
-          curl --fail --silent --show-error "$BASE_URL/health"
-          echo "Production health endpoint returned HTTP 200"
+          curl --fail --silent --show-error http://127.0.0.1:3003/ready -o ready.json
+          curl --fail --silent --show-error http://127.0.0.1:3003/version -o version.json
+          node -e '
+            const r = require("./ready.json");
+            const v = require("./version.json");
+            const expected = require("./package.json").version;
+            const safe = r.status === "ready" && r.readOnly === true && r.auth === "none" && r.storage === "memory";
+            if (!safe) { console.error("unsafe runtime mode", r); process.exit(1); }
+            if (v.version !== expected) { console.error(`version ${v.version}, expected ${expected}`); process.exit(1); }
+            console.log(`read-only, no auth, memory storage, version ${v.version}`);
+          '
 
-      - name: Exercise every published MCP profile
-        env:
-          BASE_URL: https://mcp-prompts.vercel.app
+      - name: Exercise every profile over MCP
         run: |
           set -euo pipefail
-          while read -r profile max_prompts; do
+          for profile in $(node -p 'Object.keys(require("./data/prompts/profiles.json").profiles).join(" ")'); do
             echo "::group::MCP profile: $profile"
-            pnpm exec node deploy/smoke-test.mjs \
-              --expect-read-only \
-              --max-prompts "$max_prompts" \
-              --url "$BASE_URL/mcp?profile=$profile"
+            pnpm exec node deploy/smoke-test.mjs --expect-read-only --max-prompts 20 \
+              --url "http://127.0.0.1:3003/mcp?profile=$profile"
             echo "::endgroup::"
-          done <<'PROFILES'
-          software-dev 15
-          embedded-iot 15
-          mia-vehicle 15
-          voice-home 15
-          learning-loop 15
-          android-automation 15
-          tasker-automation 15
-          PROFILES
+          done
+
+      - name: Server log
+        if: always()
+        run: docker logs candidate 2>&1 | tail -50 || true

@@ -16,11 +16,11 @@ only those prompts; the rest do not exist for it.
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
 | `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
-| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, scenarios | 16 |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, the event bus, scenarios | 17 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
-| (none) | Everything | 95 |
+| (none) | Everything | 97 |
 
 No call returns a whole library, with or without a profile: `list_prompts` gives 20 summaries a page
 (at most 50, descriptions cut to 110 characters), and `list_categories` shows what each part holds.
@@ -40,6 +40,9 @@ claude mcp add -s user prompts -- docker run -i --rm --network none ghcr.io/spar
 
 # One HTTP server for everyone; each client names its profile in its URL
 claude mcp add -s user --transport http prompts "http://localhost:3003/mcp?profile=software-dev"
+
+# The public read-only server, nothing to install (see "Hosted on Vercel" below)
+claude mcp add -s user --transport http prompts "https://mcp-prompts.vercel.app/mcp?profile=software-dev"
 ```
 
 In a client config (`.mcp.json`, `claude_desktop_config.json`, Cursor):
@@ -62,6 +65,40 @@ service installs `software-dev`, and neither pays for the other's prompts.
 The HTTP server is `mcp-prompts-http`, or from a checkout `docker compose up -d --wait --build`
 ([`docker-compose.yml`](../docker-compose.yml): read-only, on this machine only). It can serve the
 whole library and leave the choice to each URL, or be limited itself with `MCP_PROMPTS_PROFILE`.
+
+## Hosted on Vercel
+
+`https://mcp-prompts.vercel.app` is this repository's `main`, deployed by Vercel's GitHub
+integration. [`vercel.json`](../vercel.json) runs the [`Dockerfile`](../Dockerfile) (the HTTP
+server) as a container, so it behaves exactly like `docker run ghcr.io/sparesparrow/mcp-prompts:latest`:
+read-only, no token, prompts in memory, the whole bundled library, with each URL choosing a profile.
+
+| URL | Gives |
+|---|---|
+| `/mcp?profile=<name>` | MCP over Streamable HTTP (stateless), for any client that takes a URL |
+| `/v1/prompts`, `/v1/prompts/:id`, `/v1/prompts/:id/apply` | The REST API |
+| `/health`, `/ready`, `/version` | Liveness; mode (`readOnly`, `auth`, `storage`); package version |
+
+How a release reaches it ([`vercel-smoke.yml`](../.github/workflows/vercel-smoke.yml), [`vercel-monitor.yml`](../.github/workflows/vercel-monitor.yml)):
+
+1. A push to `main` starts a Vercel production deployment, and Vercel's Deployment Checks hold it
+   until the check **Verify production MCP endpoint** passes.
+2. That check builds the same `Dockerfile`, starts it as production does, and verifies read-only
+   mode, the version in `package.json`, and every profile over MCP (`smoke-test.mjs`, at most 20
+   prompts a profile). It tests the image, not the live URL, so it never waits on the deployment
+   it gates.
+3. Vercel promotes the deployment. **Monitor production MCP endpoint** then runs against the live
+   URL (on Vercel's successful production `deployment_status`, every six hours and on demand) and
+   fails if production does not serve the deployed version in safe mode.
+
+To host your own: fork, import the repository in Vercel, and keep `vercel.json`. The defaults
+are read-only. For writes set `MCP_PROMPTS_READ_ONLY=false` with `MCP_PROMPTS_AUTH_TOKEN`, and
+`MCP_PROMPTS_STORAGE=postgres` with `DATABASE_URL` so changes outlast a container (see
+[Save changes to Postgres](#save-changes-to-postgres-optional)); clients then send
+`Authorization: Bearer <token>`. To answer only to your own domain, set `MCP_PROMPTS_ALLOWED_HOSTS=<domain>`.
+
+The [install page](https://sparesparrow.github.io/mcp-prompts/?run=hosted) on GitHub Pages writes
+the install command or config for any client and any selection against the hosted URL.
 
 ## What each profile serves
 
@@ -218,4 +255,5 @@ more than you intended:
 ```bash
 node deploy/smoke-test.mjs --max-prompts 15 -- mcp-prompts --profile software-dev
 node deploy/smoke-test.mjs --max-prompts 15 --url "http://localhost:3003/mcp?profile=mia-vehicle"
+node deploy/smoke-test.mjs --expect-read-only --max-prompts 20 --url "https://mcp-prompts.vercel.app/mcp?profile=liberty-citations"
 ```

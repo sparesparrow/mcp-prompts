@@ -11,7 +11,9 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 
 **[Configure an install in the browser](https://sparesparrow.github.io/mcp-prompts/):** pick a profile
 or your own prompts and templates, choose the MCP capabilities, and copy the matching `claude mcp add`
-command, client config, URL or config file. The page reads the library from this branch.
+command, client config, URL or config file. The page reads the library from this branch. Choose
+**Hosted URL** there to use the public read-only server at `https://mcp-prompts.vercel.app` with
+nothing to install ([Install by URL](#install-by-url-nothing-to-install)).
 
 ## What's new in 4.4.0
 
@@ -64,6 +66,86 @@ command, client config, URL or config file. The page reads the library from this
 Both registries receive the same version from every `v*` tag (first together at 4.0.2); Docker images follow the same tag.
 - Docker: `ghcr.io/sparesparrow/mcp-prompts` (Docker Hub: [`sparesparrow/mcp-prompts`](https://hub.docker.com/r/sparesparrow/mcp-prompts))
 
+## Install by URL: nothing to install
+
+A read-only server runs the latest release from `main` at **`https://mcp-prompts.vercel.app`**
+(deployed on Vercel from [`vercel.json`](vercel.json) and the [`Dockerfile`](Dockerfile)). Point any
+MCP client that speaks Streamable HTTP at its `/mcp` URL; the query string picks what it serves.
+
+**The fastest way:** open the [install page](https://sparesparrow.github.io/mcp-prompts/?run=hosted)
+on GitHub Pages, choose **Hosted URL**, pick a profile, and copy the command or config for your
+client.
+
+| Profile | URL |
+|---|---|
+| everything | `https://mcp-prompts.vercel.app/mcp` |
+| `software-dev` | `https://mcp-prompts.vercel.app/mcp?profile=software-dev` |
+| `embedded-iot` | `https://mcp-prompts.vercel.app/mcp?profile=embedded-iot` |
+| `mia-vehicle` | `https://mcp-prompts.vercel.app/mcp?profile=mia-vehicle` |
+| `voice-home` | `https://mcp-prompts.vercel.app/mcp?profile=voice-home` |
+| `android-automation` | `https://mcp-prompts.vercel.app/mcp?profile=android-automation` |
+| `claude-panel` | `https://mcp-prompts.vercel.app/mcp?profile=claude-panel` |
+| `tasker-automation` | `https://mcp-prompts.vercel.app/mcp?profile=tasker-automation` |
+| `learning-loop` | `https://mcp-prompts.vercel.app/mcp?profile=learning-loop` |
+| `liberty-citations` | `https://mcp-prompts.vercel.app/mcp?profile=liberty-citations` |
+
+Add `&expose=tools,prompts,resources` to get each prompt as a slash command and as a `prompts://<id>`
+resource as well as the tools. Every option of [Choose what gets installed](#choose-what-gets-installed)
+that has a URL column works here (`profile`, `prompts`, `templates`, `exclude`, `expose`, `readOnly`).
+
+**Claude Code**
+
+```bash
+claude mcp add -s user --transport http mcp-prompts "https://mcp-prompts.vercel.app/mcp?profile=software-dev"
+```
+
+**claude.ai and Claude Desktop**: Settings → Connectors → Add custom connector, name it `mcp-prompts`
+and paste the URL. Remote servers go there, not in `claude_desktop_config.json`.
+
+**Cursor** (`~/.cursor/mcp.json`) and a project's **`.mcp.json`**:
+
+```json
+{
+  "mcpServers": {
+    "mcp-prompts": { "type": "http", "url": "https://mcp-prompts.vercel.app/mcp?profile=software-dev" }
+  }
+}
+```
+
+**VS Code** (`.vscode/mcp.json`):
+
+```json
+{ "servers": { "mcp-prompts": { "type": "http", "url": "https://mcp-prompts.vercel.app/mcp?profile=software-dev" } } }
+```
+
+**Codex** (`~/.codex/config.toml`):
+
+```toml
+[mcp_servers.mcp-prompts]
+url = "https://mcp-prompts.vercel.app/mcp?profile=software-dev"
+```
+
+The Claude API's MCP connector takes the same URL; it uses the tools only.
+
+Check what it runs: [`/version`](https://mcp-prompts.vercel.app/version) gives the package version,
+[`/ready`](https://mcp-prompts.vercel.app/ready) the mode (`readOnly: true`, `auth: none`,
+`storage: memory`). The same prompts are on its REST API, e.g.
+`curl https://mcp-prompts.vercel.app/v1/prompts?category=mia-car`.
+
+What the hosted server does not do: it is **read-only** (no `add_prompt`, `update_prompt` or
+`delete_prompt`), it serves only the **bundled library**, and it cannot read your own directories
+or save changes. For those, install locally ([Quick Start](#quick-start)) or run your own URL
+([Run your own URL](#run-your-own-url)).
+
+### Run your own URL
+
+| Where | How |
+|---|---|
+| This machine | `mcp-prompts-http` (or `docker run -p 127.0.0.1:3003:3003 ghcr.io/sparesparrow/mcp-prompts:latest`), then `http://localhost:3003/mcp?…`. See [HTTP Mode](#http-mode). |
+| Your tailnet | Read-only and behind a token: [docs/10, Remote use over Tailscale](docs/10-android-automation.md#remote-use-over-tailscale). |
+| Your own Vercel project | Fork the repository and import it in Vercel. `vercel.json` runs the `Dockerfile` as a container: read-only, no token. For your own prompts or writes, set `MCP_PROMPTS_AUTH_TOKEN`, `MCP_PROMPTS_READ_ONLY=false` and, for prompts that last, `MCP_PROMPTS_STORAGE=postgres` with `DATABASE_URL` (a container's disk does not persist). Clients then send `Authorization: Bearer <token>`. See [deploy/README.md](deploy/README.md#hosted-on-vercel). |
+| Any container host | The `latest` image is the HTTP server on port 3003, read-only by default. |
+
 ## Claude Code plugin
 
 The plugin starts the server for you, asks for your settings once, and adds three skills that do the tool calls:
@@ -96,6 +178,8 @@ The plugin runs the server with `npx`, pinned to the plugin's version. For that 
 settings file (`plugin/npmrc/`) instead of your `~/.npmrc`, so a registry mirror or proxy set there is not used.
 
 ## Quick Start
+
+To use the hosted server instead of installing anything, see [Install by URL](#install-by-url-nothing-to-install).
 
 ### 1. Install from GitHub Packages
 
@@ -165,7 +249,7 @@ much smaller:
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
 | `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
-| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, scenarios | 16 |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, the event bus, scenarios | 17 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
@@ -319,7 +403,7 @@ PORT=3003 pnpm start:http
 # or: mcp-prompts-http, or the default Docker image (port 3003), or: docker compose up -d --wait --build
 ```
 
-It listens on `127.0.0.1` unless `HOST` says otherwise. To reach it from another machine, keep it
+A public read-only instance runs at `https://mcp-prompts.vercel.app` ([Install by URL](#install-by-url-nothing-to-install)). Your own listens on `127.0.0.1` unless `HOST` says otherwise. To reach it from another machine, keep it
 inside a Tailscale network, read-only and behind a token: [docs/10, Remote use over Tailscale](docs/10-android-automation.md#remote-use-over-tailscale)
 has the settings and the client config.
 

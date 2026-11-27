@@ -35,7 +35,7 @@ export const DEFAULT_STATE: PageState = {
   stateDir: '',
 };
 
-const RUNNERS: Runner[] = ['global', 'npx', 'docker', 'http'];
+const RUNNERS: Runner[] = ['hosted', 'global', 'npx', 'docker', 'http'];
 
 function entries(value: string | null): string[] {
   return value === null ? [] : Array.from(new Set(value.split(',').map(entry => entry.trim()).filter(Boolean)));
