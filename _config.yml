@@ -1,2 +1,29 @@
+# GitHub Pages serves the install page (index.html, built from site/) and the files it reads:
+# prompt-files.json, package.json and data/prompts. Nothing else is published. Markdown is left
+# out on purpose: Pages renders every .md file with Liquid, and the docs quote {{variables}},
+# which Liquid rejects; one such file fails the whole Pages build (and, through it, the checks
+# Vercel waits for). Read the docs on GitHub instead.
 exclude:
-  - plugin/skills/
+  - "*.md"
+  - "**/*.md"
+  - plugin/
+  - docs/
+  - AGENTS/
+  - archive/
+  - examples/
+  - packages/
+  - imports/
+  - apps/
+  - scripts/
+  - deploy/
+  - evaluations/
+  - site/
+  - src/
+  - cdk/
+  - layers/
+  - migrations/
+  - contrib/
+  - flatbuffers/
+  - web/
+  - public/
+  - node_modules/
