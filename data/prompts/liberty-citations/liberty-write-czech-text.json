@@ -1,0 +1,59 @@
+{
+  "id": "liberty-write-czech-text",
+  "name": "Liberty Citations: Write a Czech Libertarian Text with Working Citations",
+  "description": "Writes a Czech libertarian article, essay, discussion reply or flyer, with drug prohibition and the war on drugs as home turf: checks the earlier debate on Stoky, lists the claims that need support and gets one or two verified quotes for each through liberty-find-citations, picks the objections this audience will raise (a co děti, závislost ničí rodiny, léčbu platíme všichni), and writes plain, confident Czech with concrete examples before theory, two to four citations that do work, authors kept in their positions and the strongest opposing point stated honestly; ends with a sources section and a self-check. Stoky posts go to liberty-stoky-post-from-idea instead. Variables: topic, form, audience, length, citations, notes.",
+  "content": "# Liberty Citations: write a Czech libertarian text\n\n## Brief\n- Topic: {{topic}}\n- Form: {{form}}\n- Audience: {{audience}}\n- Length: {{length}}\n- Citations: {{citations}}\n- Notes from the user: {{notes}}\n\nA Stoky post goes through `liberty-stoky-post-from-idea` instead, parody subtitles through `liberty-dabing-srt`.\n\n## 1. Before writing\n- The earlier debate: `stoky_search` the topic in two or three Czech phrasings (and the Facebook forum through `liberty-fsp-forum-read` when the user points there), so the text adds something and can link back.\n- The claims that need support: list them, and get one or two quotes for each with `liberty-find-citations` (`search_quotes`, then `get_passage` on every candidate), under `liberty-citation-rules`. Drug prohibition and the war on drugs are home turf; the starting points are in that prompt.\n- The objections this audience will raise. The usual ones: „A co děti?“, „Závislost ničí rodiny.“, „Léčbu platíme všichni.“, „Bez státu by vládl silnější.“ Pick the two or three this audience will actually raise.\n\n## 2. Write\n- Plain, confident Czech; concrete examples before theory; short paragraphs.\n- Meet each objection head-on with an argument, not a slogan.\n- Two to four citations in a short piece, each doing work in the argument. Quote briefly and paraphrase the rest with a locator.\n- Keep authors in their positions; where the text goes further than a source, say it is your conclusion.\n- State the strongest opposing point in a sentence or two where it is honest to do so.\n- Match the register: a discussion reply is not an essay, and a flyer has no footnotes (sources go at the end).\n\n## 3. Sources\nAt the end: the citation blocks from `liberty-citation-rules` or numbered footnotes, every quote with author, work, locator and URL, own translations marked *(přel. vlastní)*.\n\n## 4. Check before handing over\n- Every quote was retrieved in this session and copied from the passage; nothing is from memory.\n- No quote from an in-copyright work is longer than about three sentences.\n- At least one Czech source when the audience is Czech.\n- The length fits: {{length}}.\nHand over the text, then one line on what would make it stronger (a missing source, a weak step).\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "topic",
+      "description": "What the text argues, e.g. 'proti válce s drogami', 'zdanění je krádež'."
+    },
+    {
+      "name": "form",
+      "description": "Kind of text: článek, esej, odpověď do diskuse, leták, dopis redakci."
+    },
+    {
+      "name": "audience",
+      "description": "Who will read it, e.g. 'skeptický rodič', 'student ekonomie', 'Fórum Svobodného přístavu'."
+    },
+    {
+      "name": "length",
+      "description": "Target length, e.g. '600-800 slov', 'do 150 slov'."
+    },
+    {
+      "name": "citations",
+      "description": "How many citations and from whom, e.g. '2-4, aspoň jeden český hlas', or 'none'."
+    },
+    {
+      "name": "notes",
+      "description": "The user's angle, examples, expected objections, things to avoid; '-' when none.",
+      "required": false
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "writing",
+    "czech",
+    "drug-policy",
+    "essay",
+    "argument"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "stoky_search",
+      "search_quotes",
+      "get_passage"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

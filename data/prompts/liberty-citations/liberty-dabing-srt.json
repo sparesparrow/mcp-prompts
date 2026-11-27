@@ -1,0 +1,46 @@
+{
+  "id": "liberty-dabing-srt",
+  "name": "Liberty Citations: Parody Dabing Subtitles (SRT)",
+  "description": "Writes parody 'dabing' subtitles for a film or series scene (for example Mr. Robot): new dialogue that fits what happens on screen and the length of each original line, turned into a libertarian joke (two ancaps dodging the tax office, a dealer explaining the iron law of prohibition), never a transcription of the original script. Output is SRT with at most two lines of 42 characters per cue and about 15 to 17 characters per second, with given or estimated cue timings, and a note crediting ideas taken from ankap.urza.cz or Stoky. Variables: scene, cues, joke_angle, language.",
+  "content": "# Liberty Citations: parody dabing subtitles\n\n## Scene\n- Scene: {{scene}}\n- Cue timings: {{cues}}\n- Joke angle: {{joke_angle}}\n- Dialogue language: {{language}}\n\n## How\n1. Write new lines that fit what happens on screen and the length of each original line, and turn the scene into a libertarian joke. Do not transcribe or quote the original script: the joke is the contrast between the picture and the new words.\n2. Timing: use the given cues. If they are \"estimate\", estimate them from the scene and say in the notes that they are to be adjusted in a subtitle editor. One spoken line per cue.\n3. Per cue: at most 2 lines of 42 characters, and about 15 to 17 characters per second (a cue's seconds × 16 is roughly its character budget). Shorten rather than overflow.\n4. Short ideas from ankap.urza.cz or Stoky may be woven in; credit each in a note under the SRT with title and URL, retrieved in this session. No verbatim quote goes into the dialogue unless it was retrieved and is credited.\n5. The joke targets ideas, the state and the situation, not real private people.\n\n## Output\n```\n1\n00:00:01,200 --> 00:00:03,400\nfirst line of the cue\noptional second line\n\n2\n00:00:03,600 --> 00:00:06,000\n…\n```\nThen the notes: whether the timings are estimates, the credited ideas with links, and any cue where the budget forced a cut.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "scene",
+      "description": "The film or series, what happens on screen, who speaks, the scene's length."
+    },
+    {
+      "name": "cues",
+      "description": "Original cue timings (SRT, or start-end per line), or 'estimate'."
+    },
+    {
+      "name": "joke_angle",
+      "description": "The libertarian twist, e.g. 'dva ankapáci utíkají před finančním úřadem'."
+    },
+    {
+      "name": "language",
+      "description": "Dialogue language: cs (default) or en."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "dabing",
+    "subtitles",
+    "srt",
+    "humour",
+    "czech"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": []
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

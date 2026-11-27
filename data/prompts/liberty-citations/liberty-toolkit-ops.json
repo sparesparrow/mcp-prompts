@@ -1,0 +1,52 @@
+{
+  "id": "liberty-toolkit-ops",
+  "name": "Liberty Citations: Install, Status, Corpus Build, Refresh and Add Sources",
+  "description": "Operates the liberty-citations toolkit: checks what works with liberty_status, installs it in Claude Code (install.sh: venv, ffmpeg, deno, yt-dlp, faster-whisper, MCP registration), runs the first corpus build (library_setup as a background job, about 10 minutes), keeps the corpus fresh (stoky_sync, misescz_sync, youtube_catalog refresh, ankap sync, fetch and index after manifest changes), adds an article or the user's own copy of a paid book with add_source (never from a shadow library), and fixes the usual failures (YouTube bot checks, mises.org 403, CUDA libraries, Groq 429, database is locked). Variables: task - status, install, first build, a refresh, add source, or an error to fix; environment - OS and hardware; details - URL or path, author, title, year and language, or the error text.",
+  "content": "# Liberty Citations: toolkit operations\n\nInstall, check, build, refresh and extend the liberty-citations toolkit.\n\n## Task\n- Task: {{task}}\n- Environment: {{environment}}\n- Details: {{details}}\n\n## 1. Look before you act\nCall `liberty_status` (CLI `liberty doctor`, then `liberty status`). Read the modules and binaries present (ffmpeg, ffprobe, deno, pdftotext; requests, bs4, pymupdf, pypdf, yt_dlp, faster_whisper, mcp), CUDA, which speech-to-text keys are set, the auto engine order, the corpus count per source, the library state and the recent jobs. An unknown tool means the toolkit is not installed here: in claude.ai say so and continue on the web path (`liberty-tools-reference`); in Claude Code go to step 2.\n\n## 2. Install (Claude Code)\n```bash\nmkdir -p ~/.claude/skills && cd ~/.claude/skills\nunzip ~/Downloads/liberty-citations.zip          # creates ./liberty-citations/\nbash liberty-citations/scripts/install.sh        # venv, ffmpeg, deno, yt-dlp, faster-whisper, MCP\nliberty setup                                    # first corpus build, about 10 minutes\n```\nRestart Claude Code so the `mcp__liberty__*` tools appear. System packages: Arch or Omarchy `sudo pacman -S ffmpeg deno`; Kubuntu `sudo apt install ffmpeg python3-venv` and deno from deno.land. GPU: the nvidia driver plus the pip CUDA wheels install.sh adds (or `pacman -S cuda cudnn`). Ask before a command that needs sudo.\n\n## 3. First corpus build\n`library_setup()` starts a job of about 10 minutes: it downloads the free library listed in `manifest.json`, indexes it, crawls ankap.urza.cz and Stoky and fetches the video catalogue. Poll `job_status(job_id)`, and work on the web path meanwhile. When it is done, call `liberty_status` again and report the counts per source.\n\n## 4. Keep it fresh\n| Need | Tool (job) | CLI |\n|---|---|---|\n| new Stoky posts | `stoky_sync()`; `full=true` only after the site changed | `liberty stoky sync` |\n| new videos | `youtube_catalog(refresh=true)` | `liberty yt catalog --refresh` |\n| more mises.cz articles | `misescz_sync(limit=300)`, which resumes where the last crawl stopped | `liberty misescz sync --limit 300` |\n| Urza's texts | none | `liberty ankap sync` |\n| books added to the manifest | none | `liberty fetch && liberty index` |\nOne writer at a time: a crawl and an index together give `database is locked` (searching still works).\n\n## 5. Add a source\n- An article: `add_source(target=\"<url>\", author=\"…\", title=\"…\", year=\"…\", lang=\"cs\")` (or `lang=\"en\"`).\n- The user's own copy of a book that is not free (*The Ethics of Liberty*, *Economics in One Lesson*, Urza's *Anarchokapitalismus*, Szasz, Hoppe's *Democracy*): `add_source(target=\"/path/to/book.pdf\", …)`. A scanned PDF needs OCR first: `ocrmypdf in.pdf out.pdf`. Never fetch such a book from a shadow library: point to buying it (kniha.urza.cz for Urza's book) or to a library.\n- Then `search_quotes` with a phrase from the new source to confirm it is indexed with locators.\n\n## 6. Troubleshooting\n| Symptom | Fix |\n|---|---|\n| YouTube \"Sign in to confirm you're not a bot\" | set `LIBERTY_YTDLP_COOKIES_BROWSER=firefox` (or chrome, brave), update yt-dlp in the venv (`pip install -U yt-dlp`), check deno is installed |\n| mises.org answers 403 | it limits bursts; the manifest uses `cdn.mises.org` files. If a link moved, open the book's `page` from the manifest, put the new link in `manifest.json`, then `liberty fetch <id> && liberty index <id>` |\n| faster-whisper cuDNN or cuBLAS errors | run through the `liberty` wrappers (they set `LD_LIBRARY_PATH`), or `pacman -S cuda cudnn` |\n| Groq 429 | free-tier limits; the toolkit waits on `retry-after`. Long batches go overnight or on a GPU |\n| `database is locked` | two writers at once; let one finish |\n| empty corpus after setup | read the log tail with `job_status`; rerun only the failed step (`liberty fetch`, `liberty index`, `liberty stoky sync`) |\n\n## 7. Report\nWhat you checked, what you ran, the corpus counts per source before and after, jobs still running with their ids, and what the user has to do (a key, a login, a sudo step). Never print a key's value.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "task",
+      "description": "What to do: status, install, first build, refresh stoky, refresh mises.cz, refresh videos, add source, or an error message to fix."
+    },
+    {
+      "name": "environment",
+      "description": "Where it runs, e.g. 'Omarchy (Arch), NVIDIA GPU', 'Kubuntu laptop, no GPU', 'claude.ai'."
+    },
+    {
+      "name": "details",
+      "description": "For add source: URL or path, author, title, year, language. For a failure: the error text. '-' when none.",
+      "required": false
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "toolkit",
+    "setup",
+    "install",
+    "corpus",
+    "maintenance"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "liberty_status",
+      "library_setup",
+      "job_status",
+      "stoky_sync",
+      "misescz_sync",
+      "youtube_catalog",
+      "add_source",
+      "search_quotes"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

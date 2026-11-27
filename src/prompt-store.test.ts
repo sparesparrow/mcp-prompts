@@ -686,7 +686,7 @@ describe('bundled profiles', () => {
   const served = (name: string) => store.selectProfiles([name]).all();
 
   it('have no entry that matches nothing in the library', () => {
-    expect(store.profileNames).toEqual(['software-dev', 'embedded-iot', 'mia-vehicle', 'voice-home', 'android-automation', 'claude-panel', 'tasker-automation', 'learning-loop']);
+    expect(store.profileNames).toEqual(['software-dev', 'embedded-iot', 'mia-vehicle', 'voice-home', 'android-automation', 'claude-panel', 'tasker-automation', 'learning-loop', 'liberty-citations']);
     for (const profile of store.profiles()) {
       expect(profile.warnings, profile.name).toEqual([]);
       expect(profile.description.length, profile.name).toBeGreaterThan(20);

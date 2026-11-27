@@ -1,0 +1,32 @@
+{
+  "id": "liberty-citation-rules",
+  "name": "Liberty Citations: Rules for Every Quote",
+  "description": "The verification rules every prompt of the liberty-citations pack follows, and the default Czech citation block: quote only text retrieved in this session (get_passage, a fetched page or a transcript), never from memory; read the context, because Mises, Rothbard and Hoppe often state the opposing view before taking it apart; cite the primary source; fix only extraction artefacts and mark omissions and insertions; keep authors in their own positions (Hayek, Mill and Milton Friedman are classical liberals, Mises defended a minimal state, Urza is an anarcho-capitalist and agorist); keep quotes from in-copyright works to one to three sentences; mark own translations (přel. vlastní) and machine transcripts (strojový přepis); locators for books, Stoky posts and videos; which books are deliberately not in the free library and why a shadow library is never used. Read it before quoting anyone in Czech libertarian writing.",
+  "content": "# Liberty Citations: rules for every quote\n\nThese rules apply to every prompt of the liberty-citations pack and to any text that quotes Mises, Rothbard, Hoppe, Hayek, Spooner, Bastiat, Thornton, Block, David Friedman, Urza or anyone else. Libertarian quote culture is full of misattributions and \"improved\" lines; one fake quote hands the opponent an easy win and discredits the user and Svobodný přístav.\n\n## 1. Quote only what you have just read\n- Every verbatim quote is copied from text retrieved in this session: a corpus passage (`get_passage`), a page fetched with WebFetch or read in Chrome, or a transcript. Never from memory, not even a famous line you are sure of.\n- `search_quotes` snippets are for finding. Open the hit with `get_passage` and copy from the passage.\n- If you cannot retrieve it, paraphrase and say that the exact wording is unverified (\"přesné znění se nepodařilo ověřit\").\n\n## 2. Read the context\n- Read the passage around the hit (`get_passage` with `context` 1, or 2 when the hit sits at a chunk edge). Mises, Rothbard and Hoppe often state the opposing view first and then take it apart; a sentence lifted from that setup says the opposite of what the author meant.\n- When a secondary source quotes a primary one (Thornton quoting Mises, a Stoky post quoting Rothbard), find the primary and cite that. If you cannot, cite it as \"cit. podle\" the secondary source.\n\n## 3. Copy faithfully\n- Fix only extraction artefacts: split ligatures (\"aft er\"), line-break hyphenation, a running header that slipped in.\n- Mark omissions with \"…\" and your insertions with [ ]. Never join two separated sentences without \"…\".\n\n## 4. Keep authors in their positions\nHayek, Mill and Milton Friedman are classical liberals, not anarchists. Mises defended a minimal state. Rothbard and Hoppe are anarcho-capitalists. Urza is an anarcho-capitalist and agorist. When the user's argument goes further than the source, say so instead of stretching the quote.\n\n## 5. Length\n- Quote the shortest span that carries the point, usually one to three sentences, and paraphrase the rest with a pinpoint locator.\n- Longer quotes only from public-domain texts: Spooner, Bastiat's French original, Mill, Thoreau, La Boétie, Molinari, Spencer.\n- In-copyright works such as Rothbard, Hoppe, Thornton or Block: short, attributed quotes only.\n\n## 6. Translation\n- For Czech output give the original and your own translation marked *(přel. vlastní)*, or the translation in the text and the original in a footnote when flow matters.\n- Prefer a published Czech translation when one turns up (mises.cz, a Czech edition) and cite it. Never present your own translation as an official one.\n\n## 7. Locators\n- A book: author, work, year, page and edition, or chapter and section.\n- A web text: author, title, date when known, URL.\n- A Stoky post: title, author, date, URL (`https://stoky.urza.cz/texty/<id>`).\n- A video: title, date, a timestamp link (`&t=<seconds>s`).\n\n## 8. Machine transcripts\nA quote from a transcript is marked *(strojový přepis)* with its timestamp link, and only after its window was re-transcribed with a strong model (`liberty-ksp-video-quote`). Attribute a line to Urza or Tereza only when the video makes the speaker unambiguous.\n\n## 9. Default citation block (Czech output)\n```\n1. Lysander Spooner — Vices Are Not Crimes (1875), s. 9 (Mises Institute ed.)\n   „Vices are those acts by which a man harms himself or his property. Crimes are those\n   acts by which one man harms the person or property of another.“\n   Překlad (vlastní): „Neřesti jsou činy, jimiž člověk škodí sobě nebo svému majetku.\n   Zločiny jsou činy, jimiž jeden člověk škodí osobě nebo majetku druhého.“\n   K čemu: přesné odlišení „zločinu bez oběti“ — jádro argumentu proti prohibici.\n   https://mises.org/library/book/vices-are-not-crimes\n```\nThe block shows the format. Like any quote, re-retrieve this one before using it.\n\n## 10. What is deliberately not in the free library\nThe toolkit indexes only public-domain works and books their publisher or author gives away. Not free, so not downloaded: Rothbard's *The Ethics of Liberty*, Hazlitt's *Economics in One Lesson*, Urza's book *Anarchokapitalismus* (sold at kniha.urza.cz; his free web texts are indexed), Szasz, Hoppe's *Democracy: The God That Failed*. Say a book is not freely available, point to buying it or a library, and offer to index the user's own copy (`add_source`). Never fetch it from a shadow library.\n\n## 11. Honesty makes it stronger\nOffer the strongest opposing point in a sentence or two where it is honest to do so; it makes the text more persuasive, not less.\n",
+  "isTemplate": false,
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "citations",
+    "quotes",
+    "verification",
+    "czech",
+    "rules"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "search_quotes",
+      "get_passage",
+      "add_source"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

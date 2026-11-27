@@ -1,0 +1,54 @@
+{
+  "id": "liberty-stoky-post-from-idea",
+  "name": "Stoky Svobodného přístavu: From an Idea to a Draft Post",
+  "description": "Turns an idea into a draft for Stoky Svobodného přístavu (stoky.urza.cz), the place for thoughts too short for an article that are worth a discussion: lists the three to five closest earlier posts with date, author and link (via liberty-stoky-match-posts), then drafts a short title (often a question or a punchline) and an 80 to 300 word, first-person body in one to four short paragraphs that ends with a question or provocation for the comments, with at most one short verified citation or one link; saves it to the drafts folder and shows it in full. Never submits: a 'send it there' in the request approves no text yet. Variables: idea, angle, title_hint, quote_or_link.",
+  "content": "# Stoky: from an idea to a draft post\n\nStoky Svobodného přístavu (stoky.urza.cz) publishes thoughts \"too simple or short for an article\" that are worth starting a discussion; anything that touches freedom.\n\n## Idea\n- Idea: {{idea}}\n- Angle and tone: {{angle}}\n- Title hint: {{title_hint}}\n- Citation or link: {{quote_or_link}}\n\n## 1. Earlier posts\nRun `liberty-stoky-match-posts` for the idea (`stoky_search` in two or three Czech phrasings; `stoky_post` on a close hit when its comments matter). Show the three to five closest posts with date, author and link, or say that none was found. If one already makes the same point, propose a new angle, or a reply that links to it.\n\n## 2. Draft\n- Title: short; often a question or a punchline.\n- Body: 80 to 300 words in one to four short paragraphs; first person, subjective; a concrete example before the principle.\n- End with a question or a provocation that invites the comments.\n- At most one short citation or one link. A citation follows `liberty-citation-rules`: retrieved in this session, short, located.\n- Czech. No hashtags, no footnotes.\n\n## 3. Save and show\nSave it to `$LIBERTY_HOME/drafts/stoky-<YYYY-MM-DD>-<slug>.md` when a filesystem is available, with the title as the first line (`# …`). Show the whole draft in the reply, with its word count.\n\n## 4. Stop here\nDo not submit. Even when the request said \"a pošli to tam\", it approved no text, because the text did not exist yet: ask the user to approve this exact text, and mention that submitting needs their Stoky login in Chrome. Submitting is `liberty-stoky-publish`, and a submission goes to the editorial queue (\"většinu nakonec vydáme, byť často ne hned první verzi\"); it is not publishing.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "idea",
+      "description": "The idea for the post, as the user put it."
+    },
+    {
+      "name": "angle",
+      "description": "Framing and tone, e.g. 'ironicky', 'z pohledu hospodského'; '-' to choose.",
+      "required": false
+    },
+    {
+      "name": "title_hint",
+      "description": "A title the user likes, or '-' to propose one.",
+      "required": false
+    },
+    {
+      "name": "quote_or_link",
+      "description": "'none', 'one quote' (verified, short) or a URL to link; at most one."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "stoky",
+    "svobodny-pristav",
+    "writing",
+    "draft",
+    "czech"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "stoky_search",
+      "stoky_post"
+    ],
+    "evalCases": [
+      "stoky-post-from-idea"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

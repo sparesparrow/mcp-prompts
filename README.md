@@ -13,6 +13,24 @@ efficiency and concurrency lives in [mcp-prompts-rs](https://github.com/sparespa
 or your own prompts and templates, choose the MCP capabilities, and copy the matching `claude mcp add`
 command, client config, URL or config file. The page reads the library from this branch.
 
+## What's new in 4.4.0
+
+- **`liberty-citations` profile** for the liberty-citations Agent Skill and its toolkit (the
+  `liberty` MCP server and CLI): fifteen prompts and templates for Czech libertarian writing
+  backed by verified, page-cited quotes. A router maps any request to one of eight branches
+  (Cite, Write, Stoky, Forum, Video, Corpus, Setup, Never) with a gate per leaf; the citation rules
+  and a reference cover all thirteen `liberty` tools and their CLI commands; templates find and
+  check quotes, write Czech texts (drug prohibition as home turf), take a Stoky post from idea to
+  an approved submission, read and post in the Fórum Svobodného přístavu, transcribe Kanál
+  Svobodného přístavu videos and quote them with timestamps, write parody dabing subtitles, and
+  install and refresh the toolkit. Anything that publishes under the user's name needs approval of
+  the exact text. See [docs/12-liberty-citations.md](docs/12-liberty-citations.md).
+- **New prompt group** `data/prompts/liberty-citations/`; template variables carry descriptions,
+  so MCP clients show described prompt arguments and exported skills list them.
+- **Evaluations**: `evaluations/liberty-citations.xml` (ten questions for the profile), and
+  `evaluations/verify.mjs` now pages `list_prompts` (it asked for 100 a page, over the limit of 50,
+  and failed).
+
 ## What's new in 4.3.0
 
 - **Android automation, the flagship use case.** Two new profiles: `android-automation` (app agents,
@@ -150,6 +168,7 @@ much smaller:
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
+| `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
 
 ```bash
 claude mcp add -s user mcp-prompts -- mcp-prompts --profile software-dev
@@ -163,6 +182,7 @@ install one over Docker or HTTP, and how to change or add one.
 The two phone profiles, `android-automation` and `tasker-automation`, have their own guide:
 [docs/10-android-automation.md](docs/10-android-automation.md) explains the stack they are written
 for, an example client config, every prompt in them, four worked scenarios and the safety model.
+The `liberty-citations` profile has its own guide too: [docs/12-liberty-citations.md](docs/12-liberty-citations.md).
 
 ### Choose what gets installed
 

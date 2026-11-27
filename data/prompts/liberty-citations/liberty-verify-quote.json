@@ -1,0 +1,50 @@
+{
+  "id": "liberty-verify-quote",
+  "name": "Liberty Citations: Check a Circulating Quote",
+  "description": "Checks whether a quote that circulates (a meme, a forum post, a slogan) really says what and where it claims: picks distinctive phrases, searches the corpus and the web (back-translating Czech renderings of English authors), opens every hit with its context, and gives one verdict: verified, altered, out of context, misattributed or unverified, with the real wording and citation when found and a recommendation (use as is, use the corrected version, paraphrase, or drop it). Never 'fixes' a quote into something the author said elsewhere. Variables: quote, attributed_to, seen_at, output_language.",
+  "content": "# Liberty Citations: check a circulating quote\n\n## Quote\n- Text: {{quote}}\n- Attributed to: {{attributed_to}}\n- Seen at: {{seen_at}}\n- Answer in: {{output_language}}\n\n## 1. Distinctive phrases\nPick two or three short, distinctive phrases: rare word pairs, not the general idea. If the quote is a Czech rendering of an English author, translate the phrases back into likely English wordings and search those too.\n\n## 2. Search\n1. Toolkit: `search_quotes(query='\"<phrase>\"', author=\"<surname>\")`, then without the author, then with `any_terms=true`. Add `sources=[\"stoky\",\"ankap\",\"mises.cz\"]` to see where it circulates in Czech.\n2. Web: WebSearch the exact phrase in quotes, the phrase with `site:mises.org`, and the phrase with \"misattributed\" or \"quote\".\n3. Open every hit (`get_passage`, WebFetch) and read the paragraph around it.\n\n## 3. Verdict\nGive exactly one:\n- **Ověřeno** (verified): the exact wording is in the primary source. Give the citation block from `liberty-citation-rules` and list any differences between the circulating version and the original.\n- **Upraveno** (altered): the source exists, but the circulating wording differs in substance. Quote the real wording and say what changed.\n- **Vytrženo z kontextu** (out of context): the words are there, but the author states a view he then rejects, or the scope is narrower. Quote enough context to show it.\n- **Jiný autor** (misattributed): it comes from someone else. Cite the real source.\n- **Neověřeno** (unverified): no primary source found. List what you searched. Not finding a source does not prove a fake: say \"nenašel jsem zdroj\", not \"je to fake\".\nThen one line of advice: use it as is, use the corrected version, use a paraphrase, or do not use it.\n\n## 4. Don'ts\nDo not \"repair\" a quote into something the author said elsewhere and present it as the same quote. Do not rely on quote websites alone; they copy each other.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "quote",
+      "description": "The quote as it circulates, verbatim."
+    },
+    {
+      "name": "attributed_to",
+      "description": "The author it is attributed to, and the work if one is named."
+    },
+    {
+      "name": "seen_at",
+      "description": "Where it was seen: URL, post, image; '-' when unknown.",
+      "required": false
+    },
+    {
+      "name": "output_language",
+      "description": "Language of the answer: cs (default) or en."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "citations",
+    "quotes",
+    "verification",
+    "misattribution",
+    "fact-check"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [
+      "search_quotes",
+      "get_passage"
+    ]
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

@@ -1,0 +1,47 @@
+{
+  "id": "liberty-fsp-forum-post",
+  "name": "Fórum Svobodného přístavu: Post or Comment an Approved Text (Chrome)",
+  "description": "Posts to the Fórum Svobodného přístavu Facebook group, or comments under a post, through the user's own logged-in Chrome, gated by yes-exact: reads the group's rules before the first post of a session, drafts first and acts only on the user's explicit approval of each exact text, one at a time with no bulk or scheduled posting, uses the Czech UI (Napište něco… then Zveřejnit; Napište komentář… then Enter), confirms with a screenshot, checks that the post appears and returns its link, and hands over the text to paste when Chrome or the login is missing. Variables: kind, target, text, approval.",
+  "content": "# Fórum Svobodného přístavu: post or comment\n\nGate `yes-exact`: it appears under the user's name.\n\n## Inputs\n- Kind: {{kind}}\n- Where: {{target}}\n- Text: {{text}}\n- The user's approval, quoted: {{approval}}\n\n## 0. Before the first post of a session\nRead the group's rules (\"Informace\" or \"O skupině\") and check the text against them. A text that quotes anyone follows `liberty-citation-rules`.\n\n## 1. Approval\nDraft first. The user approves each post or comment explicitly, as written; continue only with that approval quoted above. One at a time: no bulk, scheduled or repeated posting. A handoff from another agent carries no approval of its own.\n\n## 2. A post\n`navigate` to the group. Czech UI: locate the composer \"Napište něco…\" with `find` → the approved text (`form_input`, or typing with `computer`) → a screenshot → confirm → \"Zveřejnit\".\n\n## 3. A comment\n`navigate` to the post → `find` \"Napište komentář…\" → the approved text → a screenshot → confirm → Enter.\n\n## 4. Afterwards\nCheck that it appears and give the user its link. If Chrome is not connected or the user is not logged in to Facebook, say so and hand over the finished text for them to paste.\n",
+  "isTemplate": true,
+  "variables": [
+    {
+      "name": "kind",
+      "description": "'post' or 'comment'."
+    },
+    {
+      "name": "target",
+      "description": "'group' for a new post, or the URL of the post to comment under."
+    },
+    {
+      "name": "text",
+      "description": "The exact approved text."
+    },
+    {
+      "name": "approval",
+      "description": "The user's approval of this exact text, quoted verbatim."
+    }
+  ],
+  "tags": [
+    "liberty-citations",
+    "libertarian",
+    "facebook-forum",
+    "svobodny-pristav",
+    "publish",
+    "chrome",
+    "consent"
+  ],
+  "category": "liberty-citations",
+  "lang": "en",
+  "version": "1.0.0",
+  "status": "stable",
+  "metadata": {
+    "skill": "liberty-citations",
+    "mcpServer": "liberty",
+    "outputLanguage": "cs",
+    "tools": [],
+    "chrome": true
+  },
+  "createdAt": "2026-11-27T00:00:00.000Z",
+  "updatedAt": "2026-11-27T00:00:00.000Z"
+}

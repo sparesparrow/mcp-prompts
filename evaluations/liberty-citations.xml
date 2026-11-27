@@ -1,0 +1,48 @@
+<!--
+  Evaluation questions for the liberty-citations profile: can a model with nothing but this
+  server's tools answer them? All are read-only (list_prompts, get_prompt, apply_template) and
+  independent of each other. Run them against `mcp-prompts --profile liberty-citations`. Each
+  answer was checked through a real MCP client by evaluations/verify.mjs.
+-->
+<evaluation>
+  <qa_pair>
+    <question>The liberty-citations router maps every request to a menu leaf that carries a gate. How many leaves carry the gate yes-exact, the gate for anything published under the user's name? Answer with a number only.</question>
+    <answer>3</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>According to the liberty-citations router, which prompt handles checking a quote that someone posted? Answer with the prompt id only.</question>
+    <answer>liberty-verify-quote</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Which template in the category liberty-citations declares the most variables? Answer with the prompt id only.</question>
+    <answer>liberty-write-czech-text</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many prompts in the category liberty-citations are plain prompts rather than templates? Answer with a number only.</question>
+    <answer>2</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The reference for the liberty toolkit's tools names a Whisper model to use when verifying the window of a video before quoting it. Which model? Answer with the model name only.</question>
+    <answer>large-v3</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>In the template for parody dabing subtitles, how many characters may one subtitle line hold at most? Answer with a number only.</question>
+    <answer>42</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>In the template that submits to Stoky Svobodného přístavu, how many characters may the title of a comment have at most? Answer with a number only.</question>
+    <answer>32</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Fill the template that submits a post or comment to Stoky Svobodného přístavu, giving values only for kind and text. How many placeholders does the server report as not filled? Answer with a number only.</question>
+    <answer>3</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Two templates of the liberty-citations category publish a text under the user's name through Chrome, one to Stoky and one to the Facebook forum. Which variable names do both declare? Answer as a comma-separated list in alphabetical order.</question>
+    <answer>approval,kind,text</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Besides job_status, which tool of the liberty MCP server does the liberty-citations router name for the menu leaf "Setup > First corpus build"? Answer with the tool name only.</question>
+    <answer>library_setup</answer>
+  </qa_pair>
+</evaluation>
