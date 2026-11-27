@@ -89,7 +89,7 @@ The same thing as a table:
 
 | Layer | What is in it | Where it runs |
 |---|---|---|
-| Intents | Voice turn (HTTP trigger on `127.0.0.1:8780`), Claude Panel scene, Tasker "Agent <name>" tasks, `claude --agent <name> -p`, notification hooks (`notif-wait.py`) | Tasker, Termux, PRoot |
+| Intents | Voice turn (HTTP trigger on `127.0.0.1:8780`), Claude Panel scene, Tasker "Agent <name>" tasks, `claude --agent <name> -p`, notification hooks (`notif-wait.py`), phone events on MQTT `phone/events/<kind>` that agents wait on with `wait_event` (prompt `android-event-bus`) | Tasker, Termux, PRoot |
 | Router | `android-automation-router` decides between an MCP tool, an app agent, a Tasker change and an MQTT command, and names the gate. The Claude Panel's own `panel-router` decides between coding agent, phone assistant and nothing. | `claude -p` in PRoot |
 | Actuators | android-assistant MCP tools, Tasker (broadcast, importer, `tasker-edit.py`), `phone_command` (named Termux and Android commands), `mqtt_publish` | PRoot → adb on `127.0.0.1:5555`, native Termux over ssh |
 | Actuators: web | The agent browser: a Chromium with its own profile, no logins, drawn on the VNC desktop and driven by the `agent-browser` MCP server (Playwright MCP over DevTools on `127.0.0.1:9223`). It leaves the phone's screen free. Rules in `android-browser-agent`. | PRoot, VNC display :1 |
