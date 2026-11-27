@@ -165,7 +165,7 @@ much smaller:
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
 | `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
-| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, scenarios | 16 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits and direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |

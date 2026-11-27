@@ -16,7 +16,7 @@ only those prompts; the rest do not exist for it.
 | `mia-vehicle` | The MIA in-car assistant at run time | 8 |
 | `voice-home` | Voice commands and home automation | 14 |
 | `learning-loop` | The self-improvement loop | 8 |
-| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, scenarios | 15 |
+| `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, scenarios | 16 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
@@ -88,10 +88,10 @@ implicit-reference resolution, light feedback, design principles, and `phone-voi
 **`learning-loop`** (7 plain, 1 template). The seven cognitive-layer instructions (perception,
 episodes, semantic, procedures, meta, transfer, evaluation) and `learning-loop-analyzer`.
 
-**`android-automation`** (1 plain, 14 templates). The `android-automation` group: the router
+**`android-automation`** (1 plain, 15 templates). The `android-automation` group: the router
 (`android-automation-router`), the scenarios (Deep Research into a notebook with an audio
 overview, multi-AI PR review), split screen with two apps, the app-agent pack (design, calibrate,
-use, eval), the Gemini advisor and Deep Research briefs, `termux-api-commands`,
+use, eval), the agent-browser brief (`android-browser-agent`), the Gemini advisor and Deep Research briefs, `termux-api-commands`,
 `termux-proot-bridge` and the plain `phone-agent-handoff` contract; plus `android-proot-phone-ops`
 and `phone-voice-assistant`. Home commands go to `openclaw-home-command-interpreter`, which is in
 `voice-home`: combine the two (`--profile android-automation,tasker-automation,voice-home`).
@@ -206,7 +206,7 @@ place of a list. A group entry picks up prompts added to that directory later; a
 
 `mcp-prompts profiles` then shows what it serves and warns about entries that match nothing. The
 tests in `src/prompt-store.test.ts` ("bundled profiles") fail when a bundled profile has such an
-entry, grows past 15 prompts, or lets a vehicle, voice or home prompt into `software-dev`.
+entry, grows past 20 prompts, or lets a vehicle, voice or home prompt into `software-dev`.
 
 A library of your own (`--prompts-dir`) gets profiles the same way: a `profiles.json` at its root.
 
