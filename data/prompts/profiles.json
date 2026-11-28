@@ -36,6 +36,11 @@
       "prompts": ["tasker-scene-xml"],
       "templates": ["tasker"]
     },
+    "android-phone": {
+      "description": "Full phone stack in one profile: every android-automation prompt and template (the router, app agents, Termux, PRoot, scenarios, the event bus) plus all seven Tasker templates and the tasker-scene-xml prompt. Use this when the voice pipeline or a phone agent needs both the android-automation and the tasker-automation selections without passing two profile names. Pairs with --profile android-phone in mcp-prompts-http or the MCP_PROMPTS_PROFILE env var in the voice pipeline. For panel (Claude Code on the phone) add claude-panel: --profile android-phone,claude-panel.",
+      "prompts": ["android-automation", "tasker-scene-xml"],
+      "templates": ["android-automation", "android-proot-phone-ops", "phone-voice-assistant", "tasker"]
+    },
     "learning-loop": {
       "description": "The self-improvement loop: the seven cognitive-layer instructions and the analyzer that turns results into learnings.",
       "prompts": ["cognitive"],

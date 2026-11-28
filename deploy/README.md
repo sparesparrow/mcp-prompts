@@ -18,6 +18,7 @@ only those prompts; the rest do not exist for it.
 | `learning-loop` | The self-improvement loop | 8 |
 | `android-automation` | Natural-language control of an Android phone: app agents, Termux, PRoot, the agent browser, the event bus, scenarios | 17 |
 | `tasker-automation` | Building and maintaining Tasker: architecture, profiles, scenes, tasks, audits, direct edits | 8 |
+| `android-phone` | The phone as one install: the whole `android-automation` and `tasker-automation` sets in one profile (add `claude-panel` for the panel) | 25 |
 | `claude-panel` | The Claude Panel: a dictated task routed to local Claude Code, answered or opened as a draft PR | 4 |
 | `liberty-citations` | Czech libertarian writing with verified quotes: citations, Stoky, the Facebook forum, Urza's videos, the toolkit | 15 |
 | (none) | Everything | 97 |
@@ -138,10 +139,18 @@ and `phone-voice-assistant`. Home commands go to `openclaw-home-command-interpre
 builder, scene builder, task actions, variables, config audit, direct edit) and the plain `tasker-scene-xml`.
 Combine with `android-automation` for the full phone stack.
 
+**`android-phone`** (2 plain, 23 templates). One install for the phone: the whole `android-automation`
+group (router, app agents, Termux, PRoot, scenarios, the event bus, `phone-voice-assistant`,
+`android-proot-phone-ops`), the whole `tasker` group and the plain `tasker-scene-xml`. It is the
+union of `android-automation` and `tasker-automation`, so it has no more to maintain than they do.
+It does not include the `panel` group; for Claude Code on the phone use
+`--profile android-phone,claude-panel`. Its size limit is 30 prompts, the others' 20.
+
 **`claude-panel`** (4 templates). The `panel` group: `panel-router`, which classifies a dictated or
 typed task, and the three routes it picks from (`panel-repo-question`, `panel-bug-fix`,
 `panel-coding-task`) for local Claude Code. A profile of its own so `android-automation` stays
 within the size limit; the phone's agents use `--profile android-automation,claude-panel`.
+`android-phone` does not include it; pass `android-phone,claude-panel`.
 
 **`liberty-citations`** (2 plain, 13 templates). The `liberty-citations` group, for the
 liberty-citations Agent Skill and its `liberty` MCP server: `liberty-router` (eight branches, a
@@ -154,8 +163,7 @@ parody dabing subtitles, and run the toolkit. Read-only knowledge: install it wi
 **In no profile** (served only without one): `gamepad-dynamic-remapper` (desktop control, none of
 these kinds of work), `analysis-assistant` (a demonstration prompt) and
 `ai-self-improvement-orchestrator` (its placeholders are Jinja expressions that `apply_template`
-cannot fill, so it always comes back incomplete), the four `panel` templates (the Claude Panel
-router reads them from the library files, not through a profile) and the four `sdlc` templates.
+cannot fill, so it always comes back incomplete) and the four `sdlc` templates.
 
 ## Combine and narrow
 
@@ -243,7 +251,8 @@ place of a list. A group entry picks up prompts added to that directory later; a
 
 `mcp-prompts profiles` then shows what it serves and warns about entries that match nothing. The
 tests in `src/prompt-store.test.ts` ("bundled profiles") fail when a bundled profile has such an
-entry, grows past 20 prompts, or lets a vehicle, voice or home prompt into `software-dev`.
+entry, grows past 20 prompts, or lets a vehicle, voice or home prompt into `software-dev`;
+`src/__tests__/profiles-validation.test.ts` checks every entry, placeholder and cs/en pair.
 
 A library of your own (`--prompts-dir`) gets profiles the same way: a `profiles.json` at its root.
 

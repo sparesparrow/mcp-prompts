@@ -686,7 +686,7 @@ describe('bundled profiles', () => {
   const served = (name: string) => store.selectProfiles([name]).all();
 
   it('have no entry that matches nothing in the library', () => {
-    expect(store.profileNames).toEqual(['software-dev', 'embedded-iot', 'mia-vehicle', 'voice-home', 'android-automation', 'claude-panel', 'tasker-automation', 'learning-loop', 'liberty-citations']);
+    expect(store.profileNames).toEqual(['software-dev', 'embedded-iot', 'mia-vehicle', 'voice-home', 'android-automation', 'claude-panel', 'tasker-automation', 'android-phone', 'learning-loop', 'liberty-citations']);
     for (const profile of store.profiles()) {
       expect(profile.warnings, profile.name).toEqual([]);
       expect(profile.description.length, profile.name).toBeGreaterThan(20);
@@ -697,8 +697,10 @@ describe('bundled profiles', () => {
     for (const profile of store.profiles()) {
       const count = profile.prompts + profile.templates;
       expect(count, profile.name).toBeGreaterThan(0);
-      // 20, not 15: the android-automation flagship profile needs 16 (android-event-bus, #140).
-      expect(count, profile.name).toBeLessThanOrEqual(20);
+      // android-phone combines android-automation (17) and tasker-automation (8) = 25; allow up to 30.
+      // 20 is the ceiling for all other profiles.
+      const ceiling = profile.name === 'android-phone' ? 30 : 20;
+      expect(count, profile.name).toBeLessThanOrEqual(ceiling);
       expect(count, profile.name).toBeLessThan(store.size / 2);
     }
   });

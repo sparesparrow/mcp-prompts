@@ -19,6 +19,14 @@ This directory contains example configuration files and usage snippets for MCP P
 |------|-------------|----------|
 | `advanced-workflow-example.json` | Multi-step prompt chaining workflow | Complex AI automation, prompt sequences |
 | `claude-desktop-config-example.json` | Claude Desktop MCP setup | Claude Desktop integration |
+| `mcp-prompts.tailscale-phone.json` | Read-only `mcp-prompts-http` on a Tailscale node: token file, Host allowlist, stateless `/mcp` | Remote phone prompts |
+
+### **Remote phone server over Tailscale**
+
+`mcp-prompts.tailscale-phone.json` is a runbook, not a `--config` file. It shows the
+`mcp-prompts-http` command, the environment variables (`MCP_PROMPTS_AUTH_TOKEN_FILE`,
+`MCP_PROMPTS_ALLOWED_HOSTS`, `MCP_PROMPTS_PROFILE`) and the client entry for a read-only server
+on the phone's tailnet address. Replace `100.x.y.z` and `phone.tailnet-name.ts.net` before use.
 
 ## 🚀 **Quick Start**
 
