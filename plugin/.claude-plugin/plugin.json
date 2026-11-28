@@ -1,7 +1,7 @@
 {
   "name": "mcp-prompts",
   "displayName": "MCP Prompts",
-  "version": "4.4.0",
+  "version": "4.4.1",
   "description": "A prompt library with templates. Skills find, fill and save prompts; settings add your own folder, default tags, a preferred language and a shared catalog.",
   "author": {
     "name": "sparesparrow",

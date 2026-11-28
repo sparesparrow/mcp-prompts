@@ -1,0 +1,42 @@
+{
+  "$comment": "Example runbook, not a --config file: mcp-prompts-http reads HOST, PORT, MCP_PROMPTS_AUTH_TOKEN_FILE and MCP_PROMPTS_ALLOWED_HOSTS from its environment. Start it as shown under 'server', then add 'client' on a desktop on the same tailnet. Tailscale encrypts the link; the bearer token and Host check are the server's own.",
+  "server": {
+    "command": "mcp-prompts-http",
+    "args": ["--read-only"],
+    "env": {
+      "HOST": "100.x.y.z",
+      "PORT": "3013",
+      "MCP_PROMPTS_PROFILE": "android-phone",
+      "MCP_PROMPTS_AUTH_TOKEN_FILE": "/home/phone/.config/mcp-prompts/remote-token",
+      "MCP_PROMPTS_ALLOWED_HOSTS": "phone.tailnet-name.ts.net,100.x.y.z"
+    },
+    "setup": [
+      "mkdir -p /home/phone/.config/mcp-prompts",
+      "umask 077 && openssl rand -hex 32 > /home/phone/.config/mcp-prompts/remote-token"
+    ]
+  },
+  "client": {
+    "mcpServers": {
+      "phone-prompts": {
+        "type": "http",
+        "url": "http://phone.tailnet-name.ts.net:3013/mcp",
+        "headers": {
+          "Authorization": "Bearer ${PHONE_PROMPTS_TOKEN}"
+        }
+      }
+    }
+  },
+  "stateless": {
+    "endpoint": "POST http://phone.tailnet-name.ts.net:3013/mcp",
+    "note": "No initialize handshake is needed; every call except /health, /ready and /version carries the bearer token.",
+    "request": {
+      "jsonrpc": "2.0",
+      "id": 1,
+      "method": "tools/call",
+      "params": {
+        "name": "list_prompts",
+        "arguments": { "limit": 5 }
+      }
+    }
+  }
+}
